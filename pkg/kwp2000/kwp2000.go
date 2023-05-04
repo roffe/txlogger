@@ -128,27 +128,21 @@ func (t *Client) DynamicallyDefineLocalIdRequest(ctx context.Context, id int, v 
 	}
 
 	message := append([]byte{byte(buff.Len()), DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER}, buff.Bytes()...)
-
 	for _, msg := range t.splitRequest(message) {
-		//log.Println(msg.String())
 		if msg.Type().Type == 1 {
 			if err := t.c.Send(msg); err != nil {
-				log.Println(err)
 				return err
 			}
 		} else {
 			resp, err := t.c.SendAndPoll(ctx, msg, t.defaultTimeout, REQ_CHUNK_CONF_ID)
 			if err != nil {
-				log.Println(err)
 				return err
 			}
 			if err := TranslateErrorCode(resp.Data()[3+2]); err != nil {
 				return err
 			}
-			//log.Println(resp.String())
 		}
 	}
-
 	return nil
 }
 

@@ -3,7 +3,6 @@ package windows
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"sort"
 	"strings"
@@ -252,7 +251,7 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 					}
 					//definedVars = append(definedVars, s)
 					definedVars.Add(s)
-					log.Printf("Name: %s, Method: %d, Value: %d, Type: %X", s.Name, s.Method, s.Value, s.Type)
+					//log.Printf("Name: %s, Method: %d, Value: %d, Type: %X", s.Name, s.Method, s.Value, s.Type)
 				}),
 				widget.NewButtonWithIcon("Load binary", theme.FileIcon(), func() {
 					filename, err := sdialog.File().Filter("Binary file", "bin").Load()
