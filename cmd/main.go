@@ -15,7 +15,7 @@ import (
 
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/adapter"
-	"github.com/roffe/t7logger/kwp2000"
+	"github.com/roffe/t7logger/pkg/kwp2000"
 )
 
 var vars []*kwp2000.VarDefinition

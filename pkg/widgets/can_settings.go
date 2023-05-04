@@ -2,7 +2,6 @@ package widgets
 
 import (
 	"errors"
-	"log"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -24,6 +23,7 @@ func NewCanSettingsWidget(app fyne.App) *CanSettingsWidget {
 	csw.adapterSelector = widget.NewSelect(adapter.List(), func(s string) {
 		//		log.Println("Selected adapter: ", s)
 		if info, found := adapter.GetAdapterMap()[s]; found {
+			app.Preferences().SetString(prefsAdapter, s)
 			if info.RequiresSerialPort {
 				csw.portSelector.Enable()
 				csw.speedSelector.Enable()
@@ -31,7 +31,6 @@ func NewCanSettingsWidget(app fyne.App) *CanSettingsWidget {
 			}
 			csw.portSelector.Disable()
 			csw.speedSelector.Disable()
-			app.Preferences().SetString(prefsAdapter, s)
 		}
 	})
 
@@ -143,6 +142,10 @@ func (cs *CanSettingsWidget) MinSize() fyne.Size {
 	return cs.objects[0].MinSize()
 }
 
+func (cs *CanSettingsWidget) Resize(size fyne.Size) {
+	cs.objects[0].Resize(size)
+}
+
 func (cs *CanSettingsWidget) listPorts() []string {
 	var portsList []string
 	ports, err := enumerator.GetDetailedPortsList()
@@ -176,7 +179,7 @@ type canSettingsWidgetRenderer struct {
 }
 
 func (cs *canSettingsWidgetRenderer) Layout(size fyne.Size) {
-	log.Println(size)
+	//log.Println(size)
 }
 
 func (cs *canSettingsWidgetRenderer) MinSize() fyne.Size {
@@ -184,7 +187,6 @@ func (cs *canSettingsWidgetRenderer) MinSize() fyne.Size {
 }
 
 func (cs *canSettingsWidgetRenderer) Refresh() {
-
 }
 
 func (cs *canSettingsWidgetRenderer) Destroy() {

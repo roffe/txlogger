@@ -24,7 +24,7 @@ func main() {
 	//defer sub.Close()
 	a := app.NewWithID("com.roffe.t7l")
 	mw := windows.NewMainWindow(a, sinkManager)
-	mw.W.Resize(fyne.NewSize(1250, 800))
+	mw.W.Resize(fyne.NewSize(1400, 800))
 	mw.W.SetContent(mw.Layout())
 	mw.W.ShowAndRun()
 }

@@ -2,7 +2,7 @@ Website = "https://roffe.nu/"
 
 [Details]
   Icon = "Icon.png"
-  Name = "T7 FastLogger"
+  Name = "T7Logger"
   ID = "com.roffe.t7l"
-  Version = "0.0.1"
-  Build = 3
+  Version = "0.0.2"
+  Build = 7

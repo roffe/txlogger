@@ -352,36 +352,33 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 		}
 	}))
 
-	rSplit := &container.Split{
-		Offset:     0,
-		Horizontal: false,
-		Leading: container.NewVBox(
-			mw.canSettings,
-			logBtn,
-			mw.progressBar,
-		),
-		Trailing: &container.Split{
-			Offset:     1,
-			Horizontal: false,
-			Leading:    mw.output,
-			Trailing: container.NewVBox(
-				mw.freqSlider,
-				container.NewGridWithColumns(3,
-					capturedCounter,
-					errorCounter,
-					freqValue,
-				),
-			),
-		},
-	}
-
-	split := &container.Split{
-		Offset:     1,
+	return &container.Split{
+		Offset:     0.6,
 		Horizontal: true,
 		Leading:    left,
-		Trailing:   rSplit,
+		Trailing: &container.Split{
+			Offset:     0,
+			Horizontal: false,
+			Leading: container.NewVBox(
+				mw.canSettings,
+				logBtn,
+				mw.progressBar,
+			),
+			Trailing: &container.Split{
+				Offset:     1,
+				Horizontal: false,
+				Leading:    mw.output,
+				Trailing: container.NewVBox(
+					mw.freqSlider,
+					container.NewGridWithColumns(3,
+						capturedCounter,
+						errorCounter,
+						freqValue,
+					),
+				),
+			},
+		},
 	}
-	return split
 
 }
 

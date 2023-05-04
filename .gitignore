@@ -1,8 +1,11 @@
 *.dll
 tmp
+tmp2
 *.t7l
 *.dif
 *.json
 *.dat
 *.bin
 *.xml
+*.exe
+*.zip
