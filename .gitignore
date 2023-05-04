@@ -1,1 +1,8 @@
 *.dll
+tmp
+*.t7l
+*.dif
+*.json
+*.dat
+*.bin
+*.xml
