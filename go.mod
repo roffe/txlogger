@@ -14,6 +14,7 @@ require (
 )
 
 require (
+	github.com/gin-contrib/static v0.0.1
 	fyne.io/systray v1.10.1-0.20230312215936-7f71b037e260 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20180517000239-4f5cfb03fabf // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
@@ -45,7 +46,7 @@ require (
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gousb v1.1.2 // indirect
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
-	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/gorilla/websocket v1.5.0
 	github.com/josharian/native v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/jsummers/gobmp v0.0.0-20151104160322-e2ba15ffa76e // indirect

@@ -19,7 +19,6 @@ func NewCanSettingsWidget(app fyne.App) *CanSettingsWidget {
 	csw := &CanSettingsWidget{
 		app: app,
 	}
-
 	csw.adapterSelector = widget.NewSelect(adapter.List(), func(s string) {
 		//		log.Println("Selected adapter: ", s)
 		if info, found := adapter.GetAdapterMap()[s]; found {

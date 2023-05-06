@@ -127,7 +127,7 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 			mw.symbolLookup,
 		),
 		container.NewVBox(
-			container.NewGridWithColumns(3,
+			container.NewGridWithColumns(4,
 				widget.NewButtonWithIcon("Load config", theme.FileIcon(), func() {
 					filename, err := sdialog.File().Filter("Config file", "json").Load()
 					if err != nil {
@@ -168,6 +168,9 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 						return
 
 					}
+				}),
+				widget.NewButtonWithIcon("Dashboard", theme.InfoIcon(), func() {
+					NewDashboard(mw.app).Show()
 				}),
 			),
 		),

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime view</title>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+</head>
+
+<body>
+
+    <div id="chart"></div>
+
+    <script>
+        var data = [];
+
+
+        var options = {
+            series: [{
+                data: data.slice()
+            }],
+            chart: {
+                id: 'realtime',
+                height: 350,
+                type: 'line',
+                animations: {
+                    enabled: true,
+                    easing: 'linear',
+                    dynamicAnimation: {
+                        speed: 1000
+                    }
+                },
+                toolbar: {
+                    show: false
+                },
+                zoom: {
+                    enabled: false
+                }
+            },
+            dataLabels: {
+                enabled: false
+            },
+            stroke: {
+                curve: 'smooth'
+            },
+            title: {
+                text: 'Dynamic Updating Chart',
+                align: 'left'
+            },
+            markers: {
+                size: 0
+            },
+            xaxis: {
+                type: 'datetime',
+                range: XAXISRANGE,
+            },
+            yaxis: {
+                max: 8500
+            },
+            legend: {
+                show: false
+            },
+        };
+
+        var chart = new ApexCharts(document.querySelector("#chart"), options);
+        chart.render();
+
+
+        window.setInterval(function () {
+            getNewSeries(lastDate, {
+                min: 10,
+                max: 90
+            })
+
+            chart.updateSeries([{
+                data: data
+            }])
+        }, 1000)
+
+        function handleEvt(evt) {
+            const msg = JSON.parse(event.data);
+            switch (msg.type) {
+                case "symbols":
+                    console.log("Received symbol list");
+                    return
+                case "metric":
+                    console.log("Received metric");
+                    const metrics = JSON.parse(msg.data);
+                    return
+            }
+            console.log("Received Message: " + evt.data);
+        }
+
+
+
+        var ws = new WebSocket("ws://localhost:8080/ws");
+        //Triggered when the connection is opened
+        ws.onopen = function (evt) {
+            console.log("Connection open...");
+            ws.send("start_session");
+        };
+        //Triggered when a message is received
+        ws.onmessage = handleEvt;
+
+        //Triggered when the connection is closed
+        ws.onclose = function (evt) {
+            console.log("Connection closed.");
+        };
+
+    </script>
+</body>
+
+</html>

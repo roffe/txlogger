@@ -35,11 +35,22 @@ func (mw *MainWindow) newMockBtn() *widget.Button {
 					case <-mockStop:
 						break outer
 					case <-t.C:
-						for _, v := range mw.vars.Get() {
+						//metrics := make(map[int]interface{})
+						for _, va := range mw.vars.Get() {
 							mw.sinkManager.Push(&sink.Message{
-								Data: []byte(fmt.Sprintf("%d:%v", v.Value, r.Intn(8000))),
+								Data: []byte(fmt.Sprintf("%d:%v", va.Value, r.Intn(8000))),
 							})
+							//metrics[va.Value] = r.Intn(8000)
 						}
+
+						//b, err := json.Marshal(metrics)
+						//if err != nil {
+						//	log.Println(err)
+						//} else {
+						//	mw.sinkManager.Push(&sink.Message{
+						//		Data: b,
+						//	})
+						//}
 					}
 				}
 				mw.progressBar.Stop()

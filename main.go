@@ -11,6 +11,7 @@ import (
 	//xlayout "fyne.io/x/fyne/layout"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 	socketio "github.com/googollee/go-socket.io"
 	"github.com/gorilla/websocket"
@@ -28,13 +29,14 @@ func main() {
 
 	vars := kwp2000.NewVarDefinitionList()
 
-	go startWeb(sm, vars)
+	go startWeb2(sm, vars)
 	//sub := sinkManager.NewSubscriber(func(msg string) {
 	//	fmt.Println("msg:", msg)
 	//})
 	//defer sub.Close()
 	a := app.NewWithID("com.roffe.t7l")
 	mw := windows.NewMainWindow(a, sm, vars)
+	mw.SetMaster()
 	mw.Resize(fyne.NewSize(1400, 800))
 	mw.SetContent(mw.Layout())
 	mw.ShowAndRun()
@@ -112,7 +114,7 @@ func startWeb(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
 				sub := sm.NewSubscriber(func(m *sink.Message) {
 					if err := ws.WriteJSON(gin.H{
 						"type": "metric",
-						"data": m.Data,
+						"data": string(m.Data),
 					}); err != nil {
 						fmt.Println(err)
 						return
@@ -137,7 +139,6 @@ func startWeb(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
 	})
 	r.Run(":8080") // listen and serve on 0.0.0.0:8080
 }
-
 func startWeb2(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
 	router := gin.New()
 
@@ -156,38 +157,29 @@ func startWeb2(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
 
 	server := socketio.NewServer(nil)
 
+	server.OnError("/", func(s socketio.Conn, e error) {
+		log.Println("socket.io error:", e)
+	})
+
 	server.OnConnect("/", func(s socketio.Conn) error {
 		s.SetContext("")
 		log.Println("connected:", s.ID())
 		return nil
 	})
 
-	server.OnEvent("/", "notice", func(s socketio.Conn, msg string) {
-		log.Println("notice:", msg)
-		s.Emit("reply", "have "+msg)
-	})
-
-	//server.OnEvent("/chat", "msg", func(s socketio.Conn, msg string) string {
-	//	s.SetContext(msg)
-	//	return "recv " + msg
-	//})
-
-	server.OnEvent("/", "bye", func(s socketio.Conn) string {
-		last := s.Context().(string)
-		s.Emit("bye", last)
-		s.Close()
-		return last
-	})
-
-	server.OnError("/", func(s socketio.Conn, e error) {
-		log.Println("meet error:", e)
-	})
-
 	server.OnDisconnect("/", func(s socketio.Conn, reason string) {
 		log.Println("closed", reason)
 	})
 
+	server.OnEvent("/", "end_session", func(s socketio.Conn) {
+		s.Leave("metrics")
+	})
+
 	server.OnEvent("/", "start_session", func(s socketio.Conn, msg string) {
+		s.Join("metrics")
+	})
+
+	server.OnEvent("/", "request_symbols", func(s socketio.Conn) {
 		var symbolList []SymbolDefinition
 		for _, v := range vars.Get() {
 			symbolList = append(symbolList, SymbolDefinition{
@@ -208,14 +200,14 @@ func startWeb2(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
 
 	sub := sm.NewSubscriber(func(msg *sink.Message) {
 		if server.Count() > 0 {
-			server.BroadcastToRoom("/", "metrics", string(msg.Data))
+			server.BroadcastToRoom("/", "metrics", "metrics", string(msg.Data))
 		}
 	})
 	defer sub.Close()
 
+	router.Use(static.Serve("/", static.LocalFile("./web", false)))
 	router.GET("/socket.io/*any", gin.WrapH(server))
 	router.POST("/socket.io/*any", gin.WrapH(server))
-	router.StaticFS("/public", http.Dir("./web"))
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatal("failed run app: ", err)

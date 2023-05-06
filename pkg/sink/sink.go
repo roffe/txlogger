@@ -3,6 +3,7 @@ package sink
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 )
 
@@ -48,6 +49,7 @@ func (mgr *Manager) run(ctx context.Context) {
 				select {
 				case sub.incoming <- msg:
 				default:
+					log.Println("failed to deliver message to subscriber")
 					sub.failedDeliveries++
 					if sub.failedDeliveries >= 10 {
 						mgr.unregister <- sub
@@ -80,7 +82,7 @@ type Subscriber struct {
 func (mgr *Manager) NewSubscriber(onMessage func(*Message)) *Subscriber {
 	sub := &Subscriber{
 		mgr:      mgr,
-		incoming: make(chan *Message, 10),
+		incoming: make(chan *Message, 100),
 	}
 	mgr.register <- sub
 	if onMessage != nil {
