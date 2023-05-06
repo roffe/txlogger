@@ -33,13 +33,13 @@ func (mw *MainWindow) newMockBtn() *widget.Button {
 				for {
 					select {
 					case <-mockStop:
+						break outer
+					case <-t.C:
 						for _, v := range mw.vars.Get() {
 							mw.sinkManager.Push(&sink.Message{
 								Data: []byte(fmt.Sprintf("%d:%v", v.Value, r.Intn(8000))),
 							})
 						}
-						break outer
-					case <-t.C:
 					}
 				}
 				mw.progressBar.Stop()
