@@ -3,6 +3,7 @@ package windows
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2/theme"
@@ -27,7 +28,7 @@ func (mw *MainWindow) newMockBtn() *widget.Button {
 
 				mw.progressBar.Start()
 
-				t := time.NewTicker(time.Second / time.Duration(25))
+				t := time.NewTicker(time.Second / time.Duration(mw.freqSlider.Value))
 				mw.mockRunning = true
 			outer:
 				for {
@@ -36,13 +37,14 @@ func (mw *MainWindow) newMockBtn() *widget.Button {
 						break outer
 					case <-t.C:
 						//metrics := make(map[int]interface{})
+						var ms []string
 						for _, va := range mw.vars.Get() {
-							mw.sinkManager.Push(&sink.Message{
-								Data: []byte(fmt.Sprintf("%d:%v", va.Value, r.Intn(8000))),
-							})
+							ms = append(ms, fmt.Sprintf("%d:%d", va.Value, r.Intn(8000)))
 							//metrics[va.Value] = r.Intn(8000)
 						}
-
+						mw.sinkManager.Push(&sink.Message{
+							Data: []byte(strings.Join(ms, ",")),
+						})
 						//b, err := json.Marshal(metrics)
 						//if err != nil {
 						//	log.Println(err)

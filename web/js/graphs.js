@@ -4,7 +4,7 @@ function getGraphBaseConfig() {
     let cfg = {
         chart: {
             type: null,
-            // zoomType: 'x',
+            zoomType: 'x',
             animation: Highcharts.svg, // don't animate in old IE
             marginRight: 10,
         },
@@ -16,7 +16,7 @@ function getGraphBaseConfig() {
         },
         xAxis: {
             type: 'datetime',
-            tickPixelInterval: 150
+            tickPixelInterval: 1000,
         },
         yAxis: {
             title: {
