@@ -95,10 +95,10 @@ func startWeb2(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
 
 	server.OnEvent("/", "start_session", func(s socketio.Conn, msg string) {
 		var symbolList []SymbolDefinition
-		for i, v := range vars.Get() {
+		for _, v := range vars.Get() {
 			symbolList = append(symbolList, SymbolDefinition{
 				Name: v.Name,
-				ID:   i,
+				ID:   v.Value,
 				Type: returnVis(v.Visualization),
 			})
 		}
