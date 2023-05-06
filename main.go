@@ -114,8 +114,6 @@ func startWeb2(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
 	router.Use(static.Serve("/", static.LocalFile("./web", false)))
 	router.GET("/socket.io/*any", gin.WrapH(server))
 	router.POST("/socket.io/*any", gin.WrapH(server))
-	// router.StaticFS("/css", http.Dir("./web/css"))
-	// router.StaticFS("/js", http.Dir("./web/js"))
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatal("failed run app: ", err)
