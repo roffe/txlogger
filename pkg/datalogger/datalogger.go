@@ -166,10 +166,12 @@ func (c *Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition) {
 	out.WriteString("|")
 	for _, va := range vars {
 		out.WriteString(va.T7L() + "|")
+		c.sink.Push(&sink.Message{
+			Data: []byte(va.T7L()),
+		})
 	}
 	msg := time.Now().Format("02-01-2006 15:04:05.999") + out.String() + "IMPORTANTLINE=0|"
 	fmt.Fprintln(file, msg)
-	c.sink.Push(msg)
 
 	out.Reset()
 }

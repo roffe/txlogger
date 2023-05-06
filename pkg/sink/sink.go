@@ -6,8 +6,12 @@ import (
 	"time"
 )
 
+type Message struct {
+	Data []byte
+}
+
 type Manager struct {
-	incoming    chan string
+	incoming    chan *Message
 	subscribers []*Subscriber
 	register    chan *Subscriber
 	unregister  chan *Subscriber
@@ -15,7 +19,7 @@ type Manager struct {
 
 func NewManager() *Manager {
 	mgr := &Manager{
-		incoming:    make(chan string, 100),
+		incoming:    make(chan *Message, 100),
 		subscribers: make([]*Subscriber, 0),
 		register:    make(chan *Subscriber, 10),
 		unregister:  make(chan *Subscriber, 10),
@@ -47,7 +51,6 @@ func (mgr *Manager) run(ctx context.Context) {
 					sub.failedDeliveries++
 					if sub.failedDeliveries >= 10 {
 						mgr.unregister <- sub
-						close(sub.incoming)
 					}
 				}
 			}
@@ -57,7 +60,7 @@ func (mgr *Manager) run(ctx context.Context) {
 
 var ErrPushTimeout = errors.New("timeout pushing message")
 
-func (mgr *Manager) Push(msg string) error {
+func (mgr *Manager) Push(msg *Message) error {
 	t := time.NewTimer(1 * time.Second)
 	defer t.Stop()
 	select {
@@ -70,20 +73,20 @@ func (mgr *Manager) Push(msg string) error {
 
 type Subscriber struct {
 	mgr              *Manager
-	incoming         chan string
+	incoming         chan *Message
 	failedDeliveries int
 }
 
-func (mgr *Manager) NewSubscriber(onMessage func(string)) *Subscriber {
+func (mgr *Manager) NewSubscriber(onMessage func(*Message)) *Subscriber {
 	sub := &Subscriber{
 		mgr:      mgr,
-		incoming: make(chan string, 10),
+		incoming: make(chan *Message, 10),
 	}
 	mgr.register <- sub
 	if onMessage != nil {
 		go func() {
 			for msg := range sub.incoming {
-				if msg == "" {
+				if len(msg.Data) == 0 {
 					return
 				}
 				onMessage(msg)
@@ -97,10 +100,10 @@ func (sub *Subscriber) Close() {
 	sub.mgr.unregister <- sub
 }
 
-func (sub *Subscriber) Next(ctx context.Context) (string, error) {
+func (sub *Subscriber) Next(ctx context.Context) (*Message, error) {
 	select {
 	case <-ctx.Done():
-		return "", ctx.Err()
+		return nil, ctx.Err()
 	case msg := <-sub.incoming:
 		return msg, nil
 	}

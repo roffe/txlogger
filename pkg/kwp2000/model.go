@@ -110,7 +110,8 @@ type VarDefinition struct {
 	Type             uint8  `json:"type"`
 	Length           uint16 `json:"length"`
 	Unit             string `json:"unit,omitempty"`
-	Correctionfactor string `json:"formula,omitempty"`
+	Correctionfactor string `json:"correctionfactor,omitempty"`
+	Visualisation    string `json:"visualisation,omitempty"`
 }
 
 /*

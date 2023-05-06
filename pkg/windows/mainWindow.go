@@ -27,7 +27,7 @@ const (
 )
 
 var (
-	definedVars    = kwp2000.NewVarDefinitionList()
+	//definedVars    = kwp2000.NewVarDefinitionList()
 	loggingRunning bool
 	dlc            *datalogger.Client
 )
@@ -55,9 +55,11 @@ type MainWindow struct {
 	freqSlider *widget.Slider
 
 	sinkManager *sink.Manager
+
+	vars *kwp2000.VarDefinitionList
 }
 
-func NewMainWindow(a fyne.App, singMgr *sink.Manager) *MainWindow {
+func NewMainWindow(a fyne.App, singMgr *sink.Manager, vars *kwp2000.VarDefinitionList) *MainWindow {
 	mw := &MainWindow{
 		W:              a.NewWindow("Trionic7 Logger - No file loaded"),
 		app:            a,
@@ -69,6 +71,7 @@ func NewMainWindow(a fyne.App, singMgr *sink.Manager) *MainWindow {
 		freqValue:      binding.NewFloat(),
 		progressBar:    widget.NewProgressBarInfinite(),
 		sinkManager:    singMgr,
+		vars:           vars,
 	}
 
 	mw.freqSlider = widget.NewSliderWithData(1, 50, mw.freqValue)
@@ -94,43 +97,36 @@ func NewMainWindow(a fyne.App, singMgr *sink.Manager) *MainWindow {
 			obj.(*widget.Label).SetText(txt)
 		},
 	)
-	/*
-		mw.symbolConfigTable = widget.NewTable(
-			func() (int, int) {
-				return definedVars.Len(), 1
-			},
-			func() fyne.CanvasObject {
-				return widgets.NewVarDefinitionWidget(mw.symbolConfigList, definedVars)
-			},
-			func(tci widget.TableCellID, co fyne.CanvasObject) {
-				coo := co.(*widgets.VarDefinitionWidget)
-				coo.Update(tci.Row, definedVars.GetPos(tci.Row))
-			},
-		)
-	*/
 	mw.symbolConfigList = widget.NewList(
 		func() int {
-			return definedVars.Len()
+			return vars.Len()
 		},
 		func() fyne.CanvasObject {
-			return widgets.NewVarDefinitionWidget(mw.symbolConfigList, definedVars)
+			return widgets.NewVarDefinitionWidget(mw.symbolConfigList, vars)
 		},
 		func(lii widget.ListItemID, co fyne.CanvasObject) {
 			coo := co.(*widgets.VarDefinitionWidget)
-			coo.Update(lii, definedVars.GetPos(lii))
+			coo.Update(lii, vars.GetPos(lii))
 		},
 	)
-	//if err := mw.loadSymbolsFromFile("EU0DF21C_55P(YS3EB55A843014952).bin"); err != nil {
-	//	dialog.ShowError(err, mw.W)
-	//}
 
-	mw.symbolLookup = xwidget.NewCompletionEntry([]string{})
+	mw.symbolLookup = mw.newSymbolnameTypeahead()
+
+	if filename := mw.app.Preferences().String(prefsLastConfig); filename != "" {
+		mw.LoadConfig(filename)
+	}
+
+	return mw
+}
+
+func (mw *MainWindow) newSymbolnameTypeahead() *xwidget.CompletionEntry {
+	symbolLookup := xwidget.NewCompletionEntry([]string{})
 
 	// When the use typed text, complete the list.
-	mw.symbolLookup.OnChanged = func(s string) {
+	symbolLookup.OnChanged = func(s string) {
 		// completion start for text length >= 3
 		if len(s) < 3 {
-			mw.symbolLookup.HideCompletion()
+			symbolLookup.HideCompletion()
 			return
 		}
 
@@ -140,30 +136,28 @@ func NewMainWindow(a fyne.App, singMgr *sink.Manager) *MainWindow {
 		for _, sym := range mw.symbolMap {
 			if strings.Contains(strings.ToLower(sym.Name), strings.ToLower(s)) {
 				results = append(results, sym.Name)
-				//log.Println(sym)
 			}
 		}
 		// no results
 		if len(results) == 0 {
-			mw.symbolLookup.HideCompletion()
+			symbolLookup.HideCompletion()
 			return
 		}
 		sort.Slice(results, func(i, j int) bool { return strings.ToLower(results[i]) < strings.ToLower(results[j]) })
 
 		// then show them
-		mw.symbolLookup.SetOptions(results)
-		mw.symbolLookup.ShowCompletion()
+		symbolLookup.SetOptions(results)
+		symbolLookup.ShowCompletion()
 	}
 
 	if filename := mw.app.Preferences().String(prefsLastConfig); filename != "" {
 		mw.LoadConfig(filename)
 	}
-
-	return mw
+	return symbolLookup
 }
 
 func (mw *MainWindow) SaveConfig(filename string) error {
-	b, err := json.Marshal(definedVars.Get())
+	b, err := json.Marshal(mw.vars.Get())
 	if err != nil {
 		return fmt.Errorf("failed to marshal config file: %w", err)
 	}
@@ -183,7 +177,7 @@ func (mw *MainWindow) LoadConfig(filename string) error {
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return fmt.Errorf("failed to unmarshal config file: %w", err)
 	}
-	definedVars.Set(cfg)
+	mw.vars.Set(cfg)
 	mw.app.Preferences().SetString(prefsLastConfig, filename)
 	return nil
 }
@@ -210,7 +204,7 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 			logBtn.SetText("Stop logging")
 			dlc = datalogger.New(datalogger.Config{
 				Dev:            device,
-				Variables:      definedVars,
+				Variables:      mw.vars,
 				Freq:           int(mw.freqSlider.Value),
 				OnMessage:      mw.writeOutput,
 				CaptureCounter: mw.captureCounter,
@@ -241,16 +235,12 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 					defer mw.symbolConfigList.Refresh()
 					s, ok := mw.symbolMap[mw.symbolLookup.Text]
 					if !ok {
-						//definedVars = append(definedVars, &kwp2000.VarDefinition{
-						//	Name: mw.symbolLookup.Text,
-						//})
-						definedVars.Add(&kwp2000.VarDefinition{
+						mw.vars.Add(&kwp2000.VarDefinition{
 							Name: mw.symbolLookup.Text,
 						})
 						return
 					}
-					//definedVars = append(definedVars, s)
-					definedVars.Add(s)
+					mw.vars.Add(s)
 					//log.Printf("Name: %s, Method: %d, Value: %d, Type: %X", s.Name, s.Method, s.Value, s.Type)
 				}),
 				widget.NewButtonWithIcon("Load binary", theme.FileIcon(), func() {
@@ -284,17 +274,10 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 					mw.symbolConfigList.Refresh()
 				}),
 				widget.NewButtonWithIcon("Sync symbols with binary", theme.ViewRefreshIcon(), func() {
-
-					for i, v := range definedVars.Get() {
-
-						//if sym, ok := mw.symbolMap[v.Name]; ok {
-						//	definedVars.UpdatePos(i, sym)
-						//}
-
+					for i, v := range mw.vars.Get() {
 						for k, vv := range mw.symbolMap {
-							//if strings.ToLower(k) == strings.ToLower(v.Name) {
 							if strings.EqualFold(k, v.Name) {
-								definedVars.UpdatePos(i, vv)
+								mw.vars.UpdatePos(i, vv)
 								break
 							}
 						}
@@ -361,6 +344,7 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 			Leading: container.NewVBox(
 				mw.canSettings,
 				logBtn,
+				mw.newMockBTN(),
 				mw.progressBar,
 			),
 			Trailing: &container.Split{
