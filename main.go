@@ -63,35 +63,22 @@ func startWeb2(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
 
 	server := socketio.NewServer(nil)
 
+	server.OnError("/", func(s socketio.Conn, e error) {
+		log.Println("socket.io error:", e)
+	})
+
 	server.OnConnect("/", func(s socketio.Conn) error {
 		s.SetContext("")
 		log.Println("connected:", s.ID())
 		return nil
 	})
 
-	server.OnEvent("/", "notice", func(s socketio.Conn, msg string) {
-		log.Println("notice:", msg)
-		s.Emit("reply", "have "+msg)
-	})
-
-	//server.OnEvent("/chat", "msg", func(s socketio.Conn, msg string) string {
-	//	s.SetContext(msg)
-	//	return "recv " + msg
-	//})
-
-	server.OnEvent("/", "bye", func(s socketio.Conn) string {
-		last := s.Context().(string)
-		s.Emit("bye", last)
-		s.Close()
-		return last
-	})
-
-	server.OnError("/", func(s socketio.Conn, e error) {
-		log.Println("meet error:", e)
-	})
-
 	server.OnDisconnect("/", func(s socketio.Conn, reason string) {
 		log.Println("closed", reason)
+	})
+
+	server.OnEvent("/", "end_session", func(s socketio.Conn) {
+		s.Close()
 	})
 
 	server.OnEvent("/", "start_session", func(s socketio.Conn, msg string) {
