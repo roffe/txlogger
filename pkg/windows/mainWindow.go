@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"sort"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -26,26 +25,22 @@ const (
 	prefsLastConfig = "lastConfig"
 )
 
-var (
-	//definedVars    = kwp2000.NewVarDefinitionList()
-	loggingRunning bool
-	dlc            *datalogger.Client
-)
-
 type MainWindow struct {
-	W   fyne.Window
+	fyne.Window
 	app fyne.App
-	//symbols   []*symbol.Symbol
+
 	symbolMap map[string]*kwp2000.VarDefinition
 
 	symbolLookup     *xwidget.CompletionEntry
 	symbolConfigList *widget.List
-	//	symbolConfigTable *widget.Table
 
 	output     *widget.List
 	outputData binding.StringList
 
 	canSettings *widgets.CanSettingsWidget
+
+	logBtn  *widget.Button
+	mockBtn *widget.Button
 
 	captureCounter binding.Int
 	errorCounter   binding.Int
@@ -56,12 +51,16 @@ type MainWindow struct {
 
 	sinkManager *sink.Manager
 
+	loggingRunning bool
+	mockRunning    bool
+
+	dlc  *datalogger.Client
 	vars *kwp2000.VarDefinitionList
 }
 
 func NewMainWindow(a fyne.App, singMgr *sink.Manager, vars *kwp2000.VarDefinitionList) *MainWindow {
 	mw := &MainWindow{
-		W:              a.NewWindow("Trionic7 Logger - No file loaded"),
+		Window:         a.NewWindow("Trionic7 Logger - No file loaded"),
 		app:            a,
 		symbolMap:      make(map[string]*kwp2000.VarDefinition),
 		outputData:     binding.NewStringList(),
@@ -73,44 +72,15 @@ func NewMainWindow(a fyne.App, singMgr *sink.Manager, vars *kwp2000.VarDefinitio
 		sinkManager:    singMgr,
 		vars:           vars,
 	}
+	mw.progressBar.Stop()
 
 	mw.freqSlider = widget.NewSliderWithData(1, 50, mw.freqValue)
 	mw.freqSlider.SetValue(25)
-	mw.progressBar.Stop()
 
-	mw.output = widget.NewListWithData(
-		mw.outputData,
-		func() fyne.CanvasObject {
-			return &widget.Label{
-				Alignment: fyne.TextAlignLeading,
-				Wrapping:  fyne.TextWrapBreak,
-				TextStyle: fyne.TextStyle{Monospace: true},
-			}
-		},
-		func(item binding.DataItem, obj fyne.CanvasObject) {
-			i := item.(binding.String)
-			txt, err := i.Get()
-			if err != nil {
-				mw.writeOutput(err.Error())
-				return
-			}
-			obj.(*widget.Label).SetText(txt)
-		},
-	)
-	mw.symbolConfigList = widget.NewList(
-		func() int {
-			return vars.Len()
-		},
-		func() fyne.CanvasObject {
-			return widgets.NewVarDefinitionWidget(mw.symbolConfigList, vars)
-		},
-		func(lii widget.ListItemID, co fyne.CanvasObject) {
-			coo := co.(*widgets.VarDefinitionWidget)
-			coo.Update(lii, vars.GetPos(lii))
-		},
-	)
-
+	mw.output = mw.newOutputList()
 	mw.symbolLookup = mw.newSymbolnameTypeahead()
+	mw.logBtn = mw.newLogBtn()
+	mw.mockBtn = mw.newMockBtn()
 
 	if filename := mw.app.Preferences().String(prefsLastConfig); filename != "" {
 		mw.LoadConfig(filename)
@@ -119,112 +89,11 @@ func NewMainWindow(a fyne.App, singMgr *sink.Manager, vars *kwp2000.VarDefinitio
 	return mw
 }
 
-func (mw *MainWindow) newSymbolnameTypeahead() *xwidget.CompletionEntry {
-	symbolLookup := xwidget.NewCompletionEntry([]string{})
-
-	// When the use typed text, complete the list.
-	symbolLookup.OnChanged = func(s string) {
-		// completion start for text length >= 3
-		if len(s) < 3 {
-			symbolLookup.HideCompletion()
-			return
-		}
-
-		// Get the list of possible completion
-		var results []string
-
-		for _, sym := range mw.symbolMap {
-			if strings.Contains(strings.ToLower(sym.Name), strings.ToLower(s)) {
-				results = append(results, sym.Name)
-			}
-		}
-		// no results
-		if len(results) == 0 {
-			symbolLookup.HideCompletion()
-			return
-		}
-		sort.Slice(results, func(i, j int) bool { return strings.ToLower(results[i]) < strings.ToLower(results[j]) })
-
-		// then show them
-		symbolLookup.SetOptions(results)
-		symbolLookup.ShowCompletion()
-	}
-
-	if filename := mw.app.Preferences().String(prefsLastConfig); filename != "" {
-		mw.LoadConfig(filename)
-	}
-	return symbolLookup
-}
-
-func (mw *MainWindow) SaveConfig(filename string) error {
-	b, err := json.Marshal(mw.vars.Get())
-	if err != nil {
-		return fmt.Errorf("failed to marshal config file: %w", err)
-	}
-	if err := os.WriteFile(filename, b, 0644); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
-	}
-	mw.app.Preferences().SetString(prefsLastConfig, filename)
-	return nil
-}
-
-func (mw *MainWindow) LoadConfig(filename string) error {
-	b, err := os.ReadFile(filename)
-	if err != nil {
-		return fmt.Errorf("failed to read config file: %w", err)
-	}
-	var cfg []*kwp2000.VarDefinition
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		return fmt.Errorf("failed to unmarshal config file: %w", err)
-	}
-	mw.vars.Set(cfg)
-	mw.app.Preferences().SetString(prefsLastConfig, filename)
-	return nil
-}
-
 func (mw *MainWindow) setTitle(str string) {
-	mw.W.SetTitle("Trionic7 Logger - " + str)
+	mw.SetTitle("Trionic7 Logger - " + str)
 }
 
 func (mw *MainWindow) Layout() fyne.CanvasObject {
-	var logBtn *widget.Button
-	logBtn = widget.NewButtonWithIcon("Start logging", theme.DownloadIcon(), func() {
-		if loggingRunning {
-			if dlc != nil {
-				dlc.Close()
-			}
-			return
-		}
-		if !loggingRunning {
-			device, err := mw.canSettings.GetAdapter(mw.writeOutput)
-			if err != nil {
-				dialog.ShowError(err, mw.W)
-				return
-			}
-			logBtn.SetText("Stop logging")
-			dlc = datalogger.New(datalogger.Config{
-				Dev:            device,
-				Variables:      mw.vars,
-				Freq:           int(mw.freqSlider.Value),
-				OnMessage:      mw.writeOutput,
-				CaptureCounter: mw.captureCounter,
-				ErrorCounter:   mw.errorCounter,
-				Sink:           mw.sinkManager,
-			})
-
-			go func() {
-				loggingRunning = true
-				mw.progressBar.Start()
-				if err := dlc.Start(); err != nil {
-					dialog.ShowError(err, mw.W)
-				}
-				mw.progressBar.Stop()
-				loggingRunning = false
-				dlc = nil
-				logBtn.SetText("Start logging")
-			}()
-		}
-	})
 	left := container.NewBorder(
 		container.NewBorder(
 			nil,
@@ -249,7 +118,7 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 						if err.Error() == "Cancelled" {
 							return
 						}
-						dialog.ShowError(err, mw.W)
+						dialog.ShowError(err, mw)
 					}
 					mw.loadSymbolsFromFile(filename)
 				}),
@@ -265,10 +134,10 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 						if err.Error() == "Cancelled" {
 							return
 						}
-						dialog.ShowError(err, mw.W)
+						dialog.ShowError(err, mw)
 					}
 					if err := mw.LoadConfig(filename); err != nil {
-						dialog.ShowError(err, mw.W)
+						dialog.ShowError(err, mw)
 						return
 					}
 					mw.symbolConfigList.Refresh()
@@ -292,10 +161,10 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 						if err.Error() == "Cancelled" {
 							return
 						}
-						dialog.ShowError(err, mw.W)
+						dialog.ShowError(err, mw)
 					}
 					if err := mw.SaveConfig(filename); err != nil {
-						dialog.ShowError(err, mw.W)
+						dialog.ShowError(err, mw)
 						return
 
 					}
@@ -305,7 +174,6 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 		nil,
 		nil,
 		mw.symbolConfigList,
-		//mw.symbolConfigTable,
 	)
 
 	capturedCounter := widget.NewLabel("")
@@ -343,8 +211,7 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 			Horizontal: false,
 			Leading: container.NewVBox(
 				mw.canSettings,
-				logBtn,
-				mw.newMockBTN(),
+				mw.logBtn,
 				mw.progressBar,
 			),
 			Trailing: &container.Split{
@@ -352,6 +219,7 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 				Horizontal: false,
 				Leading:    mw.output,
 				Trailing: container.NewVBox(
+					mw.mockBtn,
 					mw.freqSlider,
 					container.NewGridWithColumns(3,
 						capturedCounter,
@@ -366,13 +234,12 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 }
 
 func (mw *MainWindow) loadSymbolsFromFile(filename string) error {
-	newSymbols, err := symbol.LoadSymbols(filename)
+	symbols, err := symbol.LoadSymbols(filename)
 	if err != nil {
 		return fmt.Errorf("error loading symbols: %w", err)
 	}
-	mw.symbolMap = make(map[string]*kwp2000.VarDefinition)
-	for _, s := range newSymbols {
-
+	newSymbolMap := make(map[string]*kwp2000.VarDefinition)
+	for _, s := range symbols {
 		def := &kwp2000.VarDefinition{
 			Name:             s.Name,
 			Method:           kwp2000.VAR_METHOD_SYMBOL,
@@ -381,9 +248,9 @@ func (mw *MainWindow) loadSymbolsFromFile(filename string) error {
 			Length:           s.Length,
 			Correctionfactor: symbol.GetCorrectionfactor(s.Name),
 		}
-
-		mw.symbolMap[s.Name] = def
+		newSymbolMap[s.Name] = def
 	}
+	mw.symbolMap = newSymbolMap
 	mw.setTitle(filename)
 	return nil
 }
@@ -391,4 +258,30 @@ func (mw *MainWindow) loadSymbolsFromFile(filename string) error {
 func (mw *MainWindow) writeOutput(s string) {
 	mw.outputData.Append(s)
 	mw.output.ScrollToBottom()
+}
+
+func (mw *MainWindow) SaveConfig(filename string) error {
+	b, err := json.Marshal(mw.vars.Get())
+	if err != nil {
+		return fmt.Errorf("failed to marshal config file: %w", err)
+	}
+	if err := os.WriteFile(filename, b, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+	mw.app.Preferences().SetString(prefsLastConfig, filename)
+	return nil
+}
+
+func (mw *MainWindow) LoadConfig(filename string) error {
+	b, err := os.ReadFile(filename)
+	if err != nil {
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+	var cfg []*kwp2000.VarDefinition
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		return fmt.Errorf("failed to unmarshal config file: %w", err)
+	}
+	mw.vars.Set(cfg)
+	mw.app.Preferences().SetString(prefsLastConfig, filename)
+	return nil
 }
