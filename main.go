@@ -78,10 +78,14 @@ func startWeb2(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
 	})
 
 	server.OnEvent("/", "end_session", func(s socketio.Conn) {
-		s.Close()
+		s.Leave("metrics")
 	})
 
 	server.OnEvent("/", "start_session", func(s socketio.Conn, msg string) {
+		s.Join("metrics")
+	})
+
+	server.OnEvent("/", "request_symbols", func(s socketio.Conn) {
 		var symbolList []SymbolDefinition
 		for _, v := range vars.Get() {
 			symbolList = append(symbolList, SymbolDefinition{
@@ -102,7 +106,7 @@ func startWeb2(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
 
 	sub := sm.NewSubscriber(func(msg *sink.Message) {
 		if server.Count() > 0 {
-			server.BroadcastToRoom("/", "metrics", string(msg.Data))
+			server.BroadcastToRoom("/", "metrics", "metrics", string(msg.Data))
 		}
 	})
 	defer sub.Close()
