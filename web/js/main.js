@@ -51,11 +51,3 @@ socket.on('connect', () => {
 
 	socket.emit('request_symbols');
 });
-
-
-// setInterval(() => {
-// 	var shift = false;
-// 	var x = (new Date()).getTime(); // current time
-// 	chart_1.series[0].addPoint([x, Math.random()], true, shift)
-// 	chart_2.series[0].addPoint([x, Math.random()], true, shift);
-// }, 1000);
