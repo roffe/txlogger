@@ -10,29 +10,32 @@ import (
 	"github.com/roffe/t7logger/pkg/sink"
 )
 
-func (mw *MainWindow) newMockBTN() *widget.Button {
+func (mw *MainWindow) newMockBtn() *widget.Button {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	mockStop := make(chan bool, 1)
 	var mockBtn *widget.Button
 	mockBtn = widget.NewButtonWithIcon("Start mocking", theme.DownloadIcon(), func() {
-		if loggingRunning {
+		if mw.mockRunning {
 			mockStop <- true
 			return
 		}
-		if !loggingRunning {
+		if !mw.mockRunning {
 			mockBtn.SetText("Stop mocking")
-
 			go func() {
+				mw.logBtn.Disable()
+				defer mw.logBtn.Enable()
+
 				mw.progressBar.Start()
+
 				t := time.NewTicker(time.Second / time.Duration(25))
-				loggingRunning = true
+				mw.mockRunning = true
 			outer:
 				for {
 					select {
 					case <-mockStop:
-						for i := range mw.vars.Get() {
+						for _, v := range mw.vars.Get() {
 							mw.sinkManager.Push(&sink.Message{
-								Data: []byte(fmt.Sprintf("%d:%v", i, r.Intn(8000))),
+								Data: []byte(fmt.Sprintf("%d:%v", v.Value, r.Intn(8000))),
 							})
 						}
 						break outer
@@ -40,7 +43,7 @@ func (mw *MainWindow) newMockBTN() *widget.Button {
 					}
 				}
 				mw.progressBar.Stop()
-				loggingRunning = false
+				mw.mockRunning = false
 				mockBtn.SetText("Start mocking")
 			}()
 		}

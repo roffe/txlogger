@@ -8,7 +8,7 @@ require (
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-gonic/gin v1.9.0
 	github.com/googollee/go-socket.io v1.7.0
-	github.com/roffe/gocan v0.0.0-20230412192524-818995002a52
+	github.com/roffe/gocan v0.0.0-20230506143224-fbf95e599cfb
 	github.com/sqweek/dialog v0.0.0-20220809060634-e981b270ebbf
 	go.bug.st/serial v1.5.0
 )

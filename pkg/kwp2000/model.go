@@ -41,66 +41,11 @@ func (m Method) String() string {
 	return "Unknown"
 }
 
-/*
-type Type int
-
-func (t Type) String() string {
-	_, file, no, ok := runtime.Caller(1)
-	if ok {
-		fmt.Printf("called from %s#%d\n", file, no)
-	}
-
-	log.Printf("Type: %X", uint8(t))
-
-	if uint8(t)&0x01 != 0 {
-		log.Println("Signed")
-	}
-	if uint8(t)&0x02 != 0 {
-		log.Println("Const")
-	}
-	if uint8(t)&0x04 != 0 {
-		log.Println("Char")
-	}
-	if uint8(t)&0x08 != 0 {
-		log.Println("Long")
-	}
-	if uint8(t)&0x10 != 0 {
-		log.Println("Bitfield")
-	}
-	if uint8(t)&0x20 != 0 {
-		log.Println("Struct")
-	}
-
-
-		switch t {
-		case TYPE_WORD:
-			return "Word"
-		case TYPE_LONG:
-			return "Long"
-		case TYPE_BYTE:
-			return "Byte"
-		case TYPE_UWORD:
-			return "UWord"
-		}
-
-	return strconv.Itoa(int(t))
-}
-*/
-
 const (
 	VAR_METHOD_ADDRESS Method = iota
 	VAR_METHOD_LOCID
 	VAR_METHOD_SYMBOL
 )
-
-/*
-const (
-	TYPE_WORD  Type = 21
-	TYPE_BYTE  Type = 24
-	TYPE_LONG  Type = 69
-	TYPE_UWORD Type = 32
-)
-*/
 
 type VarDefinition struct {
 	data             []byte
@@ -111,25 +56,24 @@ type VarDefinition struct {
 	Length           uint16 `json:"length"`
 	Unit             string `json:"unit,omitempty"`
 	Correctionfactor string `json:"correctionfactor,omitempty"`
-	Visualisation    string `json:"visualisation,omitempty"`
+	Visualization    string `json:"visualization,omitempty"`
 }
-
-/*
-func (v *VarDefinition) Length() byte {
-	switch v.Type {
-	case TYPE_WORD, TYPE_UWORD:
-		return 2
-	case TYPE_LONG:
-		return 4
-	case TYPE_BYTE:
-		return 1
-	}
-	return 0
-}
-*/
 
 func (v *VarDefinition) Set(data []byte) {
 	v.data = data
+}
+
+func (v *VarDefinition) Read(r io.Reader) error {
+	symbolData := make([]byte, v.Length)
+	n, err := r.Read(symbolData)
+	if err != nil {
+		return fmt.Errorf("VarDefinition failed to Read: %w", err)
+	}
+	if n != int(v.Length) {
+		return fmt.Errorf("VarDefinition expected %d bytes, got %d", v.Length, n)
+	}
+	v.data = symbolData
+	return nil
 }
 
 func (v *VarDefinition) GetBool() bool {
@@ -163,30 +107,28 @@ func (v *VarDefinition) GetInt32() int32 {
 func (v *VarDefinition) String() string {
 	if v.Correctionfactor != "" {
 		fs := token.NewFileSet()
-		tv, err := types.Eval(fs, nil, token.NoPos, fmt.Sprintf("%v*%v", v.decode(), v.Correctionfactor))
+		tv, err := types.Eval(fs, nil, token.NoPos, fmt.Sprintf("%v*%v", v.Decode(), v.Correctionfactor))
 		if err != nil {
 			panic(err)
 		}
 		return fmt.Sprintf("%s=%v%s", v.Name, strings.ReplaceAll(tv.Value.String(), ".", ","), v.Unit)
 	}
-
-	return fmt.Sprintf("%s=%v%s", v.Name, v.decode(), v.Unit)
+	return fmt.Sprintf("%s=%v%s", v.Name, v.Decode(), v.Unit)
 }
 
 func (v *VarDefinition) T7L() string {
 	if v.Correctionfactor != "" {
 		fs := token.NewFileSet()
-		tv, err := types.Eval(fs, nil, token.NoPos, fmt.Sprintf("%v*%v", v.Correctionfactor, v.decode()))
+		tv, err := types.Eval(fs, nil, token.NoPos, fmt.Sprintf("%v*%v", v.Correctionfactor, v.Decode()))
 		if err != nil {
 			panic(err)
 		}
 		return fmt.Sprintf("%s=%v", v.Name, strings.ReplaceAll(tv.Value.String(), ".", ","))
 	}
-
-	return fmt.Sprintf("%s=%v", v.Name, v.decode())
+	return fmt.Sprintf("%s=%v", v.Name, v.Decode())
 }
 
-func (v *VarDefinition) decode() interface{} {
+func (v *VarDefinition) Decode() interface{} {
 	switch {
 	case v.Length == 1:
 		if len(v.data) != 1 {
@@ -216,17 +158,4 @@ func (v *VarDefinition) decode() interface{} {
 		log.Println("unknown length", v.Length)
 		return 0
 	}
-}
-
-func (v *VarDefinition) Read(r io.Reader) error {
-	symbolData := make([]byte, v.Length)
-	n, err := r.Read(symbolData)
-	if err != nil {
-		return fmt.Errorf("VarDefinition failed to Read: %w", err)
-	}
-	if n != int(v.Length) {
-		return fmt.Errorf("expected %d bytes, got %d", v.Length, n)
-	}
-	v.data = symbolData
-	return nil
 }

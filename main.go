@@ -34,9 +34,9 @@ func main() {
 	//defer sub.Close()
 	a := app.NewWithID("com.roffe.t7l")
 	mw := windows.NewMainWindow(a, sm, vars)
-	mw.W.Resize(fyne.NewSize(1400, 800))
-	mw.W.SetContent(mw.Layout())
-	mw.W.ShowAndRun()
+	mw.Resize(fyne.NewSize(1400, 800))
+	mw.SetContent(mw.Layout())
+	mw.ShowAndRun()
 }
 
 type SymbolDefinition struct {
@@ -96,11 +96,11 @@ func startWeb2(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
 
 	server.OnEvent("/", "start_session", func(s socketio.Conn, msg string) {
 		var symbolList []SymbolDefinition
-		for i, v := range vars.Get() {
+		for _, v := range vars.Get() {
 			symbolList = append(symbolList, SymbolDefinition{
 				Name: v.Name,
-				ID:   i,
-				Type: v.Visualisation,
+				ID:   v.Value,
+				Type: returnVis(v.Visualization),
 			})
 		}
 		s.Emit("symbol_list", symbolList)
@@ -129,4 +129,11 @@ func startWeb2(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
 	if err := router.Run(":8080"); err != nil {
 		log.Fatal("failed run app: ", err)
 	}
+}
+
+func returnVis(t string) string {
+	if t == "" {
+		return "linegraph"
+	}
+	return t
 }
