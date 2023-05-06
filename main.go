@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"net/http"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -10,7 +9,9 @@ import (
 	//xlayout "fyne.io/x/fyne/layout"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
+
 	socketio "github.com/googollee/go-socket.io"
 	"github.com/roffe/t7logger/pkg/kwp2000"
 	"github.com/roffe/t7logger/pkg/sink"
@@ -119,9 +120,11 @@ func startWeb2(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
 	})
 	defer sub.Close()
 
+	router.Use(static.Serve("/", static.LocalFile("./web", false)))
 	router.GET("/socket.io/*any", gin.WrapH(server))
 	router.POST("/socket.io/*any", gin.WrapH(server))
-	router.StaticFS("/public", http.Dir("./web"))
+	// router.StaticFS("/css", http.Dir("./web/css"))
+	// router.StaticFS("/js", http.Dir("./web/js"))
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatal("failed run app: ", err)
