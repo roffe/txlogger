@@ -9,7 +9,10 @@ var cnt = 0;
 socket.on("metrics", data => {
     //console.log('metrics', JSON.stringify(data));
     if (typeof (data) === 'string') {
-        let tups = data = data.split(',');
+        let split = data = data.split('|');
+        const timestamp = Date.parse(split[0])
+        console.log(timestamp);
+        let tups = split = split[1].split(',');
         if (cnt === 14) {
             refresh = true;
             cnt = 0;
@@ -17,7 +20,7 @@ socket.on("metrics", data => {
             refresh = false;
         }
         $.each(tups, (key, val) => {
-            const value = val.split(':');
+            const value = val = val.split(':');
             addSeriesPoint(value[0], value[1], refresh);
         });
         cnt++;

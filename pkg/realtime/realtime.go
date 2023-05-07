@@ -16,6 +16,7 @@ type SymbolDefinition struct {
 	Name string
 	ID   int
 	Type string
+	Unit string
 }
 
 func StartWebserver(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
@@ -69,7 +70,8 @@ func StartWebserver(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
 			symbolList = append(symbolList, SymbolDefinition{
 				Name: v.Name,
 				ID:   v.Value,
-				Type: "linegraph",
+				Type: returnVis(v.Visualization),
+				Unit: v.Unit,
 			})
 		}
 		s.Emit("symbol_list", symbolList)

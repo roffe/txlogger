@@ -43,7 +43,7 @@ func (mw *MainWindow) newMockBtn() *widget.Button {
 							//metrics[va.Value] = r.Intn(8000)
 						}
 						mw.sinkManager.Push(&sink.Message{
-							Data: []byte(strings.Join(ms, ",")),
+							Data: []byte(time.Now().Format("02-01-2006 15:04:05.999") + "|" + strings.Join(ms, ",")),
 						})
 						//b, err := json.Marshal(metrics)
 						//if err != nil {
