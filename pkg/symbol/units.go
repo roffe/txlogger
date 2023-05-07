@@ -14,6 +14,8 @@ func GetUnit(name string) string {
 		return "b BTDC"
 	case "ECMStat.p_Diff", "ECMStat.p_DiffThrot", "In.p_AirBefThrottle":
 		return "bar"
+	case "m_Request", "MAF.m_AirInlet":
+		return "mg/c"
 	default:
 		return "value"
 	}
