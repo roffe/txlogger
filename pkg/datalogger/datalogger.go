@@ -164,7 +164,6 @@ var out strings.Builder
 
 func (c *Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition) {
 	out.WriteString("|")
-
 	var ms []string
 	for _, va := range vars {
 		out.WriteString(va.T7L() + "|")
@@ -174,7 +173,7 @@ func (c *Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition) {
 	fmt.Fprintln(file, msg)
 
 	c.sink.Push(&sink.Message{
-		Data: []byte(time.Now().Format("2006-01-02-15:04:05.999Z") + "|" + strings.Join(ms, ",")),
+		Data: []byte(time.Now().Format("02-01-2006 15:04:05.999") + "|" + strings.Join(ms, ",")),
 	})
 
 	out.Reset()
