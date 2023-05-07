@@ -1,9 +1,8 @@
-var graphId = 1;
+var graphId = 0;
 
 function getGraphBaseConfig() {
     let cfg = {
         chart: {
-            type: null,
             zoomType: 'x',
             animation: Highcharts.svg, // don't animate in old IE
             marginRight: 10,
@@ -18,51 +17,39 @@ function getGraphBaseConfig() {
             type: 'datetime',
             tickPixelInterval: 200,
         },
-        yAxis: {
-            title: {
-                text: 'Value'
-            },
-            plotLines: [{
-                value: 0,
-                width: 1,
-                color: '#808080'
-            }]
-        },
         tooltip: {
             shared: true,
             headerFormat: '<b>{series.name}</b><br/>',
             pointFormat: '{point.x:%Y-%m-%d %H:%M:%S}<br/>{point.y:.2f}'
         },
-        series: [{
-            name: null,
-            data: []
-        }]
+        series: []
     };
     return cfg;
 }
 
-
-
-
-function getGraphConfig(type, title) {
-    let baseCfg = getGraphBaseConfig();
+function createNewSeries(graph, type, unit, title) {
+    let seriesType = null;
     switch (type) {
         case 'linegraph':
-            baseCfg.chart.type = 'line';
+            seriesType = 'line';
             break;
         default:
             console.error('Not supported graph type ' + type)
     }
-    baseCfg.title.text = title;
-    baseCfg.series[0].name = title;
-    return baseCfg;
-
+    return graph.addSeries({
+        name: title,
+        type: seriesType,
+    });
 }
 
+function getGraphConfig(title) {
+    let baseCfg = getGraphBaseConfig();
+    baseCfg.title.text = title;
+    return baseCfg;
+}
 
-function createGraph(data) {
-    let container = $('<div class="graph" id="chart-' + graphId + '" />').appendTo('#container');
-    let chartObj = Highcharts.chart('chart-' + graphId, getGraphConfig(data.Type, data.Name));
-    graphId++;
-    return chartObj;
+function createGraph(title) {
+    graphId++
+    $('<div class="graph" id="chart-' + graphId + '" />').appendTo('#container');
+    return Highcharts.chart('chart-' + graphId, getGraphConfig(title));
 }

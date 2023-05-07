@@ -1,45 +1,40 @@
 var socket = io("ws://localhost:8080", {
     transports: ['websocket'],
 });
-var graphs = {}
+var graphs = {}, redrawInterval, symbolAssignments = {};
 
-var refresh = false;
-var cnt = 0;
+function redraw() {
+    $.each(graphs, (id, graph) => {
+        graph.redraw();
+    });
+}
+
+function addSeriesPoint(timestamp, id, value) {
+    id = id.toString();
+    if (symbolAssignments[id]) {
+        symbolAssignments[id].series.addPoint([timestamp, 1 * value], false, false, false);
+    }
+}
+
+function getGraphId(symbolData) {
+    if (symbolData.Group) {
+        return symbolData.Group;
+    } else {
+        return 'NoGroup-' + symbolData.ID.toString();
+    }
+}
 
 socket.on("metrics", data => {
     //console.log('metrics', JSON.stringify(data));
     if (typeof (data) === 'string') {
-        let split = data = data.split('|');
+        const split = data.split('|');
         const timestamp = Date.parse(split[0])
-        let tups = split = split[1].split(',');
-        if (cnt === 14) {
-            refresh = true;
-            cnt = 0;
-        } else {
-            refresh = false;
-        }
-        $.each(tups, (key, val) => {
+        $.each(split[1].split(','), (key, val) => {
             const value = val = val.split(':');
-            addSeriesPoint(timestamp, value[0], value[1], refresh);
-        });
-        cnt++;
-    } else if (data !== null && typeof (data) === 'object') {
-        $.each(data, (key, val) => {
-            val = val.split(':');
-            addSeriesPoint(timestamp, val[0], val[1], true);
+            addSeriesPoint(timestamp, value[0], value[1]);
         });
     }
 });
-
-
-function addSeriesPoint(timestamp, id, value, refresh) {
-    id = id.toString();
-    if (graphs[id]) {
-        //var x = (new Date()).getTime(); // current time (TODO?)
-        //debugger;
-        graphs[id].series[0].addPoint([timestamp, 1 * value], refresh, false, true)
-    }
-}
 
 socket.on("symbol_list", data => {
     console.log('Symbols', data);
@@ -51,13 +46,29 @@ socket.on("symbol_list", data => {
         });
         $('#container').empty();
         graphs = {};
+        symbolAssignments = {};
 
         $.each(data, (key, val) => {
-            console.log(val);
-            graphs[val.ID.toString()] = createGraph(val);
+            const graphId = getGraphId(val);
+            if (!graphs[graphId]) {
+                if (val.Group) {
+                    graphs[graphId] = createGraph(val.Group);
+                } else {
+                    graphs[graphId] = createGraph(val.Name);
+                }
+            }
+            symbolAssignments[val.ID.toString()] = {
+                unit: val.Unit,
+                type: val.Type,
+                name: val.Name,
+                group: val.Group,
+                graph: graphs[graphId],
+                series: createNewSeries(graphs[graphId], val.Type, val.Unit, val.Name),
+            };
         });
 
         socket.emit('start_session');
+        redrawInterval = setInterval(redraw, 1000);
     } else {
         console.log('No symbols!');
     }
@@ -66,6 +77,7 @@ socket.on("symbol_list", data => {
 socket.on('connect', () => {
     console.log('Socket connected!');
     $('#loading-spinner').remove();
+    clearInterval(redrawInterval);
 
     socket.emit('request_symbols');
 });
