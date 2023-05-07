@@ -96,6 +96,17 @@ func (mw *MainWindow) setTitle(str string) {
 }
 
 func (mw *MainWindow) Layout() fyne.CanvasObject {
+	loadBinBtn := widget.NewButtonWithIcon("Load binary", theme.FileIcon(), func() {
+		filename, err := sdialog.File().Filter("Binary file", "bin").Load()
+		if err != nil {
+			if err.Error() == "Cancelled" {
+				return
+			}
+			dialog.ShowError(err, mw)
+		}
+		mw.loadSymbolsFromFile(filename)
+	})
+
 	left := container.NewBorder(
 		container.NewBorder(
 			nil,
@@ -114,16 +125,7 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 					mw.vars.Add(s)
 					//log.Printf("Name: %s, Method: %d, Value: %d, Type: %X", s.Name, s.Method, s.Value, s.Type)
 				}),
-				widget.NewButtonWithIcon("Load binary", theme.FileIcon(), func() {
-					filename, err := sdialog.File().Filter("Binary file", "bin").Load()
-					if err != nil {
-						if err.Error() == "Cancelled" {
-							return
-						}
-						dialog.ShowError(err, mw)
-					}
-					mw.loadSymbolsFromFile(filename)
-				}),
+				loadBinBtn,
 			),
 
 			mw.symbolLookup,
