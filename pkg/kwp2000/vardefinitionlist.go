@@ -55,6 +55,11 @@ func (v *VarDefinitionList) SetValue(pos, value int) {
 	v.updated()
 }
 
+func (v *VarDefinitionList) SetGroup(pos int, value string) {
+	v.data[pos].Group = value
+	v.updated()
+}
+
 func (v *VarDefinitionList) SetCorrectionfactor(pos int, correctionfactor string) {
 	v.data[pos].Correctionfactor = correctionfactor
 	v.updated()

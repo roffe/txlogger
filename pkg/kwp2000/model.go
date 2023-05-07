@@ -57,6 +57,7 @@ type VarDefinition struct {
 	Unit             string `json:"unit,omitempty"`
 	Correctionfactor string `json:"correctionfactor,omitempty"`
 	Visualization    string `json:"visualization,omitempty"`
+	Group            string `json:"group,omitempty"`
 }
 
 func (v *VarDefinition) Set(data []byte) {

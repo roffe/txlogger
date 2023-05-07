@@ -13,10 +13,11 @@ import (
 )
 
 type SymbolDefinition struct {
-	Name string
-	ID   int
-	Type string
-	Unit string
+	Name  string
+	ID    int
+	Type  string
+	Unit  string
+	Group string
 }
 
 func StartWebserver(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
@@ -68,10 +69,11 @@ func StartWebserver(sm *sink.Manager, vars *kwp2000.VarDefinitionList) {
 		for _, v := range vars.Get() {
 			//vis := "linegraph"
 			symbolList = append(symbolList, SymbolDefinition{
-				Name: v.Name,
-				ID:   v.Value,
-				Type: returnVis(v.Visualization),
-				Unit: v.Unit,
+				Name:  v.Name,
+				ID:    v.Value,
+				Type:  returnVis(v.Visualization),
+				Unit:  v.Unit,
+				Group: v.Group,
 			})
 		}
 		s.Emit("symbol_list", symbolList)

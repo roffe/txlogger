@@ -22,6 +22,7 @@ type VarDefinitionWidget struct {
 	symbolType             *widget.Entry
 	symbolSigned           *widget.Check
 	symbolCorrectionfactor *widget.Entry
+	symbolGroup            *widget.Entry
 	symbolDeleteBTN        *widget.Button
 	objects                []fyne.CanvasObject
 }
@@ -80,6 +81,14 @@ func NewVarDefinitionWidget(ls *widget.List, definedVars *kwp2000.VarDefinitionL
 		},
 	}
 
+	vd.symbolGroup = &widget.Entry{
+		OnChanged: func(s string) {
+			if definedVars.GetPos(vd.pos).Group != s {
+				definedVars.SetGroup(vd.pos, s)
+			}
+		},
+	}
+
 	vd.symbolDeleteBTN = widget.NewButtonWithIcon("Delete", theme.DeleteIcon(), func() {
 		//definedVars = append(definedVars[:vd.pos], definedVars[vd.pos+1:]...)
 		definedVars.Delete(vd.pos)
@@ -87,20 +96,21 @@ func NewVarDefinitionWidget(ls *widget.List, definedVars *kwp2000.VarDefinitionL
 	})
 	vd.objects = []fyne.CanvasObject{
 		container.NewHBox(
-			maxWidth(250, vd.symbolName),
-			maxWidth(100, vd.symbolMethod),
-			maxWidth(100, vd.symbolNumber),
-			maxWidth(100, vd.symbolType),
-			maxWidth(100, vd.symbolSigned),
-			maxWidth(150, vd.symbolCorrectionfactor),
-			maxWidth(100, vd.symbolDeleteBTN),
+			minWidth(250, vd.symbolName),
+			minWidth(90, vd.symbolMethod),
+			minWidth(50, vd.symbolNumber),
+			minWidth(40, vd.symbolType),
+			minWidth(80, vd.symbolSigned),
+			minWidth(50, vd.symbolCorrectionfactor),
+			minWidth(130, vd.symbolGroup),
+			minWidth(90, vd.symbolDeleteBTN),
 		),
 	}
 
 	return vd
 }
 
-func maxWidth(width float32, obj fyne.CanvasObject) *fyne.Container {
+func minWidth(width float32, obj fyne.CanvasObject) *fyne.Container {
 	return container.New(&diagonal{width: width}, obj)
 }
 
@@ -137,6 +147,7 @@ func (wb *VarDefinitionWidget) Update(pos int, sym *kwp2000.VarDefinition) {
 	wb.symbolNumber.SetText(strconv.Itoa(sym.Value))
 	wb.symbolType.SetText(fmt.Sprintf("%X", sym.Type))
 	wb.symbolSigned.SetChecked(sym.Type&kwp2000.SIGNED != 0)
+	wb.symbolGroup.SetText(sym.Group)
 	wb.symbolCorrectionfactor.SetText(sym.Correctionfactor)
 }
 
@@ -162,23 +173,7 @@ func (wb *VarDefinitionWidget) SetType(t uint8) {
 }
 
 func (wb *VarDefinitionWidget) MinSize() fyne.Size {
-	var w, h float32
-	for _, o := range []fyne.CanvasObject{
-		wb.symbolName,
-		wb.symbolMethod,
-		wb.symbolNumber,
-		wb.symbolType,
-		wb.symbolSigned,
-		wb.symbolCorrectionfactor,
-		wb.symbolDeleteBTN,
-	} {
-		ms := o.MinSize()
-		w += o.MinSize().Width + theme.Padding()*2
-		if ms.Height > h {
-			h = ms.Height
-		}
-	}
-	return fyne.NewSize(900+(theme.Padding()*20), h)
+	return wb.objects[0].(*fyne.Container).MinSize()
 }
 
 func (wb *VarDefinitionWidget) CreateRenderer() fyne.WidgetRenderer {
