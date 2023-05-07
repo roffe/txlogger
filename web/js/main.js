@@ -11,7 +11,6 @@ socket.on("metrics", data => {
     if (typeof (data) === 'string') {
         let split = data = data.split('|');
         const timestamp = Date.parse(split[0])
-        console.log(timestamp);
         let tups = split = split[1].split(',');
         if (cnt === 14) {
             refresh = true;
@@ -21,24 +20,24 @@ socket.on("metrics", data => {
         }
         $.each(tups, (key, val) => {
             const value = val = val.split(':');
-            addSeriesPoint(value[0], value[1], refresh);
+            addSeriesPoint(timestamp, value[0], value[1], refresh);
         });
         cnt++;
     } else if (data !== null && typeof (data) === 'object') {
         $.each(data, (key, val) => {
             val = val.split(':');
-            addSeriesPoint(val[0], val[1], true);
+            addSeriesPoint(timestamp, val[0], val[1], true);
         });
     }
 });
 
 
-function addSeriesPoint(id, value, refresh) {
+function addSeriesPoint(timestamp, id, value, refresh) {
     id = id.toString();
     if (graphs[id]) {
-        var x = (new Date()).getTime(); // current time (TODO?)
+        //var x = (new Date()).getTime(); // current time (TODO?)
         //debugger;
-        graphs[id].series[0].addPoint([x, 1 * value], refresh, false, true)
+        graphs[id].series[0].addPoint([timestamp, 1 * value], refresh, false, true)
     }
 }
 
