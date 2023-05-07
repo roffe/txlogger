@@ -3,10 +3,8 @@ package datalogger
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -167,23 +165,17 @@ var out strings.Builder
 func (c *Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition) {
 	out.WriteString("|")
 
-	metrics := make(map[int]interface{})
-
+	var ms []string
 	for _, va := range vars {
 		out.WriteString(va.T7L() + "|")
-		metrics[va.Value] = va.Decode()
+		ms = append(ms, va.Tuple())
 	}
 	msg := time.Now().Format("02-01-2006 15:04:05.999") + out.String() + "IMPORTANTLINE=0|"
 	fmt.Fprintln(file, msg)
 
-	b, err := json.Marshal(metrics)
-	if err != nil {
-		log.Println(err)
-	} else {
-		c.sink.Push(&sink.Message{
-			Data: b,
-		})
-	}
+	c.sink.Push(&sink.Message{
+		Data: []byte(strings.Join(ms, ",")),
+	})
 
 	out.Reset()
 }

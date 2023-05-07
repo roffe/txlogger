@@ -128,6 +128,18 @@ func (v *VarDefinition) T7L() string {
 	return fmt.Sprintf("%s=%v", v.Name, v.Decode())
 }
 
+func (v *VarDefinition) Tuple() string {
+	if v.Correctionfactor != "" {
+		fs := token.NewFileSet()
+		tv, err := types.Eval(fs, nil, token.NoPos, fmt.Sprintf("%v*%v", v.Correctionfactor, v.Decode()))
+		if err != nil {
+			panic(err)
+		}
+		return fmt.Sprintf("%d:%v", v.Value, tv.Value.String())
+	}
+	return fmt.Sprintf("%d:%v", v.Value, v.Decode())
+}
+
 func (v *VarDefinition) Decode() interface{} {
 	switch {
 	case v.Length == 1:

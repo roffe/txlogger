@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -170,7 +172,8 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 					}
 				}),
 				widget.NewButtonWithIcon("Dashboard", theme.InfoIcon(), func() {
-					NewDashboard(mw.app).Show()
+					//NewDashboard(mw.app).Show()
+					mw.openBrowser("http://localhost:8080")
 				}),
 			),
 		),
@@ -249,13 +252,30 @@ func (mw *MainWindow) loadSymbolsFromFile(filename string) error {
 			Value:            s.Number,
 			Type:             s.Type,
 			Length:           s.Length,
-			Correctionfactor: symbol.GetCorrectionfactor(s.Name),
+			Correctionfactor: s.Correctionfactor,
 		}
 		newSymbolMap[s.Name] = def
 	}
 	mw.symbolMap = newSymbolMap
 	mw.setTitle(filename)
 	return nil
+}
+
+func (mw *MainWindow) openBrowser(url string) {
+	var err error
+	switch runtime.GOOS {
+	case "linux":
+		err = exec.Command("xdg-open", url).Start()
+	case "windows":
+		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	case "darwin":
+		err = exec.Command("open", url).Start()
+	default:
+		err = fmt.Errorf("unsupported platform")
+	}
+	if err != nil {
+		dialog.ShowError(err, mw)
+	}
 }
 
 func (mw *MainWindow) writeOutput(s string) {

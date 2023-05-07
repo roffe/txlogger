@@ -16,8 +16,15 @@ import (
 	"unsafe"
 )
 
-func init() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+type Symbol struct {
+	data             []byte
+	Name             string
+	Number           int
+	Type             uint8
+	Address          uint32
+	Length           uint16
+	Correctionfactor string
+	Unit             string
 }
 
 func NewFromData(data []byte, symb_count int) *Symbol {
@@ -46,15 +53,6 @@ func NewFromData(data []byte, symb_count int) *Symbol {
 		Address: internall_address,
 		Length:  symbol_length,
 	}
-}
-
-type Symbol struct {
-	data    []byte
-	Name    string
-	Number  int
-	Type    uint8
-	Address uint32
-	Length  uint16
 }
 
 func (s *Symbol) String() string {
@@ -150,6 +148,8 @@ func binaryPacked(file *os.File) ([]*Symbol, error) {
 		}
 		for i := 0; i < len(symbolNames)-1; i++ {
 			symbols[i].Name = strings.TrimSpace(symbolNames[i])
+			symbols[i].Unit = GetUnit(symbols[i].Name)
+			symbols[i].Correctionfactor = GetCorrectionfactor(symbols[i].Name)
 		}
 	}
 	return symbols, nil

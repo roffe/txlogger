@@ -53,6 +53,11 @@ func (v *VarDefinitionList) SetValue(pos, value int) {
 	v.updated()
 }
 
+func (v *VarDefinitionList) SetCorrectionfactor(pos int, correctionfactor string) {
+	v.data[pos].Correctionfactor = correctionfactor
+	v.updated()
+}
+
 func (v *VarDefinitionList) Delete(pos int) {
 	v.data = append(v.data[:pos], v.data[pos+1:]...)
 	v.updated()

@@ -10,7 +10,7 @@ socket.on("metrics", data => {
     //console.log('metrics', JSON.stringify(data));
     if (typeof (data) === 'string') {
         let tups = data = data.split(',');
-        if (cnt === 5) {
+        if (cnt === 14) {
             refresh = true;
             cnt = 0;
         } else {
@@ -43,9 +43,11 @@ socket.on("symbol_list", data => {
     console.log('Symbols', data);
     if (data !== null) {
         $.each(graphs, graph => {
-            graph.destroy();
+            if (typeof graph.destroy === 'function') {
+                graph.destroy();
+            }
         });
-        $('#container>.chart').remove();
+        $('#container').empty();
         graphs = {};
 
         $.each(data, (key, val) => {

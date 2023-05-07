@@ -72,7 +72,13 @@ func NewVarDefinitionWidget(ls *widget.List, definedVars *kwp2000.VarDefinitionL
 	})
 	vd.symbolSigned.Disable()
 
-	vd.symbolCorrectionfactor = widget.NewEntry()
+	vd.symbolCorrectionfactor = &widget.Entry{
+		OnChanged: func(s string) {
+			if definedVars.GetPos(vd.pos).Correctionfactor != s {
+				definedVars.SetCorrectionfactor(vd.pos, s)
+			}
+		},
+	}
 
 	vd.symbolDeleteBTN = widget.NewButtonWithIcon("Delete", theme.DeleteIcon(), func() {
 		//definedVars = append(definedVars[:vd.pos], definedVars[vd.pos+1:]...)

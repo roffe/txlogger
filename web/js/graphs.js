@@ -16,7 +16,7 @@ function getGraphBaseConfig() {
         },
         xAxis: {
             type: 'datetime',
-            tickPixelInterval: 1000,
+            tickPixelInterval: 200,
         },
         yAxis: {
             title: {
@@ -29,6 +29,7 @@ function getGraphBaseConfig() {
             }]
         },
         tooltip: {
+            shared: true,
             headerFormat: '<b>{series.name}</b><br/>',
             pointFormat: '{point.x:%Y-%m-%d %H:%M:%S}<br/>{point.y:.2f}'
         },
