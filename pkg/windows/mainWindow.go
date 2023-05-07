@@ -253,6 +253,7 @@ func (mw *MainWindow) loadSymbolsFromFile(filename string) error {
 			Type:             s.Type,
 			Length:           s.Length,
 			Correctionfactor: s.Correctionfactor,
+			Unit:             s.Unit,
 		}
 		newSymbolMap[s.Name] = def
 	}

@@ -1,5 +1,7 @@
 package kwp2000
 
+import "github.com/roffe/t7logger/pkg/symbol"
+
 type VarDefinitionList struct {
 	data       []*VarDefinition
 	updateChan chan struct{}
@@ -71,6 +73,7 @@ func (v *VarDefinitionList) UpdatePos(i int, sym *VarDefinition) {
 	v.data[i].Length = sym.Length
 	v.data[i].Unit = sym.Unit
 	v.data[i].Correctionfactor = sym.Correctionfactor
+	v.data[i].Unit = symbol.GetUnit(sym.Name)
 	v.updated()
 }
 
