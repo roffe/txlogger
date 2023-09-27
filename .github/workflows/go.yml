@@ -1,0 +1,83 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+name: Go
+on:
+  push:
+    branches: [ "master" ]
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest]
+        include:
+          - os: windows-latest
+            vcpkgCommitId: '9edb1b8e590cc086563301d735cae4b6e732d2d2'
+    steps:
+   
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+        ref: ${{ github.event.workflow_run.head_commit.id }}
+
+    - uses: lukka/get-cmake@latest
+    
+    - name: Install libusb using Vcpkg
+      run: |
+        cd vcpkg
+        bootstrap-vcpkg.bat
+        vcpkg install libusb:x86-windows
+        cd..
+        copy D:\\a\\txlogger\\txlogger\\vcpkg\\installed\\x86-windows\\bin\libusb-1.0.dll .\
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        cache: true
+
+    - name: Set up MinGW
+      uses: egor-tensin/setup-mingw@v2
+      with:
+        platform: x86
+    
+    - name: Install Fyne CLI
+      run: go install fyne.io/fyne/v2/cmd/fyne@develop
+    
+    - name: Install dependencies
+      run: go get .
+    
+    - name: Build
+      env:
+        PKG_CONFIG_PATH: "D:\\a\\txlogger\\txlogger\\vcpkg\\packages\\libusb_x86-windows\\lib\\pkgconfig"
+        CGO_CFLAGS: "-ID:\\a\\txlogger\\txlogger\\vcpkg\\packages\\libusb_x86-windows\\include\\libusb-1.0"
+        GOARCH: 386
+        GOOS: windows
+        CGO_ENABLED: 1
+        CC: i686-w64-mingw32-gcc
+        CXX: i686-w64-mingw32-g++
+      run: fyne package -tags combi --release
+
+    - name: Creating Zip
+      run: zip -r txlogger.zip txlogger.exe lzhuf.dll libusb-1.0.dll"
+
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      env:
+        GITHUB_REPOSITORY: roffe/txlogger
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        name: latest
+        files: |
+          txlogger.exe
+          lzhuf.dll
+          libusb-1.0.dll
+

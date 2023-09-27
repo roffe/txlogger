@@ -1,0 +1,15 @@
+tmp
+tmp2
+.vscode
+*.t7l
+*.t8l
+*.dif
+/*.json
+*.dat
+*.bin
+*.exe
+*.zip
+debug.log
+*.o
+lzhuf/lzhuf.dll
+libusb-1.0.dll
