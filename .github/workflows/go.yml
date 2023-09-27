@@ -66,7 +66,7 @@ jobs:
       run: fyne package -tags combi --release
 
     - name: Creating Zip
-      run: zip -r txlogger.zip txlogger.exe lzhuf.dll libusb-1.0.dll
+      run: 7z a txlogger.zip txlogger.exe lzhuf.dll libusb-1.0.dll
 
     - name: Release
       uses: softprops/action-gh-release@v1
