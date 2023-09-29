@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -94,7 +93,7 @@ func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) ([]*s
 	//fmt.Println()
 	//cb(fmt.Sprintf("Downloaded: %d bytes in %s", buff.Len(), time.Since(start).String()))
 
-	os.WriteFile("t8_names.bin", buff.Bytes(), 0644)
+	// os.WriteFile("t8_names.bin", buff.Bytes(), 0644)
 
 	symbolNames, err := symbol.ExpandCompressedSymbolNames(buff.Bytes())
 	if err != nil {
@@ -145,7 +144,7 @@ func ReadSymbolTable(ctx context.Context, gm *gmlan.Client) ([]*symbol.Symbol, e
 	}
 	//fmt.Println()
 
-	os.WriteFile("t8_symbols.bin", buff.Bytes(), 0644)
+	//os.WriteFile("t8_symbols.bin", buff.Bytes(), 0644)
 
 	var symbols []*symbol.Symbol
 
