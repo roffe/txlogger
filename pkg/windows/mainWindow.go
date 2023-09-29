@@ -479,7 +479,7 @@ func (mw *MainWindow) setTitle(str string) {
 
 func (mw *MainWindow) Layout() fyne.CanvasObject {
 	return &container.Split{
-		Offset:     0.68,
+		Offset:     0.7,
 		Horizontal: true,
 		Leading: container.NewBorder(
 			container.NewVBox(
@@ -615,6 +615,7 @@ func (mw *MainWindow) SyncSymbols() {
 		}
 	}
 	mw.symbolConfigList.Refresh()
+	mw.SaveSymbolList()
 }
 
 func (mw *MainWindow) Content() fyne.CanvasObject {
@@ -690,7 +691,7 @@ func (mw *MainWindow) loadSymbolsFromECU() error {
 }
 
 func (mw *MainWindow) loadSymbolsFromFile(filename string) error {
-	symbols, err := symbol.LoadSymbols(filename, mw.Log)
+	symbols, err := symbol.LoadSymbols(filename, mw.ecuSelect.Selected, mw.Log)
 	if err != nil {
 		return fmt.Errorf("error loading symbols: %w", err)
 	}
