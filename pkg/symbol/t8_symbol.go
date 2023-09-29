@@ -95,10 +95,141 @@ func ReadAddressTable(data []byte, offset int) ([]*Symbol, error) {
 			}
 			symbols = append(symbols, sym)
 		}
+	}
+	return symbols, nil
+}
 
+func ValidateTrionic8File(data []byte) error {
+	if len(data) != 0x100000 {
+		return ErrInvalidLength
+	}
+	if data[0] == 0x00 && (data[1] == 0x10 || data[1] == 0x00) && data[2] == 0x0C && data[3] == 0x00 {
+		return nil
+	}
+	return ErrInvalidTrionic8File
+}
+
+func GetAddressFromOffset(data []byte, offset int) (int, error) {
+	if offset < 0 || offset > len(data)-4 {
+		return 0, ErrOffsetOutOfRange
+	}
+	retval := 0
+	retval = int(data[offset]) << 24
+	retval += int(data[offset+1]) << 16
+	retval += int(data[offset+2]) << 8
+	retval += int(data[offset+3])
+	return retval, nil
+}
+
+func GetLengthFromOffset(data []byte, offset int) (int, error) {
+	if offset < 0 || offset > len(data)-2 {
+		return 0, ErrOffsetOutOfRange
+	}
+	retval := 0
+	retval += int(data[offset]) << 8
+	retval += int(data[offset+1])
+	return retval, nil
+}
+
+func CountNq(data []byte, offset int) int {
+	cnt := 0
+	if data != nil && len(data) > offset {
+		state := 0
+		for i := offset; i < len(data) && i > (offset-8) && cnt < 3; i++ {
+			switch state {
+			case 0:
+				if data[i] != 0x4E {
+					return cnt
+				}
+				state++
+			case 1:
+				if data[i] != 0x71 {
+					return cnt
+				}
+				state = 0
+				cnt++
+				i -= 4
+			}
+		}
+	}
+	return cnt
+}
+
+func GetEndOfSymbolTable(data []byte) (int, error) {
+	pattern := []byte{0x73, 0x59, 0x4D, 0x42, 0x4F, 0x4C, 0x74, 0x41, 0x42, 0x4C, 0x45}
+	pos := bytePatternSearch(data, pattern, 0)
+	if pos == -1 {
+		return -1, ErrEndOfSymbolTableNotFound
+	}
+	return pos + len(pattern) - 1, nil
+}
+
+func GetFirstNqStringFromOffset(data []byte, offset int) (int, error) {
+	var retval, Nq1, Nq2, Nq3 int
+	state := 0
+outer:
+	for i := offset; i < len(data) && i < offset+0x100; i++ {
+		switch state {
+		case 0:
+			if data[i] == 0x4E {
+				state++
+			}
+		case 1:
+			if data[i] == 0x71 {
+				state++
+			} else {
+				state = 0
+			}
+		case 2:
+			Nq1 = i
+			if data[i] == 0x4E {
+				state++
+			} else {
+				state = 0
+			}
+		case 3:
+			if data[i] == 0x71 {
+				state++
+			} else {
+				state = 0
+			}
+		case 4:
+			Nq2 = i
+			if data[i] == 0x4E {
+				state++
+			} else {
+				state = 0
+			}
+		case 5:
+			if data[i] == 0x71 {
+				state++
+			} else {
+				state = 0
+			}
+		case 6:
+			Nq3 = i
+			retval = i
+			break outer
+		}
 	}
 
-	return symbols, nil
+	if Nq3 == 0 {
+		retval = Nq2
+	}
+
+	if retval == 0 {
+		retval = Nq1
+	}
+
+	return retval, nil
+}
+
+func FindAddressTableOffset(data []byte) error {
+	pos := bytePatternSearch(data, []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20}, 0x3000)
+	if pos == -1 {
+		return ErrAddressTableOffsetNotFound
+	}
+	return nil
 }
 
 /*
@@ -116,9 +247,7 @@ func ExtractSymbolTable(data []byte) ([]string, error) {
 	}
 	return nil, ErrEndOfSymbolTableNotFound
 }
-*/
 
-/*
 func GetAddrTableOffsetBySymbolTable(data []byte) (int, error) {
 	addrtaboffset, err := GetEndOfSymbolTable(data)
 	if err != nil {
@@ -163,23 +292,13 @@ func GetAddrTableOffsetBySymbolTable(data []byte) (int, error) {
 
 	return -1, ErrSymbolTableNotFound
 }
-*/
-
-func ValidateTrionic8File(data []byte) error {
-	if len(data) != 0x100000 {
-		return ErrInvalidLength
-	}
-	if data[0] == 0x00 && (data[1] == 0x10 || data[1] == 0x00) && data[2] == 0x0C && data[3] == 0x00 {
-		return nil
-	}
-	return ErrInvalidTrionic8File
-}
 
 func GetStartOfAddressTableOffset(data []byte) (int, error) {
 	searchSequence := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20}
 	symbolTableOffset := 0x30000
 	addressTableOffset := 0
 	adrState := 0
+outer:
 	for i := symbolTableOffset; i < len(data) && addressTableOffset == 0; i++ {
 		adrb := data[i]
 		switch adrState {
@@ -239,6 +358,7 @@ func GetStartOfAddressTableOffset(data []byte) (int, error) {
 		case 8:
 			if adrb == searchSequence[8] {
 				addressTableOffset = i - 1
+				break outer
 			} else {
 				adrState = 0
 				i -= 8
@@ -252,279 +372,4 @@ func GetStartOfAddressTableOffset(data []byte) (int, error) {
 
 	return addressTableOffset, nil
 }
-
-func GetAddressFromOffset(data []byte, offset int) (int, error) {
-	if offset < 0 || offset > len(data)-4 {
-		return 0, ErrOffsetOutOfRange
-	}
-	retval := 0
-	retval = int(data[offset]) << 24
-	retval += int(data[offset+1]) << 16
-	retval += int(data[offset+2]) << 8
-	retval += int(data[offset+3])
-	return retval, nil
-}
-
-func GetLengthFromOffset(data []byte, offset int) (int, error) {
-	if offset < 0 || offset > len(data)-2 {
-		return 0, ErrOffsetOutOfRange
-	}
-	retval := 0
-	retval += int(data[offset]) << 8
-	retval += int(data[offset+1])
-	return retval, nil
-}
-
-func CountNq(data []byte, offset int) int {
-	cnt := 0
-	if data != nil && len(data) > offset {
-		state := 0
-		for i := offset; i < len(data) && i > (offset-8) && cnt < 3; i++ {
-			switch state {
-			case 0:
-				if data[i] != 0x4E {
-					return cnt
-				}
-				state++
-			case 1:
-				if data[i] != 0x71 {
-					return cnt
-				}
-				state = 0
-				cnt++
-				i -= 4
-			}
-		}
-	}
-	return cnt
-}
-
-func GetEndOfSymbolTable(data []byte) (int, error) {
-	searchSequence := []byte{0x73, 0x59, 0x4D, 0x42, 0x4F, 0x4C, 0x74, 0x41, 0x42, 0x4C, 0x45}
-	addressTableOffset := 0
-	adrState := 0
-
-	for i := 0; i < len(data) && addressTableOffset == 0; i++ {
-		adrb := data[i]
-		switch adrState {
-		case 0:
-			if adrb == searchSequence[0] {
-				adrState++
-			}
-		case 1:
-			if adrb == searchSequence[1] {
-				adrState++
-			} else {
-				adrState = 0
-				i--
-			}
-		case 2:
-			if adrb == searchSequence[2] {
-				adrState++
-			} else {
-				adrState = 0
-				i -= 2
-			}
-		case 3:
-			if adrb == searchSequence[3] {
-				adrState++
-			} else {
-				adrState = 0
-				i -= 3
-			}
-		case 4:
-			if adrb == searchSequence[4] {
-				adrState++
-			} else {
-				adrState = 0
-				i -= 4
-			}
-		case 5:
-			if adrb == searchSequence[5] {
-				adrState++
-			} else {
-				adrState = 0
-				i -= 5
-			}
-		case 6:
-			if adrb == searchSequence[6] {
-				adrState++
-			} else {
-				adrState = 0
-				i -= 6
-			}
-		case 7:
-			if adrb == searchSequence[7] {
-				adrState++
-			} else {
-				adrState = 0
-				i -= 7
-			}
-		case 8:
-			if adrb == searchSequence[8] {
-				adrState++
-			} else {
-				adrState = 0
-				i -= 8
-			}
-		case 9:
-			if adrb == searchSequence[9] {
-				adrState++
-			} else {
-				adrState = 0
-				i -= 9
-			}
-		case 10:
-			if adrb == searchSequence[10] {
-				// found it
-				return i, nil
-			} else {
-				adrState = 0
-				i -= 10
-			}
-		}
-	}
-	return -1, ErrEndOfSymbolTableNotFound
-}
-
-func GetFirstNqStringFromOffset(data []byte, offset int) (int, error) {
-	var retval, Nq1, Nq2, Nq3 int
-
-	if len(data) == 0 {
-		return 0, ErrDataIsEmpty
-	}
-
-	state := 0
-
-outer:
-	for i := offset; i < len(data) && i < offset+0x100; i++ {
-		switch state {
-		case 0:
-			if data[i] == 0x4E {
-				state++
-			}
-		case 1:
-			if data[i] == 0x71 {
-				state++
-			} else {
-				state = 0
-			}
-		case 2:
-			Nq1 = i
-			if data[i] == 0x4E {
-				state++
-			} else {
-				state = 0
-			}
-		case 3:
-			if data[i] == 0x71 {
-				state++
-			} else {
-				state = 0
-			}
-		case 4:
-			Nq2 = i
-			if data[i] == 0x4E {
-				state++
-			} else {
-				state = 0
-			}
-		case 5:
-			if data[i] == 0x71 {
-				state++
-			} else {
-				state = 0
-			}
-		case 6:
-			Nq3 = i
-			retval = i
-			break outer
-		}
-	}
-
-	if Nq3 == 0 {
-		retval = Nq2
-	}
-
-	if retval == 0 {
-		retval = Nq1
-	}
-
-	return retval, nil
-}
-
-func FindAddressTableOffset(data []byte) error {
-	addressTableOffset := 0
-	searchSequence := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20}
-	adrState := 0
-	for i := 0; i < len(data) && addressTableOffset == 0; i++ {
-		adrb := data[i]
-		switch adrState {
-		case 0:
-			if adrb == searchSequence[0] {
-				adrState++
-			}
-		case 1:
-			if adrb == searchSequence[1] {
-				adrState++
-			} else {
-				adrState = 0
-				i--
-			}
-		case 2:
-			if adrb == searchSequence[2] {
-				adrState++
-			} else {
-				adrState = 0
-				i -= 2
-			}
-		case 3:
-			if adrb == searchSequence[3] {
-				adrState++
-			} else {
-				adrState = 0
-				i -= 3
-			}
-		case 4:
-			if adrb == searchSequence[4] {
-				adrState++
-			} else {
-				adrState = 0
-				i -= 4
-			}
-		case 5:
-			if adrb == searchSequence[5] {
-				adrState++
-			} else {
-				adrState = 0
-				i -= 5
-			}
-		case 6:
-			if adrb == searchSequence[6] {
-				adrState++
-			} else {
-				adrState = 0
-				i -= 6
-			}
-		case 7:
-			if adrb == searchSequence[7] {
-				adrState++
-			} else {
-				adrState = 0
-				i -= 7
-			}
-		case 8:
-			if adrb == searchSequence[8] {
-				// found it
-				addressTableOffset = i
-				if addressTableOffset > 0 {
-					return nil
-				}
-			} else {
-				adrState = 0
-				i -= 8
-			}
-		}
-	}
-	return ErrAddressTableOffsetNotFound
-}
+*/

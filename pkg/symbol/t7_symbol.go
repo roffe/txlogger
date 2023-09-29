@@ -290,22 +290,6 @@ func getAddressFromOffset(data []byte, offset int) int {
 	return int(binary.BigEndian.Uint32(data[offset : offset+4]))
 }
 
-func bytePatternSearch(data, search []byte, startOffset int64) int {
-	pos := startOffset
-	ix := 0
-	for ix < len(search) {
-		b := data[pos]
-		pos++
-		if search[ix] == b {
-			ix++
-		} else {
-			ix = 0
-		}
-		startOffset++
-	}
-	return int(startOffset - int64(len(search)))
-}
-
 func GetSymbolListOffSet(file *os.File, length int) (int, error) {
 	retval := 0
 	zerocount := 0

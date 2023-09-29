@@ -50,15 +50,17 @@ type MainWindow struct {
 	addSymbolBtn *widget.Button
 	logBtn       *widget.Button
 	//mockBtn            *widget.Button
+
 	loadSymbolsEcuBtn  *widget.Button
 	loadSymbolsFileBtn *widget.Button
-	dashboardBtn       *widget.Button
-	logplayerBtn       *widget.Button
-	helpBtn            *widget.Button
+	syncSymbolsBtn     *widget.Button
+
+	dashboardBtn *widget.Button
+	logplayerBtn *widget.Button
+	helpBtn      *widget.Button
 
 	loadConfigBtn *widget.Button
 	saveConfigBtn *widget.Button
-	//syncSymbolsBtn *widget.Button
 	presetSelect  *widget.Select
 	symbolsHeader *fyne.Container
 
@@ -244,23 +246,8 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 			mw.SyncSymbols()
 		},
 	}
-	/*
-		mw.syncSymbolsBtn = widget.NewButtonWithIcon("Sync symbols", theme.ViewRefreshIcon(), func() {
-			if len(mw.symbolMap) == 0 {
-				dialog.ShowError(errors.New("Load symbols first"), mw.Window) //lint:ignore ST1005 ignore error
-				return
-			}
-			for i, v := range mw.vars.Get() {
-				for k, vv := range mw.symbolMap {
-					if strings.EqualFold(k, v.Name) {
-						mw.vars.UpdatePos(i, vv)
-						break
-					}
-				}
-			}
-			mw.symbolConfigList.Refresh()
-		})
-	*/
+
+	mw.syncSymbolsBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), mw.SyncSymbols)
 
 	mw.dashboardBtn = widget.NewButtonWithIcon("Dashboard", theme.InfoIcon(), func() {
 		mw.dashboard = NewDashboard(mw, false, mw.logBtn)
@@ -486,11 +473,13 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 				container.NewBorder(
 					nil,
 					nil,
-					widget.NewLabel("Symbol lookup"),
+					//widget.NewLabel("Search"),
+					widget.NewIcon(theme.SearchIcon()),
 					container.NewHBox(
 						mw.addSymbolBtn,
 						mw.loadSymbolsFileBtn,
 						mw.loadSymbolsEcuBtn,
+						mw.syncSymbolsBtn,
 					),
 					mw.symbolLookup,
 				),
@@ -606,16 +595,19 @@ func (mw *MainWindow) SyncSymbols() {
 		mw.Log("Load bin to sync symbols")
 		return
 	}
+	cnt := 0
 	for i, v := range mw.vars.Get() {
 		for k, vv := range mw.symbolMap {
 			if strings.EqualFold(k, v.Name) {
 				mw.vars.UpdatePos(i, vv)
+				cnt++
 				break
 			}
 		}
 	}
 	mw.symbolConfigList.Refresh()
 	mw.SaveSymbolList()
+	mw.Log(fmt.Sprintf("Synced %d / %d symbols", cnt, mw.vars.Len()))
 }
 
 func (mw *MainWindow) Content() fyne.CanvasObject {

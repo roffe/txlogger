@@ -111,3 +111,45 @@ func ExpandCompressedSymbolNames(in []byte) ([]string, error) {
 
 	return strings.Split(strings.TrimSuffix(string(out), "\r\n"), "\r\n"), nil
 }
+
+func bytePatternSearch(data, search []byte, startOffset int64) int {
+	pos := startOffset
+	ix := 0
+	for ix < len(search) {
+		b := data[pos]
+		pos++
+		if search[ix] == b {
+			ix++
+		} else {
+			ix = 0
+		}
+		startOffset++
+	}
+	if ix != len(search) {
+		return -1
+	}
+	return int(startOffset - int64(len(search)))
+}
+
+/*
+
+func findFirstOccurrence(data, target []byte, startOffset int) int {
+	if len(target) == 0 {
+		return -1
+	}
+	for i := startOffset; i <= len(data)-len(target); i++ {
+		found := true
+		for j := 0; j < len(target); j++ {
+			if data[i+j] != target[j] {
+				found = false
+				break
+			}
+		}
+		if found {
+			return i + len(target) - 1
+		}
+	}
+	return -1
+}
+
+*/
