@@ -18,7 +18,7 @@ func ValidateTrionic7File(data []byte) error {
 	if len(data) != 0x80000 {
 		return ErrInvalidLength
 	}
-	if !bytes.HasPrefix(data, []byte{0xFF, 0xFF, 0xEF, 0xFC, 0x00, 0x05}) {
+	if !bytes.HasPrefix(data, []byte{0xFF, 0xFF, 0xEF, 0xFC, 0x00}) {
 		return ErrInvalidTrionic7File
 	}
 	return nil
