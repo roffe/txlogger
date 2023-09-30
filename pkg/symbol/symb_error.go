@@ -12,4 +12,5 @@ var (
 	ErrInvalidTrionic8File        = errors.New("file does not seem to be a Trionic 8 binary")
 	ErrOffsetOutOfRange           = errors.New("offset out of range")
 	ErrDataIsEmpty                = errors.New("data is empty")
+	ErrVersionNotFound            = errors.New("version not found")
 )

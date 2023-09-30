@@ -18,7 +18,7 @@ func ValidateTrionic7File(data []byte) error {
 	if len(data) != 0x80000 {
 		return ErrInvalidLength
 	}
-	if !bytes.HasPrefix(data, []byte{0xFF, 0xFF, 0xEF, 0xFC, 0x00}) {
+	if !bytes.HasPrefix(data, []byte{0xFF, 0xFF, 0xEF, 0xFC}) {
 		return ErrInvalidTrionic7File
 	}
 	return nil
@@ -96,23 +96,15 @@ func nonBinaryPacked(cb func(string), file *os.File, fstats fs.FileInfo) error {
 }
 
 func BinaryPacked(data []byte, cb func(string)) ([]*Symbol, error) {
-	compr_created, addressTableOffset, compressedSymbolTable, err := extractCompressedSymbolTable(data, cb)
-	if err != nil {
-		if err.Error() != "symbol name table not found" {
-			return nil, err
-		}
+	compressed, addressTableOffset, symbolNameTableOffset, symbolTableLength, err := getOffsets(data, cb)
+	if err != nil && !errors.Is(err, ErrSymbolTableNotFound) {
+		return nil, err
 	}
-
-	//os.WriteFile("compressedSymbolNameTable.bin", compressedSymbolTable, 0644)
+	//os.WriteFile("compressedSymbolNameTable.bin", data[symbolNameTableOffset:symbolNameTableOffset+symbolTableLength, 0644)
 	if addressTableOffset == -1 {
-		return nil, errors.New("could not find addressTableOffset table")
+		return nil, ErrAddressTableOffsetNotFound
 	}
 
-	//ff, err := os.Create("compressedSymbolTable.bin")
-	//if err != nil {
-	//	return nil, err
-	//}
-	//defer ff.Close()
 	pos := addressTableOffset
 	var (
 		symb_count int
@@ -141,13 +133,11 @@ func BinaryPacked(data []byte, cb func(string)) ([]*Symbol, error) {
 	//log.Println("Symbols found: ", symb_count)
 	cb(fmt.Sprintf("Loaded %d symbols from binary", symb_count))
 
-	if compr_created {
-		if bytes.HasPrefix(compressedSymbolTable, []byte{0xFF, 0xFF, 0xFF, 0xFF}) {
+	if compressed {
+		if bytes.HasPrefix(data[symbolNameTableOffset:symbolNameTableOffset+symbolTableLength], []byte{0xFF, 0xFF, 0xFF, 0xFF}) {
 			return nil, errors.New("compressed symbol table is not present")
 		}
-		//log.Println("Decoding packed symbol table")
-		//cb("Decoding packed symbol table")
-		symbolNames, err := ExpandCompressedSymbolNames(compressedSymbolTable)
+		symbolNames, err := ExpandCompressedSymbolNames(data[symbolNameTableOffset : symbolNameTableOffset+symbolTableLength])
 		if err != nil {
 			return nil, err
 		}
@@ -156,78 +146,76 @@ func BinaryPacked(data []byte, cb func(string)) ([]*Symbol, error) {
 			symbols[i].Unit = GetUnit(symbols[i].Name)
 			symbols[i].Correctionfactor = GetCorrectionfactor(symbols[i].Name)
 		}
-		if err := readAllSymbolsData(data, symbols); err != nil {
+		if err := readAllT7SymbolsData(data, symbols); err != nil {
 			return symbols, err
 		}
 		return symbols, nil
-	} else {
-		log.Println("Symbol table not compressed?")
 	}
 
-	ver, err := determineVersion(data)
-	if err != nil {
-		if err.Error() == "not found" {
-			cb("Could not determine binary version")
-			cb("Load symbols from XML")
-		} else {
-			return nil, fmt.Errorf("could not determine version: %v", err)
+	if symbolTableLength < 0x100 {
+		ver, err := determineVersion(data)
+		if err != nil {
+			if errors.Is(err, ErrVersionNotFound) {
+				cb("Could not determine binary version")
+				cb("Load symbols from XML")
+			} else {
+				return nil, fmt.Errorf("could not determine version: %v", err)
+			}
 		}
-	}
 
-	nameMap, err := xml2map(ver)
-	if err != nil {
-		return nil, err
-	}
-	for i, s := range symbols {
-		if value, ok := nameMap[s.Number]; ok {
-			symbols[i].Name = value
-			symbols[i].Unit = GetUnit(s.Name)
-			symbols[i].Correctionfactor = GetCorrectionfactor(symbols[i].Name)
-		}
-	}
-	if err := readAllSymbolsData(data, symbols); err != nil {
-		return nil, err
-	}
-	/*
-		ff2, err := os.OpenFile("symbols.txt", os.O_CREATE|os.O_WRONLY, 0644)
+		nameMap, err := xml2map(ver)
 		if err != nil {
 			return nil, err
 		}
-		defer ff2.Close()
-
-		for _, s := range symbols {
-			ff2.WriteString(fmt.Sprintf("%s\n", s.String()))
-		}
-	*/
-
-	return symbols, nil
-
-}
-
-func readAllSymbolsData(fileBytes []byte, symbols []*Symbol) error {
-
-	dataLocationOffset := bytePatternSearch(fileBytes, searchPattern3, 0x30000) + 12
-
-	pos := dataLocationOffset
-
-	dataOffsetValue := binary.LittleEndian.Uint32(fileBytes[dataLocationOffset : dataLocationOffset+4])
-	pos += 4
-	//log.Printf("atx %X OV: %X", dataLocationOffset, dataOffsetValue)
-	for _, sym := range symbols {
-		if sym.Address-dataOffsetValue > uint32(len(fileBytes)) {
-			//log.Printf("symbol address out of range: %s", sym.String())
-			continue
-		}
-		var err error
-		sym.data, err = readSymbolData(fileBytes, sym, dataOffsetValue)
-		if err != nil {
-			return err
+		for i, s := range symbols {
+			if value, ok := nameMap[s.Number]; ok {
+				symbols[i].Name = value
+				symbols[i].Unit = GetUnit(s.Name)
+				symbols[i].Correctionfactor = GetCorrectionfactor(symbols[i].Name)
+			}
 		}
 	}
+
+	if err := readAllT7SymbolsData(data, symbols); err != nil {
+		return nil, err
+	}
+	return symbols, nil
+}
+
+func readAllT7SymbolsData(fileBytes []byte, symbols []*Symbol) error {
+	dataLocationOffset := bytePatternSearch(fileBytes, searchPattern, 0x30000) - 10
+	dataOffsetValue := binary.BigEndian.Uint32(fileBytes[dataLocationOffset : dataLocationOffset+4])
+	for _, sym := range symbols {
+		if sym.Address < 0x0F00000 {
+			var err error
+			sym.data, err = readSymbolData(fileBytes, sym, 0)
+			if err != nil {
+				return err
+			}
+		} else {
+			//dataLocationOffset := bytePatternSearch(fileBytes, searchPattern3, 0x30000) + len(searchPattern3)
+			if sym.Address-dataOffsetValue+uint32(sym.Length) > uint32(len(fileBytes)) {
+				// debug.Log(fmt.Sprintf("symbol address out of range: %s", sym.String()))
+				// log.Printf("symbol address out of range:%X %s", sym.Address-dataOffsetValue, sym.String())
+				continue
+			}
+			var err error
+			sym.data, err = readSymbolData(fileBytes, sym, dataOffsetValue)
+			if err != nil {
+				return err
+			}
+
+		}
+	}
+	log.Printf("KUK %X", fileBytes[dataLocationOffset:dataLocationOffset+4])
+	log.Printf("dataLocationOffset: %X", dataLocationOffset)
+	log.Printf("dataOffsetValue: %X", dataOffsetValue)
+
 	return nil
 }
 
 func readSymbolData(file []byte, s *Symbol, offset uint32) ([]byte, error) {
+	//	log.Println("readSymbolData: ", s.String())
 	defer func() {
 		if err := recover(); err != nil {
 			log.Printf("%s, error reading symbol data: %v", s.String(), err)
@@ -245,7 +233,7 @@ func determineVersion(data []byte) (string, error) {
 	case bytes.Contains(data, []byte("EU0AF01C")), bytes.Contains(data, []byte("EU0BF01C")), bytes.Contains(data, []byte("EU0CF01C")):
 		return "EU0AF01C", nil
 	}
-	return "", errors.New("not found")
+	return "", ErrVersionNotFound
 }
 
 var searchPattern = []byte{0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00}
@@ -255,7 +243,7 @@ var searchPattern3 = []byte{0x73, 0x59, 0x4D, 0x42, 0x4F, 0x4C, 0x74, 0x41, 0x42
 
 //var readNo int
 
-func extractCompressedSymbolTable(data []byte, cb func(string)) (bool, int, []byte, error) {
+func getOffsets(data []byte, cb func(string)) (bool, int, int, int, error) {
 	addressTableOffset := bytePatternSearch(data, searchPattern, 0x30000) - 0x06
 	//	log.Printf("Address table offset: %08X", addressTableOffset)
 	cb(fmt.Sprintf("Address table offset: %08X", addressTableOffset))
@@ -273,13 +261,10 @@ func extractCompressedSymbolTable(data []byte, cb func(string)) (bool, int, []by
 	cb(fmt.Sprintf("Symbol table length: %08X", symbolTableLength))
 
 	if symbolTableLength > 0x1000 && symbolNameTableOffset > 0 && symbolNameTableOffset < 0x70000 {
-		compressedSymbolTable := data[symbolNameTableOffset : symbolNameTableOffset+symbolTableLength]
-		if len(compressedSymbolTable) != symbolTableLength {
-			return false, -1, nil, errors.New("did not read enough bytes for symbol table")
-		}
-		return true, addressTableOffset, compressedSymbolTable, nil
+		//compressedSymbolTable := data[symbolNameTableOffset : symbolNameTableOffset+symbolTableLength]
+		return true, addressTableOffset, symbolNameTableOffset, symbolTableLength, nil
 	}
-	return false, addressTableOffset, nil, errors.New("symbol name table not found")
+	return false, addressTableOffset, symbolNameTableOffset, symbolTableLength, ErrSymbolTableNotFound
 }
 
 func getLengthFromOffset(data []byte, offset int) int {

@@ -43,19 +43,33 @@ var xmlMap map[string][]byte = map[string][]byte{
 }
 
 func xml2map(name string) (map[int]string, error) {
+	/*
+		xmlBytes, err := xmlFiles.ReadFile(strings.ToUpper(name) + ".xml")
+		if err != nil {
+			log.Printf("xml2map: %s", err)
+			filename, err := sdialog.File().Filter("xml files", "xml").Title("Select xml file").Load()
+			if err != nil {
+				return nil, errors.New("no xml file selected, and no symbol name table present in binary")
+			}
+			f, err := os.ReadFile(filename)
+			if err != nil {
+				return nil, err
+			}
+			xmlBytes = f
+		}
+	*/
+
 	xmlBytes, ok := xmlMap[strings.ToUpper(name)]
 	if !ok {
 		filename, err := sdialog.File().Filter("xml files", "xml").Title("Select xml file").Load()
 		if err != nil {
-			return nil, errors.New("no xml file selected, and no symbol name table present in binary")
+			return nil, errors.New("no xml file selected, and no symbol table in binary")
 		}
 		f, err := os.ReadFile(filename)
 		if err != nil {
 			return nil, err
 		}
 		xmlBytes = f
-		//log.Println(name)
-		//return nil, errors.New("unknown xml version")
 	}
 
 	var symbols DocumentElement
@@ -63,17 +77,6 @@ func xml2map(name string) (map[int]string, error) {
 		return nil, err
 	}
 
-	//sort.Slice(symbols.Symbols, func(i, j int) bool {
-	//	return symbols.Symbols[i].SYMBOLNUMBER < symbols.Symbols[j].SYMBOLNUMBER
-	//})
-
-	/*
-		f, err := os.OpenFile("symdebugXX.txt", os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer f.Close()
-	*/
 	results := make(map[int]string)
 	for _, s := range symbols.Symbols {
 		//fmt.Fprintf(f, "%d %s %s\n", s.SYMBOLNUMBER, s.DESCRIPTION, s.SYMBOLNAME)

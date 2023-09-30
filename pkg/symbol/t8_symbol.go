@@ -56,11 +56,11 @@ func LoadT8Symbols(fileBytes []byte, cb func(string)) ([]*Symbol, error) {
 		sym.Correctionfactor = GetCorrectionfactor(sym.Name)
 	}
 
-	cb(fmt.Sprintf("End Of Symbol Table: 0x%X\n", addrtaboffset))
-	cb(fmt.Sprintf("NqNqNq Offset: 0x%X\n", NqNqNqOffset))
-	cb(fmt.Sprintf("Symbol Table Offset: 0x%X\n", symbtaboffset))
-	cb(fmt.Sprintf("Symbol Table Length: 0x%X\n", symbtablength))
-	cb(fmt.Sprintf("Real Address Table Offset: 0x%X\n", addressTableOffset))
+	cb(fmt.Sprintf("End Of Symbol Table: 0x%X", addrtaboffset))
+	cb(fmt.Sprintf("NqNqNq Offset: 0x%X", NqNqNqOffset))
+	cb(fmt.Sprintf("Symbol Table Offset: 0x%X", symbtaboffset))
+	cb(fmt.Sprintf("Symbol Table Length: 0x%X", symbtablength))
+	cb(fmt.Sprintf("Real Address Table Offset: 0x%X", addressTableOffset))
 
 	//log.Println("Symbols found: ", symb_count)
 	cb(fmt.Sprintf("Loaded %d symbols from binary", len(symbols)))

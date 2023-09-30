@@ -1,6 +1,7 @@
 tmp
 tmp2
 .vscode
+*.afr
 *.t7l
 *.t8l
 *.dif

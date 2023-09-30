@@ -104,6 +104,16 @@ func (c *CanSettingsWidget) Enable() {
 	c.speedSelector.Enable()
 	c.debugCheckbox.Enable()
 	c.refreshBtn.Enable()
+
+	if info, found := adapter.GetAdapterMap()[c.adapterSelector.Selected]; found {
+		if info.RequiresSerialPort {
+			c.portSelector.Enable()
+			c.speedSelector.Enable()
+		} else {
+			c.portSelector.Disable()
+			c.speedSelector.Disable()
+		}
+	}
 }
 
 const (

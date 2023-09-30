@@ -1,12 +1,13 @@
 package debug
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"runtime"
 	"time"
 )
-
-var f *os.File
 
 func init() {
 	var err error
@@ -17,8 +18,17 @@ func init() {
 }
 
 func Log(msg string) {
-	LogRaw(time.Now().Format("2006-01-02 15:04:05.000") + " " + msg)
+	timeStr := time.Now().Format("2006-01-02 15:04:05.000")
+	_, fullPath, line, ok := runtime.Caller(2)
+	filename := filepath.Base(fullPath)
+	if ok {
+		LogRaw(fmt.Sprintf("%s %s:%d %s", timeStr, filename, line, msg))
+	} else {
+		LogRaw(timeStr + " " + msg)
+	}
 }
+
+var f *os.File
 
 func LogRaw(msg string) {
 	if f == nil {

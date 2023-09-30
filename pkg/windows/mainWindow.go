@@ -541,6 +541,7 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 func (mw *MainWindow) Log(s string) {
 	debug.Log(s)
 	mw.outputData.Append(s)
+	mw.output.Refresh()
 	mw.output.ScrollToBottom()
 }
 
@@ -619,9 +620,9 @@ func (mw *MainWindow) disableBtns() {
 	mw.addSymbolBtn.Disable()
 	mw.loadConfigBtn.Disable()
 	mw.saveConfigBtn.Disable()
-	//mw.syncSymbolsBtn.Disable()
 	mw.loadSymbolsFileBtn.Disable()
 	mw.loadSymbolsEcuBtn.Disable()
+	mw.syncSymbolsBtn.Disable()
 	if !mw.loggingRunning {
 		mw.logBtn.Disable()
 	}
@@ -641,9 +642,9 @@ func (mw *MainWindow) enableBtns() {
 	mw.addSymbolBtn.Enable()
 	mw.loadConfigBtn.Enable()
 	mw.saveConfigBtn.Enable()
-	//mw.syncSymbolsBtn.Enable()
 	mw.loadSymbolsFileBtn.Enable()
 	mw.loadSymbolsEcuBtn.Enable()
+	mw.syncSymbolsBtn.Enable()
 	mw.logBtn.Enable()
 	//	mw.mockBtn.Enable()
 	mw.ecuSelect.Enable()
