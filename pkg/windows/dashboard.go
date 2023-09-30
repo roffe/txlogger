@@ -35,7 +35,7 @@ type Gauge interface {
 type Dashboard struct {
 	speed, rpm, iat/*, mReq, mAir*/ Gauge
 	throttle, pwm, engineTemp, nblambda, wblambda Gauge
-	boost, dual                                   *widgets.DualDial
+	boost, air                                    *widgets.DualDial
 	ioff, activeAirDem, ign, cruise               *canvas.Text
 	checkEngine                                   *canvas.Image
 	limpMode                                      *canvas.Image
@@ -158,7 +158,7 @@ func NewDashboard(mw *MainWindow, logplayer bool, logBtn *widget.Button) *Dashbo
 			TextSize:  28,
 			Color:     color.RGBA{R: 0, G: 255, B: 0, A: 255},
 		},
-		dual: widgets.NewDualDial(widgets.DualDialConfig{
+		air: widgets.NewDualDial(widgets.DualDialConfig{
 			Title: "mg/c",
 			Min:   0,
 			Max:   2200,
@@ -225,7 +225,7 @@ func (db *Dashboard) render() fyne.CanvasObject {
 			db.ign,
 			db.ioff,
 			db.rpm.Content(),
-			db.dual.Content(),
+			db.air.Content(),
 			db.boost.Content(),
 			db.iat.Content(),
 			db.engineTemp.Content(),
@@ -280,58 +280,84 @@ func (db *Dashboard) SetValue(key string, value float64) {
 	select {
 	case db.metricsChan <- &model.DashboardMetric{Name: key, Value: value}:
 	default:
-		log.Println("failed to set value")
+		//		log.Println("failed to set value")
 	}
 }
 
-func (db *Dashboard) startParser() {
-	metrics := map[string]Gauge{
-		"In.v_Vehicle":        db.speed,
-		"ActualIn.n_Engine":   db.rpm,
-		"ActualIn.T_AirInlet": db.iat,
-		//"m_Request":               db.mReq,
-		//"MAF.m_AirInlet":          db.mAir,
-		"ActualIn.T_Engine": db.engineTemp,
-		//"ECMStat.p_Diff":          db.boost,
-		//"ActualIn.p_AirInlet":     db.boost,
-		//"In.p_AirInlet":           db.boost,
-		"Out.X_AccPedal":          db.throttle, // t7
-		"Out.X_AccPos":            db.throttle, // t8
-		"Out.PWM_BoostCntrl":      db.pwm,
-		"DisplProt.LambdaScanner": db.wblambda,
-		"Lambda.LambdaInt":        db.nblambda,
+func (db *Dashboard) createRouter() map[string]func(float64) {
+	textSetter := func(obj *canvas.Text, text string, precission int) func(float64) {
+		return func(value float64) {
+			obj.Text = text + ": " + strconv.FormatFloat(value, 'f', precission, 64)
+			obj.Refresh()
+		}
 	}
-	for metric := range db.metricsChan {
-		if m, ok := metrics[metric.Name]; ok {
-			if metric.Value != m.Value() {
-				m.SetValue(metric.Value)
-				continue
+
+	ioff := func(value float64) {
+		db.ioff.Text = "Ioff: " + strconv.FormatFloat(value, 'f', 1, 64)
+		//db.ioff.Text = fmt.Sprintf("Ioff: %-6s", strconv.FormatFloat(value, 'f', 1, 64))
+		switch {
+		case value >= 0:
+			db.ioff.Color = color.RGBA{R: 0, G: 0xFF, B: 0, A: 0xFF}
+		case value < 0 && value >= -3:
+			db.ioff.Color = color.RGBA{R: 0xFF, G: 0xA5, B: 0, A: 0xFF}
+		case value < -3:
+			db.ioff.Color = color.RGBA{R: 0xFF, G: 0, B: 0, A: 0xFF}
+		}
+		db.ioff.Refresh()
+	}
+
+	ecmstat := func(value float64) {
+		db.activeAirDem.Text = AirDemToString(value) + " (" + strconv.FormatFloat(value, 'f', 0, 64) + ")"
+		db.activeAirDem.Refresh()
+	}
+
+	showHider := func(obj fyne.CanvasObject) func(float64) {
+		return func(value float64) {
+			if value == 1 {
+				obj.Show()
+			} else {
+				obj.Hide()
 			}
 		}
-		switch metric.Name {
-		//case "Out.X_AccPos":
-		//	db.throttle.SetValue(metric.Value * .1)
-		case "CRUISE":
-			if metric.Value == 1 {
-				db.cruise.Show()
-			} else {
-				db.cruise.Hide()
-			}
-		case "CEL":
-			if metric.Value == 1 {
-				db.checkEngine.Show()
-			} else {
-				db.checkEngine.Hide()
-			}
-		case "LIMP":
-			if metric.Value == 1 {
-				db.limpMode.Show()
-			} else {
-				db.limpMode.Hide()
-			}
-		case "KnkDet.KnockCyl":
-			if metric.Value > 0 {
-				kn := int(metric.Value)
+	}
+
+	return map[string]func(float64){
+		"In.v_Vehicle": db.speed.SetValue,
+
+		"ActualIn.n_Engine":   db.rpm.SetValue,
+		"ActualIn.T_AirInlet": db.iat.SetValue,
+
+		"ActualIn.T_Engine": db.engineTemp.SetValue,
+
+		"In.p_AirInlet":             db.boost.SetValue,
+		"ActualIn.p_AirInlet":       db.boost.SetValue,
+		"In.p_AirBefThrottle":       db.boost.SetValue2,
+		"ActualIn.p_AirBefThrottle": db.boost.SetValue2,
+
+		"Out.X_AccPedal": db.throttle.SetValue, // t7
+		"Out.X_AccPos":   db.throttle.SetValue, // t8
+
+		"Out.PWM_BoostCntrl": db.pwm.SetValue,
+
+		"DisplProt.LambdaScanner": db.wblambda.SetValue,
+		"Lambda.LambdaInt":        db.nblambda.SetValue,
+
+		"MAF.m_AirInlet":          db.air.SetValue,
+		"m_Request":               db.air.SetValue2,
+		"AirMassMast.m_Request":   db.air.SetValue2,
+		"Out.fi_Ignition":         textSetter(db.ign, "Ign", 1),
+		"ECMStat.ST_ActiveAirDem": ecmstat,
+
+		"IgnProt.fi_Offset":     ioff,
+		"IgnMastProt.fi_Offset": ioff,
+
+		"CRUISE": showHider(db.cruise),
+		"CEL":    showHider(db.checkEngine),
+		"LIMP":   showHider(db.limpMode),
+
+		"KnkDet.KnockCyl": func(value float64) {
+			if value > 0 {
+				kn := int(value)
 				knockValue := 0
 				if kn&1<<24 == 1<<24 {
 					knockValue += 1000
@@ -350,34 +376,17 @@ func (db *Dashboard) startParser() {
 			} else {
 				db.knockIcon.Content().Hide()
 			}
-		case "In.p_AirInlet", "ActualIn.p_AirInlet":
-			db.boost.SetValue(metric.Value)
+		},
+	}
+}
 
-		case "In.p_AirBefThrottle", "ActualIn.p_AirBefThrottle":
-			db.boost.SetValue2(metric.Value)
-		case "MAF.m_AirInlet":
-			db.dual.SetValue(metric.Value)
-		case "m_Request", "AirMassMast.m_Request":
-			db.dual.SetValue2(metric.Value)
-		case "Out.fi_Ignition":
-			db.ign.Text = "Ign: " + strconv.FormatFloat(metric.Value, 'f', 1, 64)
-			//db.ign.Text = fmt.Sprintf("Ign: %-6s", strconv.FormatFloat(metric.Value, 'f', 1, 64))
-			db.ign.Refresh()
-		case "IgnProt.fi_Offset", "IgnMastProt.fi_Offset":
-			db.ioff.Text = "Ioff: " + strconv.FormatFloat(metric.Value, 'f', 1, 64)
-			//db.ioff.Text = fmt.Sprintf("Ioff: %-6s", strconv.FormatFloat(metric.Value, 'f', 1, 64))
-			switch {
-			case metric.Value >= 0:
-				db.ioff.Color = color.RGBA{R: 0, G: 0xFF, B: 0, A: 0xFF}
-			case metric.Value < 0 && metric.Value >= -3:
-				db.ioff.Color = color.RGBA{R: 0xFF, G: 0xA5, B: 0, A: 0xFF}
-			case metric.Value < -3:
-				db.ioff.Color = color.RGBA{R: 0xFF, G: 0, B: 0, A: 0xFF}
-			}
-			db.ioff.Refresh()
-		case "ECMStat.ST_ActiveAirDem":
-			db.activeAirDem.Text = AirDemToString(metric.Value) + " (" + strconv.FormatFloat(metric.Value, 'f', 0, 64) + ")"
-			db.activeAirDem.Refresh()
+func (db *Dashboard) startParser() {
+
+	metrics := db.createRouter()
+	for metric := range db.metricsChan {
+		if fun, ok := metrics[metric.Name]; ok {
+			fun(metric.Value)
+			continue
 		}
 	}
 }
@@ -393,10 +402,8 @@ func (db *Dashboard) Sweep() {
 		db.speed.SetValue(300 * pa)
 		db.rpm.SetValue(8000 * pa)
 		db.iat.SetValue(80 * pa)
-		//db.mReq.SetValue(2200 * pa)
-		//db.mAir.SetValue(2200 * pa)
-		db.dual.SetValue(2200 * pa)
-		db.dual.SetValue2(2200 * pa)
+		db.air.SetValue(2100 * pa)
+		db.air.SetValue2(2200 * pa)
 		db.engineTemp.SetValue(160 * pa)
 		db.boost.SetValue(3 * pa)
 		db.throttle.SetValue(100 * pa)
@@ -424,7 +431,7 @@ func (db *Dashboard) Layout(_ []fyne.CanvasObject, space fyne.Size) {
 	rpm.Resize(fyne.NewSize(sixthWidth, thirdHeight))
 	rpm.Move(fyne.NewPos(0, 0))
 
-	dual := db.dual.Content()
+	dual := db.air.Content()
 	dual.Resize(fyne.NewSize(sixthWidth, thirdHeight))
 	dual.Move(fyne.NewPos(0, thirdHeight))
 
@@ -536,16 +543,14 @@ func (db *Dashboard) setValue(value float64) {
 	db.speed.SetValue(value)
 	db.rpm.SetValue(value)
 	db.iat.SetValue(value)
-	//db.mReq.SetValue(value)
-	//db.mAir.SetValue(value)
 	db.engineTemp.SetValue(value)
 	db.boost.SetValue(value)
 	db.throttle.SetValue(value)
 	db.pwm.SetValue(value)
 	db.nblambda.SetValue(value)
 	db.wblambda.SetValue(value)
-	db.dual.SetValue(value)
-	db.dual.SetValue2(value)
+	db.air.SetValue(value)
+	db.air.SetValue2(value)
 }
 
 func (db *Dashboard) Capture() {
@@ -594,16 +599,14 @@ func (db *Dashboard) newDebugBar() *fyne.Container {
 			db.speed.SetValue(110)
 			db.rpm.SetValue(3320)
 			db.iat.SetValue(30)
-			//db.mReq.SetValue(1200)
-			//db.mAir.SetValue(1200)
 			db.engineTemp.SetValue(85)
 			db.boost.SetValue(1.2)
 			db.throttle.SetValue(85)
 			db.pwm.SetValue(47)
 			db.nblambda.SetValue(2.13)
 			db.wblambda.SetValue(1.03)
-			db.dual.SetValue(1003)
-			db.dual.SetValue2(1200)
+			db.air.SetValue(1003)
+			db.air.SetValue2(1200)
 		}),
 		widget.NewButton("+0.01", func() {
 			mockValue += 0.01

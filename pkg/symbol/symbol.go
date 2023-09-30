@@ -13,6 +13,11 @@ import (
 	"github.com/roffe/txlogger/pkg/blowfish"
 )
 
+type ECUBinary interface {
+	Bytes() []byte
+	Symbols() []*Symbol
+}
+
 type Symbol struct {
 	Name string
 
@@ -39,24 +44,16 @@ func (s *Symbol) String() string {
 	return fmt.Sprintf("%s #%d @%08X type: %02X len: %d", s.Name, s.Number, s.Address, s.Type, s.Length)
 }
 
-func LoadSymbols(filename string, ecu string, cb func(string)) ([]*Symbol, error) {
+func LoadSymbols(filename string, ecu string, cb func(string)) (SymbolCollection, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
 	switch ecu {
 	case "T7":
-		if err := ValidateTrionic7File(data); err == nil {
-			return LoadT7Symbols(data, cb)
-		} else {
-			return nil, err
-		}
+		return LoadT7Symbols(data, cb)
 	case "T8":
-		if err := ValidateTrionic8File(data); err == nil {
-			return LoadT8Symbols(data, cb)
-		} else {
-			return nil, err
-		}
+		return LoadT8Symbols(data, cb)
 	default:
 		return nil, fmt.Errorf("unknown ECU type: %s", ecu)
 	}
@@ -116,7 +113,6 @@ func bytePatternSearch(data []byte, search []byte, startOffset int64) int {
 	if startOffset < 0 || startOffset >= int64(len(data)) {
 		return -1
 	}
-
 	ix := 0
 	for i := startOffset; i < int64(len(data)); i++ {
 		if search[ix] == data[i] {
@@ -128,48 +124,5 @@ func bytePatternSearch(data []byte, search []byte, startOffset int64) int {
 			ix = 0
 		}
 	}
-
 	return -1
 }
-
-func bytePatternSearch2(data, search []byte, startOffset int64) int {
-	pos := startOffset
-	ix := 0
-	for ix < len(search) {
-		b := data[pos]
-		pos++
-		if search[ix] == b {
-			ix++
-		} else {
-			ix = 0
-		}
-		startOffset++
-	}
-	if ix != len(search) {
-		return -1
-	}
-	return int(startOffset - int64(len(search)))
-}
-
-/*
-
-func findFirstOccurrence(data, target []byte, startOffset int) int {
-	if len(target) == 0 {
-		return -1
-	}
-	for i := startOffset; i <= len(data)-len(target); i++ {
-		found := true
-		for j := 0; j < len(target); j++ {
-			if data[i+j] != target[j] {
-				found = false
-				break
-			}
-		}
-		if found {
-			return i + len(target) - 1
-		}
-	}
-	return -1
-}
-
-*/

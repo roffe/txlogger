@@ -240,6 +240,14 @@ func (c *DualDial) MinSize(_ []fyne.CanvasObject) fyne.Size {
 	return c.minsize
 }
 
+func (c *DualDial) Value() float64 {
+	return c.value
+}
+
+func (c *DualDial) Value2() float64 {
+	return c.value2
+}
+
 func (c *DualDial) SetValue(value float64) {
 	if value == c.value {
 		return

@@ -65,6 +65,13 @@ func (v *VarDefinitionList) SetMethod(pos int, method Method) {
 	//v.updated()
 }
 
+func (v *VarDefinitionList) SetType(pos int, value uint8) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	v.data[pos].Type = value
+	//v.updated()
+}
+
 func (v *VarDefinitionList) SetValue(pos, value int) {
 	v.mu.Lock()
 	defer v.mu.Unlock()

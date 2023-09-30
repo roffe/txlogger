@@ -24,6 +24,8 @@ func Help(app fyne.App) {
 			widget.NewLabel("PGUP: Skip 100 frames forward"),
 			widget.NewLabel("PGDN: Skip 100 frames backward"),
 			widget.NewLabel("Home/Return: Go to start"),
+			widget.NewLabel("Plus: Increase playback speed"),
+			widget.NewLabel("Minus: Decrease playback speed"),
 		)),
 		container.NewTabItemWithIcon("About", theme.InfoIcon(), container.NewVBox(
 			widget.NewLabel("TxLogger"),

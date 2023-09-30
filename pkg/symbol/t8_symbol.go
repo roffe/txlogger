@@ -4,7 +4,10 @@ import (
 	"fmt"
 )
 
-func LoadT8Symbols(fileBytes []byte, cb func(string)) ([]*Symbol, error) {
+type T8Binary struct {
+}
+
+func LoadT8Symbols(fileBytes []byte, cb func(string)) (SymbolCollection, error) {
 	if err := ValidateTrionic8File(fileBytes); err != nil {
 		return nil, err
 	}
@@ -65,7 +68,7 @@ func LoadT8Symbols(fileBytes []byte, cb func(string)) ([]*Symbol, error) {
 	//log.Println("Symbols found: ", symb_count)
 	cb(fmt.Sprintf("Loaded %d symbols from binary", len(symbols)))
 
-	return symbols, nil
+	return NewCollection(symbols...), nil
 }
 
 func ReadAddressTable(data []byte, offset int) ([]*Symbol, error) {

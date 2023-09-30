@@ -94,6 +94,9 @@ func (c *T7Client) Start() error {
 			case <-ctx.Done():
 				return
 			case msg := <-sub:
+				if c.db == nil {
+					continue
+				}
 				switch msg.Identifier() {
 				case 0x1A0:
 					rpm := binary.BigEndian.Uint16(msg.Data()[1:3])
@@ -104,26 +107,26 @@ func (c *T7Client) Start() error {
 						c.db.SetValue("ActualIn.n_Engine", float64(rpm))
 						c.db.SetValue("Out.X_AccPedal", float64(throttle))
 					}
+
 				case 0x280:
-					if c.db != nil {
-						data := msg.Data()[4]
-						if data&0x20 == 0x20 {
-							c.db.SetValue("CRUISE", 1)
-						} else {
-							c.db.SetValue("CRUISE", 0)
-						}
-						if data&0x80 == 0x80 {
-							c.db.SetValue("CEL", 1)
-						} else {
-							c.db.SetValue("CEL", 0)
-						}
-						data2 := msg.Data()[3]
-						if data2&0x01 == 0x01 {
-							c.db.SetValue("LIMP", 1)
-						} else {
-							c.db.SetValue("LIMP", 0)
-						}
+					data := msg.Data()[4]
+					if data&0x20 == 0x20 {
+						c.db.SetValue("CRUISE", 1)
+					} else {
+						c.db.SetValue("CRUISE", 0)
 					}
+					if data&0x80 == 0x80 {
+						c.db.SetValue("CEL", 1)
+					} else {
+						c.db.SetValue("CEL", 0)
+					}
+					data2 := msg.Data()[3]
+					if data2&0x01 == 0x01 {
+						c.db.SetValue("LIMP", 1)
+					} else {
+						c.db.SetValue("LIMP", 0)
+					}
+
 				case 0x3A0:
 					speed := uint16(msg.Data()[4]) | uint16(msg.Data()[3])<<8
 					realSpeed := float64(speed) / 10

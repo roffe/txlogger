@@ -14,7 +14,7 @@ import (
 	"github.com/roffe/txlogger/pkg/symbol"
 )
 
-func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) ([]*symbol.Symbol, error) {
+func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (symbol.SymbolCollection, error) {
 	cl, err := gocan.New(context.TODO(), dev)
 	if err != nil {
 		return nil, err
@@ -105,5 +105,5 @@ func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) ([]*s
 	}
 	cb(fmt.Sprintf("Loaded %d symbols from ECU in %s", sym_count, time.Since(start).Round(time.Millisecond).String()))
 
-	return symbols, nil
+	return symbol.NewCollection(symbols...), nil
 }

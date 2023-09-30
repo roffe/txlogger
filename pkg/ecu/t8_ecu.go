@@ -14,7 +14,7 @@ import (
 	"github.com/roffe/txlogger/pkg/symbol"
 )
 
-func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) ([]*symbol.Symbol, error) {
+func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) (symbol.SymbolCollection, error) {
 	cl, err := gocan.New(context.TODO(), dev)
 	if err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) ([]*s
 
 	cb(fmt.Sprintf("Downloaded %d symbol names in %s", len(symbolNames), time.Since(start).Round(time.Millisecond).String()))
 
-	return symbols, nil
+	return symbol.NewCollection(symbols...), nil
 }
 
 func removeNullTerminators(str string) string {

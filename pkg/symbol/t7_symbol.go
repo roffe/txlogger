@@ -6,12 +6,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
-	"io/fs"
 	"log"
-	"os"
 	"strconv"
 	"strings"
+
+	"github.com/roffe/txlogger/pkg/debug"
 )
 
 func ValidateTrionic7File(data []byte) error {
@@ -61,7 +60,10 @@ func NewFromT7Bytes(data []byte, symb_count int) *Symbol {
 
 }
 
-func LoadT7Symbols(data []byte, cb func(string)) ([]*Symbol, error) {
+func LoadT7Symbols(data []byte, cb func(string)) (SymbolCollection, error) {
+	if err := ValidateTrionic7File(data); err != nil {
+		return nil, err
+	}
 
 	//fstats, err := file.Stat()
 	//if err != nil {
@@ -71,64 +73,154 @@ func LoadT7Symbols(data []byte, cb func(string)) ([]*Symbol, error) {
 	//	symbol_collection := make(map[string]Symbol)
 
 	if !IsBinaryPackedVersion(data, 0x9B) {
-		return nil, errors.New("non binary packed not implemented, send your bin to Roffe")
-		//log.Println("Not a binary packed version")
-		//cb("Not a binary packed symbol table")
-		//if err := nonBinaryPacked(cb, file, fstats); err != nil {
-		//	return nil, err
-		//}
+		//return nil, errors.New("non binarypacked not implemented, send your bin to Roffe")
+		//log.Println("Not a binarypacked version")
+		cb("Not a binarypacked symbol table")
+		return nonBinaryPacked(data, cb)
+
 	} else {
 		//log.Println("Binary packed version")
 		cb("Found binary packed symbol table")
-		return BinaryPacked(data, cb)
+		return binaryPacked(data, cb)
 
 	}
 	//return nil, errors.New("not implemented")
 }
 
-func nonBinaryPacked(cb func(string), file *os.File, fstats fs.FileInfo) error {
-	symbolListOffset, err := GetSymbolListOffSet(file, int(fstats.Size()))
+func nonBinaryPacked(data []byte, cb func(string)) (SymbolCollection, error) {
+	symbolListOffset, err := getSymbolListOffSet(data) // 0x15FA in 5168646.BIN
 	if err != nil {
-		return err
+		return nil, err
 	}
-	log.Printf("Symbol list offset: %X", symbolListOffset)
-	return nil
+	cb(fmt.Sprintf("Symbol list offset: %X", symbolListOffset))
+	var symbolName strings.Builder
+	var symbolCount int
+	var symbolNames []string
+	var symbolInternalPositions []int
+
+outer:
+	for pos := symbolListOffset; pos < len(data); pos++ {
+		switch data[pos] {
+		case 0xFF: // 0xFF used to keep the start of each string 'word' aligned
+			continue
+		case 0x02:
+			break outer
+		case 0x00: // 0x00 end of Symbol name string
+			symbolNames = append(symbolNames, symbolName.String())
+			symbolInternalPositions = append(symbolInternalPositions, pos-len(symbolName.String()))
+			symbolName.Reset()
+			symbolCount++
+		default:
+			symbolName.WriteByte(data[pos])
+		}
+	}
+
+	cb(fmt.Sprintln("Symbols found: ", symbolCount))
+
+	searchPattern := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF0}
+	searchPattern[12] = byte(symbolInternalPositions[0] >> 8)
+	searchPattern[13] = byte(symbolInternalPositions[0])
+
+	// log.Printf("Search pattern: %X", searchPattern)
+
+	addressTableOffset := bytePatternSearch(data, searchPattern, 0)
+	cb(fmt.Sprintf("Address table offset: %X", addressTableOffset))
+
+	if addressTableOffset == -1 {
+		return nil, ErrAddressTableOffsetNotFound
+	}
+
+	var symb_count int
+
+	symCol := NewCollection()
+
+	for pos := addressTableOffset; pos < len(data); pos += 14 {
+		if symb_count >= symbolCount {
+			break
+		}
+		buff := data[pos : pos+14]
+		sram_address := binary.BigEndian.Uint32(buff[0:4])
+		symbol_length := binary.BigEndian.Uint16(buff[4:6])
+		internal_address := binary.BigEndian.Uint32(buff[10:14])
+		mask := binary.BigEndian.Uint16(buff[6:8])
+		sym_type := buff[8]
+
+		var real_rom_address uint32
+		if sram_address > 0xF00000 {
+			real_rom_address = sram_address - 0xEF02F0
+		} else {
+			real_rom_address = sram_address
+		}
+
+		sym := &Symbol{
+			Name:             strings.TrimSpace(symbolNames[symb_count]),
+			Number:           symb_count,
+			Address:          real_rom_address,
+			Length:           symbol_length,
+			Mask:             mask,
+			Type:             sym_type,
+			Correctionfactor: GetCorrectionfactor(strings.TrimSpace(symbolNames[symb_count])),
+			Unit:             GetUnit(strings.TrimSpace(symbolNames[symb_count])),
+		}
+		if sym.Address < 0x0F00000 {
+			data, err := readSymbolData(data, sym, 0)
+			if err == nil {
+				sym.data = data
+			} else {
+				log.Println(err)
+			}
+		}
+
+		if sym.Name == "BFuelCal.Map" {
+			log.Printf("all %X", buff)
+			log.Printf("sram address: %X", sram_address)
+			log.Printf("symbol length: %X", symbol_length)
+			log.Printf("internal address: %X", internal_address)
+			log.Printf("rest %X", buff[6:10])
+			log.Printf("real rom address: %X", real_rom_address)
+			log.Println(sym.String())
+		}
+
+		symCol.Add(sym)
+		symb_count++
+	}
+	/*
+		for _, sym := range symCol.Symbols() {
+			if sym.Address < 0x0F00000 {
+				sym.data, err = readSymbolData(data, sym, 0)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	*/
+	//log.Println("Symbols found: ", symb_count)
+	cb(fmt.Sprintf("Loaded %d symbols from binary", symb_count))
+
+	return symCol, nil
 }
 
-func BinaryPacked(data []byte, cb func(string)) ([]*Symbol, error) {
+func binaryPacked(data []byte, cb func(string)) (SymbolCollection, error) {
 	compressed, addressTableOffset, symbolNameTableOffset, symbolTableLength, err := getOffsets(data, cb)
 	if err != nil && !errors.Is(err, ErrSymbolTableNotFound) {
 		return nil, err
 	}
 	//os.WriteFile("compressedSymbolNameTable.bin", data[symbolNameTableOffset:symbolNameTableOffset+symbolTableLength, 0644)
+
 	if addressTableOffset == -1 {
 		return nil, ErrAddressTableOffsetNotFound
 	}
 
-	pos := addressTableOffset
-	var (
-		symb_count int
-		symbols    []*Symbol
-	)
+	var symb_count int
+	var symbols []*Symbol
 
-	for {
-		buff := data[pos : pos+10]
-		pos += 10
-		if len(buff) != 10 {
-			return nil, errors.New("binaryPacked: not enough bytes read")
-		}
-
-		if int32(buff[0]) != 0x53 && int32(buff[1]) != 0x43 { // SC
-			symbols = append(symbols, NewFromT7Bytes(buff, symb_count))
-			symb_count++
-		} else {
-			// file.Seek(0, io.SeekCurrent)
-			// if pos, err := file.Seek(0, io.SeekCurrent); err == nil {
-			// 	log.Printf("EOT: %X", pos-0xA)
-			// }
+	// parse addresstable and create symbols with generic names
+	for pos := addressTableOffset; pos < len(data)+10; pos += 10 {
+		if data[pos] == 0x53 && data[pos+1] == 0x43 { // SC
 			break
 		}
-
+		symbols = append(symbols, NewFromT7Bytes(data[pos:pos+10], symb_count))
+		symb_count++
 	}
 	//log.Println("Symbols found: ", symb_count)
 	cb(fmt.Sprintf("Loaded %d symbols from binary", symb_count))
@@ -147,9 +239,9 @@ func BinaryPacked(data []byte, cb func(string)) ([]*Symbol, error) {
 			symbols[i].Correctionfactor = GetCorrectionfactor(symbols[i].Name)
 		}
 		if err := readAllT7SymbolsData(data, symbols); err != nil {
-			return symbols, err
+			return NewCollection(symbols...), err
 		}
-		return symbols, nil
+		return NewCollection(symbols...), nil
 	}
 
 	if symbolTableLength < 0x100 {
@@ -179,37 +271,40 @@ func BinaryPacked(data []byte, cb func(string)) ([]*Symbol, error) {
 	if err := readAllT7SymbolsData(data, symbols); err != nil {
 		return nil, err
 	}
-	return symbols, nil
+
+	return NewCollection(symbols...), nil
 }
 
 func readAllT7SymbolsData(fileBytes []byte, symbols []*Symbol) error {
 	dataLocationOffset := bytePatternSearch(fileBytes, searchPattern, 0x30000) - 10
 	dataOffsetValue := binary.BigEndian.Uint32(fileBytes[dataLocationOffset : dataLocationOffset+4])
+
+	log.Printf("dataLocationOffsetRaw %X", fileBytes[dataLocationOffset:dataLocationOffset+4])
+	log.Printf("dataLocationOffset: %X", dataLocationOffset)
+	log.Printf("dataOffsetValue: %X", dataOffsetValue)
+
+	var err error
 	for _, sym := range symbols {
 		if sym.Address < 0x0F00000 {
-			var err error
 			sym.data, err = readSymbolData(fileBytes, sym, 0)
 			if err != nil {
 				return err
 			}
 		} else {
 			//dataLocationOffset := bytePatternSearch(fileBytes, searchPattern3, 0x30000) + len(searchPattern3)
-			if sym.Address-dataOffsetValue+uint32(sym.Length) > uint32(len(fileBytes)) {
+			if sym.Address-dataOffsetValue+uint32(sym.Length) < uint32(len(fileBytes)) {
 				// debug.Log(fmt.Sprintf("symbol address out of range: %s", sym.String()))
 				// log.Printf("symbol address out of range:%X %s", sym.Address-dataOffsetValue, sym.String())
-				continue
-			}
-			var err error
-			sym.data, err = readSymbolData(fileBytes, sym, dataOffsetValue)
-			if err != nil {
-				return err
+				// continue
+				//var err error
+				sym.data, err = readSymbolData(fileBytes, sym, dataOffsetValue)
+				if err != nil {
+					return err
+				}
 			}
 
 		}
 	}
-	log.Printf("KUK %X", fileBytes[dataLocationOffset:dataLocationOffset+4])
-	log.Printf("dataLocationOffset: %X", dataLocationOffset)
-	log.Printf("dataOffsetValue: %X", dataOffsetValue)
 
 	return nil
 }
@@ -218,7 +313,7 @@ func readSymbolData(file []byte, s *Symbol, offset uint32) ([]byte, error) {
 	//	log.Println("readSymbolData: ", s.String())
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("%s, error reading symbol data: %v", s.String(), err)
+			debug.Log(fmt.Sprintf("%s, error reading symbol data: %v", s.String(), err))
 		}
 	}()
 	symData := make([]byte, s.Length)
@@ -239,9 +334,7 @@ func determineVersion(data []byte) (string, error) {
 var searchPattern = []byte{0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00}
 
 // var searchPattern2 = []byte{0x00, 0x08, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-var searchPattern3 = []byte{0x73, 0x59, 0x4D, 0x42, 0x4F, 0x4C, 0x74, 0x41, 0x42, 0x4C, 0x45, 0x00} // 12
-
-//var readNo int
+//var searchPattern3 = []byte{0x73, 0x59, 0x4D, 0x42, 0x4F, 0x4C, 0x74, 0x41, 0x42, 0x4C, 0x45, 0x00} // 12
 
 func getOffsets(data []byte, cb func(string)) (bool, int, int, int, error) {
 	addressTableOffset := bytePatternSearch(data, searchPattern, 0x30000) - 0x06
@@ -275,50 +368,32 @@ func getAddressFromOffset(data []byte, offset int) int {
 	return int(binary.BigEndian.Uint32(data[offset : offset+4]))
 }
 
-func GetSymbolListOffSet(file *os.File, length int) (int, error) {
-	retval := 0
+func getSymbolListOffSet(data []byte) (int, error) {
 	zerocount := 0
-	var pos int64
-	var err error
-
-	for pos < int64(length) && retval == 0 {
-		// Get current file position
-		pos, err = file.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return 0, err
-		}
-		b := make([]byte, 1)
-		n, err := file.Read(b)
-		if err != nil {
-			return 0, err
-		}
-		if n != 1 {
-			return 0, errors.New("read error")
-		}
-		if b[0] == 0x00 {
+	for pos := 0; pos < len(data); pos++ {
+		if data[pos] == 0x00 {
 			zerocount++
 		} else {
 			if zerocount < 15 {
 				zerocount = 0
 			} else {
-				retval = int(pos)
+				return pos, nil
 			}
 		}
 	}
-
 	return -1, errors.New("Symbol list not found")
 }
 
-func ReadMarkerAddressContent(data []byte, value byte) (length, retval, val int, err error) {
-	fileoffset := len(data) - 0x90
-	inb := data[len(data)-0x90:]
+func readMarkerAddressContent(data []byte, marker byte) (length, retval, val int, err error) {
+	fileoffset := len(data) - 0x201
+	inb := data[len(data)-0x201:]
 
-	if len(inb) != 0x90 {
-		err = fmt.Errorf("ReadMarkerAddressContent: read %d bytes, expected %d", len(inb), 0x90)
+	if len(inb) != 0x201 {
+		err = fmt.Errorf("ReadMarkerAddressContent: read %d bytes, expected %d", len(inb), 0x201)
 		return
 	}
-	for t := 0; t < 0x90; t++ {
-		if inb[t] == value && inb[t+1] < 0x30 {
+	for t := 0; t < 0x201; t++ {
+		if inb[t] == marker && inb[t+1] < 0x30 {
 			// Marker found, read 6 bytes
 			retval = fileoffset + t // 0x07FF70 + t
 			length = int(inb[t+1])
@@ -339,7 +414,7 @@ func ReadMarkerAddressContent(data []byte, value byte) (length, retval, val int,
 }
 
 func IsBinaryPackedVersion(data []byte, filelength int) bool {
-	length, retval, _, err := ReadMarkerAddressContent(data, 0x9B)
+	length, retval, _, err := readMarkerAddressContent(data, 0x9B)
 	if err != nil {
 		panic(err)
 	}

@@ -376,14 +376,14 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 	*/
 	mw.symbolsHeader = container.New(&ratioContainer{
 		widths: []float32{
-			.30, // name
+			.35, // name
 			.10, // value
 			.12, // method
 			.08, // number
 			.08, // type
-			.06, // signed
+			//.06, // signed
 			.10, // correctionfactor
-			.05, // deletebtn
+			.06, // deletebtn
 		},
 	},
 		&widget.Label{
@@ -411,11 +411,11 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 			TextStyle: fyne.TextStyle{Monospace: true},
 			Alignment: fyne.TextAlignCenter,
 		},
-		&widget.Label{
-			Text:      "Signed",
-			TextStyle: fyne.TextStyle{Monospace: true},
-			Alignment: fyne.TextAlignCenter,
-		},
+		//&widget.Label{
+		//	Text:      "Signed",
+		//	TextStyle: fyne.TextStyle{Monospace: true},
+		//	Alignment: fyne.TextAlignCenter,
+		//},
 		&widget.Label{
 			Text:      "Factor",
 			TextStyle: fyne.TextStyle{Monospace: true},
@@ -693,9 +693,9 @@ func (mw *MainWindow) loadSymbolsFromFile(filename string) error {
 	return nil
 }
 
-func (mw *MainWindow) loadSymbols(symbols []*symbol.Symbol) {
+func (mw *MainWindow) loadSymbols(symbols symbol.SymbolCollection) {
 	newSymbolMap := make(map[string]*kwp2000.VarDefinition)
-	for _, s := range symbols {
+	for _, s := range symbols.Symbols() {
 		newSymbolMap[s.Name] = &kwp2000.VarDefinition{
 			Name:             s.Name,
 			Method:           kwp2000.VAR_METHOD_SYMBOL,

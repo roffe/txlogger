@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/capture"
+	"github.com/roffe/txlogger/pkg/widgets"
 )
 
 func init() {
@@ -24,16 +25,18 @@ func init() {
 type Op int
 
 const (
-	OpToggle Op = iota
+	OpTogglePlayback Op = iota
 	OpSeek
 	OpPrev
 	OpNext
+	OpPlaybackSpeed
 	OpExit
 )
 
 type controlMsg struct {
-	Op  Op
-	Pos int
+	Op   Op
+	Pos  int
+	Rate float64
 }
 
 /*
@@ -100,7 +103,7 @@ func NewLogPlayer(a fyne.App, filename string, mw *MainWindow) {
 		Icon: theme.MediaPlayIcon(),
 	}
 	toggleBtn.OnTapped = func() {
-		controlChan <- &controlMsg{Op: OpToggle}
+		controlChan <- &controlMsg{Op: OpTogglePlayback}
 		if playing {
 			toggleBtn.SetIcon(theme.MediaPlayIcon())
 		} else {
@@ -121,6 +124,29 @@ func NewLogPlayer(a fyne.App, filename string, mw *MainWindow) {
 		controlChan <- &controlMsg{Op: OpSeek, Pos: 0}
 	})
 
+	sel := widget.NewSelect([]string{"0.1x", "0.2x", "0.5x", "1x", "2x", "4x", "8x", "16x"}, func(s string) {
+		switch s {
+		case "0.1x":
+			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 3}
+		case "0.25x":
+			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 2.5}
+		case "0.5x":
+			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 1.6}
+		case "1x":
+			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 1}
+		case "2x":
+			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 0.5}
+		case "4x":
+			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 0.25}
+		case "8x":
+			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 0.125}
+		case "16x":
+			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 0.0625}
+		}
+	})
+
+	sel.Selected = "1x"
+
 	main := container.NewBorder(
 		container.NewBorder(
 			nil,
@@ -131,7 +157,7 @@ func NewLogPlayer(a fyne.App, filename string, mw *MainWindow) {
 				restartBtn,
 				nextBtn,
 			),
-			nil,
+			widgets.FixedWidth(75, sel),
 			container.NewBorder(nil, nil, nil, posWidget, slider),
 		),
 		nil,
@@ -140,16 +166,23 @@ func NewLogPlayer(a fyne.App, filename string, mw *MainWindow) {
 		db.Content(),
 	)
 
-	w.Canvas().SetOnTypedKey(keyHandler(w, controlChan, slider, toggleBtn))
+	w.Canvas().SetOnTypedKey(keyHandler(w, controlChan, slider, toggleBtn, sel))
 	w.SetContent(main)
 	w.Show()
 }
 
-func keyHandler(w fyne.Window, controlChan chan *controlMsg, slider *widget.Slider, tb *widget.Button) func(ev *fyne.KeyEvent) {
+func keyHandler(w fyne.Window, controlChan chan *controlMsg, slider *widget.Slider, tb *widget.Button, sel *widget.Select) func(ev *fyne.KeyEvent) {
 	return func(ev *fyne.KeyEvent) {
 		switch ev.Name {
 		case fyne.KeyF12:
 			capture.Screenshot(w.Canvas())
+		case fyne.KeyPlus:
+			sel.SetSelectedIndex(sel.SelectedIndex() + 1)
+
+		case fyne.KeyMinus:
+			sel.SetSelectedIndex(sel.SelectedIndex() - 1)
+		case fyne.KeyEnter:
+			sel.SetSelected("1x")
 		case fyne.KeyReturn, fyne.KeyHome:
 			controlChan <- &controlMsg{Op: OpSeek, Pos: 0}
 		case fyne.KeyPageUp:
@@ -239,16 +272,26 @@ func playLogs(currentLine binding.Float, lines []string, db *Dashboard, control 
 	totalLines := len(lines)
 	play := false
 	playonce := false
-	var nextFrame time.Time
+	speedMultiplier := 1.0
+	var nextFrame int64
+	var lastSeek int64
+	var currentMilli int64
 	for {
+		currentMilli = time.Now().UnixMilli()
 		select {
 		case op := <-control:
 			switch op.Op {
-			case OpToggle:
+			case OpPlaybackSpeed:
+				speedMultiplier = op.Rate
+			case OpTogglePlayback:
 				play = !play
 			case OpSeek:
-				pos = op.Pos
-				playonce = true
+				//if time.Since(lastSeek) > 24*time.Millisecond {
+				if currentMilli-lastSeek > 24 {
+					pos = op.Pos
+					playonce = true
+					lastSeek = currentMilli
+				}
 			case OpPrev:
 				pos -= 2
 				if pos < 0 {
@@ -263,8 +306,11 @@ func playLogs(currentLine binding.Float, lines []string, db *Dashboard, control 
 			}
 		//case <-t.C:
 		default:
-			if (!play && !playonce) || pos >= totalLines || !time.Now().After(nextFrame) {
-				time.Sleep(500 * time.Microsecond)
+			if (!play && !playonce) || pos >= totalLines || nextFrame-currentMilli > 10 {
+				time.Sleep(time.Duration(nextFrame-currentMilli-2) * time.Millisecond)
+				continue
+			}
+			if currentMilli < nextFrame {
 				continue
 			}
 
@@ -292,7 +338,7 @@ func playLogs(currentLine binding.Float, lines []string, db *Dashboard, control 
 					log.Println(err)
 					continue
 				}
-				nextFrame = time.Now().Add(parsedTime2.Sub(parsedTime))
+				nextFrame = currentMilli + int64(float64(parsedTime2.Sub(parsedTime).Milliseconds())*speedMultiplier)
 			}
 
 			for _, kv := range touples[1:] {

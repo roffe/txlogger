@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.21.0
 
 require (
-	fyne.io/fyne/v2 v2.4.1-0.20230923194808-668656014542
+	fyne.io/fyne/v2 v2.4.1-0.20230929134633-8d541a353374
 	fyne.io/x/fyne v0.0.0-20230717140956-ad10f343f15e
 	github.com/roffe/gocan v0.0.0-20230923211524-653f77516da0
 	github.com/sqweek/dialog v0.0.0-20220809060634-e981b270ebbf
@@ -59,7 +59,7 @@ require (
 	github.com/stretchr/testify v1.8.4 // indirect
 	github.com/tevino/abool v1.2.0 // indirect
 	github.com/yuin/goldmark v1.5.6 // indirect
-	go.einride.tech/can v0.6.1 // indirect
+	go.einride.tech/can v0.7.0 // indirect
 	golang.org/x/crypto v0.13.0
 	golang.org/x/image v0.12.0 // indirect
 	golang.org/x/mobile v0.0.0-20230922142353-e2f452493d57 // indirect
