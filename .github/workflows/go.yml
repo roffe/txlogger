@@ -3,7 +3,7 @@
 name: Go
 on:
   push:
-    branches: [ "master", "develop" ]
+    branches: [ "master" ]
     tags:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
@@ -26,22 +26,18 @@ jobs:
       with:
         submodules: recursive
         ref: ${{ github.event.workflow_run.head_commit.id }}
-    - run: pacman --version
-    - run: pacman -Sy
-    - run: pacman --noconfirm -S pacman-mirrors
-    - name: 'Install requirements'
-      run: pacman --noconfirm -S mingw-w64-cross-toolchain mingw32/mingw-w64-i686-cmake
-    - run: i686-w64-mingw32-gcc --version && cmake --version && qmake --version
-      name: 'Display tools version'
-#    - name: Set up MinGW
+
+    - run: choco install mingw -y --x86
+
+    #    - name: Set up MinGW
 #      uses: egor-tensin/setup-mingw@v2
 #      with:
 #        platform: x86
-
+#
 #    - name: Install CMake
-#      run: refreshenv
+#      uses: lukka/get-cmake@latest
 
-#    - uses: lukka/get-cmake@latest
+    - uses: lukka/get-cmake@latest
     - name: Install libusb using Vcpkg
       run: |
         cd vcpkg
