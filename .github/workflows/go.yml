@@ -30,7 +30,7 @@ jobs:
     - run: pacman -Sy
     - run: pacman --noconfirm -S pacman-mirrors
     - name: 'Install requirements'
-      run: pacman --noconfirm -S mingw-w64-cross-toolchain mingw32/mingw-w64-i686-cmake mingw32/mingw-w64-i686-qtwebkit mingw32/mingw-w64-i686-python2
+      run: pacman --noconfirm -S mingw-w64-cross-toolchain mingw32/mingw-w64-i686-cmake
     - run: i686-w64-mingw32-gcc --version && cmake --version && qmake --version
       name: 'Display tools version'
 #    - name: Set up MinGW
@@ -41,7 +41,7 @@ jobs:
 #    - name: Install CMake
 #      run: refreshenv
 
-    - uses: lukka/get-cmake@latest
+#    - uses: lukka/get-cmake@latest
     - name: Install libusb using Vcpkg
       run: |
         cd vcpkg
