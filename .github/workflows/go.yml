@@ -27,7 +27,7 @@ jobs:
         submodules: recursive
         ref: ${{ github.event.workflow_run.head_commit.id }}
 
-    - run: choco install mingw -y --x86
+    - run: choco install mingw -y --x86 --force
 
     #    - name: Set up MinGW
 #      uses: egor-tensin/setup-mingw@v2
