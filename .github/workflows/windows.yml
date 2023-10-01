@@ -26,15 +26,15 @@ jobs:
       with:
         submodules: recursive
 
-#    - run: choco install mingw -y --x86 --force
+    - run: choco install mingw -y --x86 --force
 
-    - name: Set up MinGW
-      uses: egor-tensin/setup-mingw@v2
-      with:
-        platform: x86
+#    - name: Set up MinGW
+#      uses: egor-tensin/setup-mingw@v2
+#      with:
+#        platform: x86
 
-    - name: Install CMake
-      uses: lukka/get-cmake@latest
+#    - name: Install CMake
+#      uses: lukka/get-cmake@latest
 
 #    - uses: lukka/get-cmake@latest
 
@@ -51,12 +51,11 @@ jobs:
       with:
         go-version: '1.21'
         cache: false
-    
-    - name: Install Fyne CLI
-      run: go install fyne.io/fyne/v2/cmd/fyne@develop
-    
+
     - name: Install dependencies
-      run: go get .
+      run: |
+        go get .
+        go install fyne.io/fyne/v2/cmd/fyne@develop
     
     - name: Build
       env:
@@ -70,6 +69,7 @@ jobs:
       run: fyne package -tags combi --release
 
     - name: Creating Zip
+      if: startsWith(github.ref, 'refs/tags/')
       run: 7z a txlogger.zip txlogger.exe lzhuf.dll libusb-1.0.dll
 
     - name: Release
