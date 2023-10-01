@@ -1,10 +1,10 @@
 # This workflow will build a golang project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
-name: Build Windows Develop
+name: Build Windows Release
 on:
   push:
-    branches:
-    - 'develop'
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
 permissions:
   contents: write
@@ -60,4 +60,20 @@ jobs:
         Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1  
         $Env:PATH += ";C:\ProgramData\mingw64\mingw32\bin"
         fyne package -tags combi --release
+      # go build -tags combi -ldflags "-H=windowsgui" -o txlogger.exe
+#      
+
+    - name: Creating Zip
+      if: startsWith(github.ref, 'refs/tags/')
+      run: 7z a txlogger.zip txlogger.exe lzhuf.dll libusb-1.0.dll
+
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      env:
+        GITHUB_REPOSITORY: roffe/txlogger
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        files: |
+          txlogger.zip
 
