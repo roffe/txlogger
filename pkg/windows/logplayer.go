@@ -128,7 +128,7 @@ func NewLogPlayer(a fyne.App, filename string, mw *MainWindow) {
 		switch s {
 		case "0.1x":
 			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 3}
-		case "0.25x":
+		case "0.2x":
 			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 2.5}
 		case "0.5x":
 			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 1.6}
@@ -275,9 +275,9 @@ func playLogs(currentLine binding.Float, lines []string, db *Dashboard, control 
 	speedMultiplier := 1.0
 	var nextFrame int64
 	var lastSeek int64
-	var currentMilli int64
+	var currentMillis int64
 	for {
-		currentMilli = time.Now().UnixMilli()
+		currentMillis = time.Now().UnixMilli()
 		select {
 		case op := <-control:
 			switch op.Op {
@@ -287,10 +287,10 @@ func playLogs(currentLine binding.Float, lines []string, db *Dashboard, control 
 				play = !play
 			case OpSeek:
 				//if time.Since(lastSeek) > 24*time.Millisecond {
-				if currentMilli-lastSeek > 24 {
+				if currentMillis-lastSeek > 24 {
 					pos = op.Pos
 					playonce = true
-					lastSeek = currentMilli
+					lastSeek = currentMillis
 				}
 			case OpPrev:
 				pos -= 2
@@ -306,11 +306,11 @@ func playLogs(currentLine binding.Float, lines []string, db *Dashboard, control 
 			}
 		//case <-t.C:
 		default:
-			if (!play && !playonce) || pos >= totalLines || nextFrame-currentMilli > 10 {
-				time.Sleep(time.Duration(nextFrame-currentMilli-2) * time.Millisecond)
+			if (!play && !playonce) || pos >= totalLines || nextFrame-currentMillis > 10 {
+				time.Sleep(time.Duration(nextFrame-currentMillis-2) * time.Millisecond)
 				continue
 			}
-			if currentMilli < nextFrame {
+			if currentMillis < nextFrame {
 				continue
 			}
 
@@ -338,7 +338,7 @@ func playLogs(currentLine binding.Float, lines []string, db *Dashboard, control 
 					log.Println(err)
 					continue
 				}
-				nextFrame = currentMilli + int64(float64(parsedTime2.Sub(parsedTime).Milliseconds())*speedMultiplier)
+				nextFrame = currentMillis + int64(float64(parsedTime2.Sub(parsedTime).Milliseconds())*speedMultiplier)
 			}
 
 			for _, kv := range touples[1:] {
