@@ -28,7 +28,6 @@ jobs:
     
     - run: choco uninstall mingw -y --force
     - run: choco install mingw -y --x86 --force
-    - run: refreshenv
 #    - name: Set up MinGW
 #      uses: egor-tensin/setup-mingw@v2
 #      with:
