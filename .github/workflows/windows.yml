@@ -1,9 +1,9 @@
 # This workflow will build a golang project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
-name: Go
+name: Build Windows
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "develop" ]
     tags:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
@@ -25,17 +25,19 @@ jobs:
     - uses: actions/checkout@v3
       with:
         submodules: recursive
-        ref: ${{ github.event.workflow_run.head_commit.id }}
-
+    
+    - run: choco uninstall mingw -y --force
+    - run: choco install mingw -y --x86 --force
 #    - name: Set up MinGW
 #      uses: egor-tensin/setup-mingw@v2
 #      with:
 #        platform: x86
 
 #    - name: Install CMake
-#      run: refreshenv
+#      uses: lukka/get-cmake@latest
 
-    - uses: lukka/get-cmake@latest
+#    - uses: lukka/get-cmake@latest
+
     - name: Install libusb using Vcpkg
       run: |
         cd vcpkg
@@ -48,13 +50,12 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: '1.21'
-        cache: true
-    
-    - name: Install Fyne CLI
-      run: go install fyne.io/fyne/v2/cmd/fyne@develop
-    
+        cache: false
+
     - name: Install dependencies
-      run: go get .
+      run: |
+        go get .
+        go install fyne.io/fyne/v2/cmd/fyne@develop
     
     - name: Build
       env:
@@ -65,9 +66,15 @@ jobs:
         CGO_ENABLED: 1
         CC: i686-w64-mingw32-gcc
         CXX: i686-w64-mingw32-g++
-      run: fyne package -tags combi --release
+      run: |
+        Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1  
+        $Env:PATH += ";C:\ProgramData\mingw64\mingw32\bin"
+        fyne package -tags combi --release
+      # go build -tags combi -ldflags "-H=windowsgui" -o txlogger.exe
+#      
 
     - name: Creating Zip
+      if: startsWith(github.ref, 'refs/tags/')
       run: 7z a txlogger.zip txlogger.exe lzhuf.dll libusb-1.0.dll
 
     - name: Release
