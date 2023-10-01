@@ -10,9 +10,31 @@ import (
 
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/gmlan"
-	"github.com/roffe/gocanflasher/pkg/ecu/t8sec"
 	"github.com/roffe/txlogger/pkg/symbol"
 )
+
+func CalculateT8AccessKey(seed []byte, level byte) (byte, byte) {
+	val := int(seed[0])<<8 | int(seed[1])
+
+	key := func(seed int) int {
+		key := seed>>5 | seed<<11
+		return (key + 0xB988) & 0xFFFF
+	}(val)
+
+	switch level {
+	case 0xFB:
+		key ^= 0x8749
+		key += 0x06D3
+		key ^= 0xCFDF
+	case 0xFD:
+		key /= 3
+		key ^= 0x8749
+		key += 0x0ACF
+		key ^= 0x81BF
+	}
+
+	return (byte)((key >> 8) & 0xFF), (byte)(key & 0xFF)
+}
 
 func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) (symbol.SymbolCollection, error) {
 	cl, err := gocan.New(context.TODO(), dev)
@@ -37,7 +59,7 @@ func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) (symb
 
 	time.Sleep(25 * time.Millisecond)
 
-	if err := gm.RequestSecurityAccess(ctx, 0xFD, 0, t8sec.CalculateAccessKey); err != nil {
+	if err := gm.RequestSecurityAccess(ctx, 0xFD, 0, CalculateT8AccessKey); err != nil {
 		return nil, err
 	}
 

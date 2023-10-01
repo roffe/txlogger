@@ -14,7 +14,6 @@ require (
 
 require (
 	github.com/avast/retry-go/v4 v4.5.0
-	github.com/roffe/gocanflasher v0.0.0-20230614105055-43023a353626
 	github.com/yeka/zip v0.0.0-20180914125537-d046722c6feb
 )
 

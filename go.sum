@@ -302,8 +302,6 @@ github.com/posener/complete v1.1.1/go.mod h1:em0nMJCgc9GFtwrmVmEMR/ZL6WyhyjMBndr
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/roffe/gocan v0.0.0-20230923211524-653f77516da0 h1:vXnlk0fRn+9a9Rz9c76VIbAUXqtXyyIdm1i8aZAned0=
 github.com/roffe/gocan v0.0.0-20230923211524-653f77516da0/go.mod h1:hL+oAbNiz+VEYu7t4/SOguetbh8tN4/GkOS5xoe2fNM=
-github.com/roffe/gocanflasher v0.0.0-20230614105055-43023a353626 h1:3aRSmD3tez6S4IKM+82XSxyxCm+dGaiWw2YVgoxdgYY=
-github.com/roffe/gocanflasher v0.0.0-20230614105055-43023a353626/go.mod h1:IWJ/NKdbw9/NZ7rZs4yuLyboZFOW0U9hU+QWqBiLUnU=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/rogpeppe/go-internal v1.6.1/go.mod h1:xXDCJY+GAPziupqXw64V24skbSoqbTEfhy4qGm1nDQc=
