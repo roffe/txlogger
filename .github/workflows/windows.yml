@@ -67,7 +67,9 @@ jobs:
         CGO_ENABLED: 1
         CC: i686-w64-mingw32-gcc
         CXX: i686-w64-mingw32-g++
-      run: fyne package -tags combi --release
+      run: |
+        Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1  
+        fyne package -tags combi --release
       # go build -tags combi -ldflags "-H=windowsgui" -o txlogger.exe
 #      
 
