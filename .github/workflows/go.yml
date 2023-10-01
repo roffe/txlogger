@@ -26,17 +26,17 @@ jobs:
       with:
         submodules: recursive
 
-    - run: choco install mingw -y --x86 --force
+#    - run: choco install mingw -y --x86 --force
 
-    #    - name: Set up MinGW
-#      uses: egor-tensin/setup-mingw@v2
-#      with:
-#        platform: x86
-#
-#    - name: Install CMake
-#      uses: lukka/get-cmake@latest
+    - name: Set up MinGW
+      uses: egor-tensin/setup-mingw@v2
+      with:
+        platform: x86
 
-    - uses: lukka/get-cmake@latest
+    - name: Install CMake
+      uses: lukka/get-cmake@latest
+
+#    - uses: lukka/get-cmake@latest
 
     - name: Install libusb using Vcpkg
       run: |
@@ -65,8 +65,8 @@ jobs:
         GOARCH: 386
         GOOS: windows
         CGO_ENABLED: 1
-        # CC: i686-w64-mingw32-gcc
-        # CXX: i686-w64-mingw32-g++
+        CC: i686-w64-mingw32-gcc
+        CXX: i686-w64-mingw32-g++
       run: fyne package -tags combi --release
 
     - name: Creating Zip
