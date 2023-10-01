@@ -68,6 +68,7 @@ jobs:
         CXX: i686-w64-mingw32-g++
       run: |
         Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1  
+        $Env:PATH += ";C:\ProgramData\mingw64\mingw32\bin"
         fyne package -tags combi --release
       # go build -tags combi -ldflags "-H=windowsgui" -o txlogger.exe
 #      
