@@ -46,7 +46,7 @@ func TranslateErrorCode(p byte) error {
 	case SERVICE_NOT_SUPPORTED:
 		return errors.New("mode not supported")
 	case SUBFUNCTION_NOT_SUPPORTED_OR_INVALID_FORMAT:
-		return errors.New("sub-function not supported - invalid format")
+		return errors.New("sub-function not supported or invalid format")
 	case BUSY_REPEAT_REQUEST:
 		return errors.New("busy, repeat request")
 	case CONDITIONS_NOT_CORRECT_OR_REQUEST_SEQUENCE_ERROR:

@@ -1,0 +1,18 @@
+//go:build linux
+// +build linux
+
+package datalogger
+
+import (
+	"fmt"
+	"os"
+)
+
+func getLogDir() (string, error) {
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user home dir: %w", err)
+	}
+	dir = dir + "/txlogs/"
+	return dir, nil
+}

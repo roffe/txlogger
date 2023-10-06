@@ -39,3 +39,10 @@ CombiAdapter support which depends on libusb requires you to install [vc_redist.
 
 ![](txlogger.jpg)
 ![](txlogger2.jpg)
+
+# Using CANUSB with txlogger
+
+You must enable VCP mode to use CANUSB with txlogger
+
+![](canusb_vcp1.jpg)
+![](canusb_vcp2.jpg)

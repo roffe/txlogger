@@ -192,13 +192,13 @@ func keyHandler(w fyne.Window, controlChan chan *controlMsg, slider *widget.Slid
 			}
 			controlChan <- &controlMsg{Op: OpSeek, Pos: pos}
 		case fyne.KeyUp:
-			pos := int(slider.Value) + 10
+			pos := int(slider.Value) + 12
 			if pos < 0 {
 				pos = 0
 			}
 			controlChan <- &controlMsg{Op: OpSeek, Pos: pos}
 		case fyne.KeyDown:
-			pos := int(slider.Value) - 10
+			pos := int(slider.Value) - 12
 			if pos < 0 {
 				pos = 0
 			}

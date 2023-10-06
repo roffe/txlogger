@@ -65,12 +65,16 @@ func LoadT7Symbols(data []byte, cb func(string)) (SymbolCollection, error) {
 		return nil, err
 	}
 
-	//fstats, err := file.Stat()
-	//if err != nil {
-	//	return nil, err
-	//}
+	for _, h := range GetAllT7HeaderFields(data) {
+		if h.Length == 4 {
+			log.Printf("0x%02x %d> 0x%08X  %q", h.ID, len(h.Data), binary.BigEndian.Uint32(h.Data), h.Data)
+		} else if h.Length == 2 {
+			log.Printf("0x%02x %d> 0x%04X  %q", h.ID, len(h.Data), binary.BigEndian.Uint16(h.Data), h.Data)
+		} else {
+			log.Printf("0x%02x %d> %q", h.ID, len(h.Data), string(h.Data))
+		}
 
-	//	symbol_collection := make(map[string]Symbol)
+	}
 
 	if !IsBinaryPackedVersion(data, 0x9B) {
 		//return nil, errors.New("non binarypacked not implemented, send your bin to Roffe")
@@ -142,7 +146,6 @@ outer:
 		sram_address := binary.BigEndian.Uint32(buff[0:4])
 		symbol_length := binary.BigEndian.Uint16(buff[4:6])
 		internal_address := binary.BigEndian.Uint32(buff[10:14])
-		mask := binary.BigEndian.Uint16(buff[6:8])
 		sym_type := buff[8]
 
 		var real_rom_address uint32
@@ -157,7 +160,7 @@ outer:
 			Number:           symb_count,
 			Address:          real_rom_address,
 			Length:           symbol_length,
-			Mask:             mask,
+			Mask:             binary.BigEndian.Uint16(buff[6:8]),
 			Type:             sym_type,
 			Correctionfactor: GetCorrectionfactor(strings.TrimSpace(symbolNames[symb_count])),
 			Unit:             GetUnit(strings.TrimSpace(symbolNames[symb_count])),
@@ -279,11 +282,24 @@ func readAllT7SymbolsData(fileBytes []byte, symbols []*Symbol) error {
 	dataLocationOffset := bytePatternSearch(fileBytes, searchPattern, 0x30000) - 10
 	dataOffsetValue := binary.BigEndian.Uint32(fileBytes[dataLocationOffset : dataLocationOffset+4])
 
+	sram_offset, err := GetAddressFromOffset(fileBytes, dataLocationOffset+4)
+	if err != nil {
+		return err
+	}
+	log.Printf("sram_offset: %X", sram_offset)
+
 	log.Printf("dataLocationOffsetRaw %X", fileBytes[dataLocationOffset:dataLocationOffset+4])
 	log.Printf("dataLocationOffset: %X", dataLocationOffset)
 	log.Printf("dataOffsetValue: %X", dataOffsetValue)
 
-	var err error
+	c9value, err := GetT7HeaderField(fileBytes, 0x9C)
+	if err != nil {
+		return err
+	}
+
+	sramOffset := reverseInt(binary.BigEndian.Uint32(c9value))
+	log.Printf("sramOffset: %X", sramOffset)
+
 	for _, sym := range symbols {
 		if sym.Address < 0x0F00000 {
 			sym.data, err = readSymbolData(fileBytes, sym, 0)
@@ -291,22 +307,36 @@ func readAllT7SymbolsData(fileBytes []byte, symbols []*Symbol) error {
 				return err
 			}
 		} else {
-			//dataLocationOffset := bytePatternSearch(fileBytes, searchPattern3, 0x30000) + len(searchPattern3)
-			if sym.Address-dataOffsetValue+uint32(sym.Length) < uint32(len(fileBytes)) {
-				// debug.Log(fmt.Sprintf("symbol address out of range: %s", sym.String()))
-				// log.Printf("symbol address out of range:%X %s", sym.Address-dataOffsetValue, sym.String())
-				// continue
-				//var err error
+			if sym.Address-dataOffsetValue < uint32(len(fileBytes)) {
 				sym.data, err = readSymbolData(fileBytes, sym, dataOffsetValue)
 				if err != nil {
 					return err
 				}
+			} else if sym.Address-sramOffset < uint32(len(fileBytes)) {
+				sym.data, err = readSymbolData(fileBytes, sym, sramOffset)
+				if err != nil {
+					return err
+				}
+			} else {
+				log.Printf("symbol address out of range:%X %s", sym.Address-dataOffsetValue, sym.String())
 			}
 
 		}
 	}
 
 	return nil
+}
+
+func reverseInt(value uint32) uint32 {
+	// input            0x34FCEF00
+	// desired output   0x00EFFC34
+	var retval uint32
+	retval |= (value & 0xFF000000) >> 24
+	retval |= ((value & 0x00FF0000) >> 16) << 8
+	retval |= ((value & 0x0000FF00) >> 8) << 16
+	retval |= (value & 0x000000FF) << 24
+
+	return retval
 }
 
 func readSymbolData(file []byte, s *Symbol, offset uint32) ([]byte, error) {
@@ -423,4 +453,90 @@ func IsBinaryPackedVersion(data []byte, filelength int) bool {
 		return true
 	}
 	return false
+}
+
+func GetT7HeaderField(bin []byte, id byte) ([]byte, error) {
+	binLength := len(bin)
+	var answer []byte
+	addr := binLength - 1
+	var found bool
+	for addr > (binLength - 0x1FF) {
+		/* The first byte is the length of the data */
+		fieldLength := bin[addr]
+		//log.Printf("%3d, %x", lengthField, lengthField)
+		if fieldLength == 0x00 || fieldLength == 0xFF {
+			break
+		}
+		addr--
+
+		/* Second byte is an ID field */
+		fieldID := bin[addr]
+		addr--
+
+		if fieldID == id {
+			answer = make([]byte, int(fieldLength))
+			answer[fieldLength-1] = 0x00
+			//answer[fieldLength] = 0x00
+			for i := 0; i < int(fieldLength); i++ {
+				answer[i] = bin[addr]
+				addr--
+			}
+			//			log.Printf("0x%02x %d> %q", fieldID, len(answer), string(answer))
+			found = true
+			//break
+			// when this return is commented out, the function will
+			// find the last field if there are several (mainly this
+			// is for searching for the last VIN field)
+			// return 1;
+		}
+		addr -= int(fieldLength)
+	}
+	if found {
+		return answer, nil
+	}
+	return nil, fmt.Errorf("did not find header for id 0x%02x", id)
+}
+
+type T7HeaderField struct {
+	ID     byte
+	Length byte
+	Data   []byte
+}
+
+func GetAllT7HeaderFields(bin []byte) []*T7HeaderField {
+	binLength := len(bin)
+	addr := binLength - 1
+
+	fields := make([]*T7HeaderField, 0)
+
+	for addr > (binLength - 0x1FF) {
+		//		log.Printf("addr: %X", addr)
+		/* The first byte is the length of the data */
+		fieldLength := bin[addr]
+		//		log.Printf("fieldLength %X", fieldLength)
+		//log.Printf("%3d, %x", lengthField, lengthField)
+		if fieldLength == 0x00 || fieldLength == 0xFF {
+			break
+		}
+		addr--
+
+		fieldID := bin[addr]
+		addr--
+
+		fieldData := make([]byte, int(fieldLength))
+		fieldData[fieldLength-1] = 0x00
+
+		for i := 0; i < int(fieldLength); i++ {
+			fieldData[i] = bin[addr]
+			addr--
+		}
+		fields = append(fields, &T7HeaderField{
+			ID:     fieldID,
+			Length: fieldLength,
+			Data:   fieldData,
+		})
+		//		log.Printf("0x%02x %d> %q len: %d", fieldID, len(fieldData), string(fieldData), fieldLength)
+	}
+
+	return fields
 }

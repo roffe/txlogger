@@ -116,11 +116,7 @@ func GetAddressFromOffset(data []byte, offset int) (int, error) {
 	if offset < 0 || offset > len(data)-4 {
 		return 0, ErrOffsetOutOfRange
 	}
-	retval := 0
-	retval = int(data[offset]) << 24
-	retval += int(data[offset+1]) << 16
-	retval += int(data[offset+2]) << 8
-	retval += int(data[offset+3])
+	retval := int(data[offset])<<24 | int(data[offset+1])<<16 | int(data[offset+2])<<8 | int(data[offset+3])
 	return retval, nil
 }
 

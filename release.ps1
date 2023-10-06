@@ -10,9 +10,12 @@ $env:GOARCH = "386"
 $env:CGO_ENABLED = "1"
 $env:GOEXPERIMENT = "loopvar"
 
+# Invoke-Expression "rsrc -arch 386 -manifest manifest.xml"
 # Execute the command and capture the output
 Write-Host "Building txlogger.exe"
 Invoke-Expression "fyne package -tags combi --release"
+# Remove-Item "rsrc_windows_386.syso" -ErrorAction SilentlyContinue
+
 
 Write-Host "Building setup.exe"
 

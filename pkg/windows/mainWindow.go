@@ -3,6 +3,7 @@ package windows
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ import (
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/skratchdot/open-golang/open"
 	sdialog "github.com/sqweek/dialog"
 	"golang.org/x/net/context"
 )
@@ -57,6 +59,7 @@ type MainWindow struct {
 
 	dashboardBtn *widget.Button
 	logplayerBtn *widget.Button
+	logfolderBtn *widget.Button
 	helpBtn      *widget.Button
 
 	loadConfigBtn *widget.Button
@@ -258,7 +261,7 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 	})
 
 	mw.logplayerBtn = widget.NewButtonWithIcon("Log Player", theme.MediaFastForwardIcon(), func() {
-		filename, err := sdialog.File().Filter("trionic logfile", "t7l", "t8l").Load()
+		filename, err := sdialog.File().Filter("trionic logfile", "t7l", "t8l").SetStartDir("logs").Load()
 		if err != nil {
 			if err.Error() == "Cancelled" {
 				return
@@ -268,6 +271,27 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 			return
 		}
 		NewLogPlayer(mw.app, filename, mw)
+	})
+
+	mw.logfolderBtn = widget.NewButtonWithIcon("Logs Folder", theme.FolderOpenIcon(), func() {
+		if _, err := os.Stat("logs"); os.IsNotExist(err) {
+			if err := os.Mkdir("logs", 0755); err != nil {
+				if err != os.ErrExist {
+					mw.Log(fmt.Sprintf("failed to create logs dir: %s", err))
+					return
+				}
+			}
+		}
+
+		path, err := os.Getwd()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		if err := open.Run(path + "\\logs"); err != nil {
+			log.Println(err)
+		}
 	})
 
 	//mw.progressBar.Stop()
@@ -377,13 +401,13 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 	mw.symbolsHeader = container.New(&ratioContainer{
 		widths: []float32{
 			.35, // name
-			.10, // value
-			.12, // method
-			.08, // number
-			.08, // type
+			.12, // value
+			.14, // method
+			.12, // number
+			//.08, // type
 			//.06, // signed
-			.10, // correctionfactor
-			.06, // deletebtn
+			.11, // correctionfactor
+			.08, // deletebtn
 		},
 	},
 		&widget.Label{
@@ -406,11 +430,11 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 			TextStyle: fyne.TextStyle{Monospace: true},
 			Alignment: fyne.TextAlignCenter,
 		},
-		&widget.Label{
-			Text:      "Type",
-			TextStyle: fyne.TextStyle{Monospace: true},
-			Alignment: fyne.TextAlignCenter,
-		},
+		//&widget.Label{
+		//	Text:      "Type",
+		//	TextStyle: fyne.TextStyle{Monospace: true},
+		//	Alignment: fyne.TextAlignCenter,
+		//},
 		//&widget.Label{
 		//	Text:      "Signed",
 		//	TextStyle: fyne.TextStyle{Monospace: true},
@@ -523,6 +547,7 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 				Trailing: container.NewVBox(
 					mw.dashboardBtn,
 					mw.logplayerBtn,
+					mw.logfolderBtn,
 					mw.helpBtn,
 					mw.freqSlider,
 					container.NewGridWithColumns(4,

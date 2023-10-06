@@ -5,8 +5,8 @@ go 1.21
 toolchain go1.21.0
 
 require (
-	fyne.io/fyne/v2 v2.4.1-0.20230929134633-8d541a353374
-	fyne.io/x/fyne v0.0.0-20230717140956-ad10f343f15e
+	fyne.io/fyne/v2 v2.4.1-rc1
+	fyne.io/x/fyne v0.0.0-20231004122445-c04c36b7acb1
 	github.com/roffe/gocan v0.0.0-20230923211524-653f77516da0
 	github.com/sqweek/dialog v0.0.0-20220809060634-e981b270ebbf
 	go.bug.st/serial v1.6.1
@@ -21,6 +21,7 @@ require (
 	github.com/go-text/render v0.0.0-20230619120952-35bccb6164b8 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/rogpeppe/go-internal v1.8.0 // indirect
+	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )
 
@@ -59,15 +60,15 @@ require (
 	github.com/tevino/abool v1.2.0 // indirect
 	github.com/yuin/goldmark v1.5.6 // indirect
 	go.einride.tech/can v0.7.0 // indirect
-	golang.org/x/crypto v0.13.0
-	golang.org/x/image v0.12.0 // indirect
-	golang.org/x/mobile v0.0.0-20230922142353-e2f452493d57 // indirect
-	golang.org/x/mod v0.12.0 // indirect
-	golang.org/x/net v0.15.0
-	golang.org/x/sync v0.3.0
-	golang.org/x/sys v0.12.0 // indirect
+	golang.org/x/crypto v0.14.0
+	golang.org/x/image v0.13.0 // indirect
+	golang.org/x/mobile v0.0.0-20231006135142-2b44d11868fe // indirect
+	golang.org/x/mod v0.13.0 // indirect
+	golang.org/x/net v0.16.0
+	golang.org/x/sync v0.4.0
+	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
-	golang.org/x/tools v0.13.0 // indirect
+	golang.org/x/tools v0.14.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/js/dom v0.0.0-20230808055721-96db8f4d5e3b // indirect
 )
