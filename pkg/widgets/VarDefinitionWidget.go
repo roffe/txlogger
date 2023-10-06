@@ -1,7 +1,6 @@
 package widgets
 
 import (
-	"encoding/hex"
 	"fmt"
 	"log"
 	"strconv"
@@ -20,7 +19,7 @@ type VarDefinitionWidget struct {
 	symbolValue  *widget.Label
 	symbolMethod *widget.Select
 	symbolNumber *widget.Entry
-	symbolType   *widget.Entry
+	//symbolType   *widget.Entry
 	//	symbolSigned           *widget.Check
 	symbolCorrectionfactor *widget.Entry
 	symbolGroup            *widget.Entry
@@ -69,31 +68,33 @@ func NewVarDefinitionWidget(ls *widget.List, definedVars *kwp2000.VarDefinitionL
 		},
 	}
 
-	vd.symbolType = &widget.Entry{
-		OnChanged: func(s string) {
-			if s == "" {
-				return
-			}
-			if len(s) == 1 {
-				s = "0" + s
-			}
-
-			if len(s)%2 != 0 {
-				return
-			}
-
-			decodedHex, err := hex.DecodeString(s)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			if len(decodedHex) > 1 {
-				if definedVars.GetPos(vd.pos).Type != uint8(decodedHex[0]) {
-					definedVars.SetType(vd.pos, uint8(decodedHex[0]))
+	/*
+		vd.symbolType = &widget.Entry{
+			OnChanged: func(s string) {
+				if s == "" {
+					return
 				}
-			}
-		},
-	}
+				if len(s) == 1 {
+					s = "0" + s
+				}
+
+				if len(s)%2 != 0 {
+					return
+				}
+
+				decodedHex, err := hex.DecodeString(s)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				if len(decodedHex) > 1 {
+					if definedVars.GetPos(vd.pos).Type != uint8(decodedHex[0]) {
+						definedVars.SetType(vd.pos, uint8(decodedHex[0]))
+					}
+				}
+			},
+		}
+	*/
 
 	//vd.symbolSigned = widget.NewCheck("", func(b bool) {
 	//	//			definedVars[vd.pos].Signed = b
@@ -132,7 +133,7 @@ func NewVarDefinitionWidget(ls *widget.List, definedVars *kwp2000.VarDefinitionL
 		vd.symbolValue,
 		vd.symbolMethod,
 		vd.symbolNumber,
-		vd.symbolType,
+		//vd.symbolType,
 		//vd.symbolSigned,
 		vd.symbolCorrectionfactor,
 		vd.symbolDeleteBTN,
@@ -150,7 +151,7 @@ func (wb *VarDefinitionWidget) Update(pos int, sym *kwp2000.VarDefinition) {
 	wb.symbolName.SetText(sym.Name)
 	wb.symbolMethod.SetSelected(sym.Method.String())
 	wb.symbolNumber.SetText(strconv.Itoa(sym.Value))
-	wb.symbolType.SetText(fmt.Sprintf("%02X", sym.Type))
+	//wb.symbolType.SetText(fmt.Sprintf("%02X", sym.Type))
 	//wb.symbolSigned.SetChecked(sym.Type&kwp2000.SIGNED != 0)
 	wb.symbolGroup.SetText(sym.Group)
 	switch {
@@ -172,7 +173,7 @@ func (wb *VarDefinitionWidget) Disable() {
 	wb.symbolName.Disable()
 	wb.symbolMethod.Disable()
 	wb.symbolNumber.Disable()
-	wb.symbolType.Disable()
+	//wb.symbolType.Disable()
 	//wb.symbolSigned.Disable()
 	wb.symbolGroup.Disable()
 	wb.symbolCorrectionfactor.Disable()
@@ -184,7 +185,7 @@ func (wb *VarDefinitionWidget) Enable() {
 	wb.symbolName.Enable()
 	wb.symbolMethod.Enable()
 	wb.symbolNumber.Enable()
-	wb.symbolType.Enable()
+	//wb.symbolType.Enable()
 	//wb.symbolSigned.Enable()
 	wb.symbolGroup.Enable()
 	wb.symbolCorrectionfactor.Enable()
@@ -215,22 +216,21 @@ func (wb *VarDefinitionWidget) SetNumber(number int) {
 }
 
 func (wb *VarDefinitionWidget) SetType(t uint8) {
-	wb.symbolType.SetText(fmt.Sprintf("%0X", t))
+	//wb.symbolType.SetText(fmt.Sprintf("%0X", t))
 	//wb.symbolSigned.SetChecked(t&kwp2000.SIGNED != 0)
 }
 
-var sz = []float32{
-	.35, // name
-	.10, // value
-	.12, // method
-	.08, // number
-	.08, // type
-	//.06, // signed
-	.10, // correctionfactor
-	.06, // deletebtn
-}
-
 func (wb *VarDefinitionWidget) Resize(size fyne.Size) {
+	var sz = []float32{
+		.35, // name
+		.12, // value
+		.14, // method
+		.12, // number
+		//.08, // type
+		//.06, // signed
+		.11, // correctionfactor
+		.08, // deletebtn
+	}
 	var x float32
 	var tw float32
 	for _, o := range wb.objects {

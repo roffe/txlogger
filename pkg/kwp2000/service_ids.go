@@ -48,4 +48,11 @@ const (
 	START_COMMUNICATION             = 0x81
 	STOP_COMMUNICATION              = 0x82
 	ACCESS_TIMING_PARAMETERS        = 0x83
+
+	SYMBOL_IDENTIFICATION = 0x80
+
+	/* Dynamically defined local identifier constants */
+	DM_DBLI  = 0x01
+	DM_DBMA  = 0x03
+	DM_CDDLI = 0x04
 )

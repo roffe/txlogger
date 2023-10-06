@@ -170,7 +170,7 @@ func (t *Client) ReadDataByLocalIdentifier2(ctx context.Context, id, mode byte) 
 
 func (t *Client) ReadDataByLocalIdentifier(ctx context.Context, id byte) ([]byte, error) {
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, READ_DATA_BY_LOCAL_IDENTIFIER, id}, gocan.ResponseRequired)
-	resp, err := t.c.SendAndPoll(ctx, frame, 40*time.Millisecond, t.responseID)
+	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
 	if err != nil {
 		return nil, fmt.Errorf("ReadDataByLocalIdentifier: %w", err)
 	}
@@ -178,6 +178,7 @@ func (t *Client) ReadDataByLocalIdentifier(ctx context.Context, id byte) ([]byte
 
 	d := resp.Data()
 	if d[3] == 0x7F {
+		//		log.Println(resp.String())
 		return nil, fmt.Errorf("ReadDataByLocalIdentifier: %w", TranslateErrorCode(d[5]))
 	}
 
@@ -204,7 +205,7 @@ func (t *Client) ReadDataByLocalIdentifier(ctx context.Context, id byte) ([]byte
 		//log.Printf("current chunk %02X", currentChunkNumber)
 		frame := gocan.NewFrame(RESP_CHUNK_CONF_ID, []byte{0x40, 0xA1, 0x3F, d[0] &^ 0x40}, gocan.ResponseRequired)
 		//log.Println(frame.String())
-		resp, err := t.c.SendAndPoll(ctx, frame, 50*time.Millisecond, t.responseID)
+		resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
 		if err != nil {
 			return nil, err
 		}
@@ -218,7 +219,6 @@ func (t *Client) ReadDataByLocalIdentifier(ctx context.Context, id byte) ([]byte
 		currentChunkNumber = d[0] & 0x3F
 		//log.Printf("next chunk %02X", currentChunkNumber)
 	}
-
 	return out.Bytes(), nil
 }
 
@@ -312,16 +312,30 @@ func (t *Client) RequestTransferExit(ctx context.Context) error {
 	return nil
 }
 
-func (t *Client) DynamicallyDefineLocalIdRequest(ctx context.Context, id int, v *VarDefinition) error {
+func (t *Client) ClearDynamicallyDefineLocalId(ctx context.Context) error {
+	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER, DM_CDDLI}, gocan.ResponseRequired)
+	//	log.Println(frame.String())
+	resp, err := t.c.SendAndPoll(ctx, frame, 250*time.Millisecond, t.responseID)
+	if err != nil {
+		return fmt.Errorf("DynamicallyClearDefineLocalId: %w", err)
+	}
+	d := resp.Data()
+	if d[3] == 0x7F {
+		return fmt.Errorf("ClearDynamicallyDefineLocalId: %w", TranslateErrorCode(d[5]))
+	}
+	return nil
+}
+
+func (t *Client) DynamicallyDefineLocalIdRequest(ctx context.Context, index int, v *VarDefinition) error {
 	buff := bytes.NewBuffer(nil)
 	buff.WriteByte(0xF0)
 	switch v.Method {
 	case VAR_METHOD_ADDRESS:
-		buff.Write([]byte{0x03, byte(id), uint8(v.Length), byte(v.Value >> 16), byte(v.Value >> 8), byte(v.Value)})
+		buff.Write([]byte{DM_DBMA, byte(index), uint8(v.Length), byte(v.Value >> 16), byte(v.Value >> 8), byte(v.Value)})
 	case VAR_METHOD_LOCID:
-		buff.Write([]byte{0x01, byte(id), 0x00, byte(v.Value), 0x00})
+		buff.Write([]byte{DM_DBLI, byte(index), 0x00, byte(v.Value), 0x00})
 	case VAR_METHOD_SYMBOL:
-		buff.Write([]byte{0x03, byte(id), 0x00, 0x80, byte(v.Value >> 8), byte(v.Value)})
+		buff.Write([]byte{DM_DBMA, byte(index), 0x00, 0x80, byte(v.Value >> 8), byte(v.Value)})
 	}
 
 	message := append([]byte{byte(buff.Len()), DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER}, buff.Bytes()...)
@@ -575,7 +589,8 @@ func (t *Client) ReadFlash(ctx context.Context, addr, length int) ([]byte, error
 
 func (t *Client) ReadMemoryByAddress(ctx context.Context, address, length int) ([]byte, error) {
 	// Jump to read adress
-	t.c.SendFrame(REQ_MSG_ID, []byte{0x41, 0xA1, 0x08, 0x2C, 0xF0, 0x03, 0x00, byte(length)}, gocan.Outgoing)
+	t.c.SendFrame(REQ_MSG_ID, []byte{0x41, 0xA1, 0x08, DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER, 0xF0, 0x03, 0x00, byte(length)}, gocan.Outgoing)
+
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x00, 0xA1, byte((address >> 16) & 0xFF), byte((address >> 8) & 0xFF), byte(address & 0xFF), 0x00, 0x00, 0x00}, gocan.ResponseRequired)
 	f, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout*3, t.responseID)
 	if err != nil {
@@ -613,4 +628,151 @@ func (t *Client) ResetECU(ctx context.Context) error {
 		return fmt.Errorf("abnormal ecu reset response: %X", d[3:])
 	}
 	return nil
+}
+
+// -----
+/*
+func (t *Client) ReadDataByAddress(ctx context.Context, address int, length byte) ([]byte, error) {
+	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x05, READ_MEMORY_BY_ADDRESS, byte(address >> 16), byte(address >> 8), byte(address), length}, gocan.ResponseRequired)
+	f, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout*3, t.responseID)
+	if err != nil {
+		return nil, err
+	}
+	log.Println(f.String())
+
+	return t.recvReadDataByAddress(ctx, int(length))
+
+}
+
+func (t *Client) recvReadDataByAddress(ctx context.Context, length int) ([]byte, error) {
+	var receivedBytes, payloadLeft int
+	out := bytes.NewBuffer([]byte{})
+
+	sub := t.c.Subscribe(ctx, t.responseID)
+	startTransfer := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, 0x21, 0x00, 0x00, 0x00, 0x00}, gocan.ResponseRequired)
+	if err := t.c.Send(startTransfer); err != nil {
+		return nil, err
+	}
+
+outer:
+	for receivedBytes < length {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(t.defaultTimeout * 4):
+			return nil, fmt.Errorf("timeout")
+		case f := <-sub:
+			d := f.Data()
+			if d[0]&0x40 == 0x40 {
+				payloadLeft = int(d[2]) - 2 // subtract two non-payload bytes
+				if payloadLeft > 0 && receivedBytes < length {
+					out.WriteByte(d[5])
+					receivedBytes++
+					payloadLeft--
+				}
+				if payloadLeft > 0 && receivedBytes < length {
+					out.WriteByte(d[6])
+					receivedBytes++
+					payloadLeft--
+				}
+				if payloadLeft > 0 && receivedBytes < length {
+					out.WriteByte(d[7])
+					receivedBytes++
+					payloadLeft--
+				}
+			} else {
+				for i := 0; i < 6; i++ {
+					if receivedBytes < length {
+						out.WriteByte(d[2+i])
+						receivedBytes++
+						payloadLeft--
+						if payloadLeft == 0 {
+							break
+						}
+					}
+				}
+			}
+			if d[0] == 0x80 || d[0] == 0xC0 {
+				t.Ack(d[0], gocan.Outgoing)
+				break outer
+			} else {
+				t.Ack(d[0], gocan.ResponseRequired)
+			}
+		}
+	}
+	return out.Bytes(), nil
+}
+
+func (t *Client) ReadDataBySymbol2(ctx context.Context, symbolNo int) ([]byte, error) {
+	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x04, READ_MEMORY_BY_ADDRESS, SYMBOL_IDENTIFICATION, byte(symbolNo >> 8), byte(symbolNo), 0x00}, gocan.ResponseRequired)
+	f, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout*3, t.responseID)
+	if err != nil {
+		return nil, err
+	}
+	log.Println(f.String())
+
+	return nil, nil
+
+}
+*/
+
+func (t *Client) ReadDataByAddress(ctx context.Context, address, length int) ([]byte, error) {
+	buff := bytes.NewBuffer(make([]byte, 0, length))
+	if length > 244 {
+		left := length
+		for left > 0 {
+			log.Println(left)
+			toGet := min(244, left)
+
+			log.Printf("Reading memory by address, pos: 0x%X, length: 0x%X", address+buff.Len(), toGet)
+			b, err := t.readDataByAddress(ctx, address+buff.Len(), byte(toGet))
+			if err != nil {
+				return nil, err
+			}
+			left -= len(b)
+			buff.Write(b)
+		}
+		return buff.Bytes(), nil
+	}
+	return t.readDataByAddress(ctx, address, byte(length))
+}
+
+func (t *Client) readDataByAddress(ctx context.Context, address int, length byte) ([]byte, error) {
+	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x05, READ_MEMORY_BY_ADDRESS, byte(address >> 16), byte(address >> 8), byte(address), length}, gocan.ResponseRequired)
+	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+	if err != nil {
+		return nil, fmt.Errorf("ReadDataByAddress: %w", err)
+	}
+	out := bytes.NewBuffer(nil)
+
+	d := resp.Data()
+	if d[3] == 0x7F {
+		return nil, fmt.Errorf("ReadDataByAddress: %w", TranslateErrorCode(d[5]))
+	}
+
+	dataLenLeft := d[2] - 4
+	var thisRead byte
+	if dataLenLeft > 1 {
+		thisRead = 1
+	} else {
+		thisRead = dataLenLeft
+	}
+
+	out.Write(d[7 : 7+thisRead])
+	dataLenLeft -= thisRead
+
+	currentChunkNumber := d[0] & 0x3F
+	for currentChunkNumber != 0 {
+		frame := gocan.NewFrame(RESP_CHUNK_CONF_ID, []byte{0x40, 0xA1, 0x3F, d[0] &^ 0x40}, gocan.ResponseRequired)
+		resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+		if err != nil {
+			return nil, err
+		}
+		d = resp.Data()
+		toRead := uint8(math.Min(6, float64(dataLenLeft)))
+		out.Write(d[2 : 2+toRead])
+		dataLenLeft -= toRead
+		currentChunkNumber = d[0] & 0x3F
+	}
+	return out.Bytes(), nil
 }
