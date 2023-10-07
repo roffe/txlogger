@@ -3,12 +3,18 @@ package main
 import (
 	"image/color"
 	"log"
+	"net/url"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
+	"fyne.io/fyne/v2/widget"
 
 	"github.com/roffe/txlogger/pkg/kwp2000"
+	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/windows"
 )
 
@@ -28,7 +34,54 @@ func main() {
 	mw.Resize(fyne.NewSize(1024, 768))
 	mw.SetContent(mw.Layout())
 	close(ready)
+
+	go updateCheck(a, mw)
 	mw.ShowAndRun()
+}
+
+func updateCheck(a fyne.App, mw fyne.Window) {
+	doUpdateCheck := true
+	nextUpdateCheck := a.Preferences().String("nextUpdateCheck")
+	ignoreVersion := a.Preferences().String("ignoreVersion")
+	if nextUpdateCheck != "" {
+		if nextCheckTime, err := time.Parse(time.RFC3339, nextUpdateCheck); err == nil {
+			if time.Now().Before(nextCheckTime) {
+				doUpdateCheck = false
+			}
+		}
+	}
+	if doUpdateCheck {
+		if isLatest, latestVersion := update.IsLatest("v" + a.Metadata().Version); !isLatest {
+			if ignoreVersion == latestVersion {
+				return
+			}
+			u, err := url.Parse("https://txlogger.com")
+			if err != nil {
+				panic(err)
+			}
+			link := widget.NewHyperlink("txlogger.com", u)
+			link.Alignment = fyne.TextAlignCenter
+			link.TextStyle = fyne.TextStyle{Bold: true}
+			dialog.ShowCustomConfirm(
+				"Update available!",
+				"Remind me", "Don't remind me",
+				container.NewVBox(
+					widget.NewLabel("There is a new version available"),
+					link,
+				),
+
+				func(choice bool) {
+					if !choice {
+						a.Preferences().SetString("ignoreVersion", "v"+a.Metadata().Version)
+					}
+				},
+				mw,
+			)
+		}
+		if tt, err := time.Now().Add(96 * time.Hour).MarshalText(); err == nil {
+			a.Preferences().SetString("nextUpdateCheck", string(tt))
+		}
+	}
 }
 
 type myTheme struct{}
