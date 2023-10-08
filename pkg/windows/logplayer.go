@@ -43,13 +43,13 @@ func V(width, height int32) (mjpeg.AviWriter, error) {
 }
 */
 
-func NewLogPlayer(a fyne.App, filename string, mw *MainWindow) {
+func NewLogPlayer(a fyne.App, filename string, onClose func()) fyne.Window {
 	w := a.NewWindow("LogPlayer " + filename)
 	w.Resize(fyne.NewSize(900, 600))
 
 	controlChan := make(chan *controlMsg, 10)
 
-	db := NewDashboard(mw, true, mw.logBtn)
+	db := NewDashboard(w, true, nil, onClose)
 
 	w.SetCloseIntercept(func() {
 		controlChan <- &controlMsg{Op: OpExit}
@@ -70,7 +70,8 @@ func NewLogPlayer(a fyne.App, filename string, mw *MainWindow) {
 	currLine.AddListener(binding.NewDataListener(func() {
 		val, err := currLine.Get()
 		if err != nil {
-			mw.Log(err.Error())
+			//mw.Log(err.Error())
+			log.Println(err)
 			return
 		}
 		slider.Value = val
@@ -91,7 +92,8 @@ func NewLogPlayer(a fyne.App, filename string, mw *MainWindow) {
 		logz, err = logfile.NewFromTxLogfile(filename)
 		if err != nil {
 			// dialog.ShowError(err, w)
-			mw.Log(err.Error())
+			//mw.Log(err.Error())
+			log.Println(err)
 			return
 		}
 		slider.Max = float64(logz.Len())
@@ -173,6 +175,7 @@ func NewLogPlayer(a fyne.App, filename string, mw *MainWindow) {
 	w.Canvas().SetOnTypedKey(keyHandler(w, controlChan, slider, toggleBtn, sel))
 	w.SetContent(main)
 	w.Show()
+	return w
 }
 
 func keyHandler(w fyne.Window, controlChan chan *controlMsg, slider *widget.Slider, tb *widget.Button, sel *widget.Select) func(ev *fyne.KeyEvent) {

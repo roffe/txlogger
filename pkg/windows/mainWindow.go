@@ -253,7 +253,17 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 	mw.syncSymbolsBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), mw.SyncSymbols)
 
 	mw.dashboardBtn = widget.NewButtonWithIcon("Dashboard", theme.InfoIcon(), func() {
-		mw.dashboard = NewDashboard(mw, false, mw.logBtn)
+		onClose := func() {
+			if mw.dlc != nil {
+				mw.dlc.DetachDashboard(mw.dashboard)
+			}
+			close(mw.dashboard.metricsChan)
+			mw.dashboard = nil
+			mw.SetFullScreen(false)
+			mw.SetContent(mw.Content())
+		}
+
+		mw.dashboard = NewDashboard(mw, false, mw.logBtn, onClose)
 		if mw.dlc != nil {
 			mw.dlc.AttachDashboard(mw.dashboard)
 		}
@@ -270,7 +280,17 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 			mw.Log(err.Error())
 			return
 		}
-		NewLogPlayer(mw.app, filename, mw)
+
+		onClose := func() {
+			if mw.dlc != nil {
+				mw.dlc.DetachDashboard(mw.dashboard)
+			}
+			close(mw.dashboard.metricsChan)
+			mw.dashboard = nil
+			mw.SetFullScreen(false)
+			mw.SetContent(mw.Content())
+		}
+		NewLogPlayer(mw.app, filename, onClose)
 	})
 
 	mw.logfolderBtn = widget.NewButtonWithIcon("Logs Folder", theme.FolderOpenIcon(), func() {

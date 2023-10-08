@@ -4,6 +4,8 @@ import (
 	"image/color"
 	"log"
 	"net/url"
+	"os"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -28,6 +30,16 @@ func main() {
 	a.Settings().SetTheme(&myTheme{})
 	vars := kwp2000.NewVarDefinitionList()
 	//sm := sink.NewManager()
+	log.Println(os.Args)
+	if len(os.Args) > 1 {
+		filename := os.Args[1]
+		log.Println(filename)
+		if strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") {
+			windows.NewLogPlayer(a, filename, nil).ShowAndRun()
+			return
+		}
+	}
+
 	mw := windows.NewMainWindow(a, vars)
 	//go dashboard.Start(mw.Log, a.Metadata().Release, sm, vars, ready)
 	mw.SetMaster()

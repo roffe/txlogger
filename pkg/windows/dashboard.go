@@ -50,12 +50,14 @@ type Dashboard struct {
 
 	//dbgBar *fyne.Container
 
+	onClose func()
+
 	metricsChan chan *model.DashboardMetric
 
 	logplayer bool
 }
 
-func NewDashboard(mw *MainWindow, logplayer bool, logBtn *widget.Button) *Dashboard {
+func NewDashboard(mw fyne.Window, logplayer bool, logBtn *widget.Button, onClose func()) *Dashboard {
 	db := &Dashboard{
 		logBtn:    logBtn,
 		logplayer: logplayer,
@@ -168,22 +170,20 @@ func NewDashboard(mw *MainWindow, logplayer bool, logBtn *widget.Button) *Dashbo
 		fullscreenBtn: widget.NewButtonWithIcon("Fullscreen", theme.ZoomFitIcon(), func() {
 			mw.SetFullScreen(!mw.FullScreen())
 		}),
-		closeBtn: widget.NewButtonWithIcon("Back", theme.NavigateBackIcon(), func() {
-			if mw.dlc != nil {
-				mw.dlc.DetachDashboard(mw.dashboard)
-			}
-			close(mw.dashboard.metricsChan)
-			mw.dashboard = nil
-			mw.SetFullScreen(false)
-			mw.SetContent(mw.Content())
-		}),
 		knockIcon: widgets.NewIcon(&widgets.IconConfig{
 			Image:   canvas.NewImageFromResource(fyne.NewStaticResource("knock.png", knockBytes)),
 			Minsize: fyne.NewSize(90, 90),
 		}),
 		limpMode:    canvas.NewImageFromResource(fyne.NewStaticResource("limp.png", limpBytes)),
+		onClose:     onClose,
 		metricsChan: make(chan *model.DashboardMetric, 60),
 	}
+
+	db.closeBtn = widget.NewButtonWithIcon("Back", theme.NavigateBackIcon(), func() {
+		if db.onClose != nil {
+			db.onClose()
+		}
+	})
 
 	if logplayer {
 		db.time = &canvas.Text{

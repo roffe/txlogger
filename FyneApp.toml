@@ -1,9 +1,8 @@
 Website = "https://roffe.nu/"
+
 [Details]
   Icon = "Icon.png"
   Name = "txlogger"
   ID = "com.roffe.txlogger"
-  Version = "1.0.3"
-  Build = 29
-
-  
+  Version = "1.0.4"
+  Build = 31
