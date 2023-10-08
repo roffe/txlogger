@@ -3,7 +3,6 @@ package windows
 import (
 	"sort"
 	"strings"
-	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/data/binding"
@@ -12,8 +11,6 @@ import (
 	xwidget "fyne.io/x/fyne/widget"
 	"github.com/roffe/txlogger/pkg/datalogger"
 )
-
-var sweepOnce sync.Once
 
 func (mw *MainWindow) newLogBtn() {
 	mw.logBtn = widget.NewButtonWithIcon("Start logging", theme.MediaPlayIcon(), func() {
@@ -26,7 +23,6 @@ func (mw *MainWindow) newLogBtn() {
 		if !mw.loggingRunning {
 			device, err := mw.canSettings.GetAdapter(mw.ecuSelect.Selected, mw.Log)
 			if err != nil {
-				// dialog.ShowError(err, mw)
 				mw.Log(err.Error())
 				return
 			}
@@ -41,7 +37,6 @@ func (mw *MainWindow) newLogBtn() {
 				ErrorPerSecondCounter: mw.errorPerSecondCounter,
 			})
 			if err != nil {
-				// dialog.ShowError(err, mw)
 				mw.Log(err.Error())
 				return
 			}
@@ -57,7 +52,6 @@ func (mw *MainWindow) newLogBtn() {
 				}
 
 				if err := mw.dlc.Start(); err != nil {
-					// dialog.ShowError(err, mw)
 					mw.Log(err.Error())
 				}
 
@@ -65,7 +59,6 @@ func (mw *MainWindow) newLogBtn() {
 					mw.dlc.DetachDashboard(mw.dashboard)
 				}
 
-				//mw.progressBar.Stop()
 				mw.loggingRunning = false
 				mw.dlc = nil
 				mw.logBtn.SetIcon(theme.MediaPlayIcon())

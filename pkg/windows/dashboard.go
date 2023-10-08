@@ -381,7 +381,6 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 }
 
 func (db *Dashboard) startParser() {
-
 	metrics := db.createRouter()
 	for metric := range db.metricsChan {
 		if fun, ok := metrics[metric.Name]; ok {
@@ -553,11 +552,7 @@ func (db *Dashboard) setValue(value float64) {
 	db.air.SetValue2(value)
 }
 
-func (db *Dashboard) Capture() {
-
-}
-
-func (db *Dashboard) newDebugBar() *fyne.Container {
+func (db *Dashboard) NewDebugBar() *fyne.Container {
 	var mockValue float64 = 0
 	return container.NewGridWithColumns(13,
 		widget.NewButton("-100", func() {

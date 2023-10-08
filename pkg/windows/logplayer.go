@@ -71,7 +71,6 @@ func NewLogPlayer(a fyne.App, filename string, onClose func()) fyne.Window {
 	slider.Step = 1
 	slider.Orientation = widget.Horizontal
 	slider.ExtendBaseWidget(slider)
-	//slider := widget.NewSlider(0, 0)
 
 	posWidget := widget.NewLabel("")
 	currLine := binding.NewFloat()
@@ -79,7 +78,6 @@ func NewLogPlayer(a fyne.App, filename string, onClose func()) fyne.Window {
 	currLine.AddListener(binding.NewDataListener(func() {
 		val, err := currLine.Get()
 		if err != nil {
-			//mw.Log(err.Error())
 			log.Println(err)
 			return
 		}
@@ -91,7 +89,6 @@ func NewLogPlayer(a fyne.App, filename string, onClose func()) fyne.Window {
 
 	slider.OnChanged = func(pos float64) {
 		controlChan <- &controlMsg{Op: OpSeek, Pos: int(pos)}
-		//posWidget.SetText(fmt.Sprintf("%.0f%%", pos))
 		currPct := pos / float64(logz.Len()) * 100
 		posWidget.SetText(fmt.Sprintf("%.01f%%", currPct))
 	}
@@ -100,8 +97,6 @@ func NewLogPlayer(a fyne.App, filename string, onClose func()) fyne.Window {
 		var err error
 		logz, err = logfile.NewFromTxLogfile(filename)
 		if err != nil {
-			// dialog.ShowError(err, w)
-			//mw.Log(err.Error())
 			log.Println(err)
 			return
 		}
