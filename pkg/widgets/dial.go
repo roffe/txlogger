@@ -176,14 +176,11 @@ func (c *Dial) Layout(_ []fyne.CanvasObject, space fyne.Size) {
 	//c.rect.Resize(size)
 	//c.rect.Move(fyne.NewPos(0, 0))
 
-	c.face.Resize(size)
-	c.face.Move(topleft)
-
 	c.center.Resize(fyne.NewSize(radius/4, radius/4))
 	c.center.Move(middle.SubtractXY(c.center.Size().Width/2, c.center.Size().Height/2))
 
-	c.cover.Resize(fyne.NewSize(c.canvas.Size().Width, size.Height/6))
 	c.cover.Move(fyne.NewPos(0, middle.Y+radius/7*5))
+	c.cover.Resize(fyne.NewSize(c.canvas.Size().Width, size.Height/6))
 
 	c.displayText.TextSize = radius / 2
 	c.displayText.Text = fmt.Sprintf(c.displayString, c.value)
@@ -195,7 +192,9 @@ func (c *Dial) Layout(_ []fyne.CanvasObject, space fyne.Size) {
 	c.rotateNeedle(c.needle, middle, c.value, -radius*.15, radius*1.13)
 
 	c.face.StrokeWidth = smallStroke
-	c.face.Refresh()
+	c.face.Move(topleft)
+	c.face.Resize(size)
+	//c.face.Refresh()
 
 	for i, p := range c.pips {
 		if i%2 == 0 {

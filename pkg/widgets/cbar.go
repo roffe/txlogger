@@ -153,7 +153,7 @@ func (s *CBar) refresh(size fyne.Size) {
 	}
 	s.bar.Move(newBarPos)
 	s.bar.Resize(newBarSize)
-	s.bar.Refresh()
+	//s.bar.Refresh()
 
 }
 

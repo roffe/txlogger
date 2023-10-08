@@ -194,9 +194,6 @@ func (c *DualDial) Layout(_ []fyne.CanvasObject, space fyne.Size) {
 	c.titleText.Move(middle.Add(fyne.NewPos(0, diameter/4)))
 	c.titleText.Refresh()
 
-	c.face.Move(topleft)
-	c.face.Resize(size)
-
 	c.center.Move(middle.SubtractXY(c.center.Size().Width/2, c.center.Size().Height/2))
 	c.center.Resize(fyne.NewSize(radius/4, radius/4))
 
@@ -219,7 +216,9 @@ func (c *DualDial) Layout(_ []fyne.CanvasObject, space fyne.Size) {
 	c.rotateNeedle(c.needle2, middle, c.value2, -radius*.15, radius*1.13)
 
 	c.face.StrokeWidth = smallStroke
-	c.face.Refresh()
+	c.face.Move(topleft)
+	c.face.Resize(size)
+	//c.face.Refresh()
 
 	//for i, n := range c.numbers {
 	//	c.rotateNum(n, middle, float64(i), radius*1.05)

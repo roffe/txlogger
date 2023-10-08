@@ -123,7 +123,7 @@ func (s *VBar) SetValue(value float64) {
 
 	s.bar.Move(fyne.NewPos(diameter/8, size.Height-(float32(value)*heightFactor)))
 	s.bar.Resize(fyne.NewSize(size.Width-(diameter/8*2), (float32(value) * heightFactor)))
-	s.bar.Refresh()
+	//s.bar.Refresh()
 
 	s.displayText.Text = strconv.FormatFloat(value, 'f', 0, 64)
 	s.displayText.Move(fyne.NewPos(size.Width/2-s.displayText.Size().Width/2, size.Height-(float32(value)*heightFactor)-12.5))

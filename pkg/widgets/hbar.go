@@ -119,7 +119,7 @@ func (s *HBar) SetValue(value float64) {
 
 	s.bar.Move(fyne.NewPos(0, size.Height/8))
 	s.bar.Resize(fyne.NewSize((float32(value) * widthFactor), size.Height-(size.Height/8*2)))
-	s.bar.Refresh()
+	//s.bar.Refresh()
 }
 
 func (s *HBar) Value() float64 {
