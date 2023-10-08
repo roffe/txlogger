@@ -1,12 +1,8 @@
 package windows
 
 import (
-	"bufio"
 	"fmt"
 	"log"
-	"os"
-	"strconv"
-	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -15,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/capture"
+	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
@@ -49,12 +46,6 @@ func V(width, height int32) (mjpeg.AviWriter, error) {
 func NewLogPlayer(a fyne.App, filename string, mw *MainWindow) {
 	w := a.NewWindow("LogPlayer " + filename)
 	w.Resize(fyne.NewSize(900, 600))
-	lines, err := readLog(filename)
-	if err != nil {
-		// dialog.ShowError(err, w)
-		mw.Log(err.Error())
-		return
-	}
 
 	controlChan := make(chan *controlMsg, 10)
 
@@ -70,32 +61,45 @@ func NewLogPlayer(a fyne.App, filename string, mw *MainWindow) {
 	db.SetValue("CRUISE", 0)
 	db.SetValue("LIMP", 0)
 
-	slider := widget.NewSlider(0, float64(len(lines)))
+	logz := (logfile.Logfile)(&logfile.TxLogfile{})
+
+	slider := widget.NewSlider(0, 0)
 	posWidget := widget.NewLabel("")
 	currLine := binding.NewFloat()
 
 	currLine.AddListener(binding.NewDataListener(func() {
 		val, err := currLine.Get()
 		if err != nil {
-			// dialog.ShowError(err, w)
 			mw.Log(err.Error())
 			return
 		}
 		slider.Value = val
 		slider.Refresh()
-		currPct := val / float64(len(lines)) * 100
+		currPct := val / float64(logz.Len()) * 100
 		posWidget.SetText(fmt.Sprintf("%.01f%%", currPct))
-		//posWidget.SetText(fmt.Sprintf("%.0f%%", val))
 	}))
 
 	slider.OnChanged = func(pos float64) {
 		controlChan <- &controlMsg{Op: OpSeek, Pos: int(pos)}
 		//posWidget.SetText(fmt.Sprintf("%.0f%%", pos))
-		currPct := pos / float64(len(lines)) * 100
+		currPct := pos / float64(logz.Len()) * 100
 		posWidget.SetText(fmt.Sprintf("%.01f%%", currPct))
 	}
 
-	go playLogs(currLine, lines, db, controlChan, w)
+	go func() {
+		var err error
+		logz, err = logfile.NewFromTxLogfile(filename)
+		if err != nil {
+			// dialog.ShowError(err, w)
+			mw.Log(err.Error())
+			return
+		}
+		slider.Max = float64(logz.Len())
+		posWidget.SetText("0.0%")
+		slider.Refresh()
+
+		go playLogs(currLine, logz, db, controlChan, w)
+	}()
 
 	playing := false
 	toggleBtn := &widget.Button{
@@ -127,11 +131,11 @@ func NewLogPlayer(a fyne.App, filename string, mw *MainWindow) {
 	sel := widget.NewSelect([]string{"0.1x", "0.2x", "0.5x", "1x", "2x", "4x", "8x", "16x"}, func(s string) {
 		switch s {
 		case "0.1x":
-			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 3}
+			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 10}
 		case "0.2x":
-			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 2.5}
+			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 5}
 		case "0.5x":
-			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 1.6}
+			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 2}
 		case "1x":
 			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 1}
 		case "2x":
@@ -223,53 +227,9 @@ func keyHandler(w fyne.Window, controlChan chan *controlMsg, slider *widget.Slid
 	}
 }
 
-func readLog(filename string) ([]string, error) {
-	readFile, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer readFile.Close()
-
-	fileScanner := bufio.NewScanner(readFile)
-	fileScanner.Split(bufio.ScanLines)
-
-	var output []string
-	for fileScanner.Scan() {
-		output = append(output, fileScanner.Text())
-	}
-	return output, nil
-}
-
 const TIME_FORMAT = "02-01-2006 15:04:05.999"
 
-func playLogs(currentLine binding.Float, lines []string, db *Dashboard, control <-chan *controlMsg, ww fyne.Window) {
-	/*
-		aw, err := V(int32(db.canvas.Size().Width), int32(db.canvas.Size().Height))
-		if err != nil {
-			log.Println(err)
-		}
-
-		imgChan := make(chan image.Image, 10)
-		go func() {
-			for img := range imgChan {
-				buf := bytes.NewBuffer(nil)
-				if err := jpeg.Encode(buf, img, &jpeg.Options{Quality: 55}); err != nil {
-					log.Println(err)
-					continue
-				}
-				if err := aw.AddFrame(buf.Bytes()); err != nil {
-					log.Println(err)
-					continue
-				}
-			}
-			if err := aw.Close(); err != nil {
-				log.Println(err)
-			}
-		}()
-	*/
-
-	pos := 0
-	totalLines := len(lines)
+func playLogs(currentLine binding.Float, logz logfile.Logfile, db *Dashboard, control <-chan *controlMsg, ww fyne.Window) {
 	play := false
 	playonce := false
 	speedMultiplier := 1.0
@@ -286,99 +246,45 @@ func playLogs(currentLine binding.Float, lines []string, db *Dashboard, control 
 			case OpTogglePlayback:
 				play = !play
 			case OpSeek:
-				//if time.Since(lastSeek) > 24*time.Millisecond {
 				if currentMillis-lastSeek > 24 {
-					pos = op.Pos
-					playonce = true
 					lastSeek = currentMillis
+					logz.Seek(op.Pos)
+					playonce = true
 				}
 			case OpPrev:
-				pos -= 2
+				pos := logz.Pos() - 2
 				if pos < 0 {
 					pos = 0
 				}
 				playonce = true
+				logz.Seek(pos)
 			case OpNext:
 				playonce = true
 			case OpExit:
-				//close(imgChan)
 				return
 			}
-		//case <-t.C:
 		default:
-			if (!play && !playonce) || pos >= totalLines || nextFrame-currentMillis > 10 {
+			if logz.Pos() >= logz.Len()-1 || (!play && !playonce) {
+				time.Sleep(10 * time.Millisecond)
+				continue
+			}
+			if nextFrame-currentMillis > 4 {
 				time.Sleep(time.Duration(nextFrame-currentMillis-2) * time.Millisecond)
 				continue
 			}
 			if currentMillis < nextFrame {
 				continue
 			}
-
-			touples := strings.Split(strings.TrimSuffix(lines[pos], "|"), "|")
-
-			func() {
-				defer func() {
-					if r := recover(); r != nil {
-						log.Println("Recovered in f", r)
-					}
-				}()
-				db.SetTimeText(strings.Split(touples[0], " ")[1])
-			}()
-
-			parsedTime, err := time.Parse(TIME_FORMAT, touples[0])
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-
-			if pos+1 < len(lines) {
-				touples2 := strings.Split(strings.TrimSuffix(lines[pos+1], "|"), "|")
-				parsedTime2, err := time.Parse(TIME_FORMAT, touples2[0])
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				nextFrame = currentMillis + int64(float64(parsedTime2.Sub(parsedTime).Milliseconds())*speedMultiplier)
-			}
-
-			for _, kv := range touples[1:] {
-				parts := strings.Split(kv, "=")
-				if parts[0] == "IMPORTANTLINE" {
-					continue
-				}
-				val, err := strconv.ParseFloat(strings.Replace(parts[1], ",", ".", 1), 64)
-				if err != nil {
-					log.Println(err)
-					pos++
-					currentLine.Set(float64(pos))
-					continue
-				}
-				db.SetValue(parts[0], val)
+			rec := logz.Next()
+			currentLine.Set(float64(logz.Pos()))
+			nextFrame = currentMillis + int64(float64(rec.DelayTillNext)*speedMultiplier)
+			db.SetTimeText(rec.Time.Format("15:04:05.999"))
+			for _, kv := range rec.Values {
+				db.SetValue(kv.Key, kv.Value)
 			}
 			if playonce {
 				playonce = false
 			}
-			/*
-				if pos < totalLines {
-					touples2 := strings.Split(strings.TrimSuffix(lines[pos], "|"), "|")
-					t1, err := time.Parse(TIME_FORMAT, touples[0])
-					if err != nil {
-						log.Fatal(err)
-					}
-					t2, err := time.Parse(TIME_FORMAT, touples2[0])
-					if err != nil {
-						log.Fatal(err)
-						}
-
-						tt := t2.Sub(t1) - time.Since(lastFrame)
-						log.Println(tt.Milliseconds())
-						t.Reset(tt)
-					}
-			*/
-			currentLine.Set(float64(pos))
-			pos++
-			//time.Sleep(slp - 500*time.Microsecond)
-			//imgChan <- ww.Canvas().Capture()
 		}
 	}
 }
