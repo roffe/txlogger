@@ -5,8 +5,10 @@ import (
 	"errors"
 	"log"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -92,17 +94,17 @@ func (l *TxLogfile) End() time.Time {
 	return time.Time{}
 }
 
+var timeFormats = []string{
+	`02/01/2006 15:04:05.999`,
+	`2006/01/02 15:04:05.999`,
+	`02-01-2006 15:04:05.999`,
+	`2006-01-02 15:04:05.999`,
+}
+
 func detectTimeFormat(text string) (string, error) {
-	var formats = []string{
-		"02/01/2006 15:04:05.999",
-		"2006/01/02 15:04:05.999",
-		"02-01-2006 15:04:05.999",
-		"2006-01-02 15:04:05.999",
-	}
 	text = strings.Split(strings.TrimSuffix(text, "|"), "|")[0]
-	for _, format := range formats {
+	for _, format := range timeFormats {
 		if _, err := time.Parse(format, text); err == nil {
-			//			log.Printf("Detected time format: %s", format)
 			return format, nil
 		}
 	}
@@ -114,7 +116,9 @@ func parseTxLogfile(filename string) ([]*Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(lines) == 0 {
+	noLines := len(lines)
+
+	if noLines <= 0 {
 		return nil, errors.New("no lines in file")
 	}
 
@@ -123,52 +127,70 @@ func parseTxLogfile(filename string) ([]*Record, error) {
 		return nil, err
 	}
 
-	noLines := len(lines)
-	var records []*Record
+	records := make([]*Record, noLines)
+	semChan := make(chan struct{}, runtime.NumCPU())
+	var wg sync.WaitGroup
 
-	for pos, line := range lines {
-		parsedTime, rawValues, err := splitTxLogLine(line, timeFormat)
-		if err != nil {
-			log.Println(err)
+	for pos := 0; pos < noLines; pos++ {
+		semChan <- struct{}{}
+		wg.Add(1)
+		go func(position int) {
+			defer wg.Done()
+			if record, err := parseLine(lines[position], timeFormat); err == nil {
+				if position+1 < noLines {
+					record.DelayTillNext = getDelayTillNext(lines[position+1], timeFormat, record.Time)
+				}
+				records[position] = record
+			} else {
+				log.Println(err)
+			}
+			<-semChan
+		}(pos)
+	}
+	wg.Wait()
+	return records, nil
+}
+
+func parseLine(line, timeFormat string) (*Record, error) {
+	parsedTime, rawValues, err := splitTxLogLine(line, timeFormat)
+	if err != nil {
+		return nil, err
+	}
+	record := NewRecord(parsedTime)
+	for _, kv := range rawValues {
+		if strings.HasPrefix(kv, "IMPORTANTLINE") {
 			continue
 		}
-
-		record := &Record{
-			Time:   parsedTime,
-			Values: make([]*RecordValue, 0),
+		key, value, err := parseValue(kv)
+		if err != nil {
+			return nil, err
 		}
-
-		if pos+1 < noLines {
-			pipeIndex := strings.Index(lines[pos+1], "|")
-			if pipeIndex != -1 {
-				textBeforePipe := lines[pos+1][:pipeIndex]
-				parsedTime2, err := time.Parse(timeFormat, textBeforePipe)
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				record.DelayTillNext = parsedTime2.Sub(parsedTime).Milliseconds()
-			}
-		}
-		for _, kv := range rawValues {
-			parts := strings.Split(kv, "=")
-			if parts[0] == "IMPORTANTLINE" {
-				continue
-			}
-			val, err := strconv.ParseFloat(strings.Replace(parts[1], ",", ".", 1), 64)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			record.Values = append(record.Values, &RecordValue{
-				Key:   parts[0],
-				Value: val,
-			})
-		}
-		records = append(records, record)
+		record.SetValue(key, value)
 	}
+	return record, nil
+}
 
-	return records, nil
+func getDelayTillNext(line, timeFormat string, currentDelay time.Time) int64 {
+	pipeIndex := strings.Index(line, "|")
+	if pipeIndex != -1 {
+		textBeforePipe := line[:pipeIndex]
+		parsedTime, err := time.Parse(timeFormat, textBeforePipe)
+		if err != nil {
+			log.Println(err)
+			return 0
+		}
+		return parsedTime.Sub(currentDelay).Milliseconds()
+	}
+	return 0
+}
+
+func parseValue(valueString string) (string, float64, error) {
+	parts := strings.Split(valueString, "=")
+	val, err := strconv.ParseFloat(strings.Replace(parts[1], ",", ".", 1), 64)
+	if err != nil {
+		return "", 0, err
+	}
+	return parts[0], val, nil
 }
 
 func splitTxLogLine(line, timeFormat string) (time.Time, []string, error) {
@@ -186,7 +208,6 @@ func readTxLogfile(filename string) ([]string, error) {
 		return nil, err
 	}
 	defer readFile.Close()
-
 	fileScanner := bufio.NewScanner(readFile)
 	var output []string
 	for fileScanner.Scan() {
