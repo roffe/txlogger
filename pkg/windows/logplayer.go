@@ -56,7 +56,7 @@ func (s *slider) TypedKey(key *fyne.KeyEvent) {
 
 func NewLogPlayer(a fyne.App, filename string, onClose func()) fyne.Window {
 	w := a.NewWindow("LogPlayer " + filename)
-	w.Resize(fyne.NewSize(900, 600))
+	w.Resize(fyne.NewSize(1024, 600))
 
 	controlChan := make(chan *controlMsg, 10)
 
