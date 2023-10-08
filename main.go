@@ -31,7 +31,6 @@ func main() {
 	vars := kwp2000.NewVarDefinitionList()
 	if len(os.Args) > 1 {
 		filename := os.Args[1]
-		log.Println(filename)
 		if strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") {
 			windows.NewLogPlayer(a, filename, nil).ShowAndRun()
 			return
