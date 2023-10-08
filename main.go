@@ -29,8 +29,6 @@ func main() {
 	a := app.NewWithID("com.roffe.trl")
 	a.Settings().SetTheme(&myTheme{})
 	vars := kwp2000.NewVarDefinitionList()
-	//sm := sink.NewManager()
-	log.Println(os.Args)
 	if len(os.Args) > 1 {
 		filename := os.Args[1]
 		log.Println(filename)
@@ -41,7 +39,6 @@ func main() {
 	}
 
 	mw := windows.NewMainWindow(a, vars)
-	//go dashboard.Start(mw.Log, a.Metadata().Release, sm, vars, ready)
 	mw.SetMaster()
 	mw.Resize(fyne.NewSize(1024, 768))
 	mw.SetContent(mw.Layout())
