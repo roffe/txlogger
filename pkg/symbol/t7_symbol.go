@@ -66,14 +66,10 @@ func LoadT7Symbols(data []byte, cb func(string)) (SymbolCollection, error) {
 	}
 
 	for _, h := range GetAllT7HeaderFields(data) {
-		if h.Length == 4 {
-			log.Printf("0x%02x %d> 0x%08X  %q", h.ID, len(h.Data), binary.BigEndian.Uint32(h.Data), h.Data)
-		} else if h.Length == 2 {
-			log.Printf("0x%02x %d> 0x%04X  %q", h.ID, len(h.Data), binary.BigEndian.Uint16(h.Data), h.Data)
-		} else {
-			log.Printf("0x%02x %d> %q", h.ID, len(h.Data), string(h.Data))
+		switch h.ID {
+		case 0x91, 0x94, 0x95, 0x97:
+			cb(h.String())
 		}
-
 	}
 
 	if !IsBinaryPackedVersion(data, 0x9B) {
@@ -282,15 +278,16 @@ func readAllT7SymbolsData(fileBytes []byte, symbols []*Symbol) error {
 	dataLocationOffset := bytePatternSearch(fileBytes, searchPattern, 0x30000) - 10
 	dataOffsetValue := binary.BigEndian.Uint32(fileBytes[dataLocationOffset : dataLocationOffset+4])
 
-	sram_offset, err := GetAddressFromOffset(fileBytes, dataLocationOffset+4)
-	if err != nil {
-		return err
-	}
-	log.Printf("sram_offset: %X", sram_offset)
-
-	log.Printf("dataLocationOffsetRaw %X", fileBytes[dataLocationOffset:dataLocationOffset+4])
-	log.Printf("dataLocationOffset: %X", dataLocationOffset)
-	log.Printf("dataOffsetValue: %X", dataOffsetValue)
+	//sram_offset, err := GetAddressFromOffset(fileBytes, dataLocationOffset+4)
+	//if err != nil {
+	//	return err
+	//}
+	/*
+		log.Printf("sram_offset: %X", sram_offset)
+		log.Printf("dataLocationOffsetRaw %X", fileBytes[dataLocationOffset:dataLocationOffset+4])
+		log.Printf("dataLocationOffset: %X", dataLocationOffset)
+		log.Printf("dataOffsetValue: %X", dataOffsetValue)
+	*/
 
 	c9value, err := GetT7HeaderField(fileBytes, 0x9C)
 	if err != nil {
@@ -298,7 +295,7 @@ func readAllT7SymbolsData(fileBytes []byte, symbols []*Symbol) error {
 	}
 
 	sramOffset := reverseInt(binary.BigEndian.Uint32(c9value))
-	log.Printf("sramOffset: %X", sramOffset)
+	//	log.Printf("sramOffset: %X", sramOffset)
 
 	for _, sym := range symbols {
 		if sym.Address < 0x0F00000 {
@@ -501,6 +498,16 @@ type T7HeaderField struct {
 	ID     byte
 	Length byte
 	Data   []byte
+}
+
+func (h *T7HeaderField) String() string {
+	if h.Length == 4 {
+		return fmt.Sprintf("0x%02x %d> 0x%08X  %q", h.ID, len(h.Data), binary.BigEndian.Uint32(h.Data), h.Data)
+	} else if h.Length == 2 {
+		return fmt.Sprintf("0x%02x %d> 0x%04X  %q", h.ID, len(h.Data), binary.BigEndian.Uint16(h.Data), h.Data)
+	} else {
+		return fmt.Sprintf("0x%02x> %s", h.ID, string(h.Data))
+	}
 }
 
 func GetAllT7HeaderFields(bin []byte) []*T7HeaderField {

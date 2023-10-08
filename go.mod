@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.21.0
 
 require (
-	fyne.io/fyne/v2 v2.4.1-rc1
+	fyne.io/fyne/v2 v2.4.1-0.20231004175827-d530122f8b39
 	fyne.io/x/fyne v0.0.0-20231004122445-c04c36b7acb1
 	github.com/roffe/gocan v0.0.0-20230923211524-653f77516da0
 	github.com/sqweek/dialog v0.0.0-20220809060634-e981b270ebbf

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -49,6 +50,9 @@ func LoadSymbols(filename string, ecu string, cb func(string)) (SymbolCollection
 	if err != nil {
 		return nil, err
 	}
+
+	cb(fmt.Sprintf("Loading %s", filepath.Base(filename)))
+
 	switch ecu {
 	case "T7":
 		return LoadT7Symbols(data, cb)

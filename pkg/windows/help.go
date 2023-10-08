@@ -1,6 +1,9 @@
 package windows
 
 import (
+	"net/url"
+	"strconv"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
@@ -8,6 +11,14 @@ import (
 )
 
 func Help(app fyne.App) {
+	u, err := url.Parse("https://txlogger.com")
+	if err != nil {
+		panic(err)
+	}
+	link := widget.NewHyperlink(u.Host, u)
+	link.Alignment = fyne.TextAlignLeading
+	link.TextStyle = fyne.TextStyle{Bold: true}
+
 	w := app.NewWindow("Help")
 	w.Resize(fyne.NewSize(400, 600))
 	tabs := container.NewAppTabs(
@@ -26,16 +37,18 @@ func Help(app fyne.App) {
 			widget.NewLabel("Return/Home: Go to start"),
 			widget.NewLabel("Plus: Increase playback speed"),
 			widget.NewLabel("Minus: Decrease playback speed"),
-			widget.NewLabel("num Enter Reset playback speed"),
+			widget.NewLabel("Num Enter Reset playback speed"),
 		)),
 		container.NewTabItemWithIcon("About", theme.InfoIcon(), container.NewVBox(
 			widget.NewLabel("TxLogger"),
-			widget.NewLabel("Version: "+app.Metadata().Version),
+			widget.NewLabel("Version: "+app.Metadata().Version+" Build: "+strconv.Itoa(app.Metadata().Build)),
 			widget.NewLabel("Author: Roffe"),
+			link,
 			widget.NewSeparator(),
 			widget.NewLabel("tHANKS tO:"),
 			widget.NewLabel("SAAB for making the cars we love"),
 			widget.NewLabel("The guys who made TrionicCANFlasher and TxSuite"),
+			widget.NewLabel("Kalej"),
 			widget.NewLabel("Artursson"),
 			widget.NewLabel("Schottis"),
 			widget.NewLabel("o2o Crew"),
