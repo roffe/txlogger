@@ -93,20 +93,6 @@ func NewLogPlayer(a fyne.App, filename string, onClose func()) fyne.Window {
 		posWidget.SetText(fmt.Sprintf("%.01f%%", currPct))
 	}
 
-	go func() {
-		var err error
-		logz, err = logfile.NewFromTxLogfile(filename)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		slider.Max = float64(logz.Len())
-		posWidget.SetText("0.0%")
-		slider.Refresh()
-
-		go playLogs(currLine, logz, db, controlChan, w)
-	}()
-
 	playing := false
 	toggleBtn := &widget.Button{
 		Text: "",
@@ -178,10 +164,25 @@ func NewLogPlayer(a fyne.App, filename string, onClose func()) fyne.Window {
 
 	handler := keyHandler(w, controlChan, slider, toggleBtn, sel)
 	slider.TypedKey = handler
-
 	w.Canvas().SetOnTypedKey(handler)
 	w.SetContent(main)
 	w.Show()
+
+	go func() {
+		var err error
+		start := time.Now()
+		logz, err = logfile.NewFromTxLogfile(filename)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		log.Printf("Parsed %d records in %s", logz.Len(), time.Since(start))
+		slider.Max = float64(logz.Len())
+		posWidget.SetText("0.0%")
+		slider.Refresh()
+		db.PlayLog(currLine, logz, controlChan, w)
+	}()
+
 	return w
 }
 
@@ -238,63 +239,3 @@ func keyHandler(w fyne.Window, controlChan chan *controlMsg, slider *Slider, tb 
 }
 
 const TIME_FORMAT = "02-01-2006 15:04:05.999"
-
-func playLogs(currentLine binding.Float, logz logfile.Logfile, db *Dashboard, control <-chan *controlMsg, ww fyne.Window) {
-	play := false
-	playonce := false
-	speedMultiplier := 1.0
-	var nextFrame int64
-	var lastSeek int64
-	var currentMillis int64
-	for {
-		currentMillis = time.Now().UnixMilli()
-		select {
-		case op := <-control:
-			switch op.Op {
-			case OpPlaybackSpeed:
-				speedMultiplier = op.Rate
-			case OpTogglePlayback:
-				play = !play
-			case OpSeek:
-				if currentMillis-lastSeek > 24 {
-					lastSeek = currentMillis
-					logz.Seek(op.Pos)
-					playonce = true
-				}
-			case OpPrev:
-				pos := logz.Pos() - 2
-				if pos < 0 {
-					pos = 0
-				}
-				playonce = true
-				logz.Seek(pos)
-			case OpNext:
-				playonce = true
-			case OpExit:
-				return
-			}
-		default:
-			if logz.Pos() >= logz.Len()-1 || (!play && !playonce) {
-				time.Sleep(10 * time.Millisecond)
-				continue
-			}
-			if nextFrame-currentMillis > 4 {
-				time.Sleep(time.Duration(nextFrame-currentMillis-2) * time.Millisecond)
-				continue
-			}
-			if currentMillis < nextFrame {
-				continue
-			}
-			rec := logz.Next()
-			currentLine.Set(float64(logz.Pos()))
-			nextFrame = currentMillis + int64(float64(rec.DelayTillNext)*speedMultiplier)
-			db.SetTimeText(rec.Time.Format("15:04:05.999"))
-			for _, kv := range rec.Values {
-				db.SetValue(kv.Key, kv.Value)
-			}
-			if playonce {
-				playonce = false
-			}
-		}
-	}
-}

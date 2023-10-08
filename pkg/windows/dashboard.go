@@ -11,8 +11,10 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/model"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
@@ -187,7 +189,7 @@ func NewDashboard(mw fyne.Window, logplayer bool, logBtn *widget.Button, onClose
 
 	if logplayer {
 		db.time = &canvas.Text{
-			Text:     "00:00:00.000",
+			Text:     "00:00:00.00",
 			Color:    color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF},
 			TextSize: 35,
 		}
@@ -624,7 +626,67 @@ func (db *Dashboard) NewDebugBar() *fyne.Container {
 			db.setValue(mockValue)
 		}),
 	)
+}
 
+func (db *Dashboard) PlayLog(currentLine binding.Float, logz logfile.Logfile, control <-chan *controlMsg, ww fyne.Window) {
+	play := true
+	playonce := false
+	speedMultiplier := 1.0
+	var nextFrame int64
+	var lastSeek int64
+	var currentMillis int64
+	for {
+		currentMillis = time.Now().UnixMilli()
+		select {
+		case op := <-control:
+			switch op.Op {
+			case OpPlaybackSpeed:
+				speedMultiplier = op.Rate
+			case OpTogglePlayback:
+				play = !play
+			case OpSeek:
+				if currentMillis-lastSeek > 24 {
+					lastSeek = currentMillis
+					logz.Seek(op.Pos)
+					playonce = true
+				}
+			case OpPrev:
+				pos := logz.Pos() - 2
+				if pos < 0 {
+					pos = 0
+				}
+				playonce = true
+				logz.Seek(pos)
+			case OpNext:
+				playonce = true
+			case OpExit:
+				return
+			}
+		default:
+			if logz.Pos() >= logz.Len()-1 || (!play && !playonce) {
+				time.Sleep(10 * time.Millisecond)
+				continue
+			}
+			if nextFrame-currentMillis > 4 {
+				time.Sleep(time.Duration(nextFrame-currentMillis-2) * time.Millisecond)
+				continue
+			}
+			if currentMillis < nextFrame {
+				continue
+			}
+			currentLine.Set(float64(logz.Pos()))
+			if rec := logz.Next(); rec != nil {
+				nextFrame = currentMillis + int64(float64(rec.DelayTillNext)*speedMultiplier)
+				for k, v := range rec.Values {
+					db.SetValue(k, v)
+				}
+				db.SetTimeText(rec.Time.Format("15:04:05.99"))
+			}
+			if playonce {
+				playonce = false
+			}
+		}
+	}
 }
 
 func AirDemToString(v float64) string {
