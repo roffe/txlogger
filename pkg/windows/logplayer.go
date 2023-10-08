@@ -43,6 +43,11 @@ func V(width, height int32) (mjpeg.AviWriter, error) {
 }
 */
 
+type Slider struct {
+	widget.Slider
+	TypedKey func(key *fyne.KeyEvent)
+}
+
 func NewLogPlayer(a fyne.App, filename string, onClose func()) fyne.Window {
 	w := a.NewWindow("LogPlayer " + filename)
 	w.Resize(fyne.NewSize(900, 600))
@@ -62,8 +67,12 @@ func NewLogPlayer(a fyne.App, filename string, onClose func()) fyne.Window {
 	db.SetValue("LIMP", 0)
 
 	logz := (logfile.Logfile)(&logfile.TxLogfile{})
+	slider := &Slider{}
+	slider.Step = 1
+	slider.Orientation = widget.Horizontal
+	slider.ExtendBaseWidget(slider)
+	//slider := widget.NewSlider(0, 0)
 
-	slider := widget.NewSlider(0, 0)
 	posWidget := widget.NewLabel("")
 	currLine := binding.NewFloat()
 
@@ -172,13 +181,16 @@ func NewLogPlayer(a fyne.App, filename string, onClose func()) fyne.Window {
 		db.Content(),
 	)
 
-	w.Canvas().SetOnTypedKey(keyHandler(w, controlChan, slider, toggleBtn, sel))
+	handler := keyHandler(w, controlChan, slider, toggleBtn, sel)
+	slider.TypedKey = handler
+
+	w.Canvas().SetOnTypedKey(handler)
 	w.SetContent(main)
 	w.Show()
 	return w
 }
 
-func keyHandler(w fyne.Window, controlChan chan *controlMsg, slider *widget.Slider, tb *widget.Button, sel *widget.Select) func(ev *fyne.KeyEvent) {
+func keyHandler(w fyne.Window, controlChan chan *controlMsg, slider *Slider, tb *widget.Button, sel *widget.Select) func(ev *fyne.KeyEvent) {
 	return func(ev *fyne.KeyEvent) {
 		switch ev.Name {
 		case fyne.KeyF12:
