@@ -3,7 +3,6 @@ package windows
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -22,8 +21,6 @@ import (
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
-	"github.com/skratchdot/open-golang/open"
-	sdialog "github.com/sqweek/dialog"
 	"golang.org/x/net/context"
 )
 
@@ -58,6 +55,10 @@ type MainWindow struct {
 	syncSymbolsBtn     *widget.Button
 
 	dashboardBtn *widget.Button
+
+	fuelBtn     *widget.Button
+	ignitionBtn *widget.Button
+
 	logplayerBtn *widget.Button
 	logfolderBtn *widget.Button
 	helpBtn      *widget.Button
@@ -88,9 +89,15 @@ type MainWindow struct {
 	dlc  datalogger.DataClient
 	vars *kwp2000.VarDefinitionList
 
+	symbols symbol.SymbolCollection
+
 	dashboard *Dashboard
 	//metricChan chan *model.DashboardMetric
 	buttonsDisabled bool
+
+	leading *fyne.Container
+
+	openMaps map[string]*MapViewer
 }
 
 func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
@@ -106,7 +113,8 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		freqValue:             binding.NewFloat(),
 		//progressBar:           widget.NewProgressBarInfinite(),
 		//sinkManager:           singMgr,
-		vars: vars,
+		vars:     vars,
+		openMaps: make(map[string]*MapViewer),
 	}
 
 	mw.Window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
@@ -138,96 +146,7 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		mw.Close()
 	})
 
-	mw.addSymbolBtn = widget.NewButtonWithIcon("Add", theme.ContentAddIcon(), func() {
-		defer mw.symbolConfigList.Refresh()
-		s, ok := mw.symbolMap[mw.symbolLookup.Text]
-		if !ok {
-			mw.vars.Add(&kwp2000.VarDefinition{
-				Name: mw.symbolLookup.Text,
-			})
-			return
-		}
-		mw.vars.Add(s)
-		mw.SaveSymbolList()
-		//log.Printf("Name: %s, Method: %d, Value: %d, Type: %X", s.Name, s.Method, s.Value, s.Type)
-	})
-
-	mw.loadSymbolsFileBtn = widget.NewButtonWithIcon("Load from binary", theme.FileIcon(), func() {
-		filename, err := sdialog.File().Filter("Binary file", "bin").Load()
-		if err != nil {
-			if err.Error() == "Cancelled" {
-				return
-			}
-			// dialog.ShowError(err, mw)
-			mw.Log(err.Error())
-			return
-		}
-		if err := mw.loadSymbolsFromFile(filename); err != nil {
-			// dialog.ShowError(err, mw)
-			mw.Log(err.Error())
-			return
-		}
-		mw.SyncSymbols()
-	})
-
-	mw.loadSymbolsEcuBtn = widget.NewButtonWithIcon("Load from ECU", theme.DownloadIcon(), func() {
-		//		mw.progressBar.Start()
-		mw.disableBtns()
-		go func() {
-			defer mw.enableBtns()
-			//		defer mw.progressBar.Stop()
-			if err := mw.loadSymbolsFromECU(); err != nil {
-				// dialog.ShowError(err, mw)
-				mw.Log(err.Error())
-				return
-			}
-			mw.SyncSymbols()
-		}()
-	})
-
-	mw.loadConfigBtn = widget.NewButtonWithIcon("Load config", theme.FileIcon(), func() {
-		filename, err := sdialog.File().Filter("*.json", "json").Load()
-		if err != nil {
-			if err.Error() == "Cancelled" {
-				return
-			}
-			// dialog.ShowError(err, mw)
-			mw.Log(err.Error())
-			return
-		}
-		if err := mw.LoadConfig(filename); err != nil {
-			// dialog.ShowError(err, mw)
-			mw.Log(err.Error())
-			return
-		}
-		mw.symbolConfigList.Refresh()
-		mw.SyncSymbols()
-	})
-
-	mw.saveConfigBtn = widget.NewButtonWithIcon("Save config", theme.DocumentSaveIcon(), func() {
-		filename, err := sdialog.File().Filter("json", "json").Save()
-		if err != nil {
-			if err.Error() == "Cancelled" {
-				return
-			}
-			// dialog.ShowError(err, mw)
-			mw.Log(err.Error())
-			return
-		}
-		if !strings.HasSuffix(filename, ".json") {
-			filename += ".json"
-		}
-		if err := mw.SaveConfig(filename); err != nil {
-			// dialog.ShowError(err, mw)
-			mw.Log(err.Error())
-			return
-
-		}
-	})
-
-	mw.helpBtn = widget.NewButtonWithIcon("Help", theme.HelpIcon(), func() {
-		Help(mw.app)
-	})
+	mw.createButtons()
 
 	mw.presetSelect = &widget.Select{
 		Alignment:   fyne.TextAlignCenter,
@@ -249,70 +168,6 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 			mw.SyncSymbols()
 		},
 	}
-
-	mw.syncSymbolsBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), mw.SyncSymbols)
-
-	mw.dashboardBtn = widget.NewButtonWithIcon("Dashboard", theme.InfoIcon(), func() {
-		onClose := func() {
-			if mw.dlc != nil {
-				mw.dlc.DetachDashboard(mw.dashboard)
-			}
-			close(mw.dashboard.metricsChan)
-			mw.dashboard = nil
-			mw.SetFullScreen(false)
-			mw.SetContent(mw.Content())
-		}
-
-		mw.dashboard = NewDashboard(mw, false, mw.logBtn, onClose)
-		if mw.dlc != nil {
-			mw.dlc.AttachDashboard(mw.dashboard)
-		}
-		mw.SetContent(mw.dashboard.Content())
-	})
-
-	mw.logplayerBtn = widget.NewButtonWithIcon("Log Player", theme.MediaFastForwardIcon(), func() {
-		filename, err := sdialog.File().Filter("trionic logfile", "t7l", "t8l").SetStartDir("logs").Load()
-		if err != nil {
-			if err.Error() == "Cancelled" {
-				return
-			}
-			// dialog.ShowError(err, mw)
-			mw.Log(err.Error())
-			return
-		}
-
-		onClose := func() {
-			if mw.dlc != nil {
-				mw.dlc.DetachDashboard(mw.dashboard)
-			}
-			close(mw.dashboard.metricsChan)
-			mw.dashboard = nil
-			mw.SetFullScreen(false)
-			mw.SetContent(mw.Content())
-		}
-		NewLogPlayer(mw.app, filename, onClose)
-	})
-
-	mw.logfolderBtn = widget.NewButtonWithIcon("Logs Folder", theme.FolderOpenIcon(), func() {
-		if _, err := os.Stat("logs"); os.IsNotExist(err) {
-			if err := os.Mkdir("logs", 0755); err != nil {
-				if err != os.ErrExist {
-					mw.Log(fmt.Sprintf("failed to create logs dir: %s", err))
-					return
-				}
-			}
-		}
-
-		path, err := os.Getwd()
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		if err := open.Run(path + "\\logs"); err != nil {
-			log.Println(err)
-		}
-	})
 
 	//mw.progressBar.Stop()
 
@@ -342,7 +197,6 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 
 	mw.newOutputList()
 	mw.newSymbolnameTypeahead()
-	mw.newLogBtn()
 
 	mw.capturedCounterLabel = &widget.Label{
 		Alignment: fyne.TextAlignLeading,
@@ -382,42 +236,6 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		mw.app.Preferences().SetString(prefsSelectedECU, s)
 	})
 
-	/*
-		mw.symbolsHeader = container.NewHBox(
-			widgets.FixedWidth(197, &widget.Label{
-				Text:      "Name",
-				Alignment: fyne.TextAlignLeading,
-			}),
-			widgets.FixedWidth(70, &widget.Label{
-				Text:      "Value",
-				Alignment: fyne.TextAlignLeading,
-			}),
-			widgets.FixedWidth(90, &widget.Label{
-				Text:      "Method",
-				Alignment: fyne.TextAlignLeading,
-			}),
-			widgets.FixedWidth(44, &widget.Label{
-				Text:      "#",
-				Alignment: fyne.TextAlignLeading,
-			}),
-			widgets.FixedWidth(28, &widget.Label{
-				Text:      "Type",
-				Alignment: fyne.TextAlignLeading,
-			}),
-			widgets.FixedWidth(40, &widget.Label{
-				Text:      "Signed",
-				Alignment: fyne.TextAlignLeading,
-			}),
-			widgets.FixedWidth(55, &widget.Label{
-				Text:      "Factor",
-				Alignment: fyne.TextAlignLeading,
-			}),
-			//widgets.FixedWidth(110, &widget.Label{
-			//	Text:      "Group",
-			//	Alignment: fyne.TextAlignLeading,
-			//}),
-		)
-	*/
 	mw.symbolsHeader = container.New(&ratioContainer{
 		widths: []float32{
 			.35, // name
@@ -469,7 +287,6 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 
 	mw.loadPrefs()
 	mw.setTitle("No symbols loaded")
-
 	mw.Resize(fyne.NewSize(1280, 720))
 
 	return mw
@@ -508,43 +325,44 @@ func (mw *MainWindow) setTitle(str string) {
 	mw.SetTitle(fmt.Sprintf("txlogger v%s Build %d - %s", meta.Version, meta.Build, str))
 }
 
-func (mw *MainWindow) Layout() fyne.CanvasObject {
+func (mw *MainWindow) Layout() *container.Split {
+	mw.leading = container.NewBorder(
+		container.NewVBox(
+			container.NewBorder(
+				nil,
+				nil,
+				//widget.NewLabel("Search"),
+				widget.NewIcon(theme.SearchIcon()),
+				container.NewHBox(
+					mw.addSymbolBtn,
+					mw.loadSymbolsFileBtn,
+					mw.loadSymbolsEcuBtn,
+					mw.syncSymbolsBtn,
+				),
+				mw.symbolLookup,
+			),
+		),
+		container.NewVBox(
+			container.NewGridWithColumns(3,
+				mw.loadConfigBtn,
+				mw.saveConfigBtn,
+				mw.presetSelect,
+			),
+		),
+		nil,
+		nil,
+		container.NewBorder(
+			mw.symbolsHeader,
+			nil,
+			nil,
+			nil,
+			mw.symbolConfigList,
+		),
+	)
 	return &container.Split{
 		Offset:     0.7,
 		Horizontal: true,
-		Leading: container.NewBorder(
-			container.NewVBox(
-				container.NewBorder(
-					nil,
-					nil,
-					//widget.NewLabel("Search"),
-					widget.NewIcon(theme.SearchIcon()),
-					container.NewHBox(
-						mw.addSymbolBtn,
-						mw.loadSymbolsFileBtn,
-						mw.loadSymbolsEcuBtn,
-						mw.syncSymbolsBtn,
-					),
-					mw.symbolLookup,
-				),
-			),
-			container.NewVBox(
-				container.NewGridWithColumns(3,
-					mw.loadConfigBtn,
-					mw.saveConfigBtn,
-					mw.presetSelect,
-				),
-			),
-			nil,
-			nil,
-			container.NewBorder(
-				mw.symbolsHeader,
-				nil,
-				nil,
-				nil,
-				mw.symbolConfigList,
-			),
-		),
+		Leading:    mw.leading,
 		Trailing: &container.Split{
 			Offset:     0,
 			Horizontal: false,
@@ -566,6 +384,8 @@ func (mw *MainWindow) Layout() fyne.CanvasObject {
 				Leading:    mw.output,
 				Trailing: container.NewVBox(
 					mw.dashboardBtn,
+					mw.fuelBtn,
+					mw.ignitionBtn,
 					mw.logplayerBtn,
 					mw.logfolderBtn,
 					mw.helpBtn,
@@ -733,6 +553,7 @@ func (mw *MainWindow) loadSymbolsFromFile(filename string) error {
 	if err != nil {
 		return fmt.Errorf("error loading symbols: %w", err)
 	}
+	os.WriteFile("symbols.txt", []byte(symbols.Dump()), 0644)
 	mw.loadSymbols(symbols)
 	mw.setTitle(filename)
 	return nil
@@ -752,4 +573,5 @@ func (mw *MainWindow) loadSymbols(symbols symbol.SymbolCollection) {
 		}
 	}
 	mw.symbolMap = newSymbolMap
+	mw.symbols = symbols
 }

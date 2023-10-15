@@ -32,7 +32,7 @@ func main() {
 	if len(os.Args) > 1 {
 		filename := os.Args[1]
 		if strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") {
-			windows.NewLogPlayer(a, filename, nil).ShowAndRun()
+			windows.NewLogPlayer(a, filename, nil, nil).ShowAndRun()
 			return
 		}
 	}

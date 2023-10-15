@@ -2,6 +2,7 @@ package symbol
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -43,6 +44,34 @@ func (s *Symbol) Bytes() []byte {
 
 func (s *Symbol) String() string {
 	return fmt.Sprintf("%s #%d @%08X type: %02X len: %d", s.Name, s.Number, s.Address, s.Type, s.Length)
+}
+
+func (s *Symbol) DataToUint16() []uint16 {
+	r := bytes.NewReader(s.data)
+	var values []uint16
+	for r.Len() > 0 {
+		var v uint16
+		err := binary.Read(r, binary.BigEndian, &v)
+		if err != nil {
+			log.Fatalf("error reading symbol data: %v", err)
+		}
+		values = append(values, v)
+	}
+	return values
+}
+
+func (s *Symbol) DataToByte() []byte {
+	r := bytes.NewReader(s.data)
+	var values []byte
+	for r.Len() > 0 {
+		var v byte
+		err := binary.Read(r, binary.BigEndian, &v)
+		if err != nil {
+			log.Fatalf("error reading symbol data: %v", err)
+		}
+		values = append(values, v)
+	}
+	return values
 }
 
 func LoadSymbols(filename string, ecu string, cb func(string)) (SymbolCollection, error) {

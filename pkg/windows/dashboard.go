@@ -11,10 +11,8 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/model"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
@@ -57,10 +55,39 @@ type Dashboard struct {
 	metricsChan chan *model.DashboardMetric
 
 	logplayer bool
+
+	//mv, mv2 *MapViewer
+	//w1, w2  fyne.Window
 }
 
-func NewDashboard(mw fyne.Window, logplayer bool, logBtn *widget.Button, onClose func()) *Dashboard {
+func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.Button, onClose func()) *Dashboard {
+	/*
+		filename := ".\\tmp\\bosse.bin"
+		cb := func(s string) {
+			log.Println(s)
+		}
+		symbols, err := symbol.LoadSymbols(filename, "T7", cb)
+		if err != nil {
+			log.Fatalf("error loading symbols: %v", err)
+		}
+
+		ww := a.NewWindow("Map Viewer")
+		ww2 := a.NewWindow("Map Viewer")
+
+		mv := NewMapViewer(ww, "BFuelCal.AirXSP", "BFuelCal.RpmYSP", "BFuelCal.Map", symbols, interpolate.U16_u16_int)
+		mv2 := NewMapViewer(ww2, "BFuelCal.AirXSP", "BFuelCal.RpmYSP", "IgnNormCal.Map", symbols, interpolate.U16_u16_int)
+
+		ww.SetContent(container.NewStack(mv))
+		ww2.SetContent(container.NewStack(mv2))
+		ww.Show()
+		ww2.Show()
+	*/
+
 	db := &Dashboard{
+		//mv:        mv,
+		//mv2:       mv2,
+		//w1:        ww,
+		//w2:        ww2,
 		logBtn:    logBtn,
 		logplayer: logplayer,
 		speed: widgets.NewDial(widgets.DialConfig{
@@ -182,6 +209,14 @@ func NewDashboard(mw fyne.Window, logplayer bool, logBtn *widget.Button, onClose
 	}
 
 	db.closeBtn = widget.NewButtonWithIcon("Back", theme.NavigateBackIcon(), func() {
+		// if db.w1 != nil {
+		// 	db.w1.Close()
+		// }
+		//
+		// if db.w2 != nil {
+		// 	db.w2.Close()
+		// }
+
 		if db.onClose != nil {
 			db.onClose()
 		}
@@ -260,6 +295,11 @@ func (db *Dashboard) render() fyne.CanvasObject {
 	return content
 }
 
+func (db *Dashboard) Close() {
+	//db.w1.Close()
+	//db.w2.Close()
+}
+
 func (db *Dashboard) SetTime(t time.Time) {
 	if db.time != nil {
 		db.time.Text = t.Format("15:04:05.000")
@@ -326,6 +366,7 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 	return map[string]func(float64){
 		"In.v_Vehicle": db.speed.SetValue,
 
+		// "ActualIn.n_Engine":   db.rpm.SetValue,
 		"ActualIn.n_Engine":   db.rpm.SetValue,
 		"ActualIn.T_AirInlet": db.iat.SetValue,
 
@@ -344,7 +385,9 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		"DisplProt.LambdaScanner": db.wblambda.SetValue,
 		"Lambda.LambdaInt":        db.nblambda.SetValue,
 
-		"MAF.m_AirInlet":          db.air.SetValue,
+		//"MAF.m_AirInlet":          db.air.SetValue,
+		"MAF.m_AirInlet": db.air.SetValue,
+
 		"m_Request":               db.air.SetValue2,
 		"AirMassMast.m_Request":   db.air.SetValue2,
 		"Out.fi_Ignition":         textSetter(db.ign, "Ign", 1),
@@ -626,67 +669,6 @@ func (db *Dashboard) NewDebugBar() *fyne.Container {
 			db.setValue(mockValue)
 		}),
 	)
-}
-
-func (db *Dashboard) PlayLog(currentLine binding.Float, logz logfile.Logfile, control <-chan *controlMsg, ww fyne.Window) {
-	play := true
-	playonce := false
-	speedMultiplier := 1.0
-	var nextFrame int64
-	var lastSeek int64
-	var currentMillis int64
-	for {
-		currentMillis = time.Now().UnixMilli()
-		select {
-		case op := <-control:
-			switch op.Op {
-			case OpPlaybackSpeed:
-				speedMultiplier = op.Rate
-			case OpTogglePlayback:
-				play = !play
-			case OpSeek:
-				if currentMillis-lastSeek > 24 {
-					lastSeek = currentMillis
-					logz.Seek(op.Pos)
-					playonce = true
-				}
-			case OpPrev:
-				pos := logz.Pos() - 2
-				if pos < 0 {
-					pos = 0
-				}
-				playonce = true
-				logz.Seek(pos)
-			case OpNext:
-				playonce = true
-			case OpExit:
-				return
-			}
-		default:
-			if logz.Pos() >= logz.Len()-1 || (!play && !playonce) {
-				time.Sleep(10 * time.Millisecond)
-				continue
-			}
-			if nextFrame-currentMillis > 4 {
-				time.Sleep(time.Duration(nextFrame-currentMillis-2) * time.Millisecond)
-				continue
-			}
-			if currentMillis < nextFrame {
-				continue
-			}
-			currentLine.Set(float64(logz.Pos()))
-			if rec := logz.Next(); rec != nil {
-				nextFrame = currentMillis + int64(float64(rec.DelayTillNext)*speedMultiplier)
-				for k, v := range rec.Values {
-					db.SetValue(k, v)
-				}
-				db.SetTimeText(rec.Time.Format("15:04:05.99"))
-			}
-			if playonce {
-				playonce = false
-			}
-		}
-	}
 }
 
 func AirDemToString(v float64) string {

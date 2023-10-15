@@ -57,6 +57,7 @@ func LoadT8Symbols(fileBytes []byte, cb func(string)) (SymbolCollection, error) 
 		sym.Name = names[i+1]
 		sym.Unit = GetUnit(sym.Name)
 		sym.Correctionfactor = GetCorrectionfactor(sym.Name)
+		extractT8SymbolData(sym, fileBytes)
 	}
 
 	cb(fmt.Sprintf("End Of Symbol Table: 0x%X", addrtaboffset))
@@ -68,7 +69,17 @@ func LoadT8Symbols(fileBytes []byte, cb func(string)) (SymbolCollection, error) 
 	//log.Println("Symbols found: ", symb_count)
 	cb(fmt.Sprintf("Loaded %d symbols from binary", len(symbols)))
 
-	return NewCollection(symbols...), nil
+	syms := NewCollection(symbols...)
+
+	return syms, nil
+}
+
+func extractT8SymbolData(sym *Symbol, data []byte) {
+	if sym.Address < 0x020000 || sym.Address+uint32(sym.Length) > uint32(len(data)) {
+		//log.Println("out of fisring")
+		return
+	}
+	sym.data = data[sym.Address : sym.Address+uint32(sym.Length)]
 }
 
 func ReadAddressTable(data []byte, offset int) ([]*Symbol, error) {
@@ -86,7 +97,6 @@ func ReadAddressTable(data []byte, offset int) ([]*Symbol, error) {
 			//log.Printf("End of table found at 0x%X\n", pos)
 			break
 		} else {
-
 			sym := &Symbol{
 				Name:         fmt.Sprintf("Symbol-%d", symb_count),
 				Number:       symb_count,

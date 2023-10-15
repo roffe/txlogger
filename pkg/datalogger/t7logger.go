@@ -22,6 +22,8 @@ type T7Client struct {
 	Config
 	sysvars *ThreadSafeMap
 	db      Dashboard
+
+	subs map[string][]*func(float64)
 }
 
 func NewT7(cfg Config) (*T7Client, error) {
@@ -36,7 +38,34 @@ func NewT7(cfg Config) (*T7Client, error) {
 				"Out.ST_LimpHome":   "0",   // comes from 0x280
 			},
 		},
+		subs: make(map[string][]*func(float64)),
 	}, nil
+}
+
+func (c *T7Client) Subscribe(name string, cb *func(float64)) {
+	subs, found := c.subs[name]
+	if !found {
+		c.subs[name] = []*func(float64){cb}
+		return
+	}
+
+	for _, f := range subs {
+		if f == cb {
+			return
+		}
+	}
+
+	subs = append(subs, cb)
+	c.subs[name] = subs
+}
+
+func (c *T7Client) Unsubscribe(name string, cb *func(float64)) {
+	for i, f := range c.subs[name] {
+		if f == cb {
+			c.subs[name] = append(c.subs[name][:i], c.subs[name][i+1:]...)
+			return
+		}
+	}
 }
 
 func (c *T7Client) Close() {
@@ -94,9 +123,6 @@ func (c *T7Client) Start() error {
 			case <-ctx.Done():
 				return
 			case msg := <-sub:
-				if c.db == nil {
-					continue
-				}
 				switch msg.Identifier() {
 				case 0x1A0:
 					rpm := binary.BigEndian.Uint16(msg.Data()[1:3])
@@ -107,8 +133,20 @@ func (c *T7Client) Start() error {
 						c.db.SetValue("ActualIn.n_Engine", float64(rpm))
 						c.db.SetValue("Out.X_AccPedal", float64(throttle))
 					}
-
+					if subs, found := c.subs["ActualIn.n_Engine"]; found {
+						for _, sub := range subs {
+							(*sub)(float64(rpm))
+						}
+					}
+					if subs, found := c.subs["Out.X_AccPedal"]; found {
+						for _, sub := range subs {
+							(*sub)(float64(throttle))
+						}
+					}
 				case 0x280:
+					if c.db == nil {
+						continue
+					}
 					data := msg.Data()[4]
 					if data&0x20 == 0x20 {
 						c.db.SetValue("CRUISE", 1)
@@ -227,9 +265,17 @@ func (c *T7Client) Start() error {
 							c.OnMessage(fmt.Sprintf("Failed to read %s: %v", va.Name, err))
 							break
 						}
+
+						// Set value on dashboard
 						if c.db != nil {
 							c.db.SetValue(va.Name, va.GetFloat64())
 						}
+						if subs, found := c.subs[va.Name]; found {
+							for _, sub := range subs {
+								(*sub)(va.GetFloat64())
+							}
+						}
+
 					}
 					if r.Len() > 0 {
 						left := r.Len()

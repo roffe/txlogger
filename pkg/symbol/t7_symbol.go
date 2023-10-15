@@ -24,30 +24,24 @@ func ValidateTrionic7File(data []byte) error {
 }
 
 func NewFromT7Bytes(data []byte, symb_count int) *Symbol {
-	var internall_address uint32
-	for i := 0; i < 4; i++ {
-		internall_address <<= 8
-		internall_address |= uint32(data[i])
-	}
-	var symbol_length uint16
-	if symb_count == 0 {
-		symbol_length = 0x08
-	} else {
-		for i := 4; i <= 5; i++ {
-			symbol_length <<= 8
-			symbol_length |= uint16(data[i])
-		}
+	extractUint32 := func(data []byte, start int) uint32 {
+		return uint32(data[start])<<24 | uint32(data[start+1])<<16 | uint32(data[start+2])<<8 | uint32(data[start+3])
 	}
 
-	var symbol_mask uint16
-	for i := 6; i <= 7; i++ {
-		symbol_mask <<= 8
-		symbol_mask |= uint16(data[i])
+	extractUint16 := func(data []byte, start int) uint16 {
+		return uint16(data[start])<<8 | uint16(data[start+1])
 	}
+
+	internall_address := extractUint32(data, 0)
+
+	symbol_length := uint16(0x08)
+	if symb_count != 0 {
+		symbol_length = extractUint16(data, 4)
+	}
+
+	symbol_mask := extractUint16(data, 6)
 
 	symbol_type := data[8]
-
-	//	log.Printf("%X %d %X %X", internall_address, symbol_length, symbol_mask, symbol_type)
 
 	return &Symbol{
 		Name:    "Symbol-" + strconv.Itoa(symb_count),
@@ -57,7 +51,6 @@ func NewFromT7Bytes(data []byte, symb_count int) *Symbol {
 		Mask:    symbol_mask,
 		Type:    symbol_type,
 	}
-
 }
 
 func LoadT7Symbols(data []byte, cb func(string)) (SymbolCollection, error) {
@@ -170,6 +163,10 @@ outer:
 			}
 		}
 
+		if sym.Name == "BFuelCal.E85Map" {
+			log.Println(sym.String())
+		}
+
 		if sym.Name == "BFuelCal.Map" {
 			log.Printf("all %X", buff)
 			log.Printf("sram address: %X", sram_address)
@@ -232,6 +229,7 @@ func binaryPacked(data []byte, cb func(string)) (SymbolCollection, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		for i := 0; i < len(symbolNames)-1; i++ {
 			symbols[i].Name = strings.TrimSpace(symbolNames[i])
 			symbols[i].Unit = GetUnit(symbols[i].Name)

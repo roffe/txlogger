@@ -122,22 +122,83 @@ func (v *VarDefinition) GetInt64() int64 {
 }
 
 func (v *VarDefinition) GetFloat64() float64 {
-	switch t := v.Decode().(type) {
-	case int8:
-		return float64(t) * v.Correctionfactor
-	case uint8:
-		return float64(t) * v.Correctionfactor
-	case int16:
-		return float64(t) * v.Correctionfactor
-	case uint16:
-		return float64(t) * v.Correctionfactor
-	case int32:
-		return float64(t) * v.Correctionfactor
-	case uint32:
-		return float64(t) * v.Correctionfactor
+	switch {
+	case v.Length == 1:
+		if len(v.data) != 1 {
+			return -1
+		}
+		if v.Type&SIGNED != 0 {
+			//if mock {
+			//	return int8(r1.Int())
+			//}
+			return float64(v.GetInt8()) * v.Correctionfactor
+		}
+		//if mock {
+		//	return uint8(r1.Int())
+		//}
+		return float64(v.GetUint8()) * v.Correctionfactor
+	case v.Length == 2:
+		if len(v.data) != 2 {
+			return -1
+		}
+		if v.Type&SIGNED != 0 {
+			//if mock {
+			//	return int16(r1.Int())
+			//}
+			return float64(v.GetInt16()) * v.Correctionfactor
+		}
+		//if mock {
+		//	return uint16(r1.Int())
+		//}
+		return float64(v.GetUint16()) * v.Correctionfactor
+	case v.Length == 4:
+		if len(v.data) != 4 {
+			return -1
+		}
+		if v.Type&SIGNED != 0 {
+			//if mock {
+			//	return int32(r1.Uint32())
+			//}
+			return float64(v.GetInt32()) * v.Correctionfactor
+		}
+		//if mock {
+		//	return uint32(r1.Uint32())
+		//}
+		return float64(v.GetUint32()) * v.Correctionfactor
+	case v.Length == 8:
+		if len(v.data) != 8 {
+			return -1
+		}
+		if v.Type&SIGNED != 0 {
+			//if mock {
+			//	return int32(r1.Uint32())
+			//}
+			return float64(v.GetInt64()) * v.Correctionfactor
+		}
+		return float64(v.GetUint64()) * v.Correctionfactor
 	default:
-		return 0
+		return 0.0
 	}
+
+	/*
+
+		switch t := v.Decode().(type) {
+		case int8:
+			return float64(t) * v.Correctionfactor
+		case uint8:
+			return float64(t) * v.Correctionfactor
+		case int16:
+			return float64(t) * v.Correctionfactor
+		case uint16:
+			return float64(t) * v.Correctionfactor
+		case int32:
+			return float64(t) * v.Correctionfactor
+		case uint32:
+			return float64(t) * v.Correctionfactor
+		default:
+			return 0
+		}
+	*/
 }
 
 func (v *VarDefinition) StringValue() string {

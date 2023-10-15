@@ -1,11 +1,15 @@
 package symbol
 
-import "sync"
+import (
+	"strings"
+	"sync"
+)
 
 type SymbolCollection interface {
 	GetByName(name string) *Symbol
 	GetByNumber(number int) *Symbol
 	Symbols() []*Symbol
+	Dump() string
 	Count() int
 	Add(symbols ...*Symbol)
 }
@@ -68,4 +72,13 @@ func (c *Collection) Count() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.count
+}
+
+func (c *Collection) Dump() string {
+	var out strings.Builder
+	for _, s := range c.symbols {
+		out.WriteString(s.String())
+		out.WriteString("\n")
+	}
+	return out.String()
 }

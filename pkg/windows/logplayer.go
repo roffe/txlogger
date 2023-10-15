@@ -3,6 +3,8 @@ package windows
 import (
 	"fmt"
 	"log"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -11,7 +13,9 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/capture"
+	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/logfile"
+	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
@@ -36,13 +40,6 @@ type controlMsg struct {
 	Rate float64
 }
 
-/*
-func V(width, height int32) (mjpeg.AviWriter, error) {
-	filename := fmt.Sprintf("capture-%s.avi", time.Now().Format("2006-01-02-15-04-05"))
-	return mjpeg.New(filename, width, height, 24)
-}
-*/
-
 type slider struct {
 	widget.Slider
 	typedKey func(key *fyne.KeyEvent)
@@ -54,126 +51,148 @@ func (s *slider) TypedKey(key *fyne.KeyEvent) {
 	}
 }
 
-func NewLogPlayer(a fyne.App, filename string, onClose func()) fyne.Window {
+type LogPlayer struct {
+	fyne.Window
+
+	app fyne.App
+
+	prevBtn    *widget.Button
+	toggleBtn  *widget.Button
+	restartBtn *widget.Button
+	nextBtn    *widget.Button
+
+	currLine binding.Float
+
+	posLabel *widget.Label
+
+	selec *widget.Select
+
+	slider *slider
+
+	db          *Dashboard
+	controlChan chan *controlMsg
+
+	symbols symbol.SymbolCollection
+
+	logType string
+
+	openMaps map[string]*MapViewer
+}
+
+func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, onClose func()) fyne.Window {
 	w := a.NewWindow("LogPlayer " + filename)
 	w.Resize(fyne.NewSize(1024, 530))
 
-	controlChan := make(chan *controlMsg, 10)
-
-	db := NewDashboard(w, true, nil, onClose)
+	lp := &LogPlayer{
+		app:         a,
+		Window:      w,
+		db:          NewDashboard(a, w, true, nil, onClose),
+		openMaps:    make(map[string]*MapViewer),
+		controlChan: make(chan *controlMsg, 10),
+		symbols:     symbols,
+		logType:     strings.ToUpper(filepath.Ext(filename)),
+	}
 
 	w.SetCloseIntercept(func() {
-		controlChan <- &controlMsg{Op: OpExit}
-		close(db.metricsChan)
+		lp.controlChan <- &controlMsg{Op: OpExit}
+		if lp.db != nil {
+			close(lp.db.metricsChan)
+			lp.db.Close()
+		}
+
+		for _, ma := range lp.openMaps {
+			ma.Close()
+		}
+
 		w.Close()
 	})
 
-	db.SetValue("CEL", 0)
-	db.SetValue("CRUISE", 0)
-	db.SetValue("LIMP", 0)
+	lp.db.SetValue("CEL", 0)
+	lp.db.SetValue("CRUISE", 0)
+	lp.db.SetValue("LIMP", 0)
 
 	logz := (logfile.Logfile)(&logfile.TxLogfile{})
-	slider := &slider{}
-	slider.Step = 1
-	slider.Orientation = widget.Horizontal
-	slider.ExtendBaseWidget(slider)
 
-	posWidget := widget.NewLabel("")
-	currLine := binding.NewFloat()
+	lp.slider = &slider{}
+	lp.slider.Step = 1
+	lp.slider.Orientation = widget.Horizontal
+	lp.slider.ExtendBaseWidget(lp.slider)
 
-	currLine.AddListener(binding.NewDataListener(func() {
-		val, err := currLine.Get()
+	lp.posLabel = widget.NewLabel("")
+
+	lp.currLine = binding.NewFloat()
+
+	lp.currLine.AddListener(binding.NewDataListener(func() {
+		val, err := lp.currLine.Get()
 		if err != nil {
 			log.Println(err)
 			return
 		}
-		slider.Value = val
-		slider.Refresh()
+		lp.slider.Value = val
+		lp.slider.Refresh()
 		currPct := val / float64(logz.Len()) * 100
-		posWidget.SetText(fmt.Sprintf("%.01f%%", currPct))
+		lp.posLabel.SetText(fmt.Sprintf("%.01f%%", currPct))
 	}))
 
-	slider.OnChanged = func(pos float64) {
-		controlChan <- &controlMsg{Op: OpSeek, Pos: int(pos)}
+	lp.slider.OnChanged = func(pos float64) {
+		lp.controlChan <- &controlMsg{Op: OpSeek, Pos: int(pos)}
 		currPct := pos / float64(logz.Len()) * 100
-		posWidget.SetText(fmt.Sprintf("%.01f%%", currPct))
+		lp.posLabel.SetText(fmt.Sprintf("%.01f%%", currPct))
 	}
 
 	playing := false
-	toggleBtn := &widget.Button{
+	lp.toggleBtn = &widget.Button{
 		Text: "",
 		Icon: theme.MediaPlayIcon(),
 	}
-	toggleBtn.OnTapped = func() {
-		controlChan <- &controlMsg{Op: OpTogglePlayback}
+	lp.toggleBtn.OnTapped = func() {
+		lp.controlChan <- &controlMsg{Op: OpTogglePlayback}
 		if playing {
-			toggleBtn.SetIcon(theme.MediaPlayIcon())
+			lp.toggleBtn.SetIcon(theme.MediaPlayIcon())
 		} else {
-			toggleBtn.SetIcon(theme.MediaPauseIcon())
+			lp.toggleBtn.SetIcon(theme.MediaPauseIcon())
 		}
 		playing = !playing
 	}
 
-	prevBtn := widget.NewButtonWithIcon("", theme.MediaFastRewindIcon(), func() {
-		controlChan <- &controlMsg{Op: OpPrev}
+	lp.prevBtn = widget.NewButtonWithIcon("", theme.MediaFastRewindIcon(), func() {
+		lp.controlChan <- &controlMsg{Op: OpPrev}
 	})
 
-	nextBtn := widget.NewButtonWithIcon("", theme.MediaFastForwardIcon(), func() {
-		controlChan <- &controlMsg{Op: OpNext}
+	lp.nextBtn = widget.NewButtonWithIcon("", theme.MediaFastForwardIcon(), func() {
+		lp.controlChan <- &controlMsg{Op: OpNext}
 	})
 
-	restartBtn := widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
-		controlChan <- &controlMsg{Op: OpSeek, Pos: 0}
+	lp.restartBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
+		lp.controlChan <- &controlMsg{Op: OpSeek, Pos: 0}
 	})
 
-	sel := widget.NewSelect([]string{"0.1x", "0.2x", "0.5x", "1x", "2x", "4x", "8x", "16x"}, func(s string) {
+	lp.selec = widget.NewSelect([]string{"0.1x", "0.2x", "0.5x", "1x", "2x", "4x", "8x", "16x"}, func(s string) {
 		switch s {
 		case "0.1x":
-			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 10}
+			lp.controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 10}
 		case "0.2x":
-			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 5}
+			lp.controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 5}
 		case "0.5x":
-			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 2}
+			lp.controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 2}
 		case "1x":
-			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 1}
+			lp.controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 1}
 		case "2x":
-			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 0.5}
+			lp.controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 0.5}
 		case "4x":
-			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 0.25}
+			lp.controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 0.25}
 		case "8x":
-			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 0.125}
+			lp.controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 0.125}
 		case "16x":
-			controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 0.0625}
+			lp.controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 0.0625}
 		}
 	})
 
-	sel.Selected = "1x"
+	lp.selec.Selected = "1x"
 
-	main := container.NewBorder(
-		container.NewBorder(
-			nil,
-			nil,
-			container.NewGridWithColumns(4,
-				prevBtn,
-				toggleBtn,
-				restartBtn,
-				nextBtn,
-			),
-			widgets.FixedWidth(75, sel),
-			container.NewBorder(nil, nil, nil, posWidget, slider),
-		),
-		nil,
-		nil,
-		nil,
-		db.Content(),
-	)
-
-	handler := keyHandler(w, controlChan, slider, toggleBtn, sel)
-
-	slider.typedKey = handler
+	handler := keyHandler(w, lp.controlChan, lp.slider, lp.toggleBtn, lp.selec)
+	lp.slider.typedKey = handler
 	w.Canvas().SetOnTypedKey(handler)
-	w.SetContent(main)
-	w.Show()
 
 	go func() {
 		var err error
@@ -184,13 +203,161 @@ func NewLogPlayer(a fyne.App, filename string, onClose func()) fyne.Window {
 			return
 		}
 		log.Printf("Parsed %d records in %s", logz.Len(), time.Since(start))
-		slider.Max = float64(logz.Len())
-		posWidget.SetText("0.0%")
-		slider.Refresh()
-		db.PlayLog(currLine, logz, controlChan, w)
+		lp.slider.Max = float64(logz.Len())
+		lp.posLabel.SetText("0.0%")
+		lp.slider.Refresh()
+		lp.PlayLog(lp.currLine, logz, lp.controlChan, w)
 	}()
 
-	return w
+	w.SetContent(lp.render())
+	w.Show()
+
+	return lp
+}
+
+func (lp *LogPlayer) render() fyne.CanvasObject {
+	var bottom *fyne.Container
+	if lp.logType == ".T7L" {
+		bottom = container.NewGridWithColumns(4,
+			lp.newMapBtn("Fuel", "BFuelCal.AirXSP", "BFuelCal.RpmYSP", "BFuelCal.Map"),
+			lp.newMapBtn("Fuel/E85", "BFuelCal.AirXSP", "BFuelCal.RpmYSP", "BFuelCal.StartMap"),
+			lp.newMapBtn("Ignition", "BFuelCal.AirXSP", "BFuelCal.RpmYSP", "IgnNormCal.Map"),
+			lp.newMapBtn("Ignition/E85", "BFuelCal.AirXSP", "BFuelCal.RpmYSP", "IgnE85Cal.fi_AbsMap"),
+		)
+	}
+
+	if lp.logType == ".T8L" {
+		bottom = container.NewGridWithColumns(2,
+			lp.newMapBtn("Fuel", "IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "BFuelCal.TempEnrichFacMap"),
+			lp.newMapBtn("Ignition", "IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "IgnAbsCal.fi_NormalMAP"),
+		)
+	}
+
+	if bottom == nil {
+		bottom = container.NewStack()
+	}
+
+	if lp.symbols == nil {
+		log.Println("hide")
+		bottom.Hide()
+	}
+
+	main := container.NewBorder(
+		container.NewBorder(
+			nil,
+			nil,
+			container.NewGridWithColumns(4,
+				lp.prevBtn,
+				lp.toggleBtn,
+				lp.restartBtn,
+				lp.nextBtn,
+			),
+			widgets.FixedWidth(75, lp.selec),
+			container.NewBorder(nil, nil, nil, lp.posLabel, lp.slider),
+		),
+		bottom,
+		nil,
+		nil,
+		lp.db.Content(),
+	)
+	return main
+}
+
+func (lp *LogPlayer) newMapBtn(btnTitle, supXName, supYName, mapName string) *widget.Button {
+	return widget.NewButtonWithIcon(btnTitle, theme.GridIcon(), func() {
+		if lp.symbols == nil {
+			return
+		}
+		mv, found := lp.openMaps[mapName]
+		if !found {
+			w := lp.app.NewWindow("Map Viewer - " + mapName)
+			mv, err := NewMapViewer(w, supXName, supYName, mapName, lp.symbols, interpolate.U16_u16_int)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+			w.SetCloseIntercept(func() {
+				delete(lp.openMaps, mapName)
+				w.Close()
+			})
+			lp.openMaps[mapName] = mv
+			w.SetContent(mv)
+			w.Show()
+			return
+		}
+		mv.w.RequestFocus()
+	})
+}
+
+func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, control <-chan *controlMsg, ww fyne.Window) {
+	play := true
+	playonce := false
+	speedMultiplier := 1.0
+	var nextFrame int64
+	var lastSeek int64
+	var currentMillis int64
+	var tmpRpm float64
+	for {
+		currentMillis = time.Now().UnixMilli()
+		select {
+		case op := <-control:
+			switch op.Op {
+			case OpPlaybackSpeed:
+				speedMultiplier = op.Rate
+			case OpTogglePlayback:
+				play = !play
+			case OpSeek:
+				if currentMillis-lastSeek > 24 {
+					lastSeek = currentMillis
+					logz.Seek(op.Pos)
+					playonce = true
+				}
+			case OpPrev:
+				pos := logz.Pos() - 2
+				if pos < 0 {
+					pos = 0
+				}
+				playonce = true
+				logz.Seek(pos)
+			case OpNext:
+				playonce = true
+			case OpExit:
+				return
+			}
+		default:
+			if logz.Pos() >= logz.Len()-1 || (!play && !playonce) {
+				time.Sleep(10 * time.Millisecond)
+				continue
+			}
+			if nextFrame-currentMillis > 4 {
+				time.Sleep(time.Duration(nextFrame-currentMillis-2) * time.Millisecond)
+				continue
+			}
+			if currentMillis < nextFrame {
+				continue
+			}
+			currentLine.Set(float64(logz.Pos()))
+			if rec := logz.Next(); rec != nil {
+				nextFrame = currentMillis + int64(float64(rec.DelayTillNext)*speedMultiplier)
+				for k, v := range rec.Values {
+					if k == "ActualIn.n_Engine" {
+						tmpRpm = v
+					}
+					if k == "MAF.m_AirInlet" {
+						for _, ma := range lp.openMaps {
+							ma.SetXY(uint16(v), uint16(tmpRpm))
+						}
+					}
+					lp.db.SetValue(k, v)
+				}
+				lp.db.SetTimeText(rec.Time.Format("15:04:05.99"))
+			}
+			if playonce {
+				playonce = false
+			}
+		}
+	}
 }
 
 func keyHandler(w fyne.Window, controlChan chan *controlMsg, slider *slider, tb *widget.Button, sel *widget.Select) func(ev *fyne.KeyEvent) {

@@ -19,6 +19,8 @@ type DataClient interface {
 	Close()
 	AttachDashboard(Dashboard)
 	DetachDashboard(Dashboard)
+	Subscribe(name string, cb *func(float64))
+	Unsubscribe(name string, cb *func(float64))
 }
 
 type Config struct {

@@ -23,6 +23,7 @@ func NewT8(cfg Config) (*T8Client, error) {
 		sysvars: &ThreadSafeMap{
 			values: make(map[string]string),
 		},
+		subs: make(map[string][]*func(float64)),
 	}, nil
 }
 
@@ -31,11 +32,39 @@ type T8Client struct {
 	Config
 	sysvars *ThreadSafeMap
 	db      Dashboard
+
+	subs map[string][]*func(float64)
 }
 
 func (c *T8Client) Close() {
 	close(c.quitChan)
 	time.Sleep(200 * time.Millisecond)
+}
+
+func (c *T8Client) Subscribe(name string, cb *func(float64)) {
+	subs, found := c.subs[name]
+	if !found {
+		c.subs[name] = []*func(float64){cb}
+		return
+	}
+
+	for _, f := range subs {
+		if f == cb {
+			return
+		}
+	}
+
+	subs = append(subs, cb)
+	c.subs[name] = subs
+}
+
+func (c *T8Client) Unsubscribe(name string, cb *func(float64)) {
+	for i, f := range c.subs[name] {
+		if f == cb {
+			c.subs[name] = append(c.subs[name][:i], c.subs[name][i+1:]...)
+			return
+		}
+	}
 }
 
 func (c *T8Client) AttachDashboard(db Dashboard) {
@@ -152,6 +181,11 @@ func (c *T8Client) Start() error {
 						}
 						if c.db != nil {
 							c.db.SetValue(va.Name, va.GetFloat64())
+						}
+						if subs, found := c.subs[va.Name]; found {
+							for _, sub := range subs {
+								(*sub)(va.GetFloat64())
+							}
 						}
 					}
 					if r.Len() > 0 {
