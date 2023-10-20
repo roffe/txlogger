@@ -3,16 +3,20 @@ package symbol
 func GetCorrectionfactor(name string) float64 {
 	//log.Println(name)
 	switch name {
-	case "IgnProt.fi_Offset",
-		"Out.X_AccPedal", "Out.X_AccPos",
-		"Out.fi_Ignition",
-		"Out.PWM_BoostCntrl",
-		"In.v_Vehicle",
-		"In.p_AirAmbient",
-		"IgnNormCal.Map",
+	case "AirCompCal.PressMap",
 		"IgnAbsCal.fi_NormalMAP",
 		"IgnE85Cal.fi_AbsMap",
-		"IgnMastProt.fi_Offset":
+		"IgnIdleCal.fi_IdleMap",
+		"IgnMastProt.fi_Offset",
+		"IgnNormCal.Map",
+		"In.p_AirAmbient",
+		"In.v_Vehicle",
+		"Out.fi_Ignition",
+		"Out.PWM_BoostCntrl",
+		"Out.X_AccPedal", "Out.X_AccPos",
+		"BstKnkCal.OffsetXSP",
+		"BoostCal.RegMap",
+		"IgnProt.fi_Offset":
 		return 0.1
 	case "DisplProt.LambdaScanner",
 		"BFuelCal.Map",
@@ -26,6 +30,8 @@ func GetCorrectionfactor(name string) float64 {
 		"In.p_AirBefThrottle", "ActualIn.p_AirBefThrottle",
 		"In.p_AirInlet", "ActualIn.p_AirInlet":
 		return 0.001
+	case "BstKnkCal.MaxAirmass":
+		fallthrough
 	default:
 		return 1
 	}

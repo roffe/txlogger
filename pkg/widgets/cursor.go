@@ -6,18 +6,18 @@ import (
 	"fyne.io/fyne/v2/canvas"
 )
 
-func NewTracker() *canvas.Rectangle {
-	tracker := canvas.NewRectangle(color.RGBA{0, 0, 0, 0})
-	tracker.FillColor = color.Transparent
-	tracker.StrokeColor = color.RGBA{0xfc, 0x4a, 0xaa, 255}
-	tracker.StrokeWidth = 4
-	return tracker
+func NewRectangle(col color.Color, strokeWidth float32) *canvas.Rectangle {
+	Rectangle := canvas.NewRectangle(color.RGBA{0, 0, 0, 0})
+	Rectangle.FillColor = color.Transparent
+	Rectangle.StrokeColor = col
+	Rectangle.StrokeWidth = strokeWidth
+	return Rectangle
 }
 
-func NewCursor() *canvas.Circle {
-	cursor := canvas.NewCircle(color.RGBA{0, 0, 0, 0})
-	cursor.FillColor = color.Transparent
-	cursor.StrokeColor = color.RGBA{0x0c, 0x4a, 0xaa, 255}
-	cursor.StrokeWidth = 4
-	return cursor
+func NewCircle(col color.Color) *canvas.Circle {
+	circle := canvas.NewCircle(color.RGBA{0, 0, 0, 0})
+	circle.FillColor = color.Transparent
+	circle.StrokeColor = col
+	circle.StrokeWidth = 4
+	return circle
 }

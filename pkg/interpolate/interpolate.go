@@ -4,20 +4,75 @@ import (
 	"fmt"
 )
 
-type InterPolFunc func([]uint16, []uint16, []int, uint16, uint16) (float64, float64, float64, error)
+type InterPolFunc func([]int, []int, []int, int, int) (float64, float64, float64, error)
 
 // Helper function to clamp offset values
-func clamp(offset, len int) int {
+func clamp(offset, max int) int {
 	if offset < 0 {
 		return 0
 	}
-	if offset >= len {
-		return len - 1
+	if offset >= max {
+		return max - 1
 	}
 	return offset
 }
 
-func U16_u16_int(xAxis, yAxis []uint16, data []int, xValue uint16, yValue uint16) (float64, float64, float64, error) {
+// Finds the index and fraction of the nearest value in the given array
+func findIndexAndFrac(arr []int, value int) (int, float64) {
+	idx := len(arr) - 1
+	frac := 0.0
+
+	for i, v := range arr {
+		if v >= value {
+			idx = i
+			break
+		}
+	}
+
+	if idx > 0 {
+		delta := arr[idx] - arr[idx-1]
+		frac = float64(value-arr[idx-1]) / float64(delta)
+	}
+
+	return idx, frac
+}
+
+func Interpolate(xAxis, yAxis, data []int, xValue, yValue int) (float64, float64, float64, error) {
+	if len(xAxis) == 0 || len(yAxis) == 0 || len(data) == 0 {
+		return 0, 0, 0, fmt.Errorf("xAxis, yAxis or data is empty")
+	}
+
+	xIdx, xFrac := findIndexAndFrac(xAxis, xValue)
+	yIdx, yFrac := findIndexAndFrac(yAxis, yValue)
+
+	dataLen := len(data)
+	// Calculate the offsets in the data array for the four surrounding data points
+	getOffset := func(i, j int) int {
+		return clamp(i*len(xAxis)+j, dataLen)
+	}
+
+	offsets := [4]int{
+		getOffset(yIdx-1, xIdx-1),
+		getOffset(yIdx-1, xIdx),
+		getOffset(yIdx, xIdx-1),
+		getOffset(yIdx, xIdx),
+	}
+
+	values := [4]float64{
+		float64(data[offsets[0]]),
+		float64(data[offsets[1]]),
+		float64(data[offsets[2]]),
+		float64(data[offsets[3]]),
+	}
+
+	// Perform bilinear interpolation
+	interpolatedX0 := (1.0-xFrac)*values[0] + xFrac*values[1]
+	interpolatedX1 := (1.0-xFrac)*values[2] + xFrac*values[3]
+	interpolatedValue := (1.0-yFrac)*interpolatedX0 + yFrac*interpolatedX1
+	return float64(xIdx-1) + xFrac, float64(yIdx-1) + yFrac, interpolatedValue, nil
+}
+
+func U16_u16_int2(xAxis, yAxis []uint16, data []int, xValue uint16, yValue uint16) (float64, float64, float64, error) {
 	if len(xAxis) == 0 || len(yAxis) == 0 || len(data) == 0 {
 		return 0, 0, 0.0, fmt.Errorf("xAxis, yAxis or data is empty")
 	}
@@ -29,11 +84,18 @@ func U16_u16_int(xAxis, yAxis []uint16, data []int, xValue uint16, yValue uint16
 			break
 		}
 	}
+	if xIdx == 0 && xValue > xAxis[len(xAxis)-1] {
+		xIdx = len(xAxis) - 1
+	}
+
 	for i, y := range yAxis {
 		if y >= yValue {
 			yIdx = i
 			break
 		}
+	}
+	if yIdx == 0 && yValue > yAxis[len(yAxis)-1] {
+		yIdx = len(yAxis) - 1
 	}
 
 	var xFrac, yFrac float64

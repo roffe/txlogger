@@ -29,15 +29,25 @@ func main() {
 	a := app.NewWithID("com.roffe.trl")
 	a.Settings().SetTheme(&myTheme{})
 	vars := kwp2000.NewVarDefinitionList()
-	if len(os.Args) > 1 {
+	if len(os.Args) == 2 {
 		filename := os.Args[1]
 		if strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") {
 			windows.NewLogPlayer(a, filename, nil, nil).ShowAndRun()
 			return
 		}
+
+	}
+	mw := windows.NewMainWindow(a, vars)
+	if len(os.Args) == 2 {
+		filename := os.Args[1]
+		if strings.HasSuffix(filename, ".bin") {
+			if err := mw.LoadSymbolsFromFile(filename); err != nil {
+				log.Println(err)
+				mw.Log(err.Error())
+			}
+		}
 	}
 
-	mw := windows.NewMainWindow(a, vars)
 	mw.SetMaster()
 	mw.Resize(fyne.NewSize(1024, 768))
 	mw.SetContent(mw.Layout())
@@ -120,6 +130,9 @@ func (m myTheme) Size(name fyne.ThemeSizeName) float32 {
 	}
 	if name == theme.SizeNameScrollBar {
 		return 8
+	}
+	if name == theme.SizeNamePadding {
+		return 3
 	}
 	return theme.DefaultTheme().Size(name)
 }

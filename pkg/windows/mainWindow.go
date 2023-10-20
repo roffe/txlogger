@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -18,9 +19,12 @@ import (
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/kwp2000"
+	"github.com/roffe/txlogger/pkg/layout"
+	"github.com/roffe/txlogger/pkg/mapviewer"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
+	sdialog "github.com/sqweek/dialog"
 	"golang.org/x/net/context"
 )
 
@@ -56,8 +60,9 @@ type MainWindow struct {
 
 	dashboardBtn *widget.Button
 
-	fuelBtn     *widget.Button
-	ignitionBtn *widget.Button
+	mapSelector *widget.Tree
+	//fuelBtn     *widget.Button
+	//ignitionBtn *widget.Button
 
 	logplayerBtn *widget.Button
 	logfolderBtn *widget.Button
@@ -97,7 +102,7 @@ type MainWindow struct {
 
 	leading *fyne.Container
 
-	openMaps map[string]*MapViewer
+	openMaps map[string]*mapviewer.MapViewer
 }
 
 func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
@@ -114,7 +119,7 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		//progressBar:           widget.NewProgressBarInfinite(),
 		//sinkManager:           singMgr,
 		vars:     vars,
-		openMaps: make(map[string]*MapViewer),
+		openMaps: make(map[string]*mapviewer.MapViewer),
 	}
 
 	mw.Window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
@@ -285,11 +290,83 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		},
 	)
 
+	mw.mapSelector = widget.NewTreeWithStrings(mapToTreeMap(symbol.T7SymbolsTuning))
+	mw.mapSelector.OnSelected = func(uid widget.TreeNodeID) {
+		//		log.Printf("%q", uid)
+		if uid == "" || !strings.Contains(uid, ".") {
+			if !mw.mapSelector.IsBranchOpen(uid) {
+				mw.mapSelector.OpenBranch(uid)
+			} else {
+				mw.mapSelector.CloseBranch(uid)
+			}
+			mw.mapSelector.UnselectAll()
+			return
+
+		}
+		mw.openMap(symbol.GetInfo(symbol.ECU_T7, uid))
+		mw.mapSelector.UnselectAll()
+	}
+
+	/*
+		widget.NewSelect([]string{"Select map", "Fuel", "Ignition"}, func(s string) {
+			if s == "Select map" {
+				return
+			}
+			mw.openShort(s)
+		})
+		mw.mapSelector.SetSelectedIndex(0)
+	*/
+
+	menu := fyne.NewMainMenu(
+		fyne.NewMenu("File",
+			fyne.NewMenuItem("Load binary", func() {
+				filename, err := sdialog.File().Filter("Binary file", "bin").Load()
+				if err != nil {
+					if err.Error() == "Cancelled" {
+						return
+					}
+					// dialog.ShowError(err, mw)
+					mw.Log(err.Error())
+					return
+				}
+				if err := mw.LoadSymbolsFromFile(filename); err != nil {
+					// dialog.ShowError(err, mw)
+					mw.Log(err.Error())
+					return
+				}
+				mw.SyncSymbols()
+			}),
+		),
+	)
+
 	mw.loadPrefs()
 	mw.setTitle("No symbols loaded")
+	mw.Window.SetMainMenu(menu)
 	mw.Resize(fyne.NewSize(1280, 720))
 
 	return mw
+}
+
+func mapToTreeMap(data map[string][]string) map[string][]string {
+	result := make(map[string][]string)
+
+	// Sort map keys to maintain a consistent order
+	var sortedKeys []string
+	for key := range data {
+		sortedKeys = append(sortedKeys, key)
+	}
+	sort.Strings(sortedKeys)
+
+	for _, key := range sortedKeys {
+		id := "" + key
+		result[""] = append(result[""], id)
+		items := data[key]
+		// Sort the items if necessary
+		sort.Strings(items)
+		result[id] = append(result[id], items...)
+	}
+
+	return result
 }
 
 type ratioContainer struct {
@@ -359,6 +436,28 @@ func (mw *MainWindow) Layout() *container.Split {
 			mw.symbolConfigList,
 		),
 	)
+
+	bottomRightSplit := container.NewVSplit(
+		container.New(&layout.MinHeight{Height: 170}, mw.mapSelector),
+		container.NewVBox(
+			mw.dashboardBtn,
+			container.NewGridWithColumns(2,
+				mw.logplayerBtn,
+				mw.logfolderBtn,
+			),
+			mw.helpBtn,
+			mw.freqSlider,
+			container.NewGridWithColumns(4,
+				mw.capturedCounterLabel,
+				mw.errorCounterLabel,
+				mw.errPerSecondCounterLabel,
+				mw.freqValueLabel,
+			),
+		),
+	)
+
+	bottomRightSplit.SetOffset(1)
+
 	return &container.Split{
 		Offset:     0.7,
 		Horizontal: true,
@@ -379,24 +478,10 @@ func (mw *MainWindow) Layout() *container.Split {
 				//mw.progressBar,
 			),
 			Trailing: &container.Split{
-				Offset:     1,
+				Offset:     0.4,
 				Horizontal: false,
 				Leading:    mw.output,
-				Trailing: container.NewVBox(
-					mw.dashboardBtn,
-					mw.fuelBtn,
-					mw.ignitionBtn,
-					mw.logplayerBtn,
-					mw.logfolderBtn,
-					mw.helpBtn,
-					mw.freqSlider,
-					container.NewGridWithColumns(4,
-						mw.capturedCounterLabel,
-						mw.errorCounterLabel,
-						mw.errPerSecondCounterLabel,
-						mw.freqValueLabel,
-					),
-				),
+				Trailing:   bottomRightSplit,
 			},
 		},
 	}
@@ -548,12 +633,12 @@ func (mw *MainWindow) loadSymbolsFromECU() error {
 	return nil
 }
 
-func (mw *MainWindow) loadSymbolsFromFile(filename string) error {
+func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	symbols, err := symbol.LoadSymbols(filename, mw.ecuSelect.Selected, mw.Log)
 	if err != nil {
 		return fmt.Errorf("error loading symbols: %w", err)
 	}
-	os.WriteFile("symbols.txt", []byte(symbols.Dump()), 0644)
+	//os.WriteFile("symbols.txt", []byte(symbols.Dump()), 0644)
 	mw.loadSymbols(symbols)
 	mw.setTitle(filename)
 	return nil

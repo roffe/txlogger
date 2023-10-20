@@ -16,6 +16,8 @@ type Axis struct {
 	XDescription string
 	YDescription string
 	ZDescription string
+	XFrom        string
+	YFrom        string
 }
 
 func (a *Axis) String() string {
@@ -51,11 +53,15 @@ var axisTranslator = map[ECUType]AxisInformation{
 			"",
 			"",
 			"",
+			"",
+			"",
 		},
 		"IgnAbsCal.fi_NormalMAP": Axis{
 			"IgnAbsCal.m_AirNormXSP",
 			"IgnAbsCal.n_EngNormYSP",
 			"BFuelCal.TempEnrichFacMap",
+			"",
+			"",
 			"",
 			"",
 			"",
@@ -72,7 +78,28 @@ func GetAxis(ecu ECUType, name string) Axis {
 }
 
 // returns x, y, z axis map name
-func GetInfo(ecu ECUType, name string) (string, string, string) {
+func GetInfo(ecu ECUType, name string) Axis {
 	axis := GetAxis(ecu, name)
-	return axis.X, axis.Y, axis.Z
+
+	if axis.XFrom == "" {
+		axis.XFrom = "MAF.m_AirInlet"
+	}
+	if axis.YFrom == "" {
+		axis.YFrom = "ActualIn.n_Engine"
+	}
+
+	if axis.X == "" && axis.Y == "" && axis.Z == "" {
+		return Axis{
+			"none",
+			"none",
+			name,
+			"",
+			"",
+			"",
+			"",
+			"",
+		}
+	}
+
+	return axis
 }

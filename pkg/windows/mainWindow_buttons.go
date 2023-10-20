@@ -11,6 +11,7 @@ import (
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/kwp2000"
+	"github.com/roffe/txlogger/pkg/mapviewer"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/skratchdot/open-golang/open"
 	sdialog "github.com/sqweek/dialog"
@@ -41,7 +42,7 @@ func (mw *MainWindow) createButtons() {
 			mw.Log(err.Error())
 			return
 		}
-		if err := mw.loadSymbolsFromFile(filename); err != nil {
+		if err := mw.LoadSymbolsFromFile(filename); err != nil {
 			// dialog.ShowError(err, mw)
 			mw.Log(err.Error())
 			return
@@ -149,7 +150,7 @@ func (mw *MainWindow) createButtons() {
 			mw.SetFullScreen(false)
 			mw.SetContent(mw.Content())
 		}
-		NewLogPlayer(mw.app, filename, mw.symbols, onClose)
+		go NewLogPlayer(mw.app, filename, mw.symbols, onClose)
 	})
 
 	mw.logfolderBtn = widget.NewButtonWithIcon("Logs Folder", theme.FolderOpenIcon(), func() {
@@ -216,7 +217,7 @@ func (mw *MainWindow) createButtons() {
 				}
 
 				setAir := func(v float64) {
-					mv.SetXY(uint16(v), uint16(tmpRpm))
+					mv.SetXY(int(v), int(tmpRpm))
 				}
 				mw.dlc.Subscribe("ActualIn.n_Engine", &setRpm)
 				mw.dlc.Subscribe("MAF.m_AirInlet", &setAir)
@@ -244,15 +245,18 @@ func (mw *MainWindow) createButtons() {
 	//mw.fuelBtn = mw.newMapBtn("Fuel", "IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "BFuelCal.TempEnrichFacMap")
 	//mw.ignitionBtn = mw.newMapBtn("Ignition", "IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "IgnAbsCal.fi_NormalMAP")
 
-	mw.fuelBtn = widget.NewButtonWithIcon("Fuel", theme.GridIcon(), func() {
-		mw.openShort("Fuel")
-	})
-	mw.ignitionBtn = widget.NewButtonWithIcon("Ignition", theme.GridIcon(), func() {
-		mw.openShort("Ignition")
-	})
+	/*
+		mw.fuelBtn = widget.NewButtonWithIcon("Fuel", theme.GridIcon(), func() {
+			mw.openShort("Fuel")
+		})
+		mw.ignitionBtn = widget.NewButtonWithIcon("Ignition", theme.GridIcon(), func() {
+			mw.openShort("Ignition")
+		})
+	*/
 
 }
 
+/*
 func (mw *MainWindow) openShort(name string) {
 	switch name {
 	case "Fuel":
@@ -286,7 +290,7 @@ func (mw *MainWindow) newMap(supXName, supYName, mapName string) {
 			mw.Log("No binary loaded")
 			return
 		}
-		mv, err := NewMapViewer(nil, supXName, supYName, mapName, mw.symbols, interpolate.U16_u16_int)
+		mv, err := NewMapViewer(nil, supXName, supYName, mapName, mw.symbols, interpolate.Interpolate)
 		if err != nil {
 			mw.Log(err.Error())
 			return
@@ -297,18 +301,18 @@ func (mw *MainWindow) newMap(supXName, supYName, mapName string) {
 			tmpRpm = v
 		}
 		setAir := func(v float64) {
-			mv.SetXY(uint16(v), uint16(tmpRpm))
+			mv.SetXY(int(v), int(tmpRpm))
 		}
-		/*
-			w.SetCloseIntercept(func() {
-				delete(mw.openMaps, mapName)
-				if mw.dlc != nil {
-					mw.dlc.Unsubscribe("ActualIn.n_Engine", &setRpm)
-					mw.dlc.Unsubscribe("MAF.m_AirInlet", &setAir)
-				}
-				w.Close()
-			})
-		*/
+
+		// w.SetCloseIntercept(func() {
+		// 	delete(mw.openMaps, mapName)
+		// 	if mw.dlc != nil {
+		// 		mw.dlc.Unsubscribe("ActualIn.n_Engine", &setRpm)
+		// 		mw.dlc.Unsubscribe("MAF.m_AirInlet", &setAir)
+		// 	}
+		// 	w.Close()
+		// })
+
 		if mw.dlc != nil {
 			mw.dlc.Subscribe("ActualIn.n_Engine", &setRpm)
 			mw.dlc.Subscribe("MAF.m_AirInlet", &setAir)
@@ -318,16 +322,19 @@ func (mw *MainWindow) newMap(supXName, supYName, mapName string) {
 	mw.leading.RemoveAll()
 	mw.leading.Add(mv)
 }
+*/
 
-func (mw *MainWindow) openMap(supXName, supYName, mapName string) {
-	mv, found := mw.openMaps[mapName]
+func (mw *MainWindow) openMap(axis symbol.Axis) {
+	//log.Printf("openMap: %s %s %s", axis.X, axis.Y, axis.Z)
+	mv, found := mw.openMaps[axis.Z]
 	if !found {
-		w := mw.app.NewWindow("Map Viewer - " + mapName)
+		w := mw.app.NewWindow("Map Viewer - " + axis.Z)
+		//w.SetFixedSize(true)
 		if mw.symbols == nil {
 			mw.Log("No binary loaded")
 			return
 		}
-		mv, err := NewMapViewer(w, supXName, supYName, mapName, mw.symbols, interpolate.U16_u16_int)
+		mv, err := mapviewer.NewMapViewer(w, axis, mw.symbols, interpolate.Interpolate)
 		if err != nil {
 			mw.Log(err.Error())
 			return
@@ -338,10 +345,10 @@ func (mw *MainWindow) openMap(supXName, supYName, mapName string) {
 			tmpRpm = v
 		}
 		setAir := func(v float64) {
-			mv.SetXY(uint16(v), uint16(tmpRpm))
+			mv.SetXY(int(v), int(tmpRpm))
 		}
 		w.SetCloseIntercept(func() {
-			delete(mw.openMaps, mapName)
+			delete(mw.openMaps, axis.Z)
 			if mw.dlc != nil {
 				mw.dlc.Unsubscribe("ActualIn.n_Engine", &setRpm)
 				mw.dlc.Unsubscribe("MAF.m_AirInlet", &setAir)
@@ -352,15 +359,16 @@ func (mw *MainWindow) openMap(supXName, supYName, mapName string) {
 			mw.dlc.Subscribe("ActualIn.n_Engine", &setRpm)
 			mw.dlc.Subscribe("MAF.m_AirInlet", &setAir)
 		}
-		mw.openMaps[mapName] = mv
+		mw.openMaps[axis.Z] = mv
 		w.SetContent(mv)
 		w.Show()
 
 		return
 	}
-	mv.w.RequestFocus()
+	mv.W.RequestFocus()
 }
 
+/*
 func (mw *MainWindow) newMapBtn(btnTitle, supXName, supYName, mapName string) *widget.Button {
 	return widget.NewButtonWithIcon(btnTitle, theme.GridIcon(), func() {
 		mv, found := mw.openMaps[mapName]
@@ -370,7 +378,7 @@ func (mw *MainWindow) newMapBtn(btnTitle, supXName, supYName, mapName string) *w
 				mw.Log("No binary loaded")
 				return
 			}
-			mv, err := NewMapViewer(w, supXName, supYName, mapName, mw.symbols, interpolate.U16_u16_int)
+			mv, err := NewMapViewer(w, supXName, supYName, mapName, mw.symbols, interpolate.Interpolate)
 			if err != nil {
 				mw.Log(err.Error())
 				return
@@ -381,7 +389,7 @@ func (mw *MainWindow) newMapBtn(btnTitle, supXName, supYName, mapName string) *w
 				tmpRpm = v
 			}
 			setAir := func(v float64) {
-				mv.SetXY(uint16(v), uint16(tmpRpm))
+				mv.SetXY(int(v), int(tmpRpm))
 			}
 			w.SetCloseIntercept(func() {
 				delete(mw.openMaps, mapName)
@@ -404,3 +412,4 @@ func (mw *MainWindow) newMapBtn(btnTitle, supXName, supYName, mapName string) *w
 		mv.w.RequestFocus()
 	})
 }
+*/

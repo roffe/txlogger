@@ -15,13 +15,12 @@ import (
 	"github.com/roffe/txlogger/pkg/capture"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/logfile"
+	"github.com/roffe/txlogger/pkg/mapviewer"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
-func init() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-}
+const TIME_FORMAT = "02-01-2006 15:04:05.999"
 
 type Op int
 
@@ -76,7 +75,13 @@ type LogPlayer struct {
 
 	logType string
 
-	openMaps map[string]*MapViewer
+	openMaps map[string]*mapviewer.MapViewer
+
+	symbolSubs map[string][]*mapviewer.MapViewer
+
+	handler func(ev *fyne.KeyEvent)
+
+	closed bool
 }
 
 func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, onClose func()) fyne.Window {
@@ -87,10 +92,11 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 		app:         a,
 		Window:      w,
 		db:          NewDashboard(a, w, true, nil, onClose),
-		openMaps:    make(map[string]*MapViewer),
+		openMaps:    make(map[string]*mapviewer.MapViewer),
 		controlChan: make(chan *controlMsg, 10),
 		symbols:     symbols,
 		logType:     strings.ToUpper(filepath.Ext(filename)),
+		closed:      false,
 	}
 
 	w.SetCloseIntercept(func() {
@@ -98,6 +104,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 		if lp.db != nil {
 			close(lp.db.metricsChan)
 			lp.db.Close()
+			lp.closed = true
 		}
 
 		for _, ma := range lp.openMaps {
@@ -190,56 +197,161 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 
 	lp.selec.Selected = "1x"
 
-	handler := keyHandler(w, lp.controlChan, lp.slider, lp.toggleBtn, lp.selec)
-	lp.slider.typedKey = handler
-	w.Canvas().SetOnTypedKey(handler)
-
-	go func() {
-		var err error
-		start := time.Now()
-		logz, err = logfile.NewFromTxLogfile(filename)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		log.Printf("Parsed %d records in %s", logz.Len(), time.Since(start))
-		lp.slider.Max = float64(logz.Len())
-		lp.posLabel.SetText("0.0%")
-		lp.slider.Refresh()
-		lp.PlayLog(lp.currLine, logz, lp.controlChan, w)
-	}()
-
+	lp.handler = keyHandler(w, lp.controlChan, lp.slider, lp.toggleBtn, lp.selec)
+	lp.slider.typedKey = lp.handler
+	w.Canvas().SetOnTypedKey(lp.handler)
 	w.SetContent(lp.render())
 	w.Show()
+
+	var err error
+	start := time.Now()
+	logz, err = logfile.NewFromTxLogfile(filename)
+	if err != nil {
+		log.Println(err)
+
+	}
+	log.Printf("Parsed %d records in %s", logz.Len(), time.Since(start))
+	lp.slider.Max = float64(logz.Len())
+	lp.posLabel.SetText("0.0%")
+	lp.slider.Refresh()
+	lp.PlayLog(lp.currLine, logz, lp.controlChan, w)
 
 	return lp
 }
 
 func (lp *LogPlayer) render() fyne.CanvasObject {
-	var bottom *fyne.Container
-	if lp.logType == ".T7L" {
-		bottom = container.NewGridWithColumns(4,
-			lp.newMapBtn("Fuel", "BFuelCal.AirXSP", "BFuelCal.RpmYSP", "BFuelCal.Map"),
-			lp.newMapBtn("Fuel/E85", "BFuelCal.AirXSP", "BFuelCal.RpmYSP", "BFuelCal.StartMap"),
-			lp.newMapBtn("Ignition", "BFuelCal.AirXSP", "BFuelCal.RpmYSP", "IgnNormCal.Map"),
-			lp.newMapBtn("Ignition/E85", "BFuelCal.AirXSP", "BFuelCal.RpmYSP", "IgnE85Cal.fi_AbsMap"),
-		)
-	}
 
-	if lp.logType == ".T8L" {
-		bottom = container.NewGridWithColumns(2,
-			lp.newMapBtn("Fuel", "IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "BFuelCal.TempEnrichFacMap"),
-			lp.newMapBtn("Ignition", "IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "IgnAbsCal.fi_NormalMAP"),
-		)
-	}
+	/*
+		var objects []fyne.CanvasObject
+		var bottom *fyne.Container
+		if lp.logType == ".T7L" {
+			for _, name := range []struct {
+				label string
+				name  string
+			}{
+				{"Fuel", "BFuelCal.Map"},
+				{"Fuel/E85", "BFuelCal.StartMap"},
+				{"Ignition", "IgnNormCal.Map"},
+				{"Ignition/E85", "IgnE85Cal.fi_AbsMap"},
+				{"Ignition/Idle", "IgnIdleCal.fi_IdleMap"},
+			} {
 
-	if bottom == nil {
-		bottom = container.NewStack()
-	}
+				x, y, z := symbol.GetInfo(symbol.ECU_T7, name.name)
+				if x == "" || y == "" || z == "" {
+					continue
+				}
+				objects = append(objects, lp.newMapBtn(name.label, x, y, z))
 
-	if lp.symbols == nil {
-		log.Println("hide")
-		bottom.Hide()
+			}
+
+			bottom = container.NewGridWithColumns(len(objects), objects...)
+		}
+
+		if lp.logType == ".T8L" {
+			bottom = container.NewGridWithColumns(2,
+				lp.newMapBtn("Fuel", "IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "BFuelCal.TempEnrichFacMap"),
+				lp.newMapBtn("Ignition", "IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "IgnAbsCal.fi_NormalMAP"),
+			)
+		}
+
+		if bottom == nil {
+			bottom = container.NewStack()
+		}
+
+		if lp.symbols == nil {
+			bottom.Hide()
+		}
+	*/
+
+	tree := widget.NewTreeWithStrings(mapToTreeMap(symbol.T7SymbolsTuning))
+	tree.OnSelected = func(uid string) {
+		//		log.Printf("%q", uid)
+		if uid == "" || !strings.Contains(uid, ".") {
+			if !tree.IsBranchOpen(uid) {
+				tree.OpenBranch(uid)
+			} else {
+				tree.CloseBranch(uid)
+			}
+			tree.UnselectAll()
+			return
+		}
+		if lp.symbols == nil {
+			return
+		}
+		axis := symbol.GetInfo(symbol.ECU_T7, uid)
+		log.Println(axis)
+		mv, found := lp.openMaps[axis.Z]
+		if !found {
+			w := lp.app.NewWindow("Map Viewer - " + axis.Z)
+			//w.Canvas().SetOnTypedKey(lp.handler)
+			mv, err := mapviewer.NewMapViewer(w, axis, lp.symbols, interpolate.Interpolate)
+			if err != nil {
+				log.Printf("X: %s Y: %s Z: %s err: %v", axis.X, axis.Y, axis.Z, err)
+				return
+			}
+			w.SetCloseIntercept(func() {
+				log.Println("closing", axis.Z)
+				delete(lp.openMaps, axis.Z)
+				subsx, found := lp.symbolSubs[axis.XFrom]
+				if found {
+					for i, sub := range subsx {
+						if sub == mv {
+							lp.symbolSubs[axis.XFrom] = append(subsx[:i], subsx[i+1:]...)
+							break
+						}
+					}
+				}
+				subsy, found := lp.symbolSubs[axis.YFrom]
+				if found {
+					for i, sub2 := range subsy {
+						if sub2 == mv {
+							lp.symbolSubs[axis.YFrom] = append(subsy[:i], subsy[i+1:]...)
+							break
+						}
+					}
+				}
+				if axis.Z == "MAFCal.m_RedundantAirMap" {
+					subst, found := lp.symbolSubs["MAF.m_AirInlet"]
+					if found {
+						for i, sub3 := range subst {
+							if sub3 == mv {
+								lp.symbolSubs["MAF.m_AirInlet"] = append(subst[:i], subst[i+1:]...)
+								break
+							}
+						}
+					}
+				}
+				mv.Close()
+				w.Close()
+			})
+			lp.openMaps[axis.Z] = mv
+
+			if lp.symbolSubs == nil {
+				lp.symbolSubs = make(map[string][]*mapviewer.MapViewer)
+			}
+
+			if axis.XFrom == "" {
+				axis.XFrom = "MAF.m_AirInlet"
+			}
+
+			if axis.YFrom == "" {
+				axis.YFrom = "ActualIn.n_Engine"
+			}
+
+			lp.symbolSubs[axis.XFrom] = append(lp.symbolSubs[axis.XFrom], mv)
+			lp.symbolSubs[axis.YFrom] = append(lp.symbolSubs[axis.YFrom], mv)
+
+			if axis.Z == "MAFCal.m_RedundantAirMap" {
+				lp.symbolSubs["MAF.m_AirInlet"] = append(lp.symbolSubs["MAF.m_AirInlet"], mv)
+			}
+
+			w.SetContent(mv)
+			w.Show()
+			return
+		}
+
+		mv.W.RequestFocus()
+
 	}
 
 	main := container.NewBorder(
@@ -255,14 +367,21 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 			widgets.FixedWidth(75, lp.selec),
 			container.NewBorder(nil, nil, nil, lp.posLabel, lp.slider),
 		),
-		bottom,
+		nil,
 		nil,
 		nil,
 		lp.db.Content(),
 	)
-	return main
+
+	split := container.NewHSplit(
+		main,
+		container.NewVScroll(tree),
+	)
+	split.Offset = 0.7
+	return split
 }
 
+/*
 func (lp *LogPlayer) newMapBtn(btnTitle, supXName, supYName, mapName string) *widget.Button {
 	return widget.NewButtonWithIcon(btnTitle, theme.GridIcon(), func() {
 		if lp.symbols == nil {
@@ -271,9 +390,9 @@ func (lp *LogPlayer) newMapBtn(btnTitle, supXName, supYName, mapName string) *wi
 		mv, found := lp.openMaps[mapName]
 		if !found {
 			w := lp.app.NewWindow("Map Viewer - " + mapName)
-			mv, err := NewMapViewer(w, supXName, supYName, mapName, lp.symbols, interpolate.U16_u16_int)
+			mv, err := NewMapViewer(w, supXName, supYName, mapName, lp.symbols, interpolate.Interpolate)
 			if err != nil {
-				log.Println(err)
+				log.Printf("X: %s Y: %s Z: %s err: %v", supXName, supYName, mapName, err)
 				return
 			}
 
@@ -289,30 +408,25 @@ func (lp *LogPlayer) newMapBtn(btnTitle, supXName, supYName, mapName string) *wi
 		mv.w.RequestFocus()
 	})
 }
+*/
 
 func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, control <-chan *controlMsg, ww fyne.Window) {
 	play := true
-	playonce := false
+	var nextFrame, currentMillis int64
+	var airUpdated, playonce bool
 	speedMultiplier := 1.0
-	var nextFrame int64
-	var lastSeek int64
-	var currentMillis int64
-	var tmpRpm float64
-	for {
-		currentMillis = time.Now().UnixMilli()
-		select {
-		case op := <-control:
+
+	go func() {
+		for op := range control {
+			currentMillis := time.Now().UnixMilli()
 			switch op.Op {
 			case OpPlaybackSpeed:
 				speedMultiplier = op.Rate
 			case OpTogglePlayback:
 				play = !play
 			case OpSeek:
-				if currentMillis-lastSeek > 24 {
-					lastSeek = currentMillis
-					logz.Seek(op.Pos)
-					playonce = true
-				}
+				logz.Seek(op.Pos)
+				playonce = true
 			case OpPrev:
 				pos := logz.Pos() - 2
 				if pos < 0 {
@@ -320,42 +434,67 @@ func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, co
 				}
 				playonce = true
 				logz.Seek(pos)
+				nextFrame = currentMillis
 			case OpNext:
 				playonce = true
 			case OpExit:
 				return
 			}
-		default:
-			if logz.Pos() >= logz.Len()-1 || (!play && !playonce) {
-				time.Sleep(10 * time.Millisecond)
-				continue
-			}
-			if nextFrame-currentMillis > 4 {
-				time.Sleep(time.Duration(nextFrame-currentMillis-2) * time.Millisecond)
-				continue
-			}
-			if currentMillis < nextFrame {
-				continue
-			}
-			currentLine.Set(float64(logz.Pos()))
-			if rec := logz.Next(); rec != nil {
-				nextFrame = currentMillis + int64(float64(rec.DelayTillNext)*speedMultiplier)
-				for k, v := range rec.Values {
-					if k == "ActualIn.n_Engine" {
-						tmpRpm = v
-					}
-					if k == "MAF.m_AirInlet" {
-						for _, ma := range lp.openMaps {
-							ma.SetXY(uint16(v), uint16(tmpRpm))
+		}
+	}()
+
+	var tmpAir, tmpmReq, airDiff float64
+	for !lp.closed {
+		currentMillis = time.Now().UnixMilli()
+		if logz.Pos() >= logz.Len()-1 || (!play && !playonce) {
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		if nextFrame-currentMillis > 4 {
+			time.Sleep(time.Duration(nextFrame-currentMillis-2) * time.Millisecond)
+			continue
+		}
+		if currentMillis < nextFrame {
+			continue
+		}
+		currentLine.Set(float64(logz.Pos()))
+		if rec := logz.Next(); rec != nil {
+			nextFrame = currentMillis + int64(float64(rec.DelayTillNext)*speedMultiplier)
+			for k, v := range rec.Values {
+				if k == "MAF.m_AirInlet" {
+					tmpAir = v
+					airDiff = tmpmReq - tmpAir
+					airUpdated = true
+				}
+				if k == "m_Request" {
+					tmpmReq = v
+					airDiff = tmpmReq - tmpAir
+					airUpdated = true
+				}
+				if airUpdated {
+					if s, found := lp.symbolSubs["AirDIFF"]; found {
+						for _, sub := range s {
+							sub.SetValue("AirDIFF", airDiff)
 						}
 					}
-					lp.db.SetValue(k, v)
+					airUpdated = false
 				}
-				lp.db.SetTimeText(rec.Time.Format("15:04:05.99"))
+				lp.db.SetValue(k, v)
+				fac := 1.0
+				if k == "ActualIn.p_AirInlet" {
+					fac = 1000
+				}
+				subs, found := lp.symbolSubs[k]
+				if found {
+					for _, sub := range subs {
+						sub.SetValue(k, v*fac)
+					}
+				}
 			}
-			if playonce {
-				playonce = false
-			}
+			lp.db.SetTimeText(rec.Time.Format("15:04:05.99"))
+		}
+		if playonce {
+			playonce = false
 		}
 	}
 }
@@ -411,5 +550,3 @@ func keyHandler(w fyne.Window, controlChan chan *controlMsg, slider *slider, tb 
 		}
 	}
 }
-
-const TIME_FORMAT = "02-01-2006 15:04:05.999"

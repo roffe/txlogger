@@ -1,0 +1,87 @@
+package widgets
+
+import (
+	"log"
+
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/widget"
+)
+
+type MouseTracker struct {
+	widget.BaseWidget
+	Cursor              fyne.CanvasObject
+	NumColumns, NumRows int
+	// CellWidth, CellHeight int
+	Data         []int
+	CellX, CellY int
+	//Cursor *canvas.Rectangle
+	sz     fyne.Size
+	moving bool
+}
+
+func (m *MouseTracker) Resize(size fyne.Size) {
+	m.sz = size
+	m.BaseWidget.Resize(size)
+	cellWidth := m.sz.Width / float32(m.NumColumns)
+	cellHeight := m.sz.Height / float32(m.NumRows)
+	newY := float32(m.NumRows-m.CellY-1) * cellHeight
+	newX := float32(m.CellX) * cellWidth
+	m.Cursor.Move(fyne.NewPos(newX, newY))
+	m.Cursor.Resize(fyne.NewSize(cellWidth, cellHeight))
+}
+
+func (m *MouseTracker) MouseIn(_ *desktop.MouseEvent) {
+}
+
+// MouseMoved is called when the mouse is moved over the widget.
+func (m *MouseTracker) MouseMoved(event *desktop.MouseEvent) {
+	if m.moving {
+		cellWidth := m.sz.Width / float32(m.NumColumns)
+		cellHeight := m.sz.Height / float32(m.NumRows)
+		m.CellX = int(event.Position.X) / int(cellWidth)
+		m.CellY = m.NumRows - int(event.Position.Y)/int(cellHeight) - 1
+		newY := float32(m.NumRows-m.CellY-1) * cellHeight
+		newX := float32(m.CellX) * cellWidth
+		m.Cursor.Move(fyne.NewPos(newX, newY))
+		m.Cursor.Resize(fyne.NewSize(cellWidth, cellHeight))
+	}
+}
+
+func (m *MouseTracker) MouseOut() {
+}
+
+func (m *MouseTracker) MouseDown(event *desktop.MouseEvent) {
+	log.Println("Mouse down!", event.Button)
+	if event.Button == desktop.MouseButtonPrimary {
+		m.moving = true
+		cellWidth := m.sz.Width / float32(m.NumColumns)
+		cellHeight := m.sz.Height / float32(m.NumRows)
+		m.CellX = int(event.Position.X) / int(cellWidth)
+		m.CellY = m.NumRows - int(event.Position.Y)/int(cellHeight) - 1
+		newY := float32(m.NumRows-m.CellY-1) * cellHeight
+		newX := float32(m.CellX) * cellWidth
+		m.Cursor.Move(fyne.NewPos(newX, newY))
+	}
+}
+
+func (m *MouseTracker) MouseUp(event *desktop.MouseEvent) {
+	if event.Button == desktop.MouseButtonPrimary {
+		m.moving = false
+	}
+	cellWidth := m.sz.Width / float32(m.NumColumns)
+	cellHeight := m.sz.Height / float32(m.NumRows)
+
+	m.CellX = int(event.Position.X) / int(cellWidth)
+	m.CellY = m.NumRows - int(event.Position.Y)/int(cellHeight) - 1
+	newY := float32(m.NumRows-m.CellY-1) * cellHeight
+	newX := float32(m.CellX) * cellWidth
+	m.Cursor.Move(fyne.NewPos(newX, newY))
+	index := m.CellY*m.NumColumns + m.CellX
+	if index < 0 || index >= len(m.Data) {
+		log.Printf("Index out of range: %d", index)
+		return
+	}
+	value := m.Data[index]
+	log.Printf("Value: %d in cell %dx%d", value, m.CellX, m.CellY)
+}

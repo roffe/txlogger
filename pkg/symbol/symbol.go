@@ -46,16 +46,82 @@ func (s *Symbol) String() string {
 	return fmt.Sprintf("%s #%d @%08X type: %02X len: %d", s.Name, s.Number, s.Address, s.Type, s.Length)
 }
 
-func (s *Symbol) DataToUint16() []uint16 {
+func (s *Symbol) IntFromData() []int {
+	signed := s.Type&SIGNED == 1
+	if !signed && s.Length == 1 {
+		return s.DataToUint8()
+	}
+	if signed && s.Length == 1 {
+		return s.DataToInt8()
+	}
+	if !signed && s.Length == 2 {
+		return s.DataToUint16()
+	}
+	if signed && s.Length == 2 {
+		return s.DataToInt16()
+	}
+	if !signed && (s.Length == 22 || s.Length == 30) {
+		return s.DataToUint16()
+	}
+	if signed && (s.Length == 22 || s.Length == 30) {
+		return s.DataToInt16()
+	}
+
+	return s.DataToUint8()
+}
+
+func (s *Symbol) DataToUint16() []int {
 	r := bytes.NewReader(s.data)
-	var values []uint16
+	var values []int
 	for r.Len() > 0 {
 		var v uint16
 		err := binary.Read(r, binary.BigEndian, &v)
 		if err != nil {
 			log.Fatalf("error reading symbol data: %v", err)
 		}
-		values = append(values, v)
+		values = append(values, int(v))
+	}
+	return values
+}
+
+func (s *Symbol) DataToInt8() []int {
+	r := bytes.NewReader(s.data)
+	var values []int
+	for r.Len() > 0 {
+		var v int8
+		err := binary.Read(r, binary.BigEndian, &v)
+		if err != nil {
+			log.Panicf("error reading symbol data: %v", err)
+		}
+		values = append(values, int(v))
+	}
+	return values
+}
+
+func (s *Symbol) DataToUint8() []int {
+	r := bytes.NewReader(s.data)
+	var values []int
+	for r.Len() > 0 {
+		var v uint8
+		err := binary.Read(r, binary.BigEndian, &v)
+		if err != nil {
+			log.Panicf("error reading symbol data: %v", err)
+		}
+		values = append(values, int(v))
+	}
+	return values
+}
+
+func (s *Symbol) DataToInt16() []int {
+	r := bytes.NewReader(s.data)
+	var values []int
+	for r.Len() > 0 {
+		var v int16
+		err := binary.Read(r, binary.BigEndian, &v)
+		if err != nil {
+			log.Panicf("error reading symbol data: %v", err)
+		}
+		values = append(values, int(float64(v)*s.Correctionfactor))
 	}
 	return values
 }

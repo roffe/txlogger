@@ -6,7 +6,7 @@ toolchain go1.21.0
 
 require (
 	fyne.io/fyne/v2 v2.4.1
-	fyne.io/x/fyne v0.0.0-20231004122445-c04c36b7acb1
+	fyne.io/x/fyne v0.0.0-20231018161245-e7104b0942c9
 	github.com/roffe/gocan v0.0.0-20230923211524-653f77516da0
 	github.com/sqweek/dialog v0.0.0-20220809060634-e981b270ebbf
 	go.bug.st/serial v1.6.1
@@ -14,7 +14,6 @@ require (
 
 require (
 	github.com/avast/retry-go/v4 v4.5.0
-	github.com/goki/freetype v1.0.1
 	github.com/yeka/zip v0.0.0-20180914125537-d046722c6feb
 )
 
@@ -52,7 +51,7 @@ require (
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.19 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mdlayher/netlink v1.7.2 // indirect
 	github.com/mdlayher/socket v0.5.0 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect

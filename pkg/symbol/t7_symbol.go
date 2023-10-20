@@ -13,6 +13,27 @@ import (
 	"github.com/roffe/txlogger/pkg/debug"
 )
 
+const (
+	SIGNED   = 0x01 /* signed flag in type */
+	KONST    = 0x02 /* konstant flag in type */
+	CHAR     = 0x04 /* character flag in type */
+	LONG     = 0x08 /* long flag in type */
+	BITFIELD = 0x10 /* bitfield flag in type */
+	STRUCT   = 0x20 /* struct flag in type */
+)
+
+var T7SymbolsTuning = map[string][]string{
+	"Adaption":    {"PurgeCal.ST_PurgeEnable", "AdpFuelCal.T_AdaptLim", "LambdaCal.ST_Enable"},
+	"Boost":       {"BoostCal.RegMap", "BoostCal.PMap", "BoostCal.IMap", "BoostCal.DMap"},
+	"Calibration": {"AirCompCal.PressMap", "MAFCal.m_RedundantAirMap", "VIOSMAFCal.FreqSP", "VIOSMAFCal.Q_AirInletTab2", "TCompCal.EnrFacTab", "TCompCal.EnrFacE85Tab"},
+	"Fuel":        {"BFuelCal.Map", "BFuelCal.StartMap"},
+	"Ignition":    {"IgnNormCal.Map", "IgnE85Cal.fi_AbsMap", "IgnIdleCal.fi_IdleMap"},
+	"Injectors":   {"InjCorrCal.InjectorConst", "InjCorrCal.BattCorrTab"},
+	"Limiters":    {"BstKnkCal.MaxAirmass", "TorqueCal.M_ManGearLim"},
+	"Myrtilos":    {"MyrtilosCal.Launch_InjFac_at_rpm", "MyrtilosCal.Launch_PWM_max_at_stand", "MyrtilosCal.Launch_RPM", "MyrtilosCal.Launch_Ign_fi_Min", "MyrtilosCal.Launch_DisableSpeed"},
+	"Start":       {"StartCal.EnrFacTab", "StartCal.EnrFacE85Tab"},
+}
+
 func ValidateTrionic7File(data []byte) error {
 	if len(data) != 0x80000 {
 		return ErrInvalidLength
