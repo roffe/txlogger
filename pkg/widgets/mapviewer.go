@@ -53,6 +53,7 @@ type MapViewer struct {
 	textValues []*canvas.Text
 
 	xAxisButtons, yAxisButtons *fyne.Container
+	xAxis, yAxis               []*canvas.Text
 
 	ipf interpolate.InterPolFunc
 
@@ -84,19 +85,25 @@ func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollecti
 		return nil, fmt.Errorf("xLen * yLen != zLen")
 	}
 
-	xAxisButtons := container.New(&layout.Horizontal{})
-	if xLen > 1 {
-		for i := 0; i < xLen; i++ {
-			text := &canvas.Text{Text: fmt.Sprintf("%d", xData[i]), TextSize: 13}
-			xAxisButtons.Add(text)
-		}
-	}
-
+	var yAxis []*canvas.Text
 	yAxisButtons := container.New(&layout.Vertical{})
 	if yLen > 1 {
 		for i := yLen - 1; i >= 0; i-- {
-			text := &canvas.Text{Text: fmt.Sprintf("%d", yData[i]), TextSize: 13}
+			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: fmt.Sprintf("%d", yData[i]), TextSize: 13}
+			yAxis = append(yAxis, text)
 			yAxisButtons.Add(text)
+		}
+	}
+
+	var xAxis []*canvas.Text
+	xAxisButtons := container.New(&layout.Horizontal{
+		Offset: yAxisButtons,
+	})
+	if xLen > 1 {
+		for i := 0; i < xLen; i++ {
+			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: fmt.Sprintf("%d", xData[i]), TextSize: 13}
+			xAxis = append(xAxis, text)
+			xAxisButtons.Add(text)
 		}
 	}
 
@@ -112,9 +119,12 @@ func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollecti
 	valueMap.SetMinSize(fyne.NewSize(width, height))
 	valueMap.Resize(fyne.NewSize(width, height))
 
+	grid := NewGrid(xLen, yLen)
+
 	inner := container.NewStack(
 		valueMap,
 		valueContainer,
+		grid,
 		container.NewWithoutLayout(
 			cursor,
 			crosshair,
@@ -147,6 +157,8 @@ func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollecti
 
 		xAxisButtons: xAxisButtons,
 		yAxisButtons: yAxisButtons,
+		xAxis:        xAxis,
+		yAxis:        yAxis,
 
 		numColumns: xLen,
 		numRows:    yLen,
@@ -352,7 +364,6 @@ func createImage(xData, yData []int, zData []int, correctionFactor float64) *ima
 	// Create a new RGBA image
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 	min, max := findMinMax(zData)
-
 	// Calculate the colors for each cell based on data
 	for y := 0; y < lenY; y++ {
 		for x := 0; x < lenX; x++ {
@@ -366,23 +377,12 @@ func createImage(xData, yData []int, zData []int, correctionFactor float64) *ima
 			}
 		}
 	}
-
-	for x := 1; x < lenX; x++ {
-		cellX := x * cellWidth
-		draw.Draw(img, image.Rect(cellX-1, 0, cellX+1, height), &image.Uniform{color.Black}, image.Point{}, draw.Src)
-	}
-
-	for y := 1; y < lenY; y++ {
-		cellY := y * cellHeight
-		draw.Draw(img, image.Rect(0, cellY-1, width, cellY+1), &image.Uniform{color.Black}, image.Point{}, draw.Src)
-	}
-
 	return img
 }
 
 func createTextValues(zData []int, corrFac float64) ([]*canvas.Text, *fyne.Container) {
 	var values []*canvas.Text
-	valueContainer := container.NewStack()
+	valueContainer := container.NewWithoutLayout()
 	prec := 0
 	if corrFac != 1 {
 		prec = 2

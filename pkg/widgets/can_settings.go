@@ -15,12 +15,19 @@ import (
 	"go.bug.st/serial/enumerator"
 )
 
+const (
+	prefsAdapter = "adapter"
+	prefsPort    = "port"
+	prefsSpeed   = "speed"
+	prefsDebug   = "debug"
+)
+
 var portSpeeds = []string{"9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600", "1mbit", "2mbit", "3mbit"}
 
 type CanSettingsWidget struct {
 	widget.BaseWidget
 	app             fyne.App
-	objects         []fyne.CanvasObject
+	container       *fyne.Container
 	adapterSelector *widget.Select
 	debugCheckbox   *widget.Check
 	portSelector    *widget.Select
@@ -32,8 +39,8 @@ func NewCanSettingsWidget(app fyne.App) *CanSettingsWidget {
 	csw := &CanSettingsWidget{
 		app: app,
 	}
+	csw.ExtendBaseWidget(csw)
 	csw.adapterSelector = widget.NewSelect(adapter.List(), func(s string) {
-		//		log.Println("Selected adapter: ", s)
 		if info, found := adapter.GetAdapterMap()[s]; found {
 			app.Preferences().SetString(prefsAdapter, s)
 			if info.RequiresSerialPort {
@@ -62,31 +69,30 @@ func NewCanSettingsWidget(app fyne.App) *CanSettingsWidget {
 		csw.portSelector.Refresh()
 	})
 
-	csw.objects = []fyne.CanvasObject{
-		container.NewVBox(
-			container.NewBorder(
-				nil,
-				nil,
-				layout.NewFixedWidth(75, widget.NewLabel("Adapter")),
-				csw.debugCheckbox,
-				csw.adapterSelector,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				layout.NewFixedWidth(75, widget.NewLabel("Port")),
-				csw.refreshBtn,
-				csw.portSelector,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				layout.NewFixedWidth(75, widget.NewLabel("Speed")),
-				nil,
-				csw.speedSelector,
-			),
+	csw.container = container.NewVBox(
+		container.NewBorder(
+			nil,
+			nil,
+			layout.NewFixedWidth(75, widget.NewLabel("Adapter")),
+			csw.debugCheckbox,
+			csw.adapterSelector,
 		),
-	}
+		container.NewBorder(
+			nil,
+			nil,
+			layout.NewFixedWidth(75, widget.NewLabel("Port")),
+			csw.refreshBtn,
+			csw.portSelector,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			layout.NewFixedWidth(75, widget.NewLabel("Speed")),
+			nil,
+			csw.speedSelector,
+		),
+	)
+
 	csw.loadPrefs()
 	return csw
 }
@@ -116,13 +122,6 @@ func (c *CanSettingsWidget) Enable() {
 		}
 	}
 }
-
-const (
-	prefsAdapter = "adapter"
-	prefsPort    = "port"
-	prefsSpeed   = "speed"
-	prefsDebug   = "debug"
-)
 
 func (cs *CanSettingsWidget) loadPrefs() {
 	if adapter := cs.app.Preferences().String(prefsAdapter); adapter != "" {
@@ -201,14 +200,6 @@ func (cs *CanSettingsWidget) GetAdapter(ecuType string, logger func(string)) (go
 	)
 }
 
-func (cs *CanSettingsWidget) MinSize() fyne.Size {
-	return cs.objects[0].MinSize()
-}
-
-func (cs *CanSettingsWidget) Resize(size fyne.Size) {
-	cs.objects[0].Resize(size)
-}
-
 func (cs *CanSettingsWidget) listPorts() []string {
 	var portsList []string
 	ports, err := enumerator.GetDetailedPortsList()
@@ -242,11 +233,11 @@ type canSettingsWidgetRenderer struct {
 }
 
 func (cs *canSettingsWidgetRenderer) Layout(size fyne.Size) {
-	//log.Println(size)
+	cs.obj.container.Resize(size)
 }
 
 func (cs *canSettingsWidgetRenderer) MinSize() fyne.Size {
-	return cs.obj.MinSize()
+	return cs.obj.container.MinSize()
 }
 
 func (cs *canSettingsWidgetRenderer) Refresh() {
@@ -256,5 +247,5 @@ func (cs *canSettingsWidgetRenderer) Destroy() {
 }
 
 func (cs *canSettingsWidgetRenderer) Objects() []fyne.CanvasObject {
-	return cs.obj.objects
+	return []fyne.CanvasObject{cs.obj.container}
 }

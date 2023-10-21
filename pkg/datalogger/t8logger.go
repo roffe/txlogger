@@ -237,7 +237,7 @@ func (c *T8Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition,
 		val := va.StringValue()
 		file.Write([]byte(va.Name + "=" + strings.Replace(val, ".", ",", 1) + "|"))
 		if va.Widget != nil {
-			va.Widget.(*widgets.VarDefinitionWidget).SetValue(val)
+			va.Widget.(*widgets.VarDefinitionWidgetEntry).SetValue(val)
 		}
 	}
 	file.Write([]byte("IMPORTANTLINE=0|\n"))

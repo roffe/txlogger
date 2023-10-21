@@ -25,12 +25,23 @@ func (vr *MapViewerRenderer) Layout(size fyne.Size) {
 	for i := len(vr.mv.yData); i > 0; i-- {
 		for j := 0; j < len(vr.mv.xData); j++ {
 			t := vr.mv.textValues[(i*vr.mv.numColumns)-(vr.mv.numColumns-j)]
-			t.Resize(fyne.NewSize(w, h))
+			t.TextSize = float32(int(h / 2.0))
 			t.Move(fyne.NewPos(
 				float32(j)*(sz.Width/float32(vr.mv.numColumns))+4,
 				sz.Height-float32(i)*(sz.Height/float32(vr.mv.numRows)),
 			))
+			t.Resize(fyne.NewSize(w, h))
 		}
+	}
+
+	for _, xb := range vr.mv.xAxis {
+		xb.TextSize = float32(int(h / 2.0))
+		xb.Refresh()
+	}
+
+	for _, yb := range vr.mv.yAxis {
+		yb.TextSize = float32(int(h / 2.0))
+		yb.Refresh()
 	}
 
 	vr.mv.crosshair.Resize(fyne.NewSize(w, h))

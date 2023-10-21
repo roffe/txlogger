@@ -6,12 +6,13 @@ import (
 	"strconv"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
-type VarDefinitionWidget struct {
+type VarDefinitionWidgetEntry struct {
 	widget.BaseWidget
 	pos          int
 	symbolName   *widget.Entry
@@ -19,15 +20,16 @@ type VarDefinitionWidget struct {
 	symbolMethod *widget.Select
 	symbolNumber *widget.Entry
 	//symbolType   *widget.Entry
-	//	symbolSigned           *widget.Check
+	//symbolSigned           *widget.Check
 	symbolCorrectionfactor *widget.Entry
 	symbolGroup            *widget.Entry
 	symbolDeleteBTN        *widget.Button
-	objects                []fyne.CanvasObject
+	container              *fyne.Container
 }
 
-func NewVarDefinitionWidget(ls *widget.List, definedVars *kwp2000.VarDefinitionList, saveSymbols func(), disabled bool) fyne.Widget {
-	vd := &VarDefinitionWidget{}
+func NewVarDefinitionWidgetEntry(ls *widget.List, definedVars *kwp2000.VarDefinitionList, saveSymbols func(), disabled bool) fyne.Widget {
+	vd := &VarDefinitionWidgetEntry{}
+	vd.ExtendBaseWidget(vd)
 	vd.symbolName = &widget.Entry{
 		OnChanged: func(s string) {
 			if definedVars.GetPos(vd.pos).Name != s {
@@ -35,11 +37,9 @@ func NewVarDefinitionWidget(ls *widget.List, definedVars *kwp2000.VarDefinitionL
 			}
 		},
 	}
-
 	vd.symbolValue = &widget.Label{
 		Alignment: fyne.TextAlignCenter,
 	}
-
 	vd.symbolMethod = widget.NewSelect([]string{"Address", "Local ID", "Symbol"}, func(s string) {
 		if definedVars.GetPos(vd.pos).Method.String() != s {
 			switch s {
@@ -52,7 +52,6 @@ func NewVarDefinitionWidget(ls *widget.List, definedVars *kwp2000.VarDefinitionL
 			}
 		}
 	})
-
 	vd.symbolNumber = &widget.Entry{
 		OnChanged: func(s string) {
 			v, err := strconv.Atoi(s)
@@ -66,7 +65,6 @@ func NewVarDefinitionWidget(ls *widget.List, definedVars *kwp2000.VarDefinitionL
 
 		},
 	}
-
 	/*
 		vd.symbolType = &widget.Entry{
 			OnChanged: func(s string) {
@@ -99,7 +97,6 @@ func NewVarDefinitionWidget(ls *widget.List, definedVars *kwp2000.VarDefinitionL
 	//	//			definedVars[vd.pos].Signed = b
 	//})
 	//vd.symbolSigned.Disable()
-
 	vd.symbolCorrectionfactor = &widget.Entry{
 		OnChanged: func(s string) {
 			cf, err := strconv.ParseFloat(s, 64)
@@ -111,7 +108,6 @@ func NewVarDefinitionWidget(ls *widget.List, definedVars *kwp2000.VarDefinitionL
 			}
 		},
 	}
-
 	vd.symbolGroup = &widget.Entry{
 		OnChanged: func(s string) {
 			if definedVars.GetPos(vd.pos).Group != s {
@@ -119,15 +115,13 @@ func NewVarDefinitionWidget(ls *widget.List, definedVars *kwp2000.VarDefinitionL
 			}
 		},
 	}
-
 	vd.symbolDeleteBTN = widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
 		//definedVars = append(definedVars[:vd.pos], definedVars[vd.pos+1:]...)
 		definedVars.Delete(vd.pos)
 		ls.Refresh()
 		saveSymbols()
 	})
-
-	vd.objects = []fyne.CanvasObject{
+	vd.container = container.NewWithoutLayout(
 		vd.symbolName,
 		vd.symbolValue,
 		vd.symbolMethod,
@@ -136,16 +130,14 @@ func NewVarDefinitionWidget(ls *widget.List, definedVars *kwp2000.VarDefinitionL
 		//vd.symbolSigned,
 		vd.symbolCorrectionfactor,
 		vd.symbolDeleteBTN,
-	}
-
+	)
 	if disabled {
 		vd.Disable()
 	}
-	vd.ExtendBaseWidget(vd)
 	return vd
 }
 
-func (wb *VarDefinitionWidget) Update(pos int, sym *kwp2000.VarDefinition) {
+func (wb *VarDefinitionWidgetEntry) Update(pos int, sym *kwp2000.VarDefinition) {
 	wb.pos = pos
 	wb.symbolName.SetText(sym.Name)
 	wb.symbolMethod.SetSelected(sym.Method.String())
@@ -168,7 +160,7 @@ func (wb *VarDefinitionWidget) Update(pos int, sym *kwp2000.VarDefinition) {
 	sym.SetWidget(wb)
 }
 
-func (wb *VarDefinitionWidget) Disable() {
+func (wb *VarDefinitionWidgetEntry) Disable() {
 	wb.symbolName.Disable()
 	wb.symbolMethod.Disable()
 	wb.symbolNumber.Disable()
@@ -180,7 +172,7 @@ func (wb *VarDefinitionWidget) Disable() {
 
 }
 
-func (wb *VarDefinitionWidget) Enable() {
+func (wb *VarDefinitionWidgetEntry) Enable() {
 	wb.symbolName.Enable()
 	wb.symbolMethod.Enable()
 	wb.symbolNumber.Enable()
@@ -192,44 +184,44 @@ func (wb *VarDefinitionWidget) Enable() {
 
 }
 
-func (wb *VarDefinitionWidget) SetName(name string) {
+func (wb *VarDefinitionWidgetEntry) SetName(name string) {
 	wb.symbolName.SetText(name)
 }
 
-func (wb *VarDefinitionWidget) SetValue(value string) {
+func (wb *VarDefinitionWidgetEntry) SetValue(value string) {
 	if wb.symbolValue.Text != value {
 		wb.symbolValue.SetText(value)
 	}
 }
 
-func (wb *VarDefinitionWidget) SetMethod(method string) {
+func (wb *VarDefinitionWidgetEntry) SetMethod(method string) {
 	wb.symbolMethod.SetSelected(method)
 }
 
-func (wb *VarDefinitionWidget) SetPos(pos int) {
+func (wb *VarDefinitionWidgetEntry) SetPos(pos int) {
 	wb.pos = pos
 }
 
-func (wb *VarDefinitionWidget) SetNumber(number int) {
+func (wb *VarDefinitionWidgetEntry) SetNumber(number int) {
 	wb.symbolNumber.SetText(strconv.Itoa(number))
 }
 
-func (wb *VarDefinitionWidget) SetType(t uint8) {
+func (wb *VarDefinitionWidgetEntry) SetType(t uint8) {
 	//wb.symbolType.SetText(fmt.Sprintf("%0X", t))
 	//wb.symbolSigned.SetChecked(t&kwp2000.SIGNED != 0)
 }
 
-func (wb *VarDefinitionWidget) CreateRenderer() fyne.WidgetRenderer {
-	return &VarDefinitionWidgetRenderer{
+func (wb *VarDefinitionWidgetEntry) CreateRenderer() fyne.WidgetRenderer {
+	return &VarDefinitionWidgetEntryRenderer{
 		obj: wb,
 	}
 }
 
-type VarDefinitionWidgetRenderer struct {
-	obj *VarDefinitionWidget
+type VarDefinitionWidgetEntryRenderer struct {
+	obj *VarDefinitionWidgetEntry
 }
 
-func (vr *VarDefinitionWidgetRenderer) Layout(size fyne.Size) {
+func (vr *VarDefinitionWidgetEntryRenderer) Layout(size fyne.Size) {
 	var sz = []float32{
 		.35, // name
 		.12, // value
@@ -242,10 +234,8 @@ func (vr *VarDefinitionWidgetRenderer) Layout(size fyne.Size) {
 	}
 	var x float32
 	var tw float32
-	for _, o := range vr.obj.objects {
+	for i, o := range vr.obj.container.Objects {
 		tw += o.MinSize().Width
-	}
-	for i, o := range vr.obj.objects {
 		az := size.Width * sz[i]
 		o.Resize(fyne.NewSize(az, size.Height))
 		o.Move(fyne.NewPos(x, 0))
@@ -253,9 +243,9 @@ func (vr *VarDefinitionWidgetRenderer) Layout(size fyne.Size) {
 	}
 }
 
-func (vr *VarDefinitionWidgetRenderer) MinSize() fyne.Size {
+func (vr *VarDefinitionWidgetEntryRenderer) MinSize() fyne.Size {
 	var w, h float32
-	for _, o := range vr.obj.objects {
+	for _, o := range vr.obj.container.Objects {
 		childSize := o.MinSize()
 		if childSize.Height > h {
 			h = childSize.Height
@@ -265,12 +255,12 @@ func (vr *VarDefinitionWidgetRenderer) MinSize() fyne.Size {
 	return fyne.NewSize(w, h)
 }
 
-func (vr *VarDefinitionWidgetRenderer) Refresh() {
+func (vr *VarDefinitionWidgetEntryRenderer) Refresh() {
 }
 
-func (vr *VarDefinitionWidgetRenderer) Destroy() {
+func (vr *VarDefinitionWidgetEntryRenderer) Destroy() {
 }
 
-func (vr *VarDefinitionWidgetRenderer) Objects() []fyne.CanvasObject {
-	return vr.obj.objects
+func (vr *VarDefinitionWidgetEntryRenderer) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{vr.obj.container}
 }

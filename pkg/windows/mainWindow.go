@@ -185,10 +185,10 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		func() fyne.CanvasObject {
 			disabled := mw.dlc != nil
 			//log.Println("newList: creating new VarDefinitionWidget")
-			return widgets.NewVarDefinitionWidget(mw.symbolConfigList, mw.vars, mw.SaveSymbolList, disabled)
+			return widgets.NewVarDefinitionWidgetEntry(mw.symbolConfigList, mw.vars, mw.SaveSymbolList, disabled)
 		},
 		func(lii widget.ListItemID, co fyne.CanvasObject) {
-			coo := co.(*widgets.VarDefinitionWidget)
+			coo := co.(*widgets.VarDefinitionWidgetEntry)
 			coo.Update(lii, mw.vars.GetPos(lii))
 			if !mw.buttonsDisabled {
 				coo.Enable()
@@ -581,7 +581,7 @@ func (mw *MainWindow) disableBtns() {
 	mw.presetSelect.Disable()
 	for _, v := range mw.vars.Get() {
 		if v.Widget != nil {
-			v.Widget.(*widgets.VarDefinitionWidget).Disable()
+			v.Widget.(*widgets.VarDefinitionWidgetEntry).Disable()
 		}
 	}
 }
@@ -601,7 +601,7 @@ func (mw *MainWindow) enableBtns() {
 	mw.presetSelect.Enable()
 	for _, v := range mw.vars.Get() {
 		if v.Widget != nil {
-			v.Widget.(*widgets.VarDefinitionWidget).Enable()
+			v.Widget.(*widgets.VarDefinitionWidgetEntry).Enable()
 		}
 	}
 }
