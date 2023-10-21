@@ -14,10 +14,10 @@ func NewRectangle(col color.Color, strokeWidth float32) *canvas.Rectangle {
 	return Rectangle
 }
 
-func NewCircle(col color.Color) *canvas.Circle {
+func NewCircle(col color.Color, strokeWidth float32) *canvas.Circle {
 	circle := canvas.NewCircle(color.RGBA{0, 0, 0, 0})
 	circle.FillColor = color.Transparent
 	circle.StrokeColor = col
-	circle.StrokeWidth = 4
+	circle.StrokeWidth = strokeWidth
 	return circle
 }

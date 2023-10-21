@@ -9,6 +9,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
+	"fyne.io/fyne/v2/widget"
 )
 
 type DialConfig struct {
@@ -41,7 +42,12 @@ type Dial struct {
 
 	minsize fyne.Size
 
+	widget.BaseWidget
 	//rect *canvas.Rectangle
+}
+
+type DialLayout struct {
+	*Dial
 }
 
 func NewDial(cfg DialConfig) *Dial {
@@ -51,7 +57,7 @@ func NewDial(cfg DialConfig) *Dial {
 		max:           cfg.Max,
 		steps:         30,
 		displayString: "%.0f",
-		minsize:       fyne.NewSize(150, 150),
+		minsize:       fyne.NewSize(270, 270),
 	}
 	if cfg.Steps > 0 {
 		c.steps = float64(cfg.Steps)
@@ -80,10 +86,10 @@ func NewDial(cfg DialConfig) *Dial {
 }
 
 func (c *Dial) render() *fyne.Container {
-	c.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0x80}, StrokeWidth: 2}
+	c.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0x80}, StrokeWidth: 1}
 	c.cover = &canvas.Rectangle{FillColor: theme.BackgroundColor()}
 	c.center = &canvas.Circle{FillColor: color.Black}
-	c.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 3}
+	c.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 5}
 
 	c.titleText = &canvas.Text{Text: c.title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
 	c.titleText.TextStyle.Monospace = true
@@ -96,22 +102,21 @@ func (c *Dial) render() *fyne.Container {
 	//c.rect = &canvas.Rectangle{StrokeColor: color.RGBA{R: 0xFF, G: 0xFF, B: 0xFF, A: 0xFF}, StrokeWidth: 3}
 
 	dial := container.NewWithoutLayout(c.face, c.cover, c.titleText)
-	fac := float64(0xA5) / c.steps
+
+	asd := float64(0xA5) / c.steps
+
 	for i := 0; i < int(c.steps+1); i++ {
-		col := color.RGBA{byte(float64(i) * fac), 0x00, 0x00, 0xFF}
-		col.G = 0xA5 - col.R
-		//pip := &canvas.Line{StrokeColor: color.RGBA{0x00, 0xE5, 0x00, 0xFF}, StrokeWidth: 2}
-		pip := &canvas.Line{StrokeColor: col, StrokeWidth: 2}
-		/*
-			if i == 0 {
-				pip.StrokeColor = color.RGBA{0x00, 0xE5, 0x00, 0xFF}
-				// } else if float64(i)*c.factor >= c.max-(c.max/4*2) && float64(i)*c.factor < c.max-(c.max/5) {
-			} else if float64(i)*c.factor >= c.max*.6 && float64(i)*c.factor < c.max*.8 {
-				pip.StrokeColor = theme.WarningColor()
-			} else if float64(i)*c.factor >= c.max*.8 {
-				pip.StrokeColor = theme.ErrorColor()
-			}
-		*/
+		br := byte(float64(i) * asd)
+		bg := 0xA5 - br
+		pip := &canvas.Line{StrokeColor: color.RGBA{br, bg, 0x00, 0xFF}, StrokeWidth: 1}
+		//if i == 0 {
+		//	pip.StrokeColor = color.RGBA{0x00, 0xE5, 0x00, 0xFF}
+		//	// } else if float64(i)*c.factor >= c.max-(c.max/4*2) && float64(i)*c.factor < c.max-(c.max/5) {
+		//} else if float64(i)*c.factor >= c.max*.6 && float64(i)*c.factor < c.max*.8 {
+		//	pip.StrokeColor = theme.WarningColor()
+		//} else if float64(i)*c.factor >= c.max*.8 {
+		//	pip.StrokeColor = theme.ErrorColor()
+		//}
 
 		//num := canvas.NewText(fmt.Sprintf("%0.f", float64(i)*c.factor), color.RGBA{0x00, 0xE5, 0x00, 0xFF})
 		//num.TextSize = 30
@@ -123,7 +128,7 @@ func (c *Dial) render() *fyne.Container {
 	}
 
 	dial.Objects = append(dial.Objects, c.center, c.needle, c.displayText)
-	dial.Layout = c
+	dial.Layout = &DialLayout{c}
 
 	return dial
 }
@@ -157,64 +162,11 @@ func (c *Dial) rotate(hand *canvas.Line, middle fyne.Position, facePosition, rot
 	hand.Position2 = fyne.NewPos(middle.X+offX+x2, middle.Y+offY+y2)
 }
 
-func (c *Dial) Layout(_ []fyne.CanvasObject, space fyne.Size) {
-	diameter := fyne.Min(space.Width, space.Height)
-	//diameter := space.Height
-	radius := diameter / 2
-	stroke := diameter / 60
-	midStroke := diameter / 80
-	smallStroke := diameter / 300
-
-	size := fyne.NewSize(diameter, diameter)
-	middle := fyne.NewPos(space.Width/2, space.Height/2)
-	topleft := fyne.NewPos(middle.X-radius, middle.Y-radius)
-
-	c.titleText.TextSize = radius / 3
-	c.titleText.Move(middle.Add(fyne.NewPos(0, diameter/4)))
-	c.titleText.Refresh()
-
-	//c.rect.Resize(size)
-	//c.rect.Move(fyne.NewPos(0, 0))
-
-	c.center.Resize(fyne.NewSize(radius/4, radius/4))
-	c.center.Move(middle.SubtractXY(c.center.Size().Width/2, c.center.Size().Height/2))
-
-	c.cover.Move(fyne.NewPos(0, middle.Y+radius/7*5))
-	c.cover.Resize(fyne.NewSize(c.canvas.Size().Width, size.Height/6))
-
-	c.displayText.TextSize = radius / 2
-	c.displayText.Text = fmt.Sprintf(c.displayString, c.value)
-	c.displayText.Resize(size)
-	c.displayText.Move(topleft.AddXY(0, diameter/6))
-
-	c.needle.StrokeWidth = stroke
-
-	c.rotateNeedle(c.needle, middle, c.value, -radius*.15, radius*1.13)
-
-	c.face.StrokeWidth = smallStroke
-	c.face.Move(topleft)
-	c.face.Resize(size)
-	//c.face.Refresh()
-
-	for i, p := range c.pips {
-		if i%2 == 0 {
-			c.rotatePips(p, middle, float64(i), radius/4*3, radius/4)
-			p.StrokeWidth = midStroke
-		} else {
-			c.rotatePips(p, middle, float64(i), radius/8*7, radius/8)
-			p.StrokeWidth = smallStroke
-		}
-	}
-}
-
 func (c *Dial) MinSize(_ []fyne.CanvasObject) fyne.Size {
 	return c.minsize
 }
 
 func (c *Dial) SetValue(value float64) {
-	if value == c.value {
-		return
-	}
 	if value > c.max {
 		value = c.max
 	}
@@ -242,6 +194,57 @@ func (c *Dial) Content() fyne.CanvasObject {
 
 func (c *Dial) Value() float64 {
 	return c.value
+}
+
+func (c *DialLayout) Layout(_ []fyne.CanvasObject, space fyne.Size) {
+	diameter := fyne.Min(space.Width, space.Height)
+	//diameter := space.Height
+	radius := diameter / 2
+	stroke := diameter / 60
+	midStroke := diameter / 80
+	smallStroke := diameter / 300
+
+	size := fyne.NewSize(diameter, diameter)
+	middle := fyne.NewPos(space.Width/2, space.Height/2)
+	topleft := fyne.NewPos(middle.X-radius, middle.Y-radius)
+
+	c.titleText.TextSize = radius / 3
+	c.titleText.Move(middle.Add(fyne.NewPos(0, diameter/4)))
+	c.titleText.Refresh()
+
+	//c.rect.Resize(size)
+	//c.rect.Move(fyne.NewPos(0, 0))
+
+	c.face.Resize(size)
+	c.face.Move(topleft)
+
+	c.center.Resize(fyne.NewSize(radius/4, radius/4))
+	c.center.Move(middle.SubtractXY(c.center.Size().Width/2, c.center.Size().Height/2))
+
+	c.cover.Resize(fyne.NewSize(c.canvas.Size().Width, size.Height/6))
+	c.cover.Move(fyne.NewPos(0, middle.Y+radius/7*5))
+
+	c.displayText.TextSize = radius / 2
+	c.displayText.Text = fmt.Sprintf(c.displayString, c.value)
+	c.displayText.Resize(size)
+	c.displayText.Move(topleft.AddXY(0, diameter/6))
+
+	c.needle.StrokeWidth = stroke
+
+	c.rotateNeedle(c.needle, middle, c.value, -radius*.15, radius*1.13)
+
+	c.face.StrokeWidth = smallStroke
+	c.face.Refresh()
+
+	for i, p := range c.pips {
+		if i%2 == 0 {
+			c.rotatePips(p, middle, float64(i), radius/4*3, radius/4)
+			p.StrokeWidth = midStroke
+		} else {
+			c.rotatePips(p, middle, float64(i), radius/8*7, radius/8)
+			p.StrokeWidth = smallStroke
+		}
+	}
 }
 
 /*

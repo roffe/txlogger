@@ -1,7 +1,7 @@
 package symbol
 
 import (
-	"embed"
+	_ "embed"
 	"encoding/xml"
 	"errors"
 	"os"
@@ -15,9 +15,6 @@ var EU0AF01C_xml []byte
 
 //go:embed EU0AF01O.xml
 var EU0AF01O_xml []byte
-
-//go:embed *.xml
-var xmlFiles embed.FS
 
 type XMLSymbol struct {
 	Text         string `xml:",chardata"`

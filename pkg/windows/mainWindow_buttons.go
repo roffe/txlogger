@@ -210,17 +210,17 @@ func (mw *MainWindow) createButtons() {
 				mw.dlc.AttachDashboard(mw.dashboard)
 			}
 
+			fac := func(mv *mapviewer.MapViewer, name string) *func(v float64) {
+				fun := func(v float64) {
+					mv.SetValue(name, v)
+				}
+				return &fun
+			}
 			for _, mv := range mw.openMaps {
-				var tmpRpm float64
-				setRpm := func(v float64) {
-					tmpRpm = v
-				}
-
-				setAir := func(v float64) {
-					mv.SetXY(int(v), int(tmpRpm))
-				}
-				mw.dlc.Subscribe("ActualIn.n_Engine", &setRpm)
-				mw.dlc.Subscribe("MAF.m_AirInlet", &setAir)
+				setRpm := fac(mv, "ActualIn.n_Engine")
+				setAir := fac(mv, "MAF.m_AirInlet")
+				mw.dlc.Subscribe("ActualIn.n_Engine", setRpm)
+				mw.dlc.Subscribe("MAF.m_AirInlet", setAir)
 			}
 
 			go func() {
@@ -340,24 +340,27 @@ func (mw *MainWindow) openMap(axis symbol.Axis) {
 			return
 		}
 
-		var tmpRpm float64
-		setRpm := func(v float64) {
-			tmpRpm = v
+		fac := func(mv *mapviewer.MapViewer, name string) *func(v float64) {
+			fun := func(v float64) {
+				mv.SetValue(name, v)
+			}
+			return &fun
 		}
-		setAir := func(v float64) {
-			mv.SetXY(int(v), int(tmpRpm))
-		}
+
+		setRpm := fac(mv, "ActualIn.n_Engine")
+		setAir := fac(mv, "MAF.m_AirInlet")
+
 		w.SetCloseIntercept(func() {
 			delete(mw.openMaps, axis.Z)
 			if mw.dlc != nil {
-				mw.dlc.Unsubscribe("ActualIn.n_Engine", &setRpm)
-				mw.dlc.Unsubscribe("MAF.m_AirInlet", &setAir)
+				mw.dlc.Unsubscribe("ActualIn.n_Engine", setRpm)
+				mw.dlc.Unsubscribe("MAF.m_AirInlet", setAir)
 			}
 			w.Close()
 		})
 		if mw.dlc != nil {
-			mw.dlc.Subscribe("ActualIn.n_Engine", &setRpm)
-			mw.dlc.Subscribe("MAF.m_AirInlet", &setAir)
+			mw.dlc.Subscribe("ActualIn.n_Engine", setRpm)
+			mw.dlc.Subscribe("MAF.m_AirInlet", setAir)
 		}
 		mw.openMaps[axis.Z] = mv
 		w.SetContent(mv)

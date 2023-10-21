@@ -48,6 +48,22 @@ func (s *Symbol) String() string {
 
 func (s *Symbol) IntFromData() []int {
 	signed := s.Type&SIGNED == 1
+
+	/*
+		if yLen*xLen == int(s.Length) {
+			if signed {
+				return s.DataToInt8()
+			}
+			return s.DataToUint8()
+		}
+
+		if yLen*xLen*2 == int(s.Length/2) {
+			if signed {
+				return s.DataToInt16()
+			}
+			return s.DataToUint16()
+		}
+	*/
 	if !signed && s.Length == 1 {
 		return s.DataToUint8()
 	}
@@ -66,7 +82,6 @@ func (s *Symbol) IntFromData() []int {
 	if signed && (s.Length == 22 || s.Length == 30) {
 		return s.DataToInt16()
 	}
-
 	return s.DataToUint8()
 }
 

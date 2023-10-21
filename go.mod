@@ -6,7 +6,6 @@ toolchain go1.21.0
 
 require (
 	fyne.io/fyne/v2 v2.4.1
-	fyne.io/x/fyne v0.0.0-20231018161245-e7104b0942c9
 	github.com/roffe/gocan v0.0.0-20230923211524-653f77516da0
 	github.com/sqweek/dialog v0.0.0-20220809060634-e981b270ebbf
 	go.bug.st/serial v1.6.1
@@ -17,7 +16,10 @@ require (
 	github.com/yeka/zip v0.0.0-20180914125537-d046722c6feb
 )
 
-require github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
+require (
+	fyne.io/x/fyne v0.0.0-20231020065621-89b4a4aea27d
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
+)
 
 require (
 	github.com/go-text/render v0.0.0-20230619120952-35bccb6164b8 // indirect

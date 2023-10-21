@@ -33,14 +33,16 @@ type Gauge interface {
 }
 
 type Dashboard struct {
-	speed, rpm, iat/*, mReq, mAir*/ Gauge
-	throttle, pwm, engineTemp, nblambda, wblambda Gauge
-	boost, air                                    *widgets.DualDial
-	ioff, activeAirDem, ign, cruise               *canvas.Text
-	checkEngine                                   *canvas.Image
-	limpMode                                      *canvas.Image
-	knockIcon                                     *widgets.Icon
-	time                                          *canvas.Text
+	rpm, speed, iat                 *widgets.Dial
+	throttle, pwm                   *widgets.VBar
+	engineTemp                      *widgets.Dial
+	nblambda, wblambda              *widgets.CBar
+	boost, air                      *widgets.DualDial
+	ioff, activeAirDem, ign, cruise *canvas.Text
+	checkEngine                     *canvas.Image
+	limpMode                        *canvas.Image
+	knockIcon                       *widgets.Icon
+	time                            *canvas.Text
 
 	canvas fyne.CanvasObject
 
@@ -55,39 +57,10 @@ type Dashboard struct {
 	metricsChan chan *model.DashboardMetric
 
 	logplayer bool
-
-	//mv, mv2 *MapViewer
-	//w1, w2  fyne.Window
 }
 
 func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.Button, onClose func()) *Dashboard {
-	/*
-		filename := ".\\tmp\\bosse.bin"
-		cb := func(s string) {
-			log.Println(s)
-		}
-		symbols, err := symbol.LoadSymbols(filename, "T7", cb)
-		if err != nil {
-			log.Fatalf("error loading symbols: %v", err)
-		}
-
-		ww := a.NewWindow("Map Viewer")
-		ww2 := a.NewWindow("Map Viewer")
-
-		mv := NewMapViewer(ww, "BFuelCal.AirXSP", "BFuelCal.RpmYSP", "BFuelCal.Map", symbols, interpolate.U16_u16_int)
-		mv2 := NewMapViewer(ww2, "BFuelCal.AirXSP", "BFuelCal.RpmYSP", "IgnNormCal.Map", symbols, interpolate.U16_u16_int)
-
-		ww.SetContent(container.NewStack(mv))
-		ww2.SetContent(container.NewStack(mv2))
-		ww.Show()
-		ww2.Show()
-	*/
-
 	db := &Dashboard{
-		//mv:        mv,
-		//mv2:       mv2,
-		//w1:        ww,
-		//w2:        ww2,
 		logBtn:    logBtn,
 		logplayer: logplayer,
 		speed: widgets.NewDial(widgets.DialConfig{
@@ -109,18 +82,6 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 			Max:   80,
 			Steps: 16,
 		}),
-		//mReq: widgets.NewDial(widgets.DialConfig{
-		//	Title: "mReq",
-		//	Min:   0,
-		//	Max:   2200,
-		//	Steps: 22,
-		//}),
-		//mAir: widgets.NewDial(widgets.DialConfig{
-		//	Title: "mAir",
-		//	Min:   0,
-		//	Max:   2200,
-		//	Steps: 22,
-		//}),
 		boost: widgets.NewDualDial(widgets.DualDialConfig{
 			Title:         "MAP",
 			Min:           0,
@@ -209,14 +170,6 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 	}
 
 	db.closeBtn = widget.NewButtonWithIcon("Back", theme.NavigateBackIcon(), func() {
-		// if db.w1 != nil {
-		// 	db.w1.Close()
-		// }
-		//
-		// if db.w2 != nil {
-		// 	db.w2.Close()
-		// }
-
 		if db.onClose != nil {
 			db.onClose()
 		}
@@ -261,16 +214,16 @@ func (db *Dashboard) render() fyne.CanvasObject {
 			//db.dbgBar,
 			db.ign,
 			db.ioff,
-			db.rpm.Content(),
+			db.rpm,
 			db.air.Content(),
 			db.boost.Content(),
-			db.iat.Content(),
-			db.engineTemp.Content(),
+			db.iat,
+			db.engineTemp,
 
 			//db.mReq.Content(),
 			//db.mAir.Content(),
 
-			db.speed.Content(),
+			db.speed,
 			db.activeAirDem,
 
 			db.nblambda.Content(),
@@ -363,17 +316,40 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		}
 	}
 
+	knkDet := func(value float64) {
+		if value > 0 {
+			kn := int(value)
+			knockValue := 0
+			if kn&1<<24 == 1<<24 {
+				knockValue += 1000
+			}
+			if kn&1<<16 == 1<<16 {
+				knockValue += 200
+			}
+			if kn&1<<8 == 1<<8 {
+				knockValue += 30
+			}
+			if kn&1 == 1 {
+				knockValue += 4
+			}
+			db.knockIcon.SetText(fmt.Sprintf("%d", knockValue))
+			db.knockIcon.Content().Show()
+		} else {
+			db.knockIcon.Content().Hide()
+		}
+	}
+
 	return map[string]func(float64){
 		"In.v_Vehicle": db.speed.SetValue,
 
-		// "ActualIn.n_Engine":   db.rpm.SetValue,
 		"ActualIn.n_Engine":   db.rpm.SetValue,
 		"ActualIn.T_AirInlet": db.iat.SetValue,
 
 		"ActualIn.T_Engine": db.engineTemp.SetValue,
 
-		"In.p_AirInlet":             db.boost.SetValue,
-		"ActualIn.p_AirInlet":       db.boost.SetValue,
+		"In.p_AirInlet":       db.boost.SetValue,
+		"ActualIn.p_AirInlet": db.boost.SetValue,
+
 		"In.p_AirBefThrottle":       db.boost.SetValue2,
 		"ActualIn.p_AirBefThrottle": db.boost.SetValue2,
 
@@ -385,11 +361,10 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		"DisplProt.LambdaScanner": db.wblambda.SetValue,
 		"Lambda.LambdaInt":        db.nblambda.SetValue,
 
-		//"MAF.m_AirInlet":          db.air.SetValue,
-		"MAF.m_AirInlet": db.air.SetValue,
+		"MAF.m_AirInlet":        db.air.SetValue,
+		"m_Request":             db.air.SetValue2,
+		"AirMassMast.m_Request": db.air.SetValue2,
 
-		"m_Request":               db.air.SetValue2,
-		"AirMassMast.m_Request":   db.air.SetValue2,
 		"Out.fi_Ignition":         textSetter(db.ign, "Ign", 1),
 		"ECMStat.ST_ActiveAirDem": ecmstat,
 
@@ -400,28 +375,7 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		"CEL":    showHider(db.checkEngine),
 		"LIMP":   showHider(db.limpMode),
 
-		"KnkDet.KnockCyl": func(value float64) {
-			if value > 0 {
-				kn := int(value)
-				knockValue := 0
-				if kn&1<<24 == 1<<24 {
-					knockValue += 1000
-				}
-				if kn&1<<16 == 1<<16 {
-					knockValue += 200
-				}
-				if kn&1<<8 == 1<<8 {
-					knockValue += 30
-				}
-				if kn&1 == 1 {
-					knockValue += 4
-				}
-				db.knockIcon.SetText(fmt.Sprintf("%d", knockValue))
-				db.knockIcon.Content().Show()
-			} else {
-				db.knockIcon.Content().Hide()
-			}
-		},
+		"KnkDet.KnockCyl": knkDet,
 	}
 }
 
@@ -464,16 +418,15 @@ func (db *Dashboard) Sweep() {
 	time.Sleep(1800 * time.Millisecond)
 	db.checkEngine.Show()
 }
-
 func (db *Dashboard) Layout(_ []fyne.CanvasObject, space fyne.Size) {
 	var sixthWidth float32 = space.Width / 6
 	var thirdHeight float32 = (space.Height - 50) / 3
 	var halfHeight float32 = (space.Height - 50) / 2
 
 	// Dials
-	rpm := db.rpm.Content()
-	rpm.Resize(fyne.NewSize(sixthWidth, thirdHeight))
-	rpm.Move(fyne.NewPos(0, 0))
+
+	db.rpm.Resize(fyne.NewSize(sixthWidth, thirdHeight))
+	db.rpm.Move(fyne.NewPos(0, 0))
 
 	dual := db.air.Content()
 	dual.Resize(fyne.NewSize(sixthWidth, thirdHeight))
@@ -483,26 +436,16 @@ func (db *Dashboard) Layout(_ []fyne.CanvasObject, space fyne.Size) {
 	boost.Resize(fyne.NewSize(sixthWidth, thirdHeight))
 	boost.Move(fyne.NewPos(0, thirdHeight*2))
 
-	iat := db.iat.Content()
-	iat.Resize(fyne.NewSize(sixthWidth, halfHeight))
-	iat.Move(fyne.NewPos(space.Width-iat.Size().Width, 0))
+	db.iat.Resize(fyne.NewSize(sixthWidth, halfHeight))
+	db.iat.Move(fyne.NewPos(space.Width-db.iat.Size().Width, 0))
 
-	teng := db.engineTemp.Content()
-	teng.Resize(fyne.NewSize(sixthWidth, halfHeight))
-	teng.Move(fyne.NewPos(space.Width-teng.Size().Width, halfHeight))
-
-	//mreq := db.mReq.Content()
-	//mreq.Resize(fyne.NewSize(sixthWidth, thirdHeight))
-	//mreq.Move(fyne.NewPos(space.Width-mreq.Size().Width, 0+thirdHeight))
-	//
-	//mair := db.mAir.Content()
-	//mair.Resize(fyne.NewSize(sixthWidth, thirdHeight))
-	//mair.Move(fyne.NewPos(space.Width-mair.Size().Width, 0+thirdHeight*2))
+	db.engineTemp.Resize(fyne.NewSize(sixthWidth, halfHeight))
+	db.engineTemp.Move(fyne.NewPos(space.Width-db.engineTemp.Size().Width, halfHeight))
 
 	// Center dial
-	speed := db.speed.Content()
-	speed.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth/3*2)-20, space.Height-115))
-	speed.Move(fyne.NewPos(space.Width/2-speed.Size().Width/2, space.Height/2-speed.Size().Height/2+25))
+
+	db.speed.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth/3*2)-20, space.Height-115))
+	db.speed.Move(fyne.NewPos(space.Width/2-db.speed.Size().Width/2, space.Height/2-db.speed.Size().Height/2+25))
 
 	// Vbar
 	pwm := db.pwm.Content()
@@ -527,8 +470,7 @@ func (db *Dashboard) Layout(_ []fyne.CanvasObject, space fyne.Size) {
 	db.limpMode.Move(fyne.NewPos(space.Width/2-db.limpMode.Size().Width/2, space.Height/2-db.limpMode.Size().Height/2-(thirdHeight/2)))
 
 	db.checkEngine.Resize(fyne.NewSize(sixthWidth/2, thirdHeight/2))
-	//db.checkEngine.Move(fyne.NewPos(space.Width/2-db.checkEngine.Size().Width/2+sixthWidth*1.3, space.Height-db.checkEngine.Size().Height-db.wblambda.Content().Size().Height))
-	db.checkEngine.Move(fyne.NewPos(space.Width-db.engineTemp.Content().Size().Width-db.throttle.Content().Size().Width-db.checkEngine.Size().Width-15, space.Height-db.checkEngine.Size().Height-db.wblambda.Content().Size().Height))
+	db.checkEngine.Move(fyne.NewPos(space.Width-db.engineTemp.Size().Width-db.throttle.Content().Size().Width-db.checkEngine.Size().Width-15, space.Height-db.checkEngine.Size().Height-db.wblambda.Content().Size().Height))
 
 	db.knockIcon.Content().Move(fyne.NewPos((space.Width/2)-(db.checkEngine.Size().Width/2)-(sixthWidth*.7), space.Height/2-60))
 
@@ -551,18 +493,10 @@ func (db *Dashboard) Layout(_ []fyne.CanvasObject, space fyne.Size) {
 
 		db.logBtn.Resize(fyne.NewSize(db.wblambda.Content().Position().X-db.fullscreenBtn.Size().Width-14, 55))
 		db.logBtn.Move(fyne.NewPos(db.fullscreenBtn.Size().Width+5, space.Height-55))
-		//} else {
-		//	db.logBtn.Resize(fyne.NewSize(sixthWidth/2, 30))
-		//	db.logBtn.Move(fyne.NewPos(0, space.Height-80))
-		//}
-		//db.logBtn.Resize(fyne.NewSize(125, 45))
 	} else {
 		db.time.Move(fyne.NewPos(space.Width/2-100, space.Height/2.6))
 	}
 	db.fullscreenBtn.Move(fyne.NewPos(0, space.Height-55))
-
-	//db.dbgBar.Resize(fyne.NewSize(sixthWidth*3, 25))
-	//db.dbgBar.Move(fyne.NewPos(space.Width/2-db.dbgBar.Size().Width/2, 0))
 
 	// Text
 

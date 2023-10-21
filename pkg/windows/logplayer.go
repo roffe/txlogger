@@ -282,7 +282,7 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 		log.Println(axis)
 		mv, found := lp.openMaps[axis.Z]
 		if !found {
-			w := lp.app.NewWindow("Map Viewer - " + axis.Z)
+			w := lp.app.NewWindow("")
 			//w.Canvas().SetOnTypedKey(lp.handler)
 			mv, err := mapviewer.NewMapViewer(w, axis, lp.symbols, interpolate.Interpolate)
 			if err != nil {
@@ -413,8 +413,9 @@ func (lp *LogPlayer) newMapBtn(btnTitle, supXName, supYName, mapName string) *wi
 func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, control <-chan *controlMsg, ww fyne.Window) {
 	play := true
 	var nextFrame, currentMillis int64
-	var airUpdated, playonce bool
+	var playonce bool
 	speedMultiplier := 1.0
+	var airUpdate uint8
 
 	go func() {
 		for op := range control {
@@ -443,7 +444,7 @@ func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, co
 		}
 	}()
 
-	var tmpAir, tmpmReq, airDiff float64
+	var tmpAir, tmpmReq float64
 	for !lp.closed {
 		currentMillis = time.Now().UnixMilli()
 		if logz.Pos() >= logz.Len()-1 || (!play && !playonce) {
@@ -461,25 +462,25 @@ func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, co
 		if rec := logz.Next(); rec != nil {
 			nextFrame = currentMillis + int64(float64(rec.DelayTillNext)*speedMultiplier)
 			for k, v := range rec.Values {
+				// Set values on dashboard
+				lp.db.SetValue(k, v)
+
 				if k == "MAF.m_AirInlet" {
 					tmpAir = v
-					airDiff = tmpmReq - tmpAir
-					airUpdated = true
+					airUpdate++
 				}
 				if k == "m_Request" {
 					tmpmReq = v
-					airDiff = tmpmReq - tmpAir
-					airUpdated = true
+					airUpdate++
 				}
-				if airUpdated {
+				if airUpdate == 2 {
 					if s, found := lp.symbolSubs["AirDIFF"]; found {
 						for _, sub := range s {
-							sub.SetValue("AirDIFF", airDiff)
+							sub.SetValue("AirDIFF", tmpmReq-tmpAir)
 						}
 					}
-					airUpdated = false
+					airUpdate = 0
 				}
-				lp.db.SetValue(k, v)
 				fac := 1.0
 				if k == "ActualIn.p_AirInlet" {
 					fac = 1000

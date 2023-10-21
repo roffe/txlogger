@@ -8,7 +8,6 @@ import (
 	"image/color"
 	"image/draw"
 	"log"
-	"math"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -23,8 +22,8 @@ import (
 )
 
 const (
-	cellWidth  = 45
-	cellHeight = 22
+	cellWidth  = 46
+	cellHeight = 26
 )
 
 type xyUpdate struct {
@@ -32,6 +31,8 @@ type xyUpdate struct {
 }
 
 type MapViewer struct {
+	tik uint8
+
 	widget.BaseWidget
 
 	xName, yName, zName string
@@ -56,17 +57,18 @@ type MapViewer struct {
 
 	ipf interpolate.InterPolFunc
 
-	valueMap *canvas.Image
+	valueContainer *fyne.Container
+	valueMap       *canvas.Image
 
 	setChan chan xyUpdate
 
 	W fyne.Window
 
-	mAir float64
-
 	curX, curY int
 
 	moving bool
+
+	SetValueFunc func(name string, value float64)
 }
 
 func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollection, interPolfunc interpolate.InterPolFunc) (*MapViewer, error) {
@@ -75,29 +77,25 @@ func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollecti
 		return nil, err
 	}
 
-	if len(xData)*len(yData) != len(zData) && len(xData) > 1 && len(yData) > 1 {
-		return nil, fmt.Errorf("len(xData) * len(yData) != len(zData)")
+	xLen := len(xData)
+	yLen := len(yData)
+	zLen := len(zData)
+
+	if xLen*yLen != zLen && xLen > 1 && yLen > 1 {
+		return nil, fmt.Errorf("xLen * yLen != zLen")
 	}
 
-	width := float32(len(xData) * cellWidth)
-	height := float32(len(yData) * cellHeight)
-
-	valueMap := canvas.NewImageFromImage(createImage(axis.Z, xData, yData, zData, corrFac))
-	valueMap.ScaleMode = canvas.ImageScaleSmooth
-	valueMap.SetMinSize(fyne.NewSize(width, height))
-	valueMap.Resize(fyne.NewSize(width, height))
-
 	xAxisButtons := container.New(&layout.Horizontal{})
-	if len(xData) > 1 {
-		for i := 0; i < len(xData); i++ {
+	if xLen > 1 {
+		for i := 0; i < xLen; i++ {
 			text := &canvas.Text{Text: fmt.Sprintf("%d", xData[i]), TextSize: 13}
 			xAxisButtons.Add(text)
 		}
 	}
 
 	yAxisButtons := container.New(&layout.Vertical{})
-	if len(yData) > 1 {
-		for i := len(yData) - 1; i >= 0; i-- {
+	if yLen > 1 {
+		for i := yLen - 1; i >= 0; i-- {
 			text := &canvas.Text{Text: fmt.Sprintf("%d", yData[i]), TextSize: 13}
 			yAxisButtons.Add(text)
 		}
@@ -108,10 +106,17 @@ func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollecti
 
 	textValues, valueContainer := createTextValues(zData, corrFac)
 
+	width := float32(xLen * cellWidth)
+	height := float32(yLen * cellHeight)
+	valueMap := canvas.NewImageFromImage(createImage(xData, yData, zData, corrFac))
+	valueMap.ScaleMode = canvas.ImageScalePixels
+	valueMap.SetMinSize(fyne.NewSize(width, height))
+	valueMap.Resize(fyne.NewSize(width, height))
+
 	inner := container.NewStack(
 		valueMap,
+		valueContainer,
 		container.NewWithoutLayout(
-			valueContainer,
 			cursor,
 			crosshair,
 		),
@@ -119,10 +124,7 @@ func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollecti
 
 	content := container.NewBorder(
 		xAxisButtons,
-		container.NewGridWithColumns(5,
-			widget.NewLabel("X: "+axis.X),
-			widget.NewLabel("Y: "+axis.Y),
-			widget.NewLabel("Z: "+axis.Z),
+		container.NewGridWithColumns(2,
 			widget.NewButtonWithIcon("Load", theme.DocumentIcon(), func() {
 				log.Println("Load")
 			}),
@@ -147,9 +149,9 @@ func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollecti
 		xAxisButtons: xAxisButtons,
 		yAxisButtons: yAxisButtons,
 
-		numColumns: len(xData),
-		numRows:    len(yData),
-		numData:    len(zData),
+		numColumns: xLen,
+		numRows:    yLen,
+		numData:    zLen,
 
 		xName: axis.X,
 		yName: axis.Y,
@@ -162,8 +164,9 @@ func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollecti
 		yData: yData,
 		zData: zData,
 
-		valueMap: valueMap,
-		corrFac:  corrFac,
+		valueContainer: valueContainer,
+		valueMap:       valueMap,
+		corrFac:        corrFac,
 
 		textValues: textValues,
 
@@ -175,68 +178,18 @@ func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollecti
 		for xy := range mv.setChan {
 			mv.setXY(xy.x, xy.y)
 		}
-		log.Println("MapViewer setChan closed")
 	}()
 
 	if w != nil {
 		w.Canvas().SetOnTypedKey(mv.TypedKey)
+		w.SetTitle(axis.Z)
 	}
 
 	return mv, nil
 }
 
-func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
-	log.Println("TypedKey", key.Name)
-	index := mv.curY*mv.numColumns + mv.curX
-	t := mv.textValues[index]
-	var refresh, updateCursor bool
-	switch key.Name {
-	case "+":
-		mv.zData[index]++
-		refresh = true
-	case "-":
-		mv.zData[index]--
-		refresh = true
-	case "Up":
-		mv.curY++
-		if mv.curY >= mv.numRows {
-			mv.curY = mv.numRows - 1
-		}
-		updateCursor = true
-	case "Down":
-		mv.curY--
-		if mv.curY < 0 {
-			mv.curY = 0
-		}
-		updateCursor = true
-	case "Left":
-		mv.curX--
-		if mv.curX < 0 {
-			mv.curX = 0
-		}
-		updateCursor = true
-	case "Right":
-		mv.curX++
-		if mv.curX >= mv.numColumns {
-			mv.curX = mv.numColumns - 1
-		}
-		updateCursor = true
-	}
-	if updateCursor {
-		mv.cursor.Move(fyne.NewPos(
-			float32(mv.curX)*(mv.innerView.Size().Width/float32(mv.numColumns)),
-			float32(float64(mv.numRows-1)-float64(mv.curY))*(mv.innerView.Size().Height/float32(mv.numRows)),
-		))
-	}
-	if refresh {
-		t.Text = strconv.FormatFloat(float64(mv.zData[index])*mv.corrFac, 'f', 2, 64)
-		t.Refresh()
-		mv.Refresh()
-	}
-}
-
 func (mv *MapViewer) Refresh() {
-	mv.valueMap.Image = createImage(mv.zName, mv.xData, mv.yData, mv.zData, mv.corrFac)
+	mv.valueMap.Image = createImage(mv.xData, mv.yData, mv.zData, mv.corrFac)
 	mv.valueMap.Refresh()
 }
 
@@ -247,53 +200,59 @@ func (mv *MapViewer) Close() {
 	}
 }
 
-func (mv *MapViewer) XName() string {
-	return mv.xName
+type MapViewerInfo struct {
+	XName, YName, ZName string
+	XLen, YLen, ZLen    int
+	XFrom, YFrom        string
 }
 
-func (mv *MapViewer) YName() string {
-	return mv.yName
-}
-
-func (mv *MapViewer) Name() string {
-	return mv.zName
+func (mv *MapViewer) Info() MapViewerInfo {
+	return MapViewerInfo{
+		XName: mv.xName,
+		YName: mv.yName,
+		ZName: mv.zName,
+		XLen:  mv.numColumns,
+		YLen:  mv.numRows,
+		ZLen:  mv.numData,
+		XFrom: mv.xFrom,
+		YFrom: mv.yFrom,
+	}
 }
 
 func (mv *MapViewer) SetValue(name string, value float64) {
-	if name == "MAF.m_AirInlet" {
-		mv.mAir = value
+	if mv.SetValueFunc != nil {
+		mv.SetValueFunc(name, value)
+		return
 	}
 	if name == mv.xFrom || (mv.xFrom == "" && name == "MAF.m_AirInlet") {
 		mv.xValue = int(value)
+		mv.tik++
 	}
 	if name == mv.yFrom || (mv.yFrom == "" && name == "ActualIn.n_Engine") {
 		mv.yValue = int(value)
+		mv.tik++
 	}
-	mv.SetXY(mv.xValue, mv.yValue)
-}
-
-func (mv *MapViewer) SetXY(xValue, yValue int) error {
-	mv.setChan <- xyUpdate{xValue, yValue}
-	return nil
+	if mv.tik == 2 {
+		mv.setChan <- xyUpdate{mv.xValue, mv.yValue}
+		mv.tik = 0
+	}
 }
 
 func (mv *MapViewer) setXY(xValue, yValue int) error {
 	//log.Println("Set", xValue, yValue)
-	//	log.Printf("%s %s %s SetXY: %d %d", mv.zName, mv.xFrom, mv.yFrom, xValue, yValue)
-	xIdx, yIdx, value, err := mv.ipf(mv.xData, mv.yData, mv.zData, xValue, yValue)
+	mv.xValue = xValue
+	mv.yValue = yValue
 
-	_, xfrac := math.Modf(xIdx)
-	_, yfrac := math.Modf(yIdx)
-
-	if xfrac < 0.09 && yfrac < 0.09 && yValue > 1000 && xValue > 650 {
-		log.Printf("Hit at Cell %f %f %f %f diff: %f", xIdx, yIdx, value, mv.mAir, value-mv.mAir)
-	}
-
-	//	log.Println(value)
-
+	xIdx, yIdx, _, err := mv.ipf(mv.xData, mv.yData, mv.zData, xValue, yValue)
 	if err != nil {
 		return err
 	}
+	//_, xfrac := math.Modf(xIdx)
+	//_, yfrac := math.Modf(yIdx)
+	//if xfrac < 0.09 && yfrac < 0.09 && yValue > 1000 && xValue > 650 {
+	//	log.Printf("Hit at Cell %f %f %f %f diff: %f", xIdx, yIdx, value, mv.mAir, value-mv.mAir)
+	//}
+
 	if yIdx < 0 {
 		yIdx = 0
 	} else if yIdx > float64(mv.numRows-1) {
@@ -308,17 +267,12 @@ func (mv *MapViewer) setXY(xValue, yValue int) error {
 	mv.yIdx = yIdx
 	sz := mv.innerView.Size()
 
-	xPos := float32(min(xIdx, float64(len(mv.xData)))) * sz.Width / float32(mv.numColumns)
-	yPos := float32(float64(mv.numRows-1)-yIdx) * sz.Height / float32(mv.numRows)
-
 	mv.crosshair.Move(
 		fyne.NewPos(
-			xPos,
-			yPos,
+			float32(min(xIdx, float64(mv.numColumns)))*sz.Width/float32(mv.numColumns),
+			float32(float64(mv.numRows-1)-yIdx)*sz.Height/float32(mv.numRows),
 		),
 	)
-	mv.xValue = xValue
-	mv.yValue = yValue
 	return nil
 }
 
@@ -390,37 +344,37 @@ func getXYZ(xAxis, yAxis, zAxis string, symbols symbol.SymbolCollection) ([]int,
 	return nil, nil, nil, 0, fmt.Errorf("failed to convert %s %s %s", xAxis, yAxis, zAxis)
 }
 
-func createImage(mapName string, xData, yData []int, zData []int, correctionFactor float64) *image.RGBA {
-	width := len(xData) * cellWidth
-	height := len(yData) * cellHeight
+func createImage(xData, yData []int, zData []int, correctionFactor float64) *image.RGBA {
+	lenX := len(xData)
+	lenY := len(yData)
+	width := lenX * cellWidth
+	height := lenY * cellHeight
 
 	// Create a new RGBA image
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 	min, max := findMinMax(zData)
 
 	// Calculate the colors for each cell based on data
-	for y := 0; y < len(yData); y++ {
-		for x := 0; x < len(xData); x++ {
+	for y := 0; y < lenY; y++ {
+		for x := 0; x < lenX; x++ {
 			cellX := x * cellWidth
-			cellY := (len(yData) - 1 - y) * cellHeight
+			cellY := (lenY - 1 - y) * cellHeight
 			if cellY >= 0 && cellY+cellHeight <= height && cellX >= 0 && cellX+cellWidth <= width {
-				index := y*len(xData) + x
+				index := y*lenX + x
 				value := float64(zData[index]) * correctionFactor
 				color := getColorInterpolation(float64(min)*correctionFactor, float64(max)*correctionFactor, value)
-				draw.Draw(img, image.Rect(cellX, cellY, cellX+cellWidth, cellY+cellHeight), &image.Uniform{color}, image.Point{cellX, cellY}, draw.Src)
+				draw.Draw(img, image.Rect(cellX, cellY, cellX+cellWidth, cellY+cellHeight), &image.Uniform{color}, image.Point{0, 0}, draw.Src)
 			}
 		}
 	}
 
-	for x := 1; x < len(xData); x++ {
+	for x := 1; x < lenX; x++ {
 		cellX := x * cellWidth
-		height := cellHeight * len(yData)
 		draw.Draw(img, image.Rect(cellX-1, 0, cellX+1, height), &image.Uniform{color.Black}, image.Point{}, draw.Src)
 	}
 
-	for y := 1; y < len(yData); y++ {
+	for y := 1; y < lenY; y++ {
 		cellY := y * cellHeight
-		width := cellWidth * len(xData)
 		draw.Draw(img, image.Rect(0, cellY-1, width, cellY+1), &image.Uniform{color.Black}, image.Point{}, draw.Src)
 	}
 

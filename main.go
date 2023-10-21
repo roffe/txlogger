@@ -48,6 +48,26 @@ func main() {
 		}
 	}
 
+	mw.SetPadded(false)
+	mw.SetOnDropped(func(pos fyne.Position, uri []fyne.URI) {
+		for _, u := range uri {
+			if strings.HasSuffix(u.Path(), ".bin") {
+				log.Println("Loading symbols from", u.Path())
+				if err := mw.LoadSymbolsFromFile(u.Path()); err != nil {
+					log.Println(err)
+					mw.Log(err.Error())
+					return
+				}
+			}
+			if strings.HasSuffix(u.Path(), ".t7l") || strings.HasSuffix(u.Path(), ".t8l") {
+				log.Println("Loading log file", u.Path())
+				windows.NewLogPlayer(a, u.Path(), nil, nil).ShowAndRun()
+				return
+			}
+		}
+
+	})
+
 	mw.SetMaster()
 	mw.Resize(fyne.NewSize(1024, 768))
 	mw.SetContent(mw.Layout())
