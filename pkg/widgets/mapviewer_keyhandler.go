@@ -1,4 +1,4 @@
-package mapviewer
+package widgets
 
 import (
 	"log"

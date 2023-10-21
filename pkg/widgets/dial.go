@@ -67,6 +67,29 @@ func NewDial(cfg DialConfig) *Dial {
 	}
 
 	c.factor = c.max / c.steps
+	c.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0x80}, StrokeWidth: 2}
+	c.cover = &canvas.Rectangle{FillColor: theme.BackgroundColor()}
+	c.center = &canvas.Circle{FillColor: color.Black}
+	c.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 3}
+
+	c.titleText = &canvas.Text{Text: c.title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
+	c.titleText.TextStyle.Monospace = true
+	c.titleText.Alignment = fyne.TextAlignCenter
+
+	c.displayText = &canvas.Text{Text: "0", Color: color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF}, TextSize: 52}
+	c.displayText.TextStyle.Monospace = true
+	c.displayText.Alignment = fyne.TextAlignCenter
+
+	c.container = container.NewWithoutLayout(c.face, c.cover, c.titleText)
+	fac := float64(0xA5) / c.steps
+	for i := 0; i < int(c.steps+1); i++ {
+		col := color.RGBA{byte(float64(i) * fac), 0x00, 0x00, 0xFF}
+		col.G = 0xA5 - col.R
+		pip := &canvas.Line{StrokeColor: col, StrokeWidth: 2}
+		c.pips = append(c.pips, pip)
+		c.container.Add(pip)
+	}
+	c.container.Objects = append(c.container.Objects, c.center, c.needle, c.displayText)
 
 	//listener := make(chan fyne.Settings)
 	//fyne.CurrentApp().Settings().AddChangeListener(listener)
@@ -123,7 +146,6 @@ func (c *Dial) SetValue(value float64) {
 	c.value = value
 
 	size := c.container.Size()
-
 	diameter := fyne.Min(size.Width, size.Height)
 	middle := fyne.NewPos(size.Width/2, size.Height/2)
 	radius := diameter / 2
@@ -191,31 +213,6 @@ func (c *Dial) applyTheme(_ fyne.Settings) {
 */
 
 func (c *Dial) CreateRenderer() fyne.WidgetRenderer {
-	c.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0x80}, StrokeWidth: 2}
-	c.cover = &canvas.Rectangle{FillColor: theme.BackgroundColor()}
-	c.center = &canvas.Circle{FillColor: color.Black}
-	c.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 3}
-
-	c.titleText = &canvas.Text{Text: c.title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
-	c.titleText.TextStyle.Monospace = true
-	c.titleText.Alignment = fyne.TextAlignCenter
-
-	c.displayText = &canvas.Text{Text: "0", Color: color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF}, TextSize: 52}
-	c.displayText.TextStyle.Monospace = true
-	c.displayText.Alignment = fyne.TextAlignCenter
-
-	dial := container.NewWithoutLayout(c.face, c.cover, c.titleText)
-	fac := float64(0xA5) / c.steps
-	for i := 0; i < int(c.steps+1); i++ {
-		col := color.RGBA{byte(float64(i) * fac), 0x00, 0x00, 0xFF}
-		col.G = 0xA5 - col.R
-		pip := &canvas.Line{StrokeColor: col, StrokeWidth: 2}
-		c.pips = append(c.pips, pip)
-		dial.Add(pip)
-	}
-	dial.Objects = append(dial.Objects, c.center, c.needle, c.displayText)
-
-	c.container = dial
 	return &DialRenderer{
 		d: c,
 	}

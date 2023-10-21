@@ -142,7 +142,7 @@ func NewVarDefinitionWidget(ls *widget.List, definedVars *kwp2000.VarDefinitionL
 	if disabled {
 		vd.Disable()
 	}
-
+	vd.ExtendBaseWidget(vd)
 	return vd
 }
 
@@ -220,7 +220,17 @@ func (wb *VarDefinitionWidget) SetType(t uint8) {
 	//wb.symbolSigned.SetChecked(t&kwp2000.SIGNED != 0)
 }
 
-func (wb *VarDefinitionWidget) Resize(size fyne.Size) {
+func (wb *VarDefinitionWidget) CreateRenderer() fyne.WidgetRenderer {
+	return &varRenderer{
+		obj: wb,
+	}
+}
+
+type varRenderer struct {
+	obj *VarDefinitionWidget
+}
+
+func (vr *varRenderer) Layout(size fyne.Size) {
 	var sz = []float32{
 		.35, // name
 		.12, // value
@@ -233,10 +243,10 @@ func (wb *VarDefinitionWidget) Resize(size fyne.Size) {
 	}
 	var x float32
 	var tw float32
-	for _, o := range wb.objects {
+	for _, o := range vr.obj.objects {
 		tw += o.MinSize().Width
 	}
-	for i, o := range wb.objects {
+	for i, o := range vr.obj.objects {
 		az := size.Width * sz[i]
 		o.Resize(fyne.NewSize(az, size.Height))
 		o.Move(fyne.NewPos(x, 0))
@@ -244,10 +254,9 @@ func (wb *VarDefinitionWidget) Resize(size fyne.Size) {
 	}
 }
 
-func (wb *VarDefinitionWidget) MinSize() fyne.Size {
-	wb.ExtendBaseWidget(wb)
+func (vr *varRenderer) MinSize() fyne.Size {
 	var w, h float32
-	for _, o := range wb.objects {
+	for _, o := range vr.obj.objects {
 		childSize := o.MinSize()
 		if childSize.Height > h {
 			h = childSize.Height
@@ -255,24 +264,6 @@ func (wb *VarDefinitionWidget) MinSize() fyne.Size {
 		w += childSize.Width
 	}
 	return fyne.NewSize(w, h)
-}
-
-func (wb *VarDefinitionWidget) CreateRenderer() fyne.WidgetRenderer {
-	wb.ExtendBaseWidget(wb)
-	return &varRenderer{
-		obj: wb,
-	}
-}
-
-type varRenderer struct {
-	obj *VarDefinitionWidget
-}
-
-func (vr *varRenderer) Layout(size fyne.Size) {
-}
-
-func (vr *varRenderer) MinSize() fyne.Size {
-	return vr.obj.MinSize()
 }
 
 func (vr *varRenderer) Refresh() {
@@ -315,33 +306,3 @@ func (d *fixedWidthContainer) Layout(objects []fyne.CanvasObject, containerSize 
 		pos = pos.Add(fyne.NewPos(d.width, size.Height))
 	}
 }
-
-/*
-
-type customLayout struct {
-	ls *widget.List
-}
-
-func (d *customLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
-	var w, h float32
-	for _, o := range objects {
-		childSize := o.MinSize()
-		if childSize.Height > h {
-			h = childSize.Height
-		}
-		w += childSize.Width
-	}
-	return fyne.NewSize(w, h)
-}
-
-func (d *customLayout) Layout(objects []fyne.CanvasObject, containerSize fyne.Size) {
-
-	pp := d.ls.Size().Width / 8
-	//pp := float32(80)
-	log.Println(pp)
-	for i, o := range objects {
-		o.Resize(o.MinSize())
-		o.Move(fyne.NewPos(float32(i)*pp, 0))
-	}
-}
-*/

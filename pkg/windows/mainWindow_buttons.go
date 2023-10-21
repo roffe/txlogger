@@ -11,8 +11,8 @@ import (
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/kwp2000"
-	"github.com/roffe/txlogger/pkg/mapviewer"
 	"github.com/roffe/txlogger/pkg/symbol"
+	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/skratchdot/open-golang/open"
 	sdialog "github.com/sqweek/dialog"
 )
@@ -116,18 +116,20 @@ func (mw *MainWindow) createButtons() {
 			if mw.dlc != nil {
 				mw.dlc.DetachDashboard(mw.dashboard)
 			}
-			close(mw.dashboard.metricsChan)
+			if mw.dashboard != nil {
+				mw.dashboard.Close()
+			}
 			mw.dashboard = nil
 			mw.SetFullScreen(false)
 			mw.SetContent(mw.Content())
 		}
 
-		mw.dashboard = NewDashboard(mw.app, mw, false, mw.logBtn, onClose)
+		mw.dashboard = widgets.NewDashboard(mw.app, mw, false, mw.logBtn, onClose)
 		if mw.dlc != nil {
 			mw.dlc.AttachDashboard(mw.dashboard)
 		}
 
-		mw.SetContent(mw.dashboard.Content())
+		mw.SetContent(mw.dashboard)
 	})
 
 	mw.logplayerBtn = widget.NewButtonWithIcon("Log Player", theme.MediaFastForwardIcon(), func() {
@@ -145,7 +147,6 @@ func (mw *MainWindow) createButtons() {
 			if mw.dlc != nil {
 				mw.dlc.DetachDashboard(mw.dashboard)
 			}
-			close(mw.dashboard.metricsChan)
 			mw.dashboard = nil
 			mw.SetFullScreen(false)
 			mw.SetContent(mw.Content())
@@ -210,7 +211,7 @@ func (mw *MainWindow) createButtons() {
 				mw.dlc.AttachDashboard(mw.dashboard)
 			}
 
-			fac := func(mv *mapviewer.MapViewer, name string) *func(v float64) {
+			fac := func(mv *widgets.MapViewer, name string) *func(v float64) {
 				fun := func(v float64) {
 					mv.SetValue(name, v)
 				}
@@ -334,13 +335,13 @@ func (mw *MainWindow) openMap(axis symbol.Axis) {
 			mw.Log("No binary loaded")
 			return
 		}
-		mv, err := mapviewer.NewMapViewer(w, axis, mw.symbols, interpolate.Interpolate)
+		mv, err := widgets.NewMapViewer(w, axis, mw.symbols, interpolate.Interpolate)
 		if err != nil {
 			mw.Log(err.Error())
 			return
 		}
 
-		fac := func(mv *mapviewer.MapViewer, name string) *func(v float64) {
+		fac := func(mv *widgets.MapViewer, name string) *func(v float64) {
 			fun := func(v float64) {
 				mv.SetValue(name, v)
 			}

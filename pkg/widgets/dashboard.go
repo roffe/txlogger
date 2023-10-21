@@ -1,4 +1,4 @@
-package windows
+package widgets
 
 import (
 	_ "embed"
@@ -14,7 +14,6 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/model"
-	"github.com/roffe/txlogger/pkg/widgets"
 )
 
 //go:embed checkengine.png
@@ -26,25 +25,28 @@ var limpBytes []byte
 //go:embed knock.png
 var knockBytes []byte
 
+/*
 type Gauge interface {
 	SetValue(float64)
 	Value() float64
 	Content() fyne.CanvasObject
 }
+*/
 
 type Dashboard struct {
-	rpm, speed, iat                 *widgets.Dial
-	throttle, pwm                   *widgets.VBar
-	engineTemp                      *widgets.Dial
-	nblambda, wblambda              *widgets.CBar
-	boost, air                      *widgets.DualDial
+	widget.BaseWidget
+	rpm, speed, iat                 *Dial
+	throttle, pwm                   *VBar
+	engineTemp                      *Dial
+	nblambda, wblambda              *CBar
+	boost, air                      *DualDial
 	ioff, activeAirDem, ign, cruise *canvas.Text
 	checkEngine                     *canvas.Image
 	limpMode                        *canvas.Image
-	knockIcon                       *widgets.Icon
+	knockIcon                       *Icon
 	time                            *canvas.Text
 
-	canvas fyne.CanvasObject
+	container fyne.CanvasObject
 
 	fullscreenBtn *widget.Button
 	closeBtn      *widget.Button
@@ -63,53 +65,53 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 	db := &Dashboard{
 		logBtn:    logBtn,
 		logplayer: logplayer,
-		speed: widgets.NewDial(widgets.DialConfig{
+		speed: NewDial(DialConfig{
 			Title:         "km/h",
 			Min:           0,
 			Max:           300,
 			Steps:         30,
 			DisplayString: "%.1f",
 		}),
-		rpm: widgets.NewDial(widgets.DialConfig{
+		rpm: NewDial(DialConfig{
 			Title: "RPM",
 			Min:   0,
 			Max:   8000,
 			Steps: 20,
 		}),
-		iat: widgets.NewDial(widgets.DialConfig{
+		iat: NewDial(DialConfig{
 			Title: "IAT",
 			Min:   -40,
 			Max:   80,
 			Steps: 16,
 		}),
-		boost: widgets.NewDualDial(widgets.DualDialConfig{
+		boost: NewDualDial(DualDialConfig{
 			Title:         "MAP",
 			Min:           0,
 			Max:           3,
 			Steps:         30,
 			DisplayString: "%.2f",
 		}),
-		throttle: widgets.NewVBar(&widgets.VBarConfig{
+		throttle: NewVBar(&VBarConfig{
 			Title:   "TPS",
 			Min:     0,
 			Max:     100,
 			Steps:   20,
 			Minsize: fyne.NewSize(75, 100),
 		}),
-		pwm: widgets.NewVBar(&widgets.VBarConfig{
+		pwm: NewVBar(&VBarConfig{
 			Title:   "PWM",
 			Min:     0,
 			Max:     100,
 			Steps:   20,
 			Minsize: fyne.NewSize(75, 100),
 		}),
-		engineTemp: widgets.NewDial(widgets.DialConfig{
+		engineTemp: NewDial(DialConfig{
 			Title: "tEng",
 			Min:   -40,
 			Max:   160,
 			Steps: 16,
 		}),
-		wblambda: widgets.NewCBar(&widgets.CBarConfig{
+		wblambda: NewCBar(&CBarConfig{
 			Title:         "",
 			Min:           0.50,
 			Center:        1,
@@ -118,7 +120,7 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 			Minsize:       fyne.NewSize(100, 45),
 			DisplayString: "λ %.2f",
 		}),
-		nblambda: widgets.NewCBar(&widgets.CBarConfig{
+		nblambda: NewCBar(&CBarConfig{
 			Title:         "",
 			Min:           -25,
 			Center:        0,
@@ -150,7 +152,7 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 			TextSize:  28,
 			Color:     color.RGBA{R: 0, G: 255, B: 0, A: 255},
 		},
-		air: widgets.NewDualDial(widgets.DualDialConfig{
+		air: NewDualDial(DualDialConfig{
 			Title: "mg/c",
 			Min:   0,
 			Max:   2200,
@@ -160,7 +162,7 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 		fullscreenBtn: widget.NewButtonWithIcon("Fullscreen", theme.ZoomFitIcon(), func() {
 			mw.SetFullScreen(!mw.FullScreen())
 		}),
-		knockIcon: widgets.NewIcon(&widgets.IconConfig{
+		knockIcon: NewIcon(&IconConfig{
 			Image:   canvas.NewImageFromResource(fyne.NewStaticResource("knock.png", knockBytes)),
 			Minsize: fyne.NewSize(90, 90),
 		}),
@@ -168,6 +170,7 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 		onClose:     onClose,
 		metricsChan: make(chan *model.DashboardMetric, 60),
 	}
+	db.ExtendBaseWidget(db)
 
 	db.closeBtn = widget.NewButtonWithIcon("Back", theme.NavigateBackIcon(), func() {
 		if db.onClose != nil {
@@ -199,7 +202,7 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 	db.limpMode.SetMinSize(fyne.NewSize(110, 85))
 	db.limpMode.Resize(fyne.NewSize(110, 85))
 
-	db.canvas = db.render()
+	db.container = db.render()
 
 	//db.knockIcon.Hide()
 
@@ -207,33 +210,32 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 	return db
 }
 
-func (db *Dashboard) render() fyne.CanvasObject {
-	content := container.NewStack(
-		container.NewWithoutLayout(
-			db.limpMode,
-			//db.dbgBar,
-			db.ign,
-			db.ioff,
-			db.rpm,
-			db.air.Content(),
-			db.boost.Content(),
-			db.iat,
-			db.engineTemp,
+func (db *Dashboard) render() *fyne.Container {
+	content := container.NewWithoutLayout(
+		db.limpMode,
+		//db.dbgBar,
+		db.ign,
+		db.ioff,
+		db.rpm,
+		db.air,
+		db.boost,
+		db.iat,
+		db.engineTemp,
 
-			//db.mReq.Content(),
-			//db.mAir.Content(),
+		//db.mReq.Content(),
+		//db.mAir.Content(),
 
-			db.speed,
-			db.activeAirDem,
+		db.speed,
+		db.activeAirDem,
 
-			db.nblambda.Content(),
-			db.wblambda.Content(),
-			db.throttle.Content(),
-			db.pwm.Content(),
-			db.checkEngine,
-			db.cruise,
-			db.knockIcon.Content(),
-		))
+		db.nblambda,
+		db.wblambda,
+		db.throttle.Content(),
+		db.pwm.Content(),
+		db.checkEngine,
+		db.cruise,
+		db.knockIcon.Content(),
+	)
 
 	if !db.logplayer {
 		content.Add(db.fullscreenBtn)
@@ -243,14 +245,11 @@ func (db *Dashboard) render() fyne.CanvasObject {
 		content.Add(db.time)
 	}
 
-	content.Layout = db
-
 	return content
 }
 
 func (db *Dashboard) Close() {
-	//db.w1.Close()
-	//db.w2.Close()
+	close(db.metricsChan)
 }
 
 func (db *Dashboard) SetTime(t time.Time) {
@@ -389,10 +388,6 @@ func (db *Dashboard) startParser() {
 	}
 }
 
-func (db *Dashboard) Content() fyne.CanvasObject {
-	return db.canvas
-}
-
 func (db *Dashboard) Sweep() {
 	db.checkEngine.Hide()
 	an := fyne.NewAnimation(900*time.Millisecond, func(p float32) {
@@ -417,104 +412,6 @@ func (db *Dashboard) Sweep() {
 	an.Start()
 	time.Sleep(1800 * time.Millisecond)
 	db.checkEngine.Show()
-}
-func (db *Dashboard) Layout(_ []fyne.CanvasObject, space fyne.Size) {
-	var sixthWidth float32 = space.Width / 6
-	var thirdHeight float32 = (space.Height - 50) / 3
-	var halfHeight float32 = (space.Height - 50) / 2
-
-	// Dials
-
-	db.rpm.Resize(fyne.NewSize(sixthWidth, thirdHeight))
-	db.rpm.Move(fyne.NewPos(0, 0))
-
-	dual := db.air.Content()
-	dual.Resize(fyne.NewSize(sixthWidth, thirdHeight))
-	dual.Move(fyne.NewPos(0, thirdHeight))
-
-	boost := db.boost.Content()
-	boost.Resize(fyne.NewSize(sixthWidth, thirdHeight))
-	boost.Move(fyne.NewPos(0, thirdHeight*2))
-
-	db.iat.Resize(fyne.NewSize(sixthWidth, halfHeight))
-	db.iat.Move(fyne.NewPos(space.Width-db.iat.Size().Width, 0))
-
-	db.engineTemp.Resize(fyne.NewSize(sixthWidth, halfHeight))
-	db.engineTemp.Move(fyne.NewPos(space.Width-db.engineTemp.Size().Width, halfHeight))
-
-	// Center dial
-
-	db.speed.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth/3*2)-20, space.Height-115))
-	db.speed.Move(fyne.NewPos(space.Width/2-db.speed.Size().Width/2, space.Height/2-db.speed.Size().Height/2+25))
-
-	// Vbar
-	pwm := db.pwm.Content()
-	pwm.Resize(fyne.NewSize(sixthWidth/3, space.Height-125))
-	pwm.Move(fyne.NewPos(sixthWidth+8, 25))
-
-	tps := db.throttle.Content()
-	tps.Resize(fyne.NewSize(sixthWidth/3, space.Height-125))
-	tps.Move(fyne.NewPos(space.Width-sixthWidth-tps.Size().Width-8, 25))
-
-	// Cbar
-	nblambda := db.nblambda.Content()
-	nblambda.Resize(fyne.NewSize((sixthWidth*3)-10, 65))
-	nblambda.Move(fyne.NewPos(sixthWidth*1.5, 0))
-
-	wblambda := db.wblambda.Content()
-	wblambda.Resize(fyne.NewSize((sixthWidth*3)-10, 65))
-	wblambda.Move(fyne.NewPos(sixthWidth*1.5, space.Height-65))
-
-	// Icons
-	db.limpMode.Resize(fyne.NewSize(sixthWidth, thirdHeight))
-	db.limpMode.Move(fyne.NewPos(space.Width/2-db.limpMode.Size().Width/2, space.Height/2-db.limpMode.Size().Height/2-(thirdHeight/2)))
-
-	db.checkEngine.Resize(fyne.NewSize(sixthWidth/2, thirdHeight/2))
-	db.checkEngine.Move(fyne.NewPos(space.Width-db.engineTemp.Size().Width-db.throttle.Content().Size().Width-db.checkEngine.Size().Width-15, space.Height-db.checkEngine.Size().Height-db.wblambda.Content().Size().Height))
-
-	db.knockIcon.Content().Move(fyne.NewPos((space.Width/2)-(db.checkEngine.Size().Width/2)-(sixthWidth*.7), space.Height/2-60))
-
-	// Buttons
-
-	db.closeBtn.Resize(fyne.NewSize(sixthWidth, 55))
-	db.closeBtn.Move(fyne.NewPos(space.Width-sixthWidth, space.Height-55))
-
-	if !db.logplayer {
-		if space.Width < 1000 {
-			db.fullscreenBtn.SetText("(F)")
-			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth/2.1, 55))
-		} else if space.Width < 1300 {
-			db.fullscreenBtn.SetText("Fullscrn")
-			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth/1.8, 55))
-		} else {
-			db.fullscreenBtn.SetText("Fullscreen")
-			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth/1.5, 55))
-		}
-
-		db.logBtn.Resize(fyne.NewSize(db.wblambda.Content().Position().X-db.fullscreenBtn.Size().Width-14, 55))
-		db.logBtn.Move(fyne.NewPos(db.fullscreenBtn.Size().Width+5, space.Height-55))
-	} else {
-		db.time.Move(fyne.NewPos(space.Width/2-100, space.Height/2.6))
-	}
-	db.fullscreenBtn.Move(fyne.NewPos(0, space.Height-55))
-
-	// Text
-
-	//db.ign.TextSize = textSize
-	db.ign.Move(fyne.NewPos(nblambda.Position().X, nblambda.Size().Height-14))
-
-	//db.ioff.TextSize = textSize
-	db.ioff.Move(fyne.NewPos(nblambda.Position().X, db.ign.Position().Y+54))
-
-	db.activeAirDem.TextSize = min(space.Width/25.0, 45)
-	db.activeAirDem.Move(fyne.NewPos(space.Width/2, thirdHeight))
-
-	db.cruise.Move(fyne.NewPos(sixthWidth*1.45, space.Height-(db.checkEngine.Size().Height*.6)-db.wblambda.Content().Size().Height))
-
-}
-
-func (db *Dashboard) MinSize(_ []fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(800, 600)
 }
 
 func (db *Dashboard) setValue(value float64) {
@@ -662,4 +559,123 @@ func AirDemToString(v float64) string {
 	default:
 		return "Unknown"
 	}
+}
+
+func (db *Dashboard) CreateRenderer() fyne.WidgetRenderer {
+	return &DashboardRenderer{
+		db: db,
+	}
+}
+
+type DashboardRenderer struct {
+	db *Dashboard
+}
+
+func (dr *DashboardRenderer) Layout(space fyne.Size) {
+	dr.db.container.Resize(space)
+
+	db := dr.db
+
+	var sixthWidth float32 = space.Width / 6
+	var thirdHeight float32 = (space.Height - 50) / 3
+	var halfHeight float32 = (space.Height - 50) / 2
+
+	// Dials
+
+	db.rpm.Resize(fyne.NewSize(sixthWidth, thirdHeight))
+	db.rpm.Move(fyne.NewPos(0, 0))
+
+	db.air.Resize(fyne.NewSize(sixthWidth, thirdHeight))
+	db.air.Move(fyne.NewPos(0, thirdHeight))
+
+	db.boost.Resize(fyne.NewSize(sixthWidth, thirdHeight))
+	db.boost.Move(fyne.NewPos(0, thirdHeight*2))
+
+	db.iat.Resize(fyne.NewSize(sixthWidth, halfHeight))
+	db.iat.Move(fyne.NewPos(space.Width-db.iat.Size().Width, 0))
+
+	db.engineTemp.Resize(fyne.NewSize(sixthWidth, halfHeight))
+	db.engineTemp.Move(fyne.NewPos(space.Width-db.engineTemp.Size().Width, halfHeight))
+
+	// Center dial
+
+	db.speed.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth/3*2)-20, space.Height-115))
+	db.speed.Move(fyne.NewPos(space.Width/2-db.speed.Size().Width/2, space.Height/2-db.speed.Size().Height/2+25))
+
+	// Vbar
+	pwm := db.pwm.Content()
+	pwm.Resize(fyne.NewSize(sixthWidth/3, space.Height-125))
+	pwm.Move(fyne.NewPos(sixthWidth+8, 25))
+
+	tps := db.throttle.Content()
+	tps.Resize(fyne.NewSize(sixthWidth/3, space.Height-125))
+	tps.Move(fyne.NewPos(space.Width-sixthWidth-tps.Size().Width-8, 25))
+
+	// Cbar
+	db.nblambda.Resize(fyne.NewSize((sixthWidth*3)-10, 65))
+	db.nblambda.Move(fyne.NewPos(sixthWidth*1.5, 0))
+
+	db.wblambda.Resize(fyne.NewSize((sixthWidth*3)-10, 65))
+	db.wblambda.Move(fyne.NewPos(sixthWidth*1.5, space.Height-65))
+
+	// Icons
+	db.limpMode.Resize(fyne.NewSize(sixthWidth, thirdHeight))
+	db.limpMode.Move(fyne.NewPos(space.Width/2-db.limpMode.Size().Width/2, space.Height/2-db.limpMode.Size().Height/2-(thirdHeight/2)))
+
+	db.checkEngine.Resize(fyne.NewSize(sixthWidth/2, thirdHeight/2))
+	db.checkEngine.Move(fyne.NewPos(space.Width-db.engineTemp.Size().Width-db.throttle.Content().Size().Width-db.checkEngine.Size().Width-15, space.Height-db.checkEngine.Size().Height-db.wblambda.Size().Height))
+
+	db.knockIcon.Content().Move(fyne.NewPos((space.Width/2)-(db.checkEngine.Size().Width/2)-(sixthWidth*.7), space.Height/2-60))
+
+	// Buttons
+
+	db.closeBtn.Resize(fyne.NewSize(sixthWidth, 55))
+	db.closeBtn.Move(fyne.NewPos(space.Width-sixthWidth, space.Height-55))
+
+	if !db.logplayer {
+		if space.Width < 1000 {
+			db.fullscreenBtn.SetText("(F)")
+			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth/2.1, 55))
+		} else if space.Width < 1300 {
+			db.fullscreenBtn.SetText("Fullscrn")
+			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth/1.8, 55))
+		} else {
+			db.fullscreenBtn.SetText("Fullscreen")
+			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth/1.5, 55))
+		}
+
+		db.logBtn.Resize(fyne.NewSize(db.wblambda.Position().X-db.fullscreenBtn.Size().Width-14, 55))
+		db.logBtn.Move(fyne.NewPos(db.fullscreenBtn.Size().Width+5, space.Height-55))
+	} else {
+		db.time.Move(fyne.NewPos(space.Width/2-100, space.Height/2.6))
+	}
+	db.fullscreenBtn.Move(fyne.NewPos(0, space.Height-55))
+
+	// Text
+
+	//db.ign.TextSize = textSize
+	db.ign.Move(fyne.NewPos(db.nblambda.Position().X, db.nblambda.Size().Height-14))
+
+	//db.ioff.TextSize = textSize
+	db.ioff.Move(fyne.NewPos(db.nblambda.Position().X, db.ign.Position().Y+54))
+
+	db.activeAirDem.TextSize = min(space.Width/25.0, 45)
+	db.activeAirDem.Move(fyne.NewPos(space.Width/2, thirdHeight))
+
+	db.cruise.Move(fyne.NewPos(sixthWidth*1.45, space.Height-(db.checkEngine.Size().Height*.6)-db.wblambda.Size().Height))
+
+}
+
+func (dr *DashboardRenderer) MinSize() fyne.Size {
+	return fyne.NewSize(800, 600)
+}
+
+func (dr *DashboardRenderer) Refresh() {
+}
+
+func (dr *DashboardRenderer) Destroy() {
+}
+
+func (dr *DashboardRenderer) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{dr.db.container}
 }

@@ -15,7 +15,6 @@ import (
 	"github.com/roffe/txlogger/pkg/capture"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/logfile"
-	"github.com/roffe/txlogger/pkg/mapviewer"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
@@ -68,31 +67,31 @@ type LogPlayer struct {
 
 	slider *slider
 
-	db          *Dashboard
+	db          *widgets.Dashboard
 	controlChan chan *controlMsg
 
 	symbols symbol.SymbolCollection
 
 	logType string
 
-	openMaps map[string]*mapviewer.MapViewer
+	openMaps map[string]*widgets.MapViewer
 
-	symbolSubs map[string][]*mapviewer.MapViewer
+	symbolSubs map[string][]*widgets.MapViewer
 
 	handler func(ev *fyne.KeyEvent)
 
 	closed bool
 }
 
-func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, onClose func()) fyne.Window {
+func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, onClose func()) *LogPlayer {
 	w := a.NewWindow("LogPlayer " + filename)
 	w.Resize(fyne.NewSize(1024, 530))
 
 	lp := &LogPlayer{
 		app:         a,
 		Window:      w,
-		db:          NewDashboard(a, w, true, nil, onClose),
-		openMaps:    make(map[string]*mapviewer.MapViewer),
+		db:          widgets.NewDashboard(a, w, true, nil, onClose),
+		openMaps:    make(map[string]*widgets.MapViewer),
 		controlChan: make(chan *controlMsg, 10),
 		symbols:     symbols,
 		logType:     strings.ToUpper(filepath.Ext(filename)),
@@ -102,15 +101,12 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 	w.SetCloseIntercept(func() {
 		lp.controlChan <- &controlMsg{Op: OpExit}
 		if lp.db != nil {
-			close(lp.db.metricsChan)
 			lp.db.Close()
 			lp.closed = true
 		}
-
 		for _, ma := range lp.openMaps {
 			ma.Close()
 		}
-
 		w.Close()
 	})
 
@@ -284,7 +280,7 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 		if !found {
 			w := lp.app.NewWindow("")
 			//w.Canvas().SetOnTypedKey(lp.handler)
-			mv, err := mapviewer.NewMapViewer(w, axis, lp.symbols, interpolate.Interpolate)
+			mv, err := widgets.NewMapViewer(w, axis, lp.symbols, interpolate.Interpolate)
 			if err != nil {
 				log.Printf("X: %s Y: %s Z: %s err: %v", axis.X, axis.Y, axis.Z, err)
 				return
@@ -327,7 +323,7 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 			lp.openMaps[axis.Z] = mv
 
 			if lp.symbolSubs == nil {
-				lp.symbolSubs = make(map[string][]*mapviewer.MapViewer)
+				lp.symbolSubs = make(map[string][]*widgets.MapViewer)
 			}
 
 			if axis.XFrom == "" {
@@ -370,14 +366,14 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 		nil,
 		nil,
 		nil,
-		lp.db.Content(),
+		lp.db,
 	)
 
 	split := container.NewHSplit(
 		main,
 		container.NewVScroll(tree),
 	)
-	split.Offset = 0.7
+	split.Offset = 0.85
 	return split
 }
 

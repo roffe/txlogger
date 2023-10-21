@@ -7,9 +7,11 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
 )
 
 type CBar struct {
+	widget.BaseWidget
 	face        *canvas.Rectangle
 	bar         *canvas.Rectangle
 	titleText   *canvas.Text
@@ -20,7 +22,7 @@ type CBar struct {
 
 	value float64
 
-	canvas fyne.CanvasObject
+	container *fyne.Container
 }
 
 type CBarConfig struct {
@@ -36,6 +38,7 @@ func NewCBar(cfg *CBarConfig) *CBar {
 	s := &CBar{
 		cfg: cfg,
 	}
+	s.ExtendBaseWidget(s)
 	s.value = cfg.Center
 	if s.cfg.Steps == 0 {
 		s.cfg.Steps = 10
@@ -43,69 +46,7 @@ func NewCBar(cfg *CBarConfig) *CBar {
 	if s.cfg.DisplayString == "" {
 		s.cfg.DisplayString = "%.0f"
 	}
-	s.canvas = s.render()
 	return s
-}
-
-func (s *CBar) render() *fyne.Container {
-	s.face = &canvas.Rectangle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0x80}, FillColor: color.RGBA{0x00, 0x00, 0x00, 0x00}, StrokeWidth: 3}
-	s.bar = &canvas.Rectangle{FillColor: color.RGBA{0x2C, 0xA5, 0x00, 0x80}}
-
-	s.titleText = &canvas.Text{Text: s.cfg.Title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
-	s.titleText.TextStyle.Monospace = true
-	s.titleText.Alignment = fyne.TextAlignCenter
-
-	s.displayText = &canvas.Text{Text: fmt.Sprintf(s.cfg.DisplayString, 0.00), Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 40}
-	s.displayText.TextStyle.Monospace = true
-	s.displayText.Alignment = fyne.TextAlignLeading
-
-	bar := container.NewWithoutLayout(s.face)
-	for i := 0; i < int(s.cfg.Steps+1); i++ {
-		line := &canvas.Line{StrokeColor: color.RGBA{0x00, 0xE5, 0x00, 0xFF}, StrokeWidth: 2}
-		s.bars = append(s.bars, line)
-		bar.Add(line)
-	}
-	bar.Objects = append(bar.Objects, s.bar, s.titleText, s.displayText)
-	bar.Layout = s
-	return bar
-}
-
-func (s *CBar) Layout(_ []fyne.CanvasObject, space fyne.Size) {
-	diameter := space.Width
-	height := space.Height
-	middle := height / 2
-	widthFactor := float32(diameter) / float32(s.cfg.Steps)
-
-	s.face.Resize(space)
-
-	y := float32(-s.bar.Size().Height * .47)
-	if s.cfg.TextAtBottom {
-		y = float32(s.bar.Size().Height * 0.85)
-	}
-
-	s.titleText.Move(fyne.NewPos(diameter/2-s.titleText.Size().Width/2, height-30))
-	s.displayText.TextSize = min((diameter/2)/6, 40)
-	s.displayText.Move(fyne.NewPos(diameter/2-s.displayText.MinSize().Width/2, y))
-
-	for i, line := range s.bars {
-		if i%2 == 0 {
-			line.Position1 = fyne.NewPos(float32(i)*widthFactor, middle-height/3)
-			line.Position2 = fyne.NewPos(float32(i)*widthFactor, middle+height/3)
-			continue
-		}
-		line.Position1 = fyne.NewPos(float32(i)*widthFactor, middle-height/7)
-		line.Position2 = fyne.NewPos(float32(i)*widthFactor, middle+height/7)
-	}
-
-	s.refresh(space)
-}
-
-func (s *CBar) MinSize(_ []fyne.CanvasObject) fyne.Size {
-	return s.cfg.Minsize
-}
-
-func (s *CBar) Content() fyne.CanvasObject {
-	return s.canvas
 }
 
 func (s *CBar) SetValue(value float64) {
@@ -119,10 +60,11 @@ func (s *CBar) SetValue(value float64) {
 		value = s.cfg.Min
 	}
 	s.value = value
-	s.refresh(s.canvas.Size())
+	s.refresh()
 }
 
-func (s *CBar) refresh(size fyne.Size) {
+func (s *CBar) refresh() {
+	size := s.container.Size()
 	rangeWidth := s.cfg.Max - s.cfg.Min
 	center := size.Width / 2
 	widthFactor := float32(size.Width) / float32(rangeWidth)
@@ -151,12 +93,87 @@ func (s *CBar) refresh(size fyne.Size) {
 		newBarPos = fyne.NewPos(barPosition, size.Height/8)
 		newBarSize = fyne.NewSize(6, size.Height-(size.Height/8*2))
 	}
+
 	s.bar.Move(newBarPos)
 	s.bar.Resize(newBarSize)
-	//s.bar.Refresh()
-
 }
 
 func (s *CBar) Value() float64 {
 	return s.value
+}
+
+func (s *CBar) CreateRenderer() fyne.WidgetRenderer {
+	s.face = &canvas.Rectangle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0x80}, FillColor: color.RGBA{0x00, 0x00, 0x00, 0x00}, StrokeWidth: 3}
+	s.bar = &canvas.Rectangle{FillColor: color.RGBA{0x2C, 0xA5, 0x00, 0x80}}
+
+	s.titleText = &canvas.Text{Text: s.cfg.Title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
+	s.titleText.TextStyle.Monospace = true
+	s.titleText.Alignment = fyne.TextAlignCenter
+
+	s.displayText = &canvas.Text{Text: fmt.Sprintf(s.cfg.DisplayString, 0.00), Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 40}
+	s.displayText.TextStyle.Monospace = true
+	s.displayText.Alignment = fyne.TextAlignLeading
+
+	bar := container.NewWithoutLayout(s.face)
+	for i := 0; i < int(s.cfg.Steps+1); i++ {
+		line := &canvas.Line{StrokeColor: color.RGBA{0x00, 0xE5, 0x00, 0xFF}, StrokeWidth: 2}
+		s.bars = append(s.bars, line)
+		bar.Add(line)
+	}
+	bar.Objects = append(bar.Objects, s.bar, s.titleText, s.displayText)
+
+	s.container = bar
+
+	return &CBarRenderer{
+		d: s,
+	}
+}
+
+type CBarRenderer struct {
+	d *CBar
+}
+
+func (dr *CBarRenderer) Layout(space fyne.Size) {
+	dr.d.container.Resize(space)
+	s := dr.d
+	diameter := space.Width
+	height := space.Height
+	middle := height / 2
+	widthFactor := float32(diameter) / float32(s.cfg.Steps)
+
+	s.face.Resize(space)
+
+	y := float32(-s.bar.Size().Height * .47)
+	if s.cfg.TextAtBottom {
+		y = float32(s.bar.Size().Height * 0.85)
+	}
+
+	s.titleText.Move(fyne.NewPos(diameter/2-s.titleText.Size().Width/2, height-30))
+	s.displayText.TextSize = min((diameter/2)/6, 40)
+	s.displayText.Move(fyne.NewPos(diameter/2-s.displayText.MinSize().Width/2, y))
+
+	for i, line := range s.bars {
+		if i%2 == 0 {
+			line.Position1 = fyne.NewPos(float32(i)*widthFactor, middle-height/3)
+			line.Position2 = fyne.NewPos(float32(i)*widthFactor, middle+height/3)
+			continue
+		}
+		line.Position1 = fyne.NewPos(float32(i)*widthFactor, middle-height/7)
+		line.Position2 = fyne.NewPos(float32(i)*widthFactor, middle+height/7)
+	}
+	s.refresh()
+}
+
+func (dr *CBarRenderer) MinSize() fyne.Size {
+	return dr.d.container.MinSize()
+}
+
+func (dr *CBarRenderer) Refresh() {
+}
+
+func (dr *CBarRenderer) Destroy() {
+}
+
+func (dr *CBarRenderer) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{dr.d.container}
 }

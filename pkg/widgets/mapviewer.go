@@ -1,4 +1,4 @@
-package mapviewer
+package widgets
 
 import (
 	"bytes"
@@ -18,7 +18,6 @@ import (
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/symbol"
-	"github.com/roffe/txlogger/pkg/widgets"
 )
 
 const (
@@ -101,8 +100,8 @@ func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollecti
 		}
 	}
 
-	crosshair := widgets.NewRectangle(color.RGBA{0xfc, 0x4a, 0xFA, 255}, 4)
-	cursor := widgets.NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 255}, 4)
+	crosshair := NewRectangle(color.RGBA{0xfc, 0x4a, 0xFA, 255}, 4)
+	cursor := NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 255}, 4)
 
 	textValues, valueContainer := createTextValues(zData, corrFac)
 

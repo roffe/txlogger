@@ -20,7 +20,6 @@ import (
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 	"github.com/roffe/txlogger/pkg/layout"
-	"github.com/roffe/txlogger/pkg/mapviewer"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
@@ -96,13 +95,13 @@ type MainWindow struct {
 
 	symbols symbol.SymbolCollection
 
-	dashboard *Dashboard
+	dashboard *widgets.Dashboard
 	//metricChan chan *model.DashboardMetric
 	buttonsDisabled bool
 
 	leading *fyne.Container
 
-	openMaps map[string]*mapviewer.MapViewer
+	openMaps map[string]*widgets.MapViewer
 }
 
 func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
@@ -119,7 +118,7 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		//progressBar:           widget.NewProgressBarInfinite(),
 		//sinkManager:           singMgr,
 		vars:     vars,
-		openMaps: make(map[string]*mapviewer.MapViewer),
+		openMaps: make(map[string]*widgets.MapViewer),
 	}
 
 	mw.Window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
