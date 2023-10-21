@@ -1,6 +1,8 @@
 package widgets
 
 import (
+	"math"
+
 	"fyne.io/fyne/v2"
 )
 
@@ -16,47 +18,56 @@ type MapViewerRenderer struct {
 
 func (vr *MapViewerRenderer) Layout(size fyne.Size) {
 	vr.mv.content.Resize(size)
-
 	sz := vr.mv.innerView.Size()
 
-	w := sz.Width / float32(vr.mv.numColumns)
-	h := sz.Height / float32(vr.mv.numRows)
+	// Calculate shared factors
+	numColumnsFloat := float32(vr.mv.numColumns)
+	numRowsFloat := float32(vr.mv.numRows)
+	widthFactor := sz.Width / numColumnsFloat
+	heightFactor := sz.Height / numRowsFloat
 
+	// Calculate text size
+	textSize := min(heightFactor/2, widthFactor/2)
+	textSize = float32(math.Floor(float64(textSize)*100) / 100)
+
+	// Position and resize text values
 	for i := len(vr.mv.yData); i > 0; i-- {
 		for j := 0; j < len(vr.mv.xData); j++ {
 			t := vr.mv.textValues[(i*vr.mv.numColumns)-(vr.mv.numColumns-j)]
-			t.TextSize = float32(int(h / 2.0))
+			t.TextSize = textSize
 			t.Move(fyne.NewPos(
-				float32(j)*(sz.Width/float32(vr.mv.numColumns))+4,
-				sz.Height-float32(i)*(sz.Height/float32(vr.mv.numRows)),
+				float32(j)*widthFactor+4,
+				sz.Height-float32(i)*heightFactor,
 			))
-			t.Resize(fyne.NewSize(w, h))
+			t.Resize(fyne.NewSize(widthFactor, heightFactor))
 		}
 	}
 
+	// Update x and y axes
 	for _, xb := range vr.mv.xAxis {
-		xb.TextSize = float32(int(h / 2.0))
+		xb.TextSize = textSize
 		xb.Refresh()
 	}
-
 	for _, yb := range vr.mv.yAxis {
-		yb.TextSize = float32(int(h / 2.0))
+		yb.TextSize = textSize
 		yb.Refresh()
 	}
 
-	vr.mv.crosshair.Resize(fyne.NewSize(w, h))
+	// Position and resize crosshair
+	vr.mv.crosshair.Resize(fyne.NewSize(widthFactor, heightFactor))
 	vr.mv.crosshair.Move(
 		fyne.NewPos(
-			float32(vr.mv.xIdx)*(sz.Width/float32(vr.mv.numColumns)),
-			float32(float64(vr.mv.numRows-1)-vr.mv.yIdx)*(sz.Height/float32(vr.mv.numRows)),
+			float32(vr.mv.xIdx)*widthFactor,
+			float32(float64(vr.mv.numRows)-1-vr.mv.yIdx)*heightFactor,
 		),
 	)
 
-	vr.mv.cursor.Resize(fyne.NewSize(w, h))
+	// Position and resize cursor
+	vr.mv.cursor.Resize(fyne.NewSize(widthFactor, heightFactor))
 	vr.mv.cursor.Move(
 		fyne.NewPos(
-			float32(vr.mv.curX)*(sz.Width/float32(vr.mv.numColumns)),
-			float32(float64(vr.mv.numRows-1)-float64(vr.mv.curY))*(sz.Height/float32(vr.mv.numRows))+1,
+			float32(vr.mv.curX)*widthFactor,
+			float32(vr.mv.numRows-1-vr.mv.curY)*heightFactor,
 		),
 	)
 }

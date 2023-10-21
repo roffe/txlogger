@@ -23,7 +23,6 @@ import (
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
-	sdialog "github.com/sqweek/dialog"
 	"golang.org/x/net/context"
 )
 
@@ -101,7 +100,7 @@ type MainWindow struct {
 
 	leading *fyne.Container
 
-	openMaps map[string]*widgets.MapViewer
+	openMaps map[string]*MapViewerWindow
 }
 
 func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
@@ -118,7 +117,7 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		//progressBar:           widget.NewProgressBarInfinite(),
 		//sinkManager:           singMgr,
 		vars:     vars,
-		openMaps: make(map[string]*widgets.MapViewer),
+		openMaps: make(map[string]*MapViewerWindow),
 	}
 
 	mw.Window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
@@ -316,31 +315,33 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		mw.mapSelector.SetSelectedIndex(0)
 	*/
 
-	menu := fyne.NewMainMenu(
-		fyne.NewMenu("File",
-			fyne.NewMenuItem("Load binary", func() {
-				filename, err := sdialog.File().Filter("Binary file", "bin").Load()
-				if err != nil {
-					if err.Error() == "Cancelled" {
+	/*
+		menu := fyne.NewMainMenu(
+			fyne.NewMenu("File",
+				fyne.NewMenuItem("Load binary", func() {
+					filename, err := sdialog.File().Filter("Binary file", "bin").Load()
+					if err != nil {
+						if err.Error() == "Cancelled" {
+							return
+						}
+						// dialog.ShowError(err, mw)
+						mw.Log(err.Error())
 						return
 					}
-					// dialog.ShowError(err, mw)
-					mw.Log(err.Error())
-					return
-				}
-				if err := mw.LoadSymbolsFromFile(filename); err != nil {
-					// dialog.ShowError(err, mw)
-					mw.Log(err.Error())
-					return
-				}
-				mw.SyncSymbols()
-			}),
-		),
-	)
+					if err := mw.LoadSymbolsFromFile(filename); err != nil {
+						// dialog.ShowError(err, mw)
+						mw.Log(err.Error())
+						return
+					}
+					mw.SyncSymbols()
+				}),
+			),
+		)
+		mw.Window.SetMainMenu(menu)
+	*/
 
 	mw.loadPrefs()
 	mw.setTitle("No symbols loaded")
-	mw.Window.SetMainMenu(menu)
 	mw.Resize(fyne.NewSize(1280, 720))
 
 	return mw
@@ -658,4 +659,58 @@ func (mw *MainWindow) loadSymbols(symbols symbol.SymbolCollection) {
 	}
 	mw.symbolMap = newSymbolMap
 	mw.symbols = symbols
+}
+
+func (mw *MainWindow) newOutputList() {
+	mw.output = widget.NewListWithData(
+		mw.outputData,
+		func() fyne.CanvasObject {
+			return &widget.Label{
+				Alignment: fyne.TextAlignLeading,
+				Wrapping:  fyne.TextWrapBreak,
+				TextStyle: fyne.TextStyle{Monospace: true},
+			}
+		},
+		func(item binding.DataItem, obj fyne.CanvasObject) {
+			i := item.(binding.String)
+			txt, err := i.Get()
+			if err != nil {
+				mw.Log(err.Error())
+				return
+			}
+			obj.(*widget.Label).SetText(txt)
+		},
+	)
+}
+
+func (mw *MainWindow) newSymbolnameTypeahead() {
+	mw.symbolLookup = xwidget.NewCompletionEntry([]string{})
+	mw.symbolLookup.PlaceHolder = "Type to search for symbols"
+	// When the use typed text, complete the list.
+	mw.symbolLookup.OnChanged = func(s string) {
+		// completion start for text length >= 3
+		if len(s) < 3 && s != "*" {
+			mw.symbolLookup.HideCompletion()
+			return
+		}
+		// Get the list of possible completion
+		var results []string
+		for _, sym := range mw.symbolMap {
+			if strings.Contains(strings.ToLower(sym.Name), strings.ToLower(s)) || s == "*" {
+				results = append(results, sym.Name)
+			}
+		}
+		// no results
+		if len(results) == 0 {
+			mw.symbolLookup.HideCompletion()
+			return
+		}
+		sort.Slice(results, func(i, j int) bool { return strings.ToLower(results[i]) < strings.ToLower(results[j]) })
+
+		// then show them
+		if len(results) > 0 {
+			mw.symbolLookup.SetOptions(results)
+			mw.symbolLookup.ShowCompletion()
+		}
+	}
 }

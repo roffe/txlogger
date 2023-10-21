@@ -1,8 +1,6 @@
 package widgets
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"image"
 	"image/color"
@@ -17,7 +15,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/layout"
-	"github.com/roffe/txlogger/pkg/symbol"
 )
 
 const (
@@ -34,9 +31,9 @@ type MapViewer struct {
 
 	widget.BaseWidget
 
-	xName, yName, zName string
-	xValue, yValue      int
-	corrFac             float64
+	//xName, yName, zName string
+	xValue, yValue int
+	corrFac        float64
 
 	xFrom, yFrom string
 
@@ -57,26 +54,21 @@ type MapViewer struct {
 
 	ipf interpolate.InterPolFunc
 
-	valueContainer *fyne.Container
-	valueMap       *canvas.Image
+	valueTexts *fyne.Container
+	valueMap   *canvas.Image
 
 	setChan chan xyUpdate
 
-	W fyne.Window
-
 	curX, curY int
 
-	moving bool
+	moving        bool
+	selecting     bool
+	selectedCells []int
 
 	SetValueFunc func(name string, value float64)
 }
 
-func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollection, interPolfunc interpolate.InterPolFunc) (*MapViewer, error) {
-	xData, yData, zData, corrFac, err := getXYZ(axis.X, axis.Y, axis.Z, symbols)
-	if err != nil {
-		return nil, err
-	}
-
+func NewMapViewer(xData, yData, zData []int, corrFac float64, interPolfunc interpolate.InterPolFunc) (*MapViewer, error) {
 	xLen := len(xData)
 	yLen := len(yData)
 	zLen := len(zData)
@@ -110,7 +102,7 @@ func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollecti
 	crosshair := NewRectangle(color.RGBA{0xfc, 0x4a, 0xFA, 255}, 4)
 	cursor := NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 255}, 4)
 
-	textValues, valueContainer := createTextValues(zData, corrFac)
+	textValues, valueTexts := createTextValues(zData, corrFac)
 
 	width := float32(xLen * cellWidth)
 	height := float32(yLen * cellHeight)
@@ -123,11 +115,11 @@ func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollecti
 
 	inner := container.NewStack(
 		valueMap,
-		valueContainer,
 		grid,
+		valueTexts,
 		container.NewWithoutLayout(
-			cursor,
 			crosshair,
+			cursor,
 		),
 	)
 
@@ -147,7 +139,6 @@ func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollecti
 	)
 
 	mv := &MapViewer{
-		W:   w,
 		ipf: interPolfunc,
 
 		content:   content,
@@ -164,20 +155,13 @@ func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollecti
 		numRows:    yLen,
 		numData:    zLen,
 
-		xName: axis.X,
-		yName: axis.Y,
-		zName: axis.Z,
-
-		xFrom: axis.XFrom,
-		yFrom: axis.YFrom,
-
 		xData: xData,
 		yData: yData,
 		zData: zData,
 
-		valueContainer: valueContainer,
-		valueMap:       valueMap,
-		corrFac:        corrFac,
+		valueTexts: valueTexts,
+		valueMap:   valueMap,
+		corrFac:    corrFac,
 
 		textValues: textValues,
 
@@ -191,11 +175,6 @@ func NewMapViewer(w fyne.Window, axis symbol.Axis, symbols symbol.SymbolCollecti
 		}
 	}()
 
-	if w != nil {
-		w.Canvas().SetOnTypedKey(mv.TypedKey)
-		w.SetTitle(axis.Z)
-	}
-
 	return mv, nil
 }
 
@@ -206,9 +185,6 @@ func (mv *MapViewer) Refresh() {
 
 func (mv *MapViewer) Close() {
 	close(mv.setChan)
-	if mv.W != nil {
-		mv.W.Close()
-	}
 }
 
 type MapViewerInfo struct {
@@ -219,9 +195,6 @@ type MapViewerInfo struct {
 
 func (mv *MapViewer) Info() MapViewerInfo {
 	return MapViewerInfo{
-		XName: mv.xName,
-		YName: mv.yName,
-		ZName: mv.zName,
 		XLen:  mv.numColumns,
 		YLen:  mv.numRows,
 		ZLen:  mv.numData,
@@ -285,74 +258,6 @@ func (mv *MapViewer) setXY(xValue, yValue int) error {
 		),
 	)
 	return nil
-}
-
-func getXYZ(xAxis, yAxis, zAxis string, symbols symbol.SymbolCollection) ([]int, []int, []int, float64, error) {
-	symx, symy, symz := symbols.GetByName(xAxis), symbols.GetByName(yAxis), symbols.GetByName(zAxis)
-
-	var xOut, yOut []int
-	if xAxis == "none" {
-		xOut = []int{0}
-	} else if xAxis != "" && symx != nil {
-		xOut = symx.IntFromData()
-	}
-	if yAxis == "none" {
-		yOut = []int{0}
-	} else if yAxis != "" && symy != nil {
-		yOut = symy.IntFromData()
-	}
-	if xAxis == "none" || yAxis == "none" {
-		return xOut, yOut, symz.IntFromData(), symz.Correctionfactor, nil
-	}
-	asd := map[string]*symbol.Symbol{
-		xAxis: symx,
-		yAxis: symy,
-		zAxis: symz,
-	}
-	for k, v := range asd {
-		if v == nil {
-			return nil, nil, nil, 0, fmt.Errorf("failed to find %s", k)
-		}
-	}
-
-	var x, y, z []int
-	if symx.Type&symbol.SIGNED == 1 {
-		x = symx.DataToInt16()
-	} else {
-		x = symx.DataToUint16()
-	}
-	if symy.Type&symbol.SIGNED == 1 {
-		y = symy.DataToInt16()
-	} else {
-		y = symy.DataToUint16()
-	}
-
-	if len(x)*len(y) == len(symz.Bytes()) {
-		if symz.Type&symbol.SIGNED == 1 {
-			for _, v := range symz.DataToInt8() {
-				z = append(z, int(v))
-			}
-		} else {
-			for _, v := range symz.DataToUint8() {
-				z = append(z, int(v))
-			}
-		}
-		return x, y, z, symz.Correctionfactor, nil
-	}
-
-	if len(x)*len(y) == int(symz.Length/2) {
-		data := make([]int16, symz.Length/2)
-		reader := bytes.NewReader(symz.Bytes())
-		if err := binary.Read(reader, binary.BigEndian, &data); err != nil {
-			log.Fatalf("Failed to convert zData to int16 slice: %v", err)
-		}
-		for _, v := range data {
-			z = append(z, int(v))
-		}
-		return x, y, z, symz.Correctionfactor, nil
-	}
-
-	return nil, nil, nil, 0, fmt.Errorf("failed to convert %s %s %s", xAxis, yAxis, zAxis)
 }
 
 func createImage(xData, yData []int, zData []int, correctionFactor float64) *image.RGBA {

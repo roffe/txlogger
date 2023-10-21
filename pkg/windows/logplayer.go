@@ -75,7 +75,7 @@ type LogPlayer struct {
 
 	logType string
 
-	openMaps map[string]*widgets.MapViewer
+	openMaps map[string]*MapViewerWindow
 
 	symbolSubs map[string][]*widgets.MapViewer
 
@@ -92,7 +92,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 		app:         a,
 		Window:      w,
 		db:          widgets.NewDashboard(a, w, true, nil, onClose),
-		openMaps:    make(map[string]*widgets.MapViewer),
+		openMaps:    make(map[string]*MapViewerWindow),
 		controlChan: make(chan *controlMsg, 10),
 		symbols:     symbols,
 		logType:     strings.ToUpper(filepath.Ext(filename)),
@@ -281,7 +281,15 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 		if !found {
 			w := lp.app.NewWindow("")
 			//w.Canvas().SetOnTypedKey(lp.handler)
-			mv, err := widgets.NewMapViewer(w, axis, lp.symbols, interpolate.Interpolate)
+			xData, yData, zData, _, _, corrFac, err := lp.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+			w.SetTitle(fmt.Sprintf("Map Viewer - %s", axis.Z))
+
+			mv, err := widgets.NewMapViewer(xData, yData, zData, corrFac, interpolate.Interpolate)
 			if err != nil {
 				log.Printf("X: %s Y: %s Z: %s err: %v", axis.X, axis.Y, axis.Z, err)
 				return
@@ -321,7 +329,7 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 				mv.Close()
 				w.Close()
 			})
-			lp.openMaps[axis.Z] = mv
+			lp.openMaps[axis.Z] = &MapViewerWindow{Window: w, mv: mv}
 
 			if lp.symbolSubs == nil {
 				lp.symbolSubs = make(map[string][]*widgets.MapViewer)
@@ -347,7 +355,7 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 			return
 		}
 
-		mv.W.RequestFocus()
+		mv.RequestFocus()
 
 	}
 

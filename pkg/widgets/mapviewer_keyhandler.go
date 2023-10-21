@@ -7,23 +7,37 @@ import (
 	"fyne.io/fyne/v2"
 )
 
+func (mv *MapViewer) TypedRune(r rune) {
+	// print out the rune
+	log.Println("TypedRune", string(r))
+}
+
 func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 	log.Println("TypedKey", key.Name)
 	index := mv.curY*mv.numColumns + mv.curX
-	t := mv.textValues[index]
 	var refresh, updateCursor bool
 	switch key.Name {
 	case fyne.KeyPageUp:
-		mv.zData[index] += 10
+		for _, cell := range mv.selectedCells {
+			mv.zData[cell] += 10
+		}
 		refresh = true
 	case fyne.KeyPageDown:
-		mv.zData[index] -= 10
+		for _, cell := range mv.selectedCells {
+			mv.zData[cell] -= 10
+		}
 		refresh = true
 	case "+":
-		mv.zData[index]++
+		//mv.zData[index]++
+		for _, cell := range mv.selectedCells {
+			mv.zData[cell]++
+		}
 		refresh = true
 	case "-":
-		mv.zData[index]--
+		//mv.zData[index]--
+		for _, cell := range mv.selectedCells {
+			mv.zData[cell]--
+		}
 		refresh = true
 	case "Up":
 		mv.curY++
@@ -59,8 +73,11 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 		mv.cursor.Move(fyne.NewPos(xPos, yPos))
 	}
 	if refresh {
-		t.Text = strconv.FormatFloat(float64(mv.zData[index])*mv.corrFac, 'f', 2, 64)
-		t.Refresh()
+		for _, textIndex := range mv.selectedCells {
+			t := mv.textValues[textIndex]
+			t.Text = strconv.FormatFloat(float64(mv.zData[index])*mv.corrFac, 'f', 2, 64)
+			t.Refresh()
+		}
 		mv.Refresh()
 	}
 }

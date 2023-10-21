@@ -218,8 +218,8 @@ func (mw *MainWindow) createButtons() {
 				return &fun
 			}
 			for _, mv := range mw.openMaps {
-				setRpm := fac(mv, "ActualIn.n_Engine")
-				setAir := fac(mv, "MAF.m_AirInlet")
+				setRpm := fac(mv.mv, "ActualIn.n_Engine")
+				setAir := fac(mv.mv, "MAF.m_AirInlet")
 				mw.dlc.Subscribe("ActualIn.n_Engine", setRpm)
 				mw.dlc.Subscribe("MAF.m_AirInlet", setAir)
 			}
@@ -335,7 +335,13 @@ func (mw *MainWindow) openMap(axis symbol.Axis) {
 			mw.Log("No binary loaded")
 			return
 		}
-		mv, err := widgets.NewMapViewer(w, axis, mw.symbols, interpolate.Interpolate)
+		xData, yData, zData, _, _, corrFac, err := mw.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
+		if err != nil {
+			mw.Log(err.Error())
+			return
+		}
+
+		mv, err := widgets.NewMapViewer(xData, yData, zData, corrFac, interpolate.Interpolate)
 		if err != nil {
 			mw.Log(err.Error())
 			return
@@ -363,13 +369,13 @@ func (mw *MainWindow) openMap(axis symbol.Axis) {
 			mw.dlc.Subscribe("ActualIn.n_Engine", setRpm)
 			mw.dlc.Subscribe("MAF.m_AirInlet", setAir)
 		}
-		mw.openMaps[axis.Z] = mv
+		mw.openMaps[axis.Z] = &MapViewerWindow{w, mv}
 		w.SetContent(mv)
 		w.Show()
 
 		return
 	}
-	mv.W.RequestFocus()
+	mv.RequestFocus()
 }
 
 /*
