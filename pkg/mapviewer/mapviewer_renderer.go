@@ -61,6 +61,5 @@ func (vr *MapViewerRenderer) Destroy() {
 }
 
 func (vr *MapViewerRenderer) Objects() []fyne.CanvasObject {
-
 	return []fyne.CanvasObject{vr.mv.content}
 }
