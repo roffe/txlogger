@@ -13,7 +13,6 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/txlogger/pkg/model"
 )
 
 //go:embed checkengine.png
@@ -56,7 +55,8 @@ type Dashboard struct {
 
 	onClose func()
 
-	metricsChan chan *model.DashboardMetric
+	//metricsChan chan *model.ashboardMetric
+	metrics map[string]func(float64)
 
 	logplayer bool
 }
@@ -166,11 +166,13 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 			Image:   canvas.NewImageFromResource(fyne.NewStaticResource("knock.png", knockBytes)),
 			Minsize: fyne.NewSize(90, 90),
 		}),
-		limpMode:    canvas.NewImageFromResource(fyne.NewStaticResource("limp.png", limpBytes)),
-		onClose:     onClose,
-		metricsChan: make(chan *model.DashboardMetric, 60),
+		limpMode: canvas.NewImageFromResource(fyne.NewStaticResource("limp.png", limpBytes)),
+		onClose:  onClose,
+		//metricsChan: make(chan *model.DashboardMetric, 60),
 	}
 	db.ExtendBaseWidget(db)
+
+	db.metrics = db.createRouter()
 
 	db.closeBtn = widget.NewButtonWithIcon("Back", theme.NavigateBackIcon(), func() {
 		if db.onClose != nil {
@@ -206,7 +208,6 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 
 	//db.knockIcon.Hide()
 
-	go db.startParser()
 	return db
 }
 
@@ -249,7 +250,7 @@ func (db *Dashboard) render() *fyne.Container {
 }
 
 func (db *Dashboard) Close() {
-	close(db.metricsChan)
+	// close(db.metricsChan)
 }
 
 func (db *Dashboard) SetTime(t time.Time) {
@@ -271,11 +272,18 @@ func (db *Dashboard) SetValue(key string, value float64) {
 			log.Println(err)
 		}
 	}()
-	select {
-	case db.metricsChan <- &model.DashboardMetric{Name: key, Value: value}:
-	default:
-		//		log.Println("failed to set value")
+
+	if fun, ok := db.metrics[key]; ok {
+		fun(value)
 	}
+
+	/*
+		select {
+		case db.metricsChan <- &model.DashboardMetric{Name: key, Value: value}:
+		default:
+			//		log.Println("failed to set value")
+		}
+	*/
 }
 
 func (db *Dashboard) createRouter() map[string]func(float64) {
@@ -378,6 +386,7 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 	}
 }
 
+/*
 func (db *Dashboard) startParser() {
 	metrics := db.createRouter()
 	for metric := range db.metricsChan {
@@ -387,6 +396,7 @@ func (db *Dashboard) startParser() {
 		}
 	}
 }
+*/
 
 func (db *Dashboard) Sweep() {
 	db.checkEngine.Hide()
@@ -403,8 +413,8 @@ func (db *Dashboard) Sweep() {
 		db.pwm.SetValue(100 * pa)
 		db.nblambda.SetValue(25 * pa)
 		db.wblambda.SetValue(1.52 * pa)
-		db.metricsChan <- &model.DashboardMetric{Name: "Out.fi_Ignition", Value: 30.0 * pa}
-		db.metricsChan <- &model.DashboardMetric{Name: "IgnProt.fi_Offset", Value: 15.0 * pa}
+		//db.metricsChan <- &model.DashboardMetric{Name: "Out.fi_Ignition", Value: 30.0 * pa}
+		//db.metricsChan <- &model.DashboardMetric{Name: "IgnProt.fi_Offset", Value: 15.0 * pa}
 
 	})
 	an.AutoReverse = true

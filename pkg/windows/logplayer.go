@@ -14,6 +14,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/capture"
 	"github.com/roffe/txlogger/pkg/interpolate"
+	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
@@ -360,7 +361,7 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 				lp.restartBtn,
 				lp.nextBtn,
 			),
-			widgets.FixedWidth(75, lp.selec),
+			layout.NewFixedWidth(75, lp.selec),
 			container.NewBorder(nil, nil, nil, lp.posLabel, lp.slider),
 		),
 		nil,

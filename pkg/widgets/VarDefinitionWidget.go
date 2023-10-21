@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/kwp2000"
@@ -221,16 +220,16 @@ func (wb *VarDefinitionWidget) SetType(t uint8) {
 }
 
 func (wb *VarDefinitionWidget) CreateRenderer() fyne.WidgetRenderer {
-	return &varRenderer{
+	return &VarDefinitionWidgetRenderer{
 		obj: wb,
 	}
 }
 
-type varRenderer struct {
+type VarDefinitionWidgetRenderer struct {
 	obj *VarDefinitionWidget
 }
 
-func (vr *varRenderer) Layout(size fyne.Size) {
+func (vr *VarDefinitionWidgetRenderer) Layout(size fyne.Size) {
 	var sz = []float32{
 		.35, // name
 		.12, // value
@@ -254,7 +253,7 @@ func (vr *varRenderer) Layout(size fyne.Size) {
 	}
 }
 
-func (vr *varRenderer) MinSize() fyne.Size {
+func (vr *VarDefinitionWidgetRenderer) MinSize() fyne.Size {
 	var w, h float32
 	for _, o := range vr.obj.objects {
 		childSize := o.MinSize()
@@ -266,43 +265,12 @@ func (vr *varRenderer) MinSize() fyne.Size {
 	return fyne.NewSize(w, h)
 }
 
-func (vr *varRenderer) Refresh() {
+func (vr *VarDefinitionWidgetRenderer) Refresh() {
 }
 
-func (vr *varRenderer) Destroy() {
+func (vr *VarDefinitionWidgetRenderer) Destroy() {
 }
 
-func (vr *varRenderer) Objects() []fyne.CanvasObject {
+func (vr *VarDefinitionWidgetRenderer) Objects() []fyne.CanvasObject {
 	return vr.obj.objects
-}
-
-// ----
-
-func FixedWidth(width float32, obj fyne.CanvasObject) *fyne.Container {
-	return container.New(&fixedWidthContainer{width: width}, obj)
-}
-
-type fixedWidthContainer struct {
-	width float32
-}
-
-func (d *fixedWidthContainer) MinSize(objects []fyne.CanvasObject) fyne.Size {
-	var h float32
-	for _, o := range objects {
-		childSize := o.MinSize()
-		if childSize.Height > h {
-			h = childSize.Height
-		}
-	}
-	return fyne.NewSize(d.width+theme.Padding()*2, h)
-}
-
-func (d *fixedWidthContainer) Layout(objects []fyne.CanvasObject, containerSize fyne.Size) {
-	pos := fyne.NewPos(0, 0)
-	for _, o := range objects {
-		size := o.MinSize()
-		o.Move(pos)
-		o.Resize(fyne.NewSize(d.width, size.Height))
-		pos = pos.Add(fyne.NewPos(d.width, size.Height))
-	}
 }

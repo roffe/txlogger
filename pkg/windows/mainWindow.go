@@ -468,7 +468,7 @@ func (mw *MainWindow) Layout() *container.Split {
 				container.NewBorder(
 					nil,
 					nil,
-					widgets.FixedWidth(75, widget.NewLabel("ECU")),
+					layout.NewFixedWidth(75, widget.NewLabel("ECU")),
 					nil,
 					mw.ecuSelect,
 				),

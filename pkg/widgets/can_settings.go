@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/adapter"
+	"github.com/roffe/txlogger/pkg/layout"
 	"go.bug.st/serial/enumerator"
 )
 
@@ -66,21 +67,21 @@ func NewCanSettingsWidget(app fyne.App) *CanSettingsWidget {
 			container.NewBorder(
 				nil,
 				nil,
-				FixedWidth(75, widget.NewLabel("Adapter")),
+				layout.NewFixedWidth(75, widget.NewLabel("Adapter")),
 				csw.debugCheckbox,
 				csw.adapterSelector,
 			),
 			container.NewBorder(
 				nil,
 				nil,
-				FixedWidth(75, widget.NewLabel("Port")),
+				layout.NewFixedWidth(75, widget.NewLabel("Port")),
 				csw.refreshBtn,
 				csw.portSelector,
 			),
 			container.NewBorder(
 				nil,
 				nil,
-				FixedWidth(75, widget.NewLabel("Speed")),
+				layout.NewFixedWidth(75, widget.NewLabel("Speed")),
 				nil,
 				csw.speedSelector,
 			),
