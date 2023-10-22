@@ -3,8 +3,6 @@ package windows
 import (
 	"log"
 	"sync"
-
-	"github.com/roffe/txlogger/pkg/widgets"
 )
 
 type MapViewerEvent struct {
@@ -14,7 +12,7 @@ type MapViewerEvent struct {
 
 type MapViewerHandler struct {
 	incoming    chan MapViewerEvent
-	subs        map[string][]*widgets.MapViewer
+	subs        map[string][]MapViewerWindowWidget
 	aggregators []*MapAggregator
 
 	quit            chan struct{}
@@ -24,7 +22,7 @@ type MapViewerHandler struct {
 
 func NewMapViewerHandler() *MapViewerHandler {
 	mvh := &MapViewerHandler{
-		subs:        make(map[string][]*widgets.MapViewer),
+		subs:        make(map[string][]MapViewerWindowWidget),
 		incoming:    make(chan MapViewerEvent, 100),
 		quit:        make(chan struct{}),
 		aggregators: make([]*MapAggregator, 0),
@@ -42,14 +40,14 @@ func (mvh *MapViewerHandler) Close() {
 	close(mvh.quit)
 }
 
-func (mvh *MapViewerHandler) Subscribe(symbolName string, mv *widgets.MapViewer) {
+func (mvh *MapViewerHandler) Subscribe(symbolName string, mv MapViewerWindowWidget) {
 	log.Printf("MapViewerHandler: Subscribe: %s", symbolName)
 	mvh.subsLock.Lock()
 	defer mvh.subsLock.Unlock()
 	mvh.subs[symbolName] = append(mvh.subs[symbolName], mv)
 }
 
-func (mvh *MapViewerHandler) Unsubscribe(symbolName string, mv *widgets.MapViewer) {
+func (mvh *MapViewerHandler) Unsubscribe(symbolName string, mv MapViewerWindowWidget) {
 	log.Printf("MapViewerHandler: Unsubscribe: %s", symbolName)
 	mvh.subsLock.Lock()
 	defer mvh.subsLock.Unlock()

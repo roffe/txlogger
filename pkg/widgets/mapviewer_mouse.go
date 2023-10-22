@@ -40,6 +40,10 @@ func (mv *MapViewer) MouseMoved(event *desktop.MouseEvent) {
 }
 
 func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
+	if c := fyne.CurrentApp().Driver().CanvasForObject(mv); c != nil {
+		c.Focus(mv)
+	}
+
 	if event.Button == desktop.MouseButtonPrimary && event.Modifier == 0 {
 		//mv.moving = true
 		cellWidth := mv.innerView.Size().Width / float32(mv.numColumns)

@@ -10,7 +10,6 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/datalogger"
-	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
@@ -230,148 +229,9 @@ func (mw *MainWindow) createButtons() {
 			}()
 		}
 	})
-
-	//mw.fuelBtn = mw.newMapBtn("Fuel", "BFuelCal.AirXSP", "BFuelCal.RpmYSP", "BFuelCal.Map")
-	//mw.ignitionBtn = mw.newMapBtn("Ignition", "BFuelCal.AirXSP", "BFuelCal.RpmYSP", "IgnNormCal.Map")
-	//
-	//mw.fuelBtn = mw.newMapBtn("Fuel", "IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "BFuelCal.TempEnrichFacMap")
-	//mw.ignitionBtn = mw.newMapBtn("Ignition", "IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "IgnAbsCal.fi_NormalMAP")
-
-	/*
-		mw.fuelBtn = widget.NewButtonWithIcon("Fuel", theme.GridIcon(), func() {
-			mw.openShort("Fuel")
-		})
-		mw.ignitionBtn = widget.NewButtonWithIcon("Ignition", theme.GridIcon(), func() {
-			mw.openShort("Ignition")
-		})
-	*/
-
 }
 
-/*
-func (mw *MainWindow) openShort(name string) {
-	switch name {
-	case "Fuel":
-		switch mw.ecuSelect.Selected {
-		case "T7":
-			mw.openMap(symbol.GetInfo(symbol.ECU_T7, "BFuelCal.Map"))
-			mw.openMap(symbol.GetInfo(symbol.ECU_T7, "BFuelCal.StartMap"))
-
-		case "T8":
-			//mw.openMap("IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "BFuelCal.TempEnrichFacMap")
-			symbol.GetInfo(symbol.ECU_T8, "BFuelCal.TempEnrichFacMap")
-		}
-
-	case "Ignition":
-		switch mw.ecuSelect.Selected {
-		case "T7":
-			mw.openMap(symbol.GetInfo(symbol.ECU_T7, "IgnNormCal.Map"))
-			mw.openMap(symbol.GetInfo(symbol.ECU_T7, "IgnE85Cal.fi_AbsMap"))
-		case "T8":
-			mw.openMap(symbol.GetInfo(symbol.ECU_T8, "IgnAbsCal.fi_NormalMAP"))
-			//mw.openMap("IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "IgnAbsCal.fi_NormalMAP")
-		}
-	}
-}
-
-func (mw *MainWindow) newMap(supXName, supYName, mapName string) {
-	mv, found := mw.openMaps[mapName]
-	if !found {
-
-		if mw.symbols == nil {
-			mw.Log("No binary loaded")
-			return
-		}
-		mv, err := NewMapViewer(nil, supXName, supYName, mapName, mw.symbols, interpolate.Interpolate)
-		if err != nil {
-			mw.Log(err.Error())
-			return
-		}
-
-		var tmpRpm float64
-		setRpm := func(v float64) {
-			tmpRpm = v
-		}
-		setAir := func(v float64) {
-			mv.SetXY(int(v), int(tmpRpm))
-		}
-
-		// w.SetCloseIntercept(func() {
-		// 	delete(mw.openMaps, mapName)
-		// 	if mw.dlc != nil {
-		// 		mw.dlc.Unsubscribe("ActualIn.n_Engine", &setRpm)
-		// 		mw.dlc.Unsubscribe("MAF.m_AirInlet", &setAir)
-		// 	}
-		// 	w.Close()
-		// })
-
-		if mw.dlc != nil {
-			mw.dlc.Subscribe("ActualIn.n_Engine", &setRpm)
-			mw.dlc.Subscribe("MAF.m_AirInlet", &setAir)
-		}
-		mw.openMaps[mapName] = mv
-	}
-	mw.leading.RemoveAll()
-	mw.leading.Add(mv)
-}
-*/
-
-func (mw *MainWindow) openMap(axis symbol.Axis) {
-	//log.Printf("openMap: %s %s %s", axis.X, axis.Y, axis.Z)
-	mv, found := mw.openMaps[axis.Z]
-	if !found {
-		w := mw.app.NewWindow("Map Viewer - " + axis.Z)
-		//w.SetFixedSize(true)
-		if mw.symbols == nil {
-			mw.Log("No binary loaded")
-			return
-		}
-		xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := mw.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
-		if err != nil {
-			mw.Log(err.Error())
-			return
-		}
-
-		mv, err := widgets.NewMapViewer(
-			widgets.WithXData(xData),
-			widgets.WithYData(yData),
-			widgets.WithZData(zData),
-			widgets.WithXCorrFac(xCorrFac),
-			widgets.WithYCorrFac(yCorrFac),
-			widgets.WithZCorrFac(zCorrFac),
-			widgets.WithXFrom(axis.XFrom),
-			widgets.WithYFrom(axis.YFrom),
-			widgets.WithInterPolFunc(interpolate.Interpolate),
-		)
-		if err != nil {
-			mw.Log(err.Error())
-			return
-		}
-
-		w.Canvas().SetOnTypedKey(mv.TypedKey)
-
-		//		setRpm := fac(mv, "ActualIn.n_Engine")
-		//		setAir := fac(mv, "MAF.m_AirInlet")
-
-		w.SetCloseIntercept(func() {
-			log.Println("closing", axis.Z)
-			delete(mw.openMaps, axis.Z)
-			mw.mvh.Unsubscribe(axis.XFrom, mv)
-			mw.mvh.Unsubscribe(axis.YFrom, mv)
-
-			w.Close()
-		})
-
-		mw.openMaps[axis.Z] = mw.newMapViewerWindow(w, mv, axis)
-		w.SetContent(mv)
-		w.Show()
-
-		return
-	}
-	mv.RequestFocus()
-}
-
-func (mw *MainWindow) newMapViewerWindow(w fyne.Window, mv *widgets.MapViewer, axis symbol.Axis) *MapViewerWindow {
+func (mw *MainWindow) newMapViewerWindow(w fyne.Window, mv MapViewerWindowWidget, axis symbol.Axis) MapViewerWindowInterface {
 	mww := &MapViewerWindow{Window: w, mv: mv}
 	mw.openMaps[axis.Z] = mww
 

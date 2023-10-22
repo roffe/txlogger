@@ -59,6 +59,7 @@ type Dashboard struct {
 	metrics map[string]func(float64)
 
 	logplayer bool
+	focused   bool
 }
 
 func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.Button, onClose func()) *Dashboard {
@@ -249,6 +250,16 @@ func (db *Dashboard) render() *fyne.Container {
 	return content
 }
 
+func (db *Dashboard) FocusGained() {
+	db.focused = true
+}
+func (db *Dashboard) FocusLost() {
+	db.focused = false
+}
+func (db *Dashboard) Focused() bool {
+	return db.focused
+}
+
 func (db *Dashboard) Close() {
 	// close(db.metricsChan)
 }
@@ -309,7 +320,7 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 	}
 
 	ecmstat := func(value float64) {
-		db.activeAirDem.Text = AirDemToString(value) + " (" + strconv.FormatFloat(value, 'f', 0, 64) + ")"
+		db.activeAirDem.Text = airDemToString(value) + " (" + strconv.FormatFloat(value, 'f', 0, 64) + ")"
 		db.activeAirDem.Refresh()
 	}
 
@@ -512,7 +523,7 @@ func (db *Dashboard) NewDebugBar() *fyne.Container {
 	)
 }
 
-func AirDemToString(v float64) string {
+func airDemToString(v float64) string {
 	switch v {
 	case 10:
 		return "PedalMap"

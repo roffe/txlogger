@@ -2,12 +2,16 @@ package windows
 
 import (
 	"fyne.io/fyne/v2"
-	"github.com/roffe/txlogger/pkg/widgets"
 )
 
 type MapViewerWindow struct {
 	fyne.Window
-	mv *widgets.MapViewer
+	mv MapViewerWindowWidget
+}
+
+type MapViewerWindowWidget interface {
+	SetValue(name string, value float64)
+	Close()
 }
 
 /*

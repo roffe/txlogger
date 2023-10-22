@@ -88,7 +88,12 @@ func (c *Collection) Dump() string {
 
 func (c *Collection) GetXYZ(xAxis, yAxis, zAxis string) ([]int, []int, []int, float64, float64, float64, error) {
 	symx, symy, symz := c.GetByName(xAxis), c.GetByName(yAxis), c.GetByName(zAxis)
+	if symz == nil {
+		return nil, nil, nil, 0, 0, 0, fmt.Errorf("failed to find %s", zAxis)
+	}
+
 	var xOut, yOut []int
+
 	zOut := symz.IntFromData()
 	xFac, yFac := 1.0, 1.0
 	if xAxis == "" {

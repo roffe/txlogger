@@ -17,18 +17,20 @@ type MapViewerRenderer struct {
 }
 
 func calculateOptimalTextSize(width, height float32, columns, rows int) float32 {
-	// Calculate the width and height of a single cell
-	cellWidth := float64(width/float32(columns)) / 2.5
-	cellHeight := float64(height/float32(rows)) / 2.2
 
+	// Calculate the width and height of a single cell
+	cellWidth := float64(width / float32(columns))
+	return max(min(float32(cellWidth/5), 21), 12)
+
+	cellHeight := float64(height / float32(rows))
 	// The optimal text size is the smallest of the two dimensions of the cell
-	return float32(math.Min(cellWidth, cellHeight))
+	return float32(int(math.Min(cellWidth, cellHeight)))
+
 }
 
 func (vr *MapViewerRenderer) Layout(size fyne.Size) {
 	vr.mv.content.Resize(size)
 	sz := vr.mv.innerView.Size()
-
 	// Calculate shared factors
 	numColumnsFloat := float32(vr.mv.numColumns)
 	numRowsFloat := float32(vr.mv.numRows)
@@ -85,7 +87,11 @@ func (vr *MapViewerRenderer) Layout(size fyne.Size) {
 }
 
 func (vr *MapViewerRenderer) MinSize() fyne.Size {
-	return vr.mv.content.MinSize()
+	s := vr.mv.content.MinSize()
+	return fyne.NewSize(
+		float32(int(s.Width)),
+		float32(int(s.Height)),
+	)
 }
 
 func (vr *MapViewerRenderer) Refresh() {

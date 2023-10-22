@@ -46,15 +46,14 @@ func (l *Horizontal) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 
 func (l *Horizontal) MinSize(objects []fyne.CanvasObject) fyne.Size {
 	offset := l.Offset.Size().Width
-	var width float32
-	var height float32
+	var width, height int
 	for _, o := range objects {
-		width += o.MinSize().Width
-		if o.MinSize().Height > height {
-			height = o.MinSize().Height
+		width += int(o.MinSize().Width)
+		if int(o.MinSize().Height) > height {
+			height = int(o.MinSize().Height)
 		}
 	}
-	return fyne.NewSize(width+offset, height)
+	return fyne.NewSize(float32(width+int(offset)), float32(height))
 }
 
 type Vertical struct {
@@ -69,16 +68,16 @@ func (l *Vertical) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 }
 
 func (l *Vertical) MinSize(objects []fyne.CanvasObject) fyne.Size {
-	var width float32
-	var height float32
+	var width int
+	var height int
 	for _, o := range objects {
-		if o.MinSize().Width > width {
-			width = o.MinSize().Width
+		if int(o.MinSize().Width) > width {
+			width = int(o.MinSize().Width)
 		}
-		height += o.MinSize().Height
+		height += int(o.MinSize().Height)
 
 	}
-	return fyne.NewSize(width, height)
+	return fyne.NewSize(float32(width), float32(height))
 }
 
 func NewFixedWidth(width float32, obj fyne.CanvasObject) *fyne.Container {

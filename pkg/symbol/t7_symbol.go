@@ -58,6 +58,7 @@ var T7SymbolsTuning = map[string][]string{
 		"StartCal.EnrFacTab",
 	},
 	"Boost": {
+		"...|BoostCal.RegMap|BoostCal.PMap|BoostCal.IMap|BoostCal.DMap",
 		"BoostCal.RegMap",
 		"BoostCal.PMap",
 		"BoostCal.IMap",

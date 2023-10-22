@@ -1,7 +1,6 @@
 package windows
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -14,7 +13,6 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/capture"
-	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/symbol"
@@ -71,7 +69,7 @@ type LogPlayer struct {
 
 	logType string
 
-	openMaps map[string]*MapViewerWindow
+	openMaps map[string]MapViewerWindowInterface
 
 	mvh *MapViewerHandler
 
@@ -92,7 +90,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 
 		controlChan: make(chan *controlMsg, 10),
 
-		openMaps: make(map[string]*MapViewerWindow),
+		openMaps: make(map[string]MapViewerWindowInterface),
 		symbols:  symbols,
 		mvh:      NewMapViewerHandler(),
 
@@ -221,22 +219,6 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 	return lp
 }
 
-func (lp *LogPlayer) setupMenu() {
-	var menus []*fyne.Menu
-	menus = append(menus, fyne.NewMenu("File"))
-	for _, category := range symbol.T7SymbolsTuningOrder {
-		var items []*fyne.MenuItem
-		for _, mapName := range symbol.T7SymbolsTuning[category] {
-			items = append(items, fyne.NewMenuItem(mapName, func() {
-				lp.openMap(mapName)
-			}))
-		}
-		menus = append(menus, fyne.NewMenu(category, items...))
-	}
-	menu := fyne.NewMainMenu(menus...)
-	lp.Window.SetMainMenu(menu)
-}
-
 func (lp *LogPlayer) render() fyne.CanvasObject {
 
 	/*
@@ -269,62 +251,7 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 	return main
 }
 
-func (lp *LogPlayer) openMap(symbolName string) error {
-	if symbolName == "" {
-		return errors.New("symbolName is empty")
-	}
-	axis := symbol.GetInfo(symbol.ECU_T7, symbolName)
-	mw, found := lp.openMaps[axis.Z]
-	if !found {
-		w := lp.app.NewWindow(fmt.Sprintf("Map Viewer - %s", axis.Z))
-
-		xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := lp.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
-		if err != nil {
-			return err
-		}
-
-		mv, err := widgets.NewMapViewer(
-			widgets.WithXData(xData),
-			widgets.WithYData(yData),
-			widgets.WithZData(zData),
-			widgets.WithXCorrFac(xCorrFac),
-			widgets.WithYCorrFac(yCorrFac),
-			widgets.WithZCorrFac(zCorrFac),
-			widgets.WithXFrom(axis.XFrom),
-			widgets.WithYFrom(axis.YFrom),
-			widgets.WithInterPolFunc(interpolate.Interpolate),
-		)
-		if err != nil {
-			return fmt.Errorf("x: %s y: %s z: %s err: %w", axis.X, axis.Y, axis.Z, err)
-		}
-
-		w.Canvas().SetOnTypedKey(func(ke *fyne.KeyEvent) {
-			if ke.Name == fyne.KeySpace {
-				lp.toggleBtn.Tapped(&fyne.PointEvent{})
-				return
-			}
-			mv.TypedKey(ke)
-		})
-
-		w.SetCloseIntercept(func() {
-			log.Println("closing", axis.Z)
-			delete(lp.openMaps, axis.Z)
-			lp.mvh.Unsubscribe(axis.XFrom, mv)
-			lp.mvh.Unsubscribe(axis.YFrom, mv)
-			mv.Close()
-			w.Close()
-		})
-
-		mw = lp.newMapViewerWindow(w, mv, axis)
-
-		w.SetContent(mv)
-		w.Show()
-	}
-	mw.RequestFocus()
-	return nil
-}
-
-func (lp *LogPlayer) newMapViewerWindow(w fyne.Window, mv *widgets.MapViewer, axis symbol.Axis) *MapViewerWindow {
+func (lp *LogPlayer) newMapViewerWindow(w fyne.Window, mv MapViewerWindowWidget, axis symbol.Axis) *MapViewerWindow {
 	mw := &MapViewerWindow{Window: w, mv: mv}
 	lp.openMaps[axis.Z] = mw
 

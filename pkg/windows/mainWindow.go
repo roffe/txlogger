@@ -23,7 +23,6 @@ import (
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
-	sdialog "github.com/sqweek/dialog"
 	"golang.org/x/net/context"
 )
 
@@ -101,9 +100,14 @@ type MainWindow struct {
 
 	leading *fyne.Container
 
-	openMaps map[string]*MapViewerWindow
+	openMaps map[string]MapViewerWindowInterface
 
 	mvh *MapViewerHandler
+}
+
+type MapViewerWindowInterface interface {
+	RequestFocus()
+	Close()
 }
 
 func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
@@ -120,7 +124,7 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		//progressBar:           widget.NewProgressBarInfinite(),
 		//sinkManager:           singMgr,
 		vars:     vars,
-		openMaps: make(map[string]*MapViewerWindow),
+		openMaps: make(map[string]MapViewerWindowInterface),
 		mvh:      NewMapViewerHandler(),
 	}
 
@@ -328,62 +332,6 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 	mw.Resize(fyne.NewSize(1280, 720))
 
 	return mw
-}
-
-func (mw *MainWindow) setupMenu() {
-	var menus []*fyne.Menu
-	menus = append(menus, fyne.NewMenu("File",
-		fyne.NewMenuItem("Load binary", func() {
-			filename, err := sdialog.File().Filter("Binary file", "bin").Load()
-			if err != nil {
-				if err.Error() == "Cancelled" {
-					return
-				}
-				// dialog.ShowError(err, mw)
-				mw.Log(err.Error())
-				return
-			}
-			if err := mw.LoadSymbolsFromFile(filename); err != nil {
-				// dialog.ShowError(err, mw)
-				mw.Log(err.Error())
-				return
-			}
-			mw.SyncSymbols()
-		}),
-		fyne.NewMenuItem("Load log", func() {
-			filename, err := sdialog.File().Filter("trionic logfile", "t7l", "t8l").SetStartDir("logs").Load()
-			if err != nil {
-				if err.Error() == "Cancelled" {
-					return
-				}
-				// dialog.ShowError(err, mw)
-				mw.Log(err.Error())
-				return
-			}
-
-			onClose := func() {
-				if mw.dlc != nil {
-					mw.dlc.DetachDashboard(mw.dashboard)
-				}
-				mw.dashboard = nil
-				mw.SetFullScreen(false)
-				mw.SetContent(mw.Content())
-			}
-			go NewLogPlayer(mw.app, filename, mw.symbols, onClose)
-		}),
-	))
-
-	for _, category := range symbol.T7SymbolsTuningOrder {
-		var items []*fyne.MenuItem
-		for _, mapName := range symbol.T7SymbolsTuning[category] {
-			items = append(items, fyne.NewMenuItem(mapName, func() {
-				mw.openMap(symbol.GetInfo(symbol.ECU_T7, mapName))
-			}))
-		}
-		menus = append(menus, fyne.NewMenu(category, items...))
-	}
-	menu := fyne.NewMainMenu(menus...)
-	mw.Window.SetMainMenu(menu)
 }
 
 /*
