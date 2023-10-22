@@ -43,36 +43,36 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 		}
 		refresh = true
 	case "Up":
-		mv.curY++
-		if mv.curY >= mv.numRows {
-			mv.curY = mv.numRows - 1
+		mv.SelectedY++
+		if mv.SelectedY >= mv.numRows {
+			mv.SelectedY = mv.numRows - 1
 		}
 		updateCursor = true
 	case "Down":
-		mv.curY--
-		if mv.curY < 0 {
-			mv.curY = 0
+		mv.SelectedY--
+		if mv.SelectedY < 0 {
+			mv.SelectedY = 0
 		}
 		updateCursor = true
 	case "Left":
-		mv.curX--
-		if mv.curX < 0 {
-			mv.curX = 0
+		mv.selectedX--
+		if mv.selectedX < 0 {
+			mv.selectedX = 0
 		}
 		updateCursor = true
 	case "Right":
-		mv.curX++
-		if mv.curX >= mv.numColumns {
-			mv.curX = mv.numColumns - 1
+		mv.selectedX++
+		if mv.selectedX >= mv.numColumns {
+			mv.selectedX = mv.numColumns - 1
 		}
 		updateCursor = true
 	}
-	index := mv.curY*mv.numColumns + mv.curX
+	index := mv.SelectedY*mv.numColumns + mv.selectedX
 
 	if updateCursor {
 		sz := mv.innerView.Size()
-		xPosFactor := float32(mv.curX)
-		yPosFactor := float32(float64(mv.numRows-1) - float64(mv.curY))
+		xPosFactor := float32(mv.selectedX)
+		yPosFactor := float32(float64(mv.numRows-1) - float64(mv.SelectedY))
 		xPos := xPosFactor * (sz.Width / float32(mv.numColumns))
 		yPos := yPosFactor * (sz.Height / float32(mv.numRows))
 		mv.selectedCells = []int{index}

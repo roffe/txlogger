@@ -1,6 +1,7 @@
 package windows
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -51,20 +52,15 @@ func (s *slider) TypedKey(key *fyne.KeyEvent) {
 }
 
 type LogPlayer struct {
-	fyne.Window
-
 	app fyne.App
 
-	prevBtn    *widget.Button
-	toggleBtn  *widget.Button
-	restartBtn *widget.Button
-	nextBtn    *widget.Button
-
-	currLine binding.Float
-
-	posLabel *widget.Label
-
-	selec *widget.Select
+	prevBtn     *widget.Button
+	toggleBtn   *widget.Button
+	restartBtn  *widget.Button
+	nextBtn     *widget.Button
+	currLine    binding.Float
+	posLabel    *widget.Label
+	speedSelect *widget.Select
 
 	slider *slider
 
@@ -77,11 +73,13 @@ type LogPlayer struct {
 
 	openMaps map[string]*MapViewerWindow
 
-	symbolSubs map[string][]*widgets.MapViewer
+	mvh *MapViewerHandler
 
 	handler func(ev *fyne.KeyEvent)
 
 	closed bool
+
+	fyne.Window
 }
 
 func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, onClose func()) *LogPlayer {
@@ -89,14 +87,19 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 	w.Resize(fyne.NewSize(1024, 530))
 
 	lp := &LogPlayer{
-		app:         a,
-		Window:      w,
-		db:          widgets.NewDashboard(a, w, true, nil, onClose),
-		openMaps:    make(map[string]*MapViewerWindow),
+		app: a,
+		db:  widgets.NewDashboard(a, w, true, nil, onClose),
+
 		controlChan: make(chan *controlMsg, 10),
-		symbols:     symbols,
-		logType:     strings.ToUpper(filepath.Ext(filename)),
-		closed:      false,
+
+		openMaps: make(map[string]*MapViewerWindow),
+		symbols:  symbols,
+		mvh:      NewMapViewerHandler(),
+
+		logType: strings.ToUpper(filepath.Ext(filename)),
+		closed:  false,
+
+		Window: w,
 	}
 
 	w.SetCloseIntercept(func() {
@@ -171,7 +174,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 		lp.controlChan <- &controlMsg{Op: OpSeek, Pos: 0}
 	})
 
-	lp.selec = widget.NewSelect([]string{"0.1x", "0.2x", "0.5x", "1x", "2x", "4x", "8x", "16x"}, func(s string) {
+	lp.speedSelect = widget.NewSelect([]string{"0.1x", "0.2x", "0.5x", "1x", "2x", "4x", "8x", "16x"}, func(s string) {
 		switch s {
 		case "0.1x":
 			lp.controlChan <- &controlMsg{Op: OpPlaybackSpeed, Rate: 10}
@@ -192,9 +195,9 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 		}
 	})
 
-	lp.selec.Selected = "1x"
+	lp.speedSelect.Selected = "1x"
 
-	lp.handler = keyHandler(w, lp.controlChan, lp.slider, lp.toggleBtn, lp.selec)
+	lp.handler = keyHandler(w, lp.controlChan, lp.slider, lp.toggleBtn, lp.speedSelect)
 	lp.slider.typedKey = lp.handler
 	w.Canvas().SetOnTypedKey(lp.handler)
 	w.SetContent(lp.render())
@@ -275,113 +278,9 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 		if lp.symbols == nil {
 			return
 		}
-		axis := symbol.GetInfo(symbol.ECU_T7, uid)
-		log.Println(axis)
-		mv, found := lp.openMaps[axis.Z]
-		if !found {
-			w := lp.app.NewWindow("")
-			//w.Canvas().SetOnTypedKey(lp.handler)
-			xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := lp.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-
-			w.SetTitle(fmt.Sprintf("Map Viewer - %s", axis.Z))
-
-			mv, err := widgets.NewMapViewer(xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, interpolate.Interpolate)
-			if err != nil {
-				log.Printf("X: %s Y: %s Z: %s err: %v", axis.X, axis.Y, axis.Z, err)
-				return
-			}
-
-			/*
-				ctrlC := &desktop.CustomShortcut{KeyName: fyne.KeyC, Modifier: fyne.KeyModifierControl}
-				ctrlV := &desktop.CustomShortcut{KeyName: fyne.KeyV, Modifier: fyne.KeyModifierControl}
-
-				w.Canvas().AddShortcut(ctrlC, func(_ fyne.Shortcut) {
-					log.Println("ctrlC")
-					lp.prevBtn.Tapped(&fyne.PointEvent{})
-				})
-
-				w.Canvas().AddShortcut(ctrlV, func(_ fyne.Shortcut) {
-					log.Println("ctrlV")
-					lp.nextBtn.Tapped(&fyne.PointEvent{})
-				})
-			*/
-
-			w.Canvas().SetOnTypedKey(func(ke *fyne.KeyEvent) {
-				if ke.Name == fyne.KeySpace {
-					lp.toggleBtn.Tapped(&fyne.PointEvent{})
-					return
-				}
-				mv.TypedKey(ke)
-
-			})
-
-			w.SetCloseIntercept(func() {
-				log.Println("closing", axis.Z)
-				delete(lp.openMaps, axis.Z)
-				subsx, found := lp.symbolSubs[axis.XFrom]
-				if found {
-					for i, sub := range subsx {
-						if sub == mv {
-							lp.symbolSubs[axis.XFrom] = append(subsx[:i], subsx[i+1:]...)
-							break
-						}
-					}
-				}
-				subsy, found := lp.symbolSubs[axis.YFrom]
-				if found {
-					for i, sub2 := range subsy {
-						if sub2 == mv {
-							lp.symbolSubs[axis.YFrom] = append(subsy[:i], subsy[i+1:]...)
-							break
-						}
-					}
-				}
-				if axis.Z == "MAFCal.m_RedundantAirMap" {
-					subst, found := lp.symbolSubs["MAF.m_AirInlet"]
-					if found {
-						for i, sub3 := range subst {
-							if sub3 == mv {
-								lp.symbolSubs["MAF.m_AirInlet"] = append(subst[:i], subst[i+1:]...)
-								break
-							}
-						}
-					}
-				}
-				mv.Close()
-				w.Close()
-			})
-			lp.openMaps[axis.Z] = &MapViewerWindow{Window: w, mv: mv}
-
-			if lp.symbolSubs == nil {
-				lp.symbolSubs = make(map[string][]*widgets.MapViewer)
-			}
-
-			if axis.XFrom == "" {
-				axis.XFrom = "MAF.m_AirInlet"
-			}
-
-			if axis.YFrom == "" {
-				axis.YFrom = "ActualIn.n_Engine"
-			}
-
-			lp.symbolSubs[axis.XFrom] = append(lp.symbolSubs[axis.XFrom], mv)
-			lp.symbolSubs[axis.YFrom] = append(lp.symbolSubs[axis.YFrom], mv)
-
-			if axis.Z == "MAFCal.m_RedundantAirMap" {
-				lp.symbolSubs["MAF.m_AirInlet"] = append(lp.symbolSubs["MAF.m_AirInlet"], mv)
-			}
-
-			w.SetContent(mv)
-			w.Show()
-			return
+		if err := lp.OpenMap(uid); err != nil {
+			log.Println(err)
 		}
-
-		mv.RequestFocus()
-
 	}
 
 	main := container.NewBorder(
@@ -394,7 +293,7 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 				lp.restartBtn,
 				lp.nextBtn,
 			),
-			layout.NewFixedWidth(75, lp.selec),
+			layout.NewFixedWidth(75, lp.speedSelect),
 			container.NewBorder(nil, nil, nil, lp.posLabel, lp.slider),
 		),
 		nil,
@@ -410,6 +309,100 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 	split.Offset = 0.85
 	return split
 }
+
+func (lp *LogPlayer) OpenMap(symbolName string) error {
+	if symbolName == "" {
+		return errors.New("symbolName is empty")
+	}
+	axis := symbol.GetInfo(symbol.ECU_T7, symbolName)
+	mw, found := lp.openMaps[axis.Z]
+	if !found {
+		w := lp.app.NewWindow(fmt.Sprintf("Map Viewer - %s", axis.Z))
+
+		xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := lp.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
+		if err != nil {
+			return err
+		}
+
+		mv, err := widgets.NewMapViewer(
+			widgets.WithXData(xData),
+			widgets.WithYData(yData),
+			widgets.WithZData(zData),
+			widgets.WithXCorrFac(xCorrFac),
+			widgets.WithYCorrFac(yCorrFac),
+			widgets.WithZCorrFac(zCorrFac),
+			widgets.WithXFrom(axis.XFrom),
+			widgets.WithYFrom(axis.YFrom),
+			widgets.WithInterPolFunc(interpolate.Interpolate),
+		)
+		if err != nil {
+			return fmt.Errorf("x: %s y: %s z: %s err: %w", axis.X, axis.Y, axis.Z, err)
+		}
+
+		w.Canvas().SetOnTypedKey(func(ke *fyne.KeyEvent) {
+			if ke.Name == fyne.KeySpace {
+				lp.toggleBtn.Tapped(&fyne.PointEvent{})
+				return
+			}
+			mv.TypedKey(ke)
+		})
+
+		w.SetCloseIntercept(func() {
+			log.Println("closing", axis.Z)
+			delete(lp.openMaps, axis.Z)
+			lp.mvh.Unsubscribe(axis.XFrom, mv)
+			lp.mvh.Unsubscribe(axis.YFrom, mv)
+			mv.Close()
+			w.Close()
+		})
+
+		mw = lp.newMapViewerWindow(w, mv, axis)
+
+		w.SetContent(mv)
+		w.Show()
+	}
+	mw.RequestFocus()
+	return nil
+}
+
+func (lp *LogPlayer) newMapViewerWindow(w fyne.Window, mv *widgets.MapViewer, axis symbol.Axis) *MapViewerWindow {
+	mw := &MapViewerWindow{Window: w, mv: mv}
+	lp.openMaps[axis.Z] = mw
+
+	if axis.XFrom == "" {
+		axis.XFrom = "MAF.m_AirInlet"
+	}
+
+	if axis.YFrom == "" {
+		axis.YFrom = "ActualIn.n_Engine"
+	}
+
+	lp.mvh.Subscribe(axis.XFrom, mv)
+	lp.mvh.Subscribe(axis.YFrom, mv)
+
+	if axis.Z == "MAFCal.m_RedundantAirMap" {
+		lp.mvh.Subscribe("MAF.m_AirInlet", mv)
+	}
+	return mw
+}
+
+/*
+func (lp *LogPlayer) addSymbolSub(symbolName string, mv *widgets.MapViewer) {
+	lp.symbolSubs[symbolName] = append(lp.symbolSubs[symbolName], mv)
+}
+
+func (lp *LogPlayer) removeSymbolSub(symbolName string, mv *widgets.MapViewer) {
+	subs, found := lp.symbolSubs[symbolName]
+	if found {
+		for i, sub := range subs {
+			if sub == mv {
+				lp.symbolSubs[symbolName] = append(subs[:i], subs[i+1:]...)
+				break
+			}
+		}
+	}
+}
+*/
 
 /*
 func (lp *LogPlayer) newMapBtn(btnTitle, supXName, supYName, mapName string) *widget.Button {
@@ -445,7 +438,6 @@ func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, co
 	var nextFrame, currentMillis int64
 	var playonce bool
 	speedMultiplier := 1.0
-	var airUpdate uint8
 
 	go func() {
 		for op := range control {
@@ -474,7 +466,6 @@ func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, co
 		}
 	}()
 
-	var tmpAir, tmpmReq float64
 	for !lp.closed {
 		currentMillis = time.Now().UnixMilli()
 		if logz.Pos() >= logz.Len()-1 || (!play && !playonce) {
@@ -490,44 +481,22 @@ func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, co
 		}
 		currentLine.Set(float64(logz.Pos()))
 		if rec := logz.Next(); rec != nil {
+			lp.db.SetTimeText(rec.Time.Format("15:04:05.99"))
 			delayTilNext := int64(float64(rec.DelayTillNext) * speedMultiplier)
 			if delayTilNext > 1000 {
 				delayTilNext = 100
 			}
 			nextFrame = currentMillis + delayTilNext
-
 			for k, v := range rec.Values {
-				// Set values on dashboard
 				lp.db.SetValue(k, v)
-
-				if k == "MAF.m_AirInlet" {
-					tmpAir = v
-					airUpdate++
-				}
-				if k == "m_Request" {
-					tmpmReq = v
-					airUpdate++
-				}
-				if airUpdate == 2 {
-					if s, found := lp.symbolSubs["AirDIFF"]; found {
-						for _, sub := range s {
-							sub.SetValue("AirDIFF", tmpmReq-tmpAir)
-						}
+				if len(lp.openMaps) > 0 {
+					fac := 1.0
+					if k == "ActualIn.p_AirInlet" {
+						fac = 1000
 					}
-					airUpdate = 0
-				}
-				fac := 1.0
-				if k == "ActualIn.p_AirInlet" {
-					fac = 1000
-				}
-				subs, found := lp.symbolSubs[k]
-				if found {
-					for _, sub := range subs {
-						sub.SetValue(k, v*fac)
-					}
+					lp.mvh.SetValue(k, v*fac)
 				}
 			}
-			lp.db.SetTimeText(rec.Time.Format("15:04:05.99"))
 		}
 		if playonce {
 			playonce = false

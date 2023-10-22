@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/datalogger"
@@ -211,18 +212,7 @@ func (mw *MainWindow) createButtons() {
 				mw.dlc.AttachDashboard(mw.dashboard)
 			}
 
-			fac := func(mv *widgets.MapViewer, name string) *func(v float64) {
-				fun := func(v float64) {
-					mv.SetValue(name, v)
-				}
-				return &fun
-			}
-			for _, mv := range mw.openMaps {
-				setRpm := fac(mv.mv, "ActualIn.n_Engine")
-				setAir := fac(mv.mv, "MAF.m_AirInlet")
-				mw.dlc.Subscribe("ActualIn.n_Engine", setRpm)
-				mw.dlc.Subscribe("MAF.m_AirInlet", setAir)
-			}
+			mw.dlc.AttachDashboard(mw.mvh)
 
 			go func() {
 				defer mw.enableBtns()
@@ -232,6 +222,7 @@ func (mw *MainWindow) createButtons() {
 				if mw.dashboard != nil {
 					mw.dlc.DetachDashboard(mw.dashboard)
 				}
+				mw.dlc.DetachDashboard(mw.mvh)
 				mw.loggingRunning = false
 				mw.dlc = nil
 				mw.logBtn.SetIcon(theme.MediaPlayIcon())
@@ -341,45 +332,60 @@ func (mw *MainWindow) openMap(axis symbol.Axis) {
 			return
 		}
 
-		mv, err := widgets.NewMapViewer(xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, interpolate.Interpolate)
+		mv, err := widgets.NewMapViewer(
+			widgets.WithXData(xData),
+			widgets.WithYData(yData),
+			widgets.WithZData(zData),
+			widgets.WithXCorrFac(xCorrFac),
+			widgets.WithYCorrFac(yCorrFac),
+			widgets.WithZCorrFac(zCorrFac),
+			widgets.WithXFrom(axis.XFrom),
+			widgets.WithYFrom(axis.YFrom),
+			widgets.WithInterPolFunc(interpolate.Interpolate),
+		)
 		if err != nil {
 			mw.Log(err.Error())
 			return
 		}
 
 		w.Canvas().SetOnTypedKey(mv.TypedKey)
-		w.Canvas().SetOnTypedRune(func(r rune) {
-			log.Println("TypedRune", string(r))
-		})
-		fac := func(mv *widgets.MapViewer, name string) *func(v float64) {
-			fun := func(v float64) {
-				mv.SetValue(name, v)
-			}
-			return &fun
-		}
 
-		setRpm := fac(mv, "ActualIn.n_Engine")
-		setAir := fac(mv, "MAF.m_AirInlet")
+		//		setRpm := fac(mv, "ActualIn.n_Engine")
+		//		setAir := fac(mv, "MAF.m_AirInlet")
 
 		w.SetCloseIntercept(func() {
+			log.Println("closing", axis.Z)
 			delete(mw.openMaps, axis.Z)
-			if mw.dlc != nil {
-				mw.dlc.Unsubscribe("ActualIn.n_Engine", setRpm)
-				mw.dlc.Unsubscribe("MAF.m_AirInlet", setAir)
-			}
+			mw.mvh.Unsubscribe(axis.XFrom, mv)
+			mw.mvh.Unsubscribe(axis.YFrom, mv)
+
 			w.Close()
 		})
-		if mw.dlc != nil {
-			mw.dlc.Subscribe("ActualIn.n_Engine", setRpm)
-			mw.dlc.Subscribe("MAF.m_AirInlet", setAir)
-		}
-		mw.openMaps[axis.Z] = &MapViewerWindow{w, mv}
+
+		mw.openMaps[axis.Z] = mw.newMapViewerWindow(w, mv, axis)
 		w.SetContent(mv)
 		w.Show()
 
 		return
 	}
 	mv.RequestFocus()
+}
+
+func (mw *MainWindow) newMapViewerWindow(w fyne.Window, mv *widgets.MapViewer, axis symbol.Axis) *MapViewerWindow {
+	mww := &MapViewerWindow{Window: w, mv: mv}
+	mw.openMaps[axis.Z] = mww
+
+	if axis.XFrom == "" {
+		axis.XFrom = "MAF.m_AirInlet"
+	}
+
+	if axis.YFrom == "" {
+		axis.YFrom = "ActualIn.n_Engine"
+	}
+
+	mw.mvh.Subscribe(axis.XFrom, mv)
+	mw.mvh.Subscribe(axis.YFrom, mv)
+	return mww
 }
 
 /*

@@ -102,6 +102,8 @@ type MainWindow struct {
 	leading *fyne.Container
 
 	openMaps map[string]*MapViewerWindow
+
+	mvh *MapViewerHandler
 }
 
 func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
@@ -119,6 +121,7 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		//sinkManager:           singMgr,
 		vars:     vars,
 		openMaps: make(map[string]*MapViewerWindow),
+		mvh:      NewMapViewerHandler(),
 	}
 
 	mw.Window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {

@@ -51,8 +51,8 @@ func (s *Symbol) IntFromData() []int {
 	konst := s.Type&KONST == KONST
 	char := s.Type&CHAR == CHAR
 
-	log.Println("IntFromData", s.Name, signed, konst, char, s.Length)
-	log.Printf("type: %X", s.Type)
+	log.Printf("IntFromData %s signed: %t konst: %t chat: %t len: %d: type %X", s.Name, signed, konst, char, s.Length, s.Type)
+
 	if konst && char {
 		return s.DataToUint8()
 	}

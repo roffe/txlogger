@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -31,9 +33,10 @@ type T8Client struct {
 	quitChan chan struct{}
 	Config
 	sysvars *ThreadSafeMap
-	db      Dashboard
+	dbs     []Dashboard
 
 	subs map[string][]*func(float64)
+	mu   sync.Mutex
 }
 
 func (c *T8Client) Close() {
@@ -59,6 +62,8 @@ func (c *T8Client) Subscribe(name string, cb *func(float64)) {
 }
 
 func (c *T8Client) Unsubscribe(name string, cb *func(float64)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	for i, f := range c.subs[name] {
 		if f == cb {
 			c.subs[name] = append(c.subs[name][:i], c.subs[name][i+1:]...)
@@ -68,13 +73,33 @@ func (c *T8Client) Unsubscribe(name string, cb *func(float64)) {
 }
 
 func (c *T8Client) AttachDashboard(db Dashboard) {
-	c.db = db
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, d := range c.dbs {
+		if d == db {
+			log.Println("Dropping")
+			return
+		}
+	}
+	c.dbs = append(c.dbs, db)
 }
 
 func (c *T8Client) DetachDashboard(db Dashboard) {
-	c.db = nil
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for i, d := range c.dbs {
+		if d == db {
+			c.dbs = append(c.dbs[:i], c.dbs[i+1:]...)
+			return
+		}
+	}
 }
 
+func (c *T8Client) setDbValue(name string, value float64) {
+	for _, db := range c.dbs {
+		db.SetValue(name, value)
+	}
+}
 func (c *T8Client) Start() error {
 	file, filename, err := createLog("t8l")
 	if err != nil {
@@ -179,9 +204,8 @@ func (c *T8Client) Start() error {
 							c.OnMessage(fmt.Sprintf("Failed to read %s: %v", va.Name, err))
 							break
 						}
-						if c.db != nil {
-							c.db.SetValue(va.Name, va.GetFloat64())
-						}
+
+						c.setDbValue(va.Name, va.GetFloat64())
 						if subs, found := c.subs[va.Name]; found {
 							for _, sub := range subs {
 								(*sub)(va.GetFloat64())

@@ -6,8 +6,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -21,9 +23,10 @@ type T7Client struct {
 	quitChan chan struct{}
 	Config
 	sysvars *ThreadSafeMap
-	db      Dashboard
+	dbs     []Dashboard
 
 	subs map[string][]*func(float64)
+	mu   sync.Mutex
 }
 
 func NewT7(cfg Config) (*T7Client, error) {
@@ -43,23 +46,25 @@ func NewT7(cfg Config) (*T7Client, error) {
 }
 
 func (c *T7Client) Subscribe(name string, cb *func(float64)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	subs, found := c.subs[name]
 	if !found {
 		c.subs[name] = []*func(float64){cb}
 		return
 	}
-
 	for _, f := range subs {
 		if f == cb {
 			return
 		}
 	}
-
 	subs = append(subs, cb)
 	c.subs[name] = subs
 }
 
 func (c *T7Client) Unsubscribe(name string, cb *func(float64)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	for i, f := range c.subs[name] {
 		if f == cb {
 			c.subs[name] = append(c.subs[name][:i], c.subs[name][i+1:]...)
@@ -74,11 +79,32 @@ func (c *T7Client) Close() {
 }
 
 func (c *T7Client) AttachDashboard(db Dashboard) {
-	c.db = db
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, d := range c.dbs {
+		if d == db {
+			log.Println("Dropping")
+			return
+		}
+	}
+	c.dbs = append(c.dbs, db)
 }
 
 func (c *T7Client) DetachDashboard(db Dashboard) {
-	c.db = nil
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for i, d := range c.dbs {
+		if d == db {
+			c.dbs = append(c.dbs[:i], c.dbs[i+1:]...)
+			return
+		}
+	}
+}
+
+func (c *T7Client) setDbValue(name string, value float64) {
+	for _, db := range c.dbs {
+		db.SetValue(name, value)
+	}
 }
 
 func (c *T7Client) Start() error {
@@ -129,10 +155,10 @@ func (c *T7Client) Start() error {
 					throttle := int(msg.Data()[5])
 					c.sysvars.Set("ActualIn.n_Engine", strconv.Itoa(int(rpm)))
 					c.sysvars.Set("Out.X_AccPedal", strconv.Itoa(throttle)+",0")
-					if c.db != nil {
-						c.db.SetValue("ActualIn.n_Engine", float64(rpm))
-						c.db.SetValue("Out.X_AccPedal", float64(throttle))
-					}
+
+					c.setDbValue("ActualIn.n_Engine", float64(rpm))
+					c.setDbValue("Out.X_AccPedal", float64(throttle))
+
 					if subs, found := c.subs["ActualIn.n_Engine"]; found {
 						for _, sub := range subs {
 							(*sub)(float64(rpm))
@@ -144,34 +170,29 @@ func (c *T7Client) Start() error {
 						}
 					}
 				case 0x280:
-					if c.db == nil {
-						continue
-					}
 					data := msg.Data()[4]
 					if data&0x20 == 0x20 {
-						c.db.SetValue("CRUISE", 1)
+						c.setDbValue("CRUISE", 1)
 					} else {
-						c.db.SetValue("CRUISE", 0)
+						c.setDbValue("CRUISE", 0)
 					}
 					if data&0x80 == 0x80 {
-						c.db.SetValue("CEL", 1)
+						c.setDbValue("CEL", 1)
 					} else {
-						c.db.SetValue("CEL", 0)
+						c.setDbValue("CEL", 0)
 					}
 					data2 := msg.Data()[3]
 					if data2&0x01 == 0x01 {
-						c.db.SetValue("LIMP", 1)
+						c.setDbValue("LIMP", 1)
 					} else {
-						c.db.SetValue("LIMP", 0)
+						c.setDbValue("LIMP", 0)
 					}
 
 				case 0x3A0:
 					speed := uint16(msg.Data()[4]) | uint16(msg.Data()[3])<<8
 					realSpeed := float64(speed) / 10
 					c.sysvars.Set("In.v_Vehicle", strconv.FormatFloat(realSpeed, 'f', 1, 64))
-					if c.db != nil {
-						c.db.SetValue("In.v_Vehicle", realSpeed)
-					}
+					c.setDbValue("In.v_Vehicle", realSpeed)
 				}
 			}
 		}
@@ -266,10 +287,9 @@ func (c *T7Client) Start() error {
 							break
 						}
 
-						// Set value on dashboard
-						if c.db != nil {
-							c.db.SetValue(va.Name, va.GetFloat64())
-						}
+						// Set value on dashboards
+						c.setDbValue(va.Name, va.GetFloat64())
+
 						if subs, found := c.subs[va.Name]; found {
 							for _, sub := range subs {
 								(*sub)(va.GetFloat64())

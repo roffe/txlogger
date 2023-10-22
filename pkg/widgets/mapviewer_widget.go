@@ -1,20 +1,16 @@
 package widgets
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
-	"log"
 	"strconv"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/interpolate"
-	"github.com/roffe/txlogger/pkg/layout"
 )
 
 const (
@@ -37,13 +33,12 @@ type MapViewer struct {
 
 	xFrom, yFrom string
 
-	xIdx, yIdx float64
-
 	numColumns, numRows, numData int
 	xData, yData, zData          []int
 
 	content   *fyne.Container
 	innerView *fyne.Container
+	grid      *Grid
 	cursor    fyne.CanvasObject
 	crosshair fyne.CanvasObject
 
@@ -59,135 +54,14 @@ type MapViewer struct {
 
 	setChan chan xyUpdate
 
-	curX, curY int
+	xIdx, yIdx           float64
+	selectedX, SelectedY int
 
 	moving        bool
 	selecting     bool
 	selectedCells []int
 
 	SetValueFunc func(name string, value float64)
-}
-
-func NewMapViewer(xData, yData, zData []int, xCorrFac, yCorrFac, zCorrFac float64, interPolfunc interpolate.InterPolFunc) (*MapViewer, error) {
-	xLen := len(xData)
-	yLen := len(yData)
-	zLen := len(zData)
-
-	if xLen*yLen != zLen && xLen > 1 && yLen > 1 {
-		return nil, fmt.Errorf("NewMapViewer xLen * yLen != zLen")
-	}
-
-	var yAxis []*canvas.Text
-	yAxisButtons := container.New(&layout.Vertical{})
-	if yLen > 1 {
-		prec := 0
-		if xCorrFac < 1 {
-			prec = 2
-
-		}
-		for i := yLen - 1; i >= 0; i-- {
-			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(yData[i])*yCorrFac, 'f', prec, 64), TextSize: 13}
-			yAxis = append(yAxis, text)
-			yAxisButtons.Add(text)
-		}
-	}
-
-	var xAxis []*canvas.Text
-	xAxisButtons := container.New(&layout.Horizontal{
-		Offset: yAxisButtons,
-	})
-	if xLen > 1 {
-		prec := 0
-		if xCorrFac < 1 {
-			prec = 2
-		}
-		for i := 0; i < xLen; i++ {
-			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(xData[i])*xCorrFac, 'f', prec, 64), TextSize: 13}
-			xAxis = append(xAxis, text)
-			xAxisButtons.Add(text)
-		}
-	}
-
-	crosshair := NewRectangle(color.RGBA{0xfc, 0x4a, 0xFA, 255}, 4)
-	cursor := NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 255}, 4)
-
-	textValues, valueTexts := createTextValues(zData, zCorrFac)
-
-	width := float32(xLen * cellWidth)
-	height := float32(yLen * cellHeight)
-	valueMap := canvas.NewImageFromImage(createImage(xData, yData, zData, zCorrFac))
-	valueMap.ScaleMode = canvas.ImageScalePixels
-	valueMap.SetMinSize(fyne.NewSize(width, height))
-	valueMap.Resize(fyne.NewSize(width, height))
-
-	grid := NewGrid(xLen, yLen)
-
-	inner := container.NewStack(
-		valueMap,
-		grid,
-		valueTexts,
-		container.NewWithoutLayout(
-			crosshair,
-			cursor,
-		),
-	)
-
-	content := container.NewBorder(
-		xAxisButtons,
-		container.NewGridWithColumns(2,
-			widget.NewButtonWithIcon("Load", theme.DocumentIcon(), func() {
-				log.Println("Load")
-			}),
-			widget.NewButtonWithIcon("Save", theme.DocumentSaveIcon(), func() {
-				log.Println("Save")
-			}),
-		),
-		yAxisButtons,
-		nil,
-		inner,
-	)
-
-	mv := &MapViewer{
-		ipf: interPolfunc,
-
-		content:   content,
-		innerView: inner,
-		cursor:    cursor,
-		crosshair: crosshair,
-
-		xAxisButtons: xAxisButtons,
-		yAxisButtons: yAxisButtons,
-		xAxis:        xAxis,
-		yAxis:        yAxis,
-
-		numColumns: xLen,
-		numRows:    yLen,
-		numData:    zLen,
-
-		xData: xData,
-		yData: yData,
-		zData: zData,
-
-		valueTexts: valueTexts,
-		valueMap:   valueMap,
-
-		xCorrFac: xCorrFac,
-		yCorrFac: yCorrFac,
-		zCorrFac: zCorrFac,
-
-		textValues: textValues,
-
-		setChan: make(chan xyUpdate, 100),
-	}
-	mv.ExtendBaseWidget(mv)
-
-	go func() {
-		for xy := range mv.setChan {
-			mv.setXY(xy.x, xy.y)
-		}
-	}()
-
-	return mv, nil
 }
 
 func (mv *MapViewer) Refresh() {
@@ -216,6 +90,7 @@ func (mv *MapViewer) Info() MapViewerInfo {
 }
 
 func (mv *MapViewer) SetValue(name string, value float64) {
+	//log.Printf("MapViewer: SetValue: %s: %f", name, value)
 	if mv.SetValueFunc != nil {
 		mv.SetValueFunc(name, value)
 		return
@@ -228,8 +103,10 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 		mv.yValue = int(value)
 		mv.tik++
 	}
-	if mv.tik == 2 {
-		mv.setChan <- xyUpdate{mv.xValue, mv.yValue}
+	if mv.tik >= 2 {
+		update := xyUpdate{mv.xValue, mv.yValue}
+		//log.Printf("MapViewer: SetValue: x: %d, y: %d", mv.xValue, mv.yValue)
+		mv.setChan <- update
 		mv.tik = 0
 	}
 }

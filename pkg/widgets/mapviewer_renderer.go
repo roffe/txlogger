@@ -78,8 +78,8 @@ func (vr *MapViewerRenderer) Layout(size fyne.Size) {
 	vr.mv.cursor.Resize(fyne.NewSize(widthFactor, heightFactor))
 	vr.mv.cursor.Move(
 		fyne.NewPos(
-			float32(vr.mv.curX)*widthFactor,
-			float32(vr.mv.numRows-1-vr.mv.curY)*heightFactor,
+			float32(vr.mv.selectedX)*widthFactor,
+			float32(vr.mv.numRows-1-vr.mv.SelectedY)*heightFactor,
 		),
 	)
 }
