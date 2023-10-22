@@ -16,6 +16,15 @@ type MapViewerRenderer struct {
 	mv *MapViewer
 }
 
+func calculateOptimalTextSize(width, height float32, columns, rows int) float32 {
+	// Calculate the width and height of a single cell
+	cellWidth := float64(width/float32(columns)) / 2.5
+	cellHeight := float64(height/float32(rows)) / 2.2
+
+	// The optimal text size is the smallest of the two dimensions of the cell
+	return float32(math.Min(cellWidth, cellHeight))
+}
+
 func (vr *MapViewerRenderer) Layout(size fyne.Size) {
 	vr.mv.content.Resize(size)
 	sz := vr.mv.innerView.Size()
@@ -26,30 +35,33 @@ func (vr *MapViewerRenderer) Layout(size fyne.Size) {
 	widthFactor := sz.Width / numColumnsFloat
 	heightFactor := sz.Height / numRowsFloat
 
+	// Use the more restrictive factor to determine text size
+
 	// Calculate text size
-	textSize := min(heightFactor/2, widthFactor/2)
-	textSize = float32(math.Floor(float64(textSize)*100) / 100)
+	textSize := calculateOptimalTextSize(sz.Width, sz.Height, vr.mv.numColumns, vr.mv.numRows)
 
 	// Position and resize text values
 	for i := len(vr.mv.yData); i > 0; i-- {
 		for j := 0; j < len(vr.mv.xData); j++ {
 			t := vr.mv.textValues[(i*vr.mv.numColumns)-(vr.mv.numColumns-j)]
 			t.TextSize = textSize
+			t.Resize(t.MinSize())
 			t.Move(fyne.NewPos(
-				float32(j)*widthFactor+4,
-				sz.Height-float32(i)*heightFactor,
+				(float32(j)*widthFactor)+(widthFactor/2)-(t.MinSize().Width/2),
+				(sz.Height-float32(i)*heightFactor)+(heightFactor/2)-(t.MinSize().Height/2),
 			))
-			t.Resize(fyne.NewSize(widthFactor, heightFactor))
 		}
 	}
 
 	// Update x and y axes
 	for _, xb := range vr.mv.xAxis {
 		xb.TextSize = textSize
+		xb.Resize(xb.MinSize())
 		xb.Refresh()
 	}
 	for _, yb := range vr.mv.yAxis {
 		yb.TextSize = textSize
+		yb.Resize(yb.MinSize())
 		yb.Refresh()
 	}
 

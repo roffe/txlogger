@@ -335,18 +335,22 @@ func (mw *MainWindow) openMap(axis symbol.Axis) {
 			mw.Log("No binary loaded")
 			return
 		}
-		xData, yData, zData, _, _, corrFac, err := mw.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
+		xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := mw.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
 		if err != nil {
 			mw.Log(err.Error())
 			return
 		}
 
-		mv, err := widgets.NewMapViewer(xData, yData, zData, corrFac, interpolate.Interpolate)
+		mv, err := widgets.NewMapViewer(xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, interpolate.Interpolate)
 		if err != nil {
 			mw.Log(err.Error())
 			return
 		}
 
+		w.Canvas().SetOnTypedKey(mv.TypedKey)
+		w.Canvas().SetOnTypedRune(func(r rune) {
+			log.Println("TypedRune", string(r))
+		})
 		fac := func(mv *widgets.MapViewer, name string) *func(v float64) {
 			fun := func(v float64) {
 				mv.SetValue(name, v)

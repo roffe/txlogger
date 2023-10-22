@@ -13,30 +13,33 @@ func (mv *MapViewer) TypedRune(r rune) {
 }
 
 func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
-	log.Println("TypedKey", key.Name)
-	index := mv.curY*mv.numColumns + mv.curX
+	shifted := false
+	if key.Name == "LeftShift" {
+		shifted = true
+	}
+	log.Println("TypedKey", key.Name, shifted, key.Physical.ScanCode)
 	var refresh, updateCursor bool
 	switch key.Name {
 	case fyne.KeyPageUp:
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] += 10
+			mv.zData[cell] += int((mv.zCorrFac * 10) * (1.0 / mv.zCorrFac))
 		}
 		refresh = true
 	case fyne.KeyPageDown:
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] -= 10
+			mv.zData[cell] -= int((mv.zCorrFac * 10) * (1.0 / mv.zCorrFac))
 		}
 		refresh = true
 	case "+":
 		//mv.zData[index]++
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell]++
+			mv.zData[cell] += int(mv.zCorrFac * (1.0 / mv.zCorrFac))
 		}
 		refresh = true
 	case "-":
 		//mv.zData[index]--
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell]--
+			mv.zData[cell] -= int(mv.zCorrFac * (1.0 / mv.zCorrFac))
 		}
 		refresh = true
 	case "Up":
@@ -64,18 +67,27 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 		}
 		updateCursor = true
 	}
+	index := mv.curY*mv.numColumns + mv.curX
+
 	if updateCursor {
 		sz := mv.innerView.Size()
 		xPosFactor := float32(mv.curX)
 		yPosFactor := float32(float64(mv.numRows-1) - float64(mv.curY))
 		xPos := xPosFactor * (sz.Width / float32(mv.numColumns))
 		yPos := yPosFactor * (sz.Height / float32(mv.numRows))
+		mv.selectedCells = []int{index}
+		mv.cursor.Resize(fyne.NewSize(sz.Width/float32(mv.numColumns), sz.Height/float32(mv.numRows)))
 		mv.cursor.Move(fyne.NewPos(xPos, yPos))
 	}
+
 	if refresh {
 		for _, textIndex := range mv.selectedCells {
+			prec := 2
+			if mv.zCorrFac == 1 {
+				prec = 0
+			}
 			t := mv.textValues[textIndex]
-			t.Text = strconv.FormatFloat(float64(mv.zData[index])*mv.corrFac, 'f', 2, 64)
+			t.Text = strconv.FormatFloat(float64(mv.zData[index])*mv.zCorrFac, 'f', prec, 64)
 			t.Refresh()
 		}
 		mv.Refresh()

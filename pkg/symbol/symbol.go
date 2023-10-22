@@ -48,6 +48,22 @@ func (s *Symbol) String() string {
 
 func (s *Symbol) IntFromData() []int {
 	signed := s.Type&SIGNED == 1
+	konst := s.Type&KONST == KONST
+	char := s.Type&CHAR == CHAR
+
+	log.Println("IntFromData", s.Name, signed, konst, char, s.Length)
+	log.Printf("type: %X", s.Type)
+	if konst && char {
+		return s.DataToUint8()
+	}
+
+	if s.Name == "VIOSMAFCal.Q_AirInletTab2" {
+		return s.DataToUint16()
+	}
+
+	if s.Name == "BstKnkCal.MaxAirmass" {
+		return s.DataToInt16()
+	}
 
 	/*
 		if yLen*xLen == int(s.Length) {
@@ -76,82 +92,63 @@ func (s *Symbol) IntFromData() []int {
 	if signed && s.Length == 2 {
 		return s.DataToInt16()
 	}
-	if !signed && (s.Length == 22 || s.Length == 30) {
+	if !signed && (s.Length == 22 || s.Length == 30 || s.Length == 36) {
 		return s.DataToUint16()
 	}
-	if signed && (s.Length == 22 || s.Length == 30) {
+	if signed && (s.Length == 22 || s.Length == 30 || s.Length == 36) {
 		return s.DataToInt16()
 	}
-	return s.DataToUint8()
-}
-
-func (s *Symbol) DataToUint16() []int {
-	r := bytes.NewReader(s.data)
-	var values []int
-	for r.Len() > 0 {
-		var v uint16
-		err := binary.Read(r, binary.BigEndian, &v)
-		if err != nil {
-			log.Fatalf("error reading symbol data: %v", err)
-		}
-		values = append(values, int(v))
+	if !signed {
+		return s.DataToUint16()
 	}
-	return values
+	return s.DataToInt16()
 }
 
 func (s *Symbol) DataToInt8() []int {
-	r := bytes.NewReader(s.data)
-	var values []int
-	for r.Len() > 0 {
-		var v int8
-		err := binary.Read(r, binary.BigEndian, &v)
-		if err != nil {
-			log.Panicf("error reading symbol data: %v", err)
-		}
-		values = append(values, int(v))
+	values := make([]int, len(s.data))
+	for i, b := range s.data {
+		values[i] = int(int8(b))
 	}
 	return values
 }
 
 func (s *Symbol) DataToUint8() []int {
-	r := bytes.NewReader(s.data)
-	var values []int
-	for r.Len() > 0 {
-		var v uint8
-		err := binary.Read(r, binary.BigEndian, &v)
-		if err != nil {
-			log.Panicf("error reading symbol data: %v", err)
-		}
-		values = append(values, int(v))
+	values := make([]int, len(s.data))
+	for i, b := range s.data {
+		values[i] = int(b)
 	}
+	return values
+}
+
+func (s *Symbol) DataToUint16() []int {
+	if len(s.data)%2 != 0 {
+		log.Panicf("data length is not even: %d", len(s.data))
+	}
+
+	count := len(s.data) / 2
+	values := make([]int, count)
+
+	for i := 0; i < count; i++ {
+		value := binary.BigEndian.Uint16(s.data[i*2 : i*2+2])
+		values[i] = int(value)
+	}
+
 	return values
 }
 
 func (s *Symbol) DataToInt16() []int {
-	r := bytes.NewReader(s.data)
-	var values []int
-	for r.Len() > 0 {
-		var v int16
-		err := binary.Read(r, binary.BigEndian, &v)
-		if err != nil {
-			log.Panicf("error reading symbol data: %v", err)
-		}
-		values = append(values, int(float64(v)*s.Correctionfactor))
+	if len(s.data)%2 != 0 {
+		log.Panicf("data length is not even: %d", len(s.data))
 	}
-	return values
-}
 
-func (s *Symbol) DataToByte() []byte {
-	r := bytes.NewReader(s.data)
-	var values []byte
-	for r.Len() > 0 {
-		var v byte
-		err := binary.Read(r, binary.BigEndian, &v)
-		if err != nil {
-			log.Fatalf("error reading symbol data: %v", err)
-		}
-		values = append(values, v)
+	count := len(s.data) / 2
+	values := make([]int, count)
+
+	for i := 0; i < count; i++ {
+		value := int16(binary.BigEndian.Uint16(s.data[i*2 : i*2+2]))
+		values[i] = int(value)
 	}
+
 	return values
 }
 

@@ -22,16 +22,66 @@ const (
 	STRUCT   = 0x20 /* struct flag in type */
 )
 
+var T7SymbolsTuningOrder = []string{
+	"Calibration",
+	"Injectors",
+	"Limiters",
+	"Fuel",
+	"Boost",
+	"Ignition",
+	"Adaption",
+	"Myrtilos",
+}
+
 var T7SymbolsTuning = map[string][]string{
-	"Adaption":    {"PurgeCal.ST_PurgeEnable", "AdpFuelCal.T_AdaptLim", "LambdaCal.ST_Enable"},
-	"Boost":       {"BoostCal.RegMap", "BoostCal.PMap", "BoostCal.IMap", "BoostCal.DMap"},
-	"Calibration": {"AirCompCal.PressMap", "MAFCal.m_RedundantAirMap", "VIOSMAFCal.FreqSP", "VIOSMAFCal.Q_AirInletTab2", "TCompCal.EnrFacTab", "TCompCal.EnrFacE85Tab"},
-	"Fuel":        {"BFuelCal.Map", "BFuelCal.StartMap"},
-	"Ignition":    {"IgnNormCal.Map", "IgnE85Cal.fi_AbsMap", "IgnIdleCal.fi_IdleMap"},
-	"Injectors":   {"InjCorrCal.InjectorConst", "InjCorrCal.BattCorrTab"},
-	"Limiters":    {"BstKnkCal.MaxAirmass", "TorqueCal.M_ManGearLim"},
-	"Myrtilos":    {"MyrtilosCal.Launch_InjFac_at_rpm", "MyrtilosCal.Launch_PWM_max_at_stand", "MyrtilosCal.Launch_RPM", "MyrtilosCal.Launch_Ign_fi_Min", "MyrtilosCal.Launch_DisableSpeed"},
-	"Start":       {"StartCal.EnrFacTab", "StartCal.EnrFacE85Tab"},
+	"Calibration": {
+		"AirCompCal.PressMap",
+		"MAFCal.m_RedundantAirMap",
+		"TCompCal.EnrFacE85Tab",
+		"TCompCal.EnrFacTab",
+		"VIOSMAFCal.FreqSP",
+		"VIOSMAFCal.Q_AirInletTab2",
+	},
+	"Injectors": {
+		"InjCorrCal.BattCorrTab",
+		"InjCorrCal.BattCorrSP",
+		"InjCorrCal.InjectorConst",
+	},
+	"Limiters": {
+		"BstKnkCal.MaxAirmass",
+		"TorqueCal.M_ManGearLim",
+	},
+	"Fuel": {
+		"BFuelCal.Map",
+		"BFuelCal.StartMap",
+		"StartCal.EnrFacE85Tab",
+		"StartCal.EnrFacTab",
+	},
+	"Boost": {
+		"BoostCal.RegMap",
+		"BoostCal.PMap",
+		"BoostCal.IMap",
+		"BoostCal.DMap",
+	},
+	"Ignition": {
+		"IgnE85Cal.fi_AbsMap",
+		"IgnIdleCal.fi_IdleMap",
+		"IgnNormCal.Map",
+		"IgnStartCal.fi_StartMap",
+	},
+	"Adaption": {
+		"AdpFuelCal.T_AdaptLim",
+		"FCutCal.ST_Enable",
+		"LambdaCal.ST_Enable",
+		"PurgeCal.ST_PurgeEnable",
+	},
+	"Myrtilos": {
+		"MyrtilosCal.Launch_DisableSpeed",
+		"MyrtilosCal.Launch_Ign_fi_Min",
+		"MyrtilosCal.Launch_RPM",
+		"MyrtilosCal.Launch_InjFac_at_rpm",
+		"MyrtilosCal.Launch_PWM_max_at_stand",
+	},
 }
 
 func ValidateTrionic7File(data []byte) error {

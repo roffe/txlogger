@@ -26,7 +26,6 @@ func (l *MinHeight) MinSize(objects []fyne.CanvasObject) fyne.Size {
 		if width < o.MinSize().Width {
 			width = o.MinSize().Width
 		}
-
 		height += o.MinSize().Height
 	}
 	return fyne.NewSize(width, max(height, l.Height))
@@ -40,8 +39,8 @@ func (l *Horizontal) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	offset := l.Offset.Size().Width
 	width := (size.Width - offset) / float32(len(objects))
 	for i, o := range objects {
-		o.Move(fyne.NewPos((float32(i)*width)+offset, 0))
-		o.Resize(fyne.NewSize(width, o.MinSize().Height))
+		o.Resize(fyne.NewSize(o.MinSize().Width, o.MinSize().Height))
+		o.Move(fyne.NewPos(offset+(float32(i)*width)+(width/2)-o.MinSize().Width/2, 0))
 	}
 }
 
@@ -64,8 +63,8 @@ type Vertical struct {
 func (l *Vertical) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	for i, o := range objects {
 		height := size.Height / float32(len(objects))
-		o.Move(fyne.NewPos(0, float32(i)*height))
-		o.Resize(fyne.NewSize(size.Width, height))
+		o.Resize(fyne.NewSize(o.MinSize().Width, o.MinSize().Height))
+		o.Move(fyne.NewPos(0, (float32(i)*height)+(height/2)-o.MinSize().Height/2))
 	}
 }
 

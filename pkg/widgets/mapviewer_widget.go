@@ -32,8 +32,8 @@ type MapViewer struct {
 	widget.BaseWidget
 
 	//xName, yName, zName string
-	xValue, yValue int
-	corrFac        float64
+	xValue, yValue               int
+	xCorrFac, yCorrFac, zCorrFac float64
 
 	xFrom, yFrom string
 
@@ -68,20 +68,25 @@ type MapViewer struct {
 	SetValueFunc func(name string, value float64)
 }
 
-func NewMapViewer(xData, yData, zData []int, corrFac float64, interPolfunc interpolate.InterPolFunc) (*MapViewer, error) {
+func NewMapViewer(xData, yData, zData []int, xCorrFac, yCorrFac, zCorrFac float64, interPolfunc interpolate.InterPolFunc) (*MapViewer, error) {
 	xLen := len(xData)
 	yLen := len(yData)
 	zLen := len(zData)
 
 	if xLen*yLen != zLen && xLen > 1 && yLen > 1 {
-		return nil, fmt.Errorf("xLen * yLen != zLen")
+		return nil, fmt.Errorf("NewMapViewer xLen * yLen != zLen")
 	}
 
 	var yAxis []*canvas.Text
 	yAxisButtons := container.New(&layout.Vertical{})
 	if yLen > 1 {
+		prec := 0
+		if xCorrFac < 1 {
+			prec = 2
+
+		}
 		for i := yLen - 1; i >= 0; i-- {
-			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: fmt.Sprintf("%d", yData[i]), TextSize: 13}
+			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(yData[i])*yCorrFac, 'f', prec, 64), TextSize: 13}
 			yAxis = append(yAxis, text)
 			yAxisButtons.Add(text)
 		}
@@ -92,8 +97,12 @@ func NewMapViewer(xData, yData, zData []int, corrFac float64, interPolfunc inter
 		Offset: yAxisButtons,
 	})
 	if xLen > 1 {
+		prec := 0
+		if xCorrFac < 1 {
+			prec = 2
+		}
 		for i := 0; i < xLen; i++ {
-			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: fmt.Sprintf("%d", xData[i]), TextSize: 13}
+			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(xData[i])*xCorrFac, 'f', prec, 64), TextSize: 13}
 			xAxis = append(xAxis, text)
 			xAxisButtons.Add(text)
 		}
@@ -102,11 +111,11 @@ func NewMapViewer(xData, yData, zData []int, corrFac float64, interPolfunc inter
 	crosshair := NewRectangle(color.RGBA{0xfc, 0x4a, 0xFA, 255}, 4)
 	cursor := NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 255}, 4)
 
-	textValues, valueTexts := createTextValues(zData, corrFac)
+	textValues, valueTexts := createTextValues(zData, zCorrFac)
 
 	width := float32(xLen * cellWidth)
 	height := float32(yLen * cellHeight)
-	valueMap := canvas.NewImageFromImage(createImage(xData, yData, zData, corrFac))
+	valueMap := canvas.NewImageFromImage(createImage(xData, yData, zData, zCorrFac))
 	valueMap.ScaleMode = canvas.ImageScalePixels
 	valueMap.SetMinSize(fyne.NewSize(width, height))
 	valueMap.Resize(fyne.NewSize(width, height))
@@ -161,7 +170,10 @@ func NewMapViewer(xData, yData, zData []int, corrFac float64, interPolfunc inter
 
 		valueTexts: valueTexts,
 		valueMap:   valueMap,
-		corrFac:    corrFac,
+
+		xCorrFac: xCorrFac,
+		yCorrFac: yCorrFac,
+		zCorrFac: zCorrFac,
 
 		textValues: textValues,
 
@@ -179,7 +191,7 @@ func NewMapViewer(xData, yData, zData []int, corrFac float64, interPolfunc inter
 }
 
 func (mv *MapViewer) Refresh() {
-	mv.valueMap.Image = createImage(mv.xData, mv.yData, mv.zData, mv.corrFac)
+	mv.valueMap.Image = createImage(mv.xData, mv.yData, mv.zData, mv.zCorrFac)
 	mv.valueMap.Refresh()
 }
 
@@ -289,7 +301,7 @@ func createTextValues(zData []int, corrFac float64) ([]*canvas.Text, *fyne.Conta
 	var values []*canvas.Text
 	valueContainer := container.NewWithoutLayout()
 	prec := 0
-	if corrFac != 1 {
+	if corrFac < 1 {
 		prec = 2
 	}
 	for _, v := range zData {

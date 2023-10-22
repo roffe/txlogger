@@ -1,5 +1,10 @@
 package symbol
 
+import (
+	"fmt"
+	"log"
+)
+
 type ECUType int
 
 const (
@@ -21,7 +26,7 @@ type Axis struct {
 }
 
 func (a *Axis) String() string {
-	return a.X + ", " + a.Y + ", " + a.Z
+	return fmt.Sprintf("X: %s, Y: %s, Z: %s, XFrom: %s, YFrom: %s", a.X, a.Y, a.Z, a.XFrom, a.YFrom)
 }
 
 /*
@@ -90,8 +95,8 @@ func GetInfo(ecu ECUType, name string) Axis {
 
 	if axis.X == "" && axis.Y == "" && axis.Z == "" {
 		return Axis{
-			"none",
-			"none",
+			"",
+			"",
 			name,
 			"",
 			"",
@@ -100,6 +105,6 @@ func GetInfo(ecu ECUType, name string) Axis {
 			"",
 		}
 	}
-
+	log.Println(axis)
 	return axis
 }

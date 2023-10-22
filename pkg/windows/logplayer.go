@@ -281,7 +281,7 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 		if !found {
 			w := lp.app.NewWindow("")
 			//w.Canvas().SetOnTypedKey(lp.handler)
-			xData, yData, zData, _, _, corrFac, err := lp.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
+			xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := lp.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
 			if err != nil {
 				log.Println(err)
 				return
@@ -289,11 +289,36 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 
 			w.SetTitle(fmt.Sprintf("Map Viewer - %s", axis.Z))
 
-			mv, err := widgets.NewMapViewer(xData, yData, zData, corrFac, interpolate.Interpolate)
+			mv, err := widgets.NewMapViewer(xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, interpolate.Interpolate)
 			if err != nil {
 				log.Printf("X: %s Y: %s Z: %s err: %v", axis.X, axis.Y, axis.Z, err)
 				return
 			}
+
+			/*
+				ctrlC := &desktop.CustomShortcut{KeyName: fyne.KeyC, Modifier: fyne.KeyModifierControl}
+				ctrlV := &desktop.CustomShortcut{KeyName: fyne.KeyV, Modifier: fyne.KeyModifierControl}
+
+				w.Canvas().AddShortcut(ctrlC, func(_ fyne.Shortcut) {
+					log.Println("ctrlC")
+					lp.prevBtn.Tapped(&fyne.PointEvent{})
+				})
+
+				w.Canvas().AddShortcut(ctrlV, func(_ fyne.Shortcut) {
+					log.Println("ctrlV")
+					lp.nextBtn.Tapped(&fyne.PointEvent{})
+				})
+			*/
+
+			w.Canvas().SetOnTypedKey(func(ke *fyne.KeyEvent) {
+				if ke.Name == fyne.KeySpace {
+					lp.toggleBtn.Tapped(&fyne.PointEvent{})
+					return
+				}
+				mv.TypedKey(ke)
+
+			})
+
 			w.SetCloseIntercept(func() {
 				log.Println("closing", axis.Z)
 				delete(lp.openMaps, axis.Z)
@@ -465,7 +490,12 @@ func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, co
 		}
 		currentLine.Set(float64(logz.Pos()))
 		if rec := logz.Next(); rec != nil {
-			nextFrame = currentMillis + int64(float64(rec.DelayTillNext)*speedMultiplier)
+			delayTilNext := int64(float64(rec.DelayTillNext) * speedMultiplier)
+			if delayTilNext > 1000 {
+				delayTilNext = 100
+			}
+			nextFrame = currentMillis + delayTilNext
+
 			for k, v := range rec.Values {
 				// Set values on dashboard
 				lp.db.SetValue(k, v)

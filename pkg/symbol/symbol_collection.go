@@ -1,8 +1,6 @@
 package symbol
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"log"
 	"strings"
@@ -90,23 +88,23 @@ func (c *Collection) Dump() string {
 
 func (c *Collection) GetXYZ(xAxis, yAxis, zAxis string) ([]int, []int, []int, float64, float64, float64, error) {
 	symx, symy, symz := c.GetByName(xAxis), c.GetByName(yAxis), c.GetByName(zAxis)
-
 	var xOut, yOut []int
+	zOut := symz.IntFromData()
 	xFac, yFac := 1.0, 1.0
-	if xAxis == "none" {
+	if xAxis == "" {
 		xOut = []int{0}
 	} else if xAxis != "" && symx != nil {
 		xOut = symx.IntFromData()
 		xFac = symx.Correctionfactor
 	}
-	if yAxis == "none" {
-		yOut = []int{0}
+	if yAxis == "" {
+		yOut = make([]int, len(zOut))
 	} else if yAxis != "" && symy != nil {
 		yOut = symy.IntFromData()
 		yFac = symy.Correctionfactor
 	}
-	if xAxis == "none" || yAxis == "none" {
-		return xOut, yOut, symz.IntFromData(), xFac, yFac, symz.Correctionfactor, nil
+	if len(xOut) >= 1 || len(yOut) >= 1 {
+		return xOut, yOut, zOut, xFac, yFac, symz.Correctionfactor, nil
 	}
 	asd := map[string]*Symbol{
 		xAxis: symx,
@@ -115,46 +113,52 @@ func (c *Collection) GetXYZ(xAxis, yAxis, zAxis string) ([]int, []int, []int, fl
 	}
 	for k, v := range asd {
 		if v == nil {
+			log.Println("xxx")
 			return nil, nil, nil, 0, 0, 0, fmt.Errorf("failed to find %s", k)
 		}
 	}
 
-	var x, y, z []int
-	if symx.Type&SIGNED == 1 {
-		x = symx.DataToInt16()
-	} else {
-		x = symx.DataToUint16()
-	}
-	if symy.Type&SIGNED == 1 {
-		y = symy.DataToInt16()
-	} else {
-		y = symy.DataToUint16()
-	}
-
-	if len(x)*len(y) == len(symz.Bytes()) {
-		if symz.Type&SIGNED == 1 {
-			for _, v := range symz.DataToInt8() {
-				z = append(z, int(v))
-			}
+	return nil, nil, nil, 0, 0, 0, fmt.Errorf("failed to convert x:%s y:%s z:%s", xAxis, yAxis, zAxis)
+	/*
+		var x, y, z []int
+		if symx.Type&SIGNED == 1 {
+			x = symx.DataToInt16()
 		} else {
-			for _, v := range symz.DataToUint8() {
+			x = symx.DataToUint16()
+		}
+		if symy.Type&SIGNED == 1 {
+			y = symy.DataToInt16()
+		} else {
+			y = symy.DataToUint16()
+		}
+
+		if len(x)*len(y) == len(symz.Bytes()) {
+			if symz.Type&SIGNED == 1 {
+				for _, v := range symz.DataToInt8() {
+					z = append(z, int(v))
+				}
+			} else {
+				for _, v := range symz.DataToUint8() {
+					z = append(z, int(v))
+				}
+			}
+			log.Println("3x")
+			return x, y, z, symx.Correctionfactor, symy.Correctionfactor, symz.Correctionfactor, nil
+		}
+
+		if len(x)*len(y) == int(symz.Length/2) {
+			data := make([]int16, symz.Length/2)
+			reader := bytes.NewReader(symz.Bytes())
+			if err := binary.Read(reader, binary.BigEndian, &data); err != nil {
+				log.Fatalf("Failed to convert zData to int16 slice: %v", err)
+			}
+			for _, v := range data {
 				z = append(z, int(v))
 			}
+			log.Println("4x")
+			return x, y, z, symx.Correctionfactor, symy.Correctionfactor, symz.Correctionfactor, nil
 		}
-		return x, y, z, symx.Correctionfactor, symy.Correctionfactor, symz.Correctionfactor, nil
-	}
-
-	if len(x)*len(y) == int(symz.Length/2) {
-		data := make([]int16, symz.Length/2)
-		reader := bytes.NewReader(symz.Bytes())
-		if err := binary.Read(reader, binary.BigEndian, &data); err != nil {
-			log.Fatalf("Failed to convert zData to int16 slice: %v", err)
-		}
-		for _, v := range data {
-			z = append(z, int(v))
-		}
-		return x, y, z, symx.Correctionfactor, symy.Correctionfactor, symz.Correctionfactor, nil
-	}
-
-	return nil, nil, nil, 0, 0, 0, fmt.Errorf("failed to convert %s %s %s", xAxis, yAxis, zAxis)
+		log.Println("189x")
+		return nil, nil, nil, 0, 0, 0, fmt.Errorf("failed to convert %s %s %s", xAxis, yAxis, zAxis)
+	*/
 }

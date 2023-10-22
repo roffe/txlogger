@@ -4,8 +4,8 @@ package symbol
 
 var axisT7 = AxisInformation{
 	"AdpFuelCal.T_AdaptLim": Axis{
-		"none",
-		"none",
+		"",
+		"",
 		"AdpFuelCal.T_AdaptLim",
 		"",
 		"",
@@ -1924,14 +1924,14 @@ var axisT7 = AxisInformation{
 		"",
 	},
 	"IgnStartCal.fi_StartMap": Axis{
-		"IgnStartCal.n_EngXSP",
+		"IgnStartCal.X_EthActSP",
 		"IgnStartCal.T_AirSP",
 		"IgnStartCal.fi_StartMap",
 		"rpm",
 		"°C",
 		"??",
-		"",
-		"",
+		"ActualIn.n_Engine",
+		"ActualIn.T_AirInlet",
 	},
 	"IgnTempCal.AirMap": Axis{
 		"IgnTempCal.n_EngXSP",
@@ -1964,7 +1964,7 @@ var axisT7 = AxisInformation{
 		"",
 	},
 	"InjCorrCal.BattCorrTab": Axis{
-		"none",
+		"",
 		"InjCorrCal.BattCorrSP",
 		"InjCorrCal.BattCorrTab",
 		"x-axis",
@@ -2324,8 +2324,8 @@ var axisT7 = AxisInformation{
 		"",
 	},
 	"LambdaCal.ST_Enable": Axis{
-		"none",
-		"none",
+		"",
+		"",
 		"LambdaCal.ST_Enable",
 		"",
 		"",
@@ -3004,7 +3004,7 @@ var axisT7 = AxisInformation{
 		"",
 	},
 	"StartCal.EnrFacE85Tab": Axis{
-		"none",
+		"",
 		"StartCal.T_EngineSP",
 		"StartCal.EnrFacE85Tab",
 		"x-axis",
@@ -3014,7 +3014,7 @@ var axisT7 = AxisInformation{
 		"",
 	},
 	"StartCal.EnrFacTab": Axis{
-		"none",
+		"",
 		"StartCal.T_EngineSP",
 		"StartCal.EnrFacTab",
 		"x-axis",
@@ -3144,7 +3144,7 @@ var axisT7 = AxisInformation{
 		"",
 	},
 	"TCompCal.EnrFacE85Tab": Axis{
-		"none",
+		"",
 		"TCompCal.T_EngineAutSP",
 		"TCompCal.EnrFacE85Tab",
 		"x-axis",
@@ -3164,7 +3164,7 @@ var axisT7 = AxisInformation{
 		"",
 	},
 	"TCompCal.EnrFacTab": Axis{
-		"none",
+		"",
 		"TCompCal.T_EngineAutSP",
 		"TCompCal.EnrFacTab",
 		"x-axis",
@@ -3384,8 +3384,8 @@ var axisT7 = AxisInformation{
 		"",
 	},
 	"TorqueCal.M_ManGearLim": Axis{
-		"none",
-		"none",
+		"",
+		"",
 		"TorqueCal.M_ManGearLim",
 		"x-axis",
 		"gear",
@@ -3687,6 +3687,16 @@ var axisT7 = AxisInformation{
 		"",
 		"VIOSMAFCal.TicsSP",
 		"VIOSMAFCal.Q_AirInletTab",
+		"x-axis",
+		"CPUTics: frequency = 13107800/VIOSMAFCal.TicsSP",
+		"g/s",
+		"",
+		"",
+	},
+	"VIOSMAFCal.Q_AirInletTab2": Axis{
+		"",
+		"VIOSMAFCal.FreqSP",
+		"VIOSMAFCal.Q_AirInletTab2",
 		"x-axis",
 		"CPUTics: frequency = 13107800/VIOSMAFCal.TicsSP",
 		"g/s",

@@ -1,40 +1,43 @@
 package symbol
 
+var correctionFactors = map[string]float64{
+	"ActualIn.p_AirBefThrottle":    0.001,
+	"ActualIn.p_AirInlet":          0.001,
+	"AirCompCal.PressMap":          0.1,
+	"BFuelCal.E85TempEnrichFacMap": 1.0 / 128,
+	"BFuelCal.LambdaOneFacMap":     1.0 / 128,
+	"BFuelCal.Map":                 0.01,
+	"BFuelCal.StartMap":            0.01,
+	"BFuelCal.TempEnrichFacMap":    1.0 / 128,
+	"BoostCal.RegMap":              0.1,
+	"DisplProt.LambdaScanner":      0.01,
+	"ECMStat.p_Diff":               0.001,
+	"ECMStat.p_DiffThrot":          0.001,
+	"IgnAbsCal.fi_NormalMAP":       0.1,
+	"IgnE85Cal.fi_AbsMap":          0.1,
+	"IgnIdleCal.fi_IdleMap":        0.1,
+	"IgnMastProt.fi_Offset":        0.1,
+	"IgnNormCal.Map":               0.1,
+	"IgnProt.fi_Offset":            0.1,
+	"IgnStartCal.fi_StartMap":      0.1,
+	"IgnStartCal.X_EthActSP":       0.1,
+	"In.p_AirAmbient":              0.1,
+	"In.p_AirBefThrottle":          0.001,
+	"In.p_AirInlet":                0.001,
+	"In.v_Vehicle":                 0.1,
+	"Lambda.LambdaInt":             0.01,
+	"MyrtilosCal.Launch_RPM":       100,
+	"Out.fi_Ignition":              0.1,
+	"Out.PWM_BoostCntrl":           0.1,
+	"Out.X_AccPedal":               0.1,
+	"Out.X_AccPos":                 0.1,
+}
+
 func GetCorrectionfactor(name string) float64 {
-	//log.Println(name)
-	switch name {
-	case "AirCompCal.PressMap",
-		"IgnAbsCal.fi_NormalMAP",
-		"IgnE85Cal.fi_AbsMap",
-		"IgnIdleCal.fi_IdleMap",
-		"IgnMastProt.fi_Offset",
-		"IgnNormCal.Map",
-		"In.p_AirAmbient",
-		"In.v_Vehicle",
-		"Out.fi_Ignition",
-		"Out.PWM_BoostCntrl",
-		"Out.X_AccPedal", "Out.X_AccPos",
-		"BstKnkCal.OffsetXSP",
-		"BoostCal.RegMap",
-		"IgnProt.fi_Offset":
-		return 0.1
-	case "DisplProt.LambdaScanner",
-		"BFuelCal.Map",
-		"BFuelCal.StartMap",
-		"Lambda.LambdaInt":
-		return 0.01
-	case "BFuelCal.LambdaOneFacMap", "BFuelCal.E85TempEnrichFacMap", "BFuelCal.TempEnrichFacMap":
-		return 1.0 / 128
-	case "ECMStat.p_Diff",
-		"ECMStat.p_DiffThrot",
-		"In.p_AirBefThrottle", "ActualIn.p_AirBefThrottle",
-		"In.p_AirInlet", "ActualIn.p_AirInlet":
-		return 0.001
-	case "BstKnkCal.MaxAirmass":
-		fallthrough
-	default:
-		return 1
+	if val, exists := correctionFactors[name]; exists {
+		return val
 	}
+	return 1
 }
 
 /*

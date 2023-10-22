@@ -23,6 +23,7 @@ import (
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
+	sdialog "github.com/sqweek/dialog"
 	"golang.org/x/net/context"
 )
 
@@ -58,7 +59,7 @@ type MainWindow struct {
 
 	dashboardBtn *widget.Button
 
-	mapSelector *widget.Tree
+	//mapSelector *widget.Tree
 	//fuelBtn     *widget.Button
 	//ignitionBtn *widget.Button
 
@@ -287,23 +288,24 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 			Alignment: fyne.TextAlignCenter,
 		},
 	)
+	/*
+		mw.mapSelector = widget.NewTreeWithStrings(mapToTreeMap(symbol.T7SymbolsTuning))
+		mw.mapSelector.OnSelected = func(uid widget.TreeNodeID) {
+			//		log.Printf("%q", uid)
+			if uid == "" || !strings.Contains(uid, ".") {
+				if !mw.mapSelector.IsBranchOpen(uid) {
+					mw.mapSelector.OpenBranch(uid)
+				} else {
+					mw.mapSelector.CloseBranch(uid)
+				}
+				mw.mapSelector.UnselectAll()
+				return
 
-	mw.mapSelector = widget.NewTreeWithStrings(mapToTreeMap(symbol.T7SymbolsTuning))
-	mw.mapSelector.OnSelected = func(uid widget.TreeNodeID) {
-		//		log.Printf("%q", uid)
-		if uid == "" || !strings.Contains(uid, ".") {
-			if !mw.mapSelector.IsBranchOpen(uid) {
-				mw.mapSelector.OpenBranch(uid)
-			} else {
-				mw.mapSelector.CloseBranch(uid)
 			}
+			mw.openMap(symbol.GetInfo(symbol.ECU_T7, uid))
 			mw.mapSelector.UnselectAll()
-			return
-
 		}
-		mw.openMap(symbol.GetInfo(symbol.ECU_T7, uid))
-		mw.mapSelector.UnselectAll()
-	}
+	*/
 
 	/*
 		widget.NewSelect([]string{"Select map", "Fuel", "Ignition"}, func(s string) {
@@ -315,36 +317,70 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		mw.mapSelector.SetSelectedIndex(0)
 	*/
 
-	/*
-		menu := fyne.NewMainMenu(
-			fyne.NewMenu("File",
-				fyne.NewMenuItem("Load binary", func() {
-					filename, err := sdialog.File().Filter("Binary file", "bin").Load()
-					if err != nil {
-						if err.Error() == "Cancelled" {
-							return
-						}
-						// dialog.ShowError(err, mw)
-						mw.Log(err.Error())
-						return
-					}
-					if err := mw.LoadSymbolsFromFile(filename); err != nil {
-						// dialog.ShowError(err, mw)
-						mw.Log(err.Error())
-						return
-					}
-					mw.SyncSymbols()
-				}),
-			),
-		)
-		mw.Window.SetMainMenu(menu)
-	*/
-
 	mw.loadPrefs()
+
+	mw.setupMenu()
+
 	mw.setTitle("No symbols loaded")
 	mw.Resize(fyne.NewSize(1280, 720))
 
 	return mw
+}
+
+func (mw *MainWindow) setupMenu() {
+	var menus []*fyne.Menu
+	menus = append(menus, fyne.NewMenu("File",
+		fyne.NewMenuItem("Load binary", func() {
+			filename, err := sdialog.File().Filter("Binary file", "bin").Load()
+			if err != nil {
+				if err.Error() == "Cancelled" {
+					return
+				}
+				// dialog.ShowError(err, mw)
+				mw.Log(err.Error())
+				return
+			}
+			if err := mw.LoadSymbolsFromFile(filename); err != nil {
+				// dialog.ShowError(err, mw)
+				mw.Log(err.Error())
+				return
+			}
+			mw.SyncSymbols()
+		}),
+		fyne.NewMenuItem("Load log", func() {
+			filename, err := sdialog.File().Filter("trionic logfile", "t7l", "t8l").SetStartDir("logs").Load()
+			if err != nil {
+				if err.Error() == "Cancelled" {
+					return
+				}
+				// dialog.ShowError(err, mw)
+				mw.Log(err.Error())
+				return
+			}
+
+			onClose := func() {
+				if mw.dlc != nil {
+					mw.dlc.DetachDashboard(mw.dashboard)
+				}
+				mw.dashboard = nil
+				mw.SetFullScreen(false)
+				mw.SetContent(mw.Content())
+			}
+			go NewLogPlayer(mw.app, filename, mw.symbols, onClose)
+		}),
+	))
+
+	for _, category := range symbol.T7SymbolsTuningOrder {
+		var items []*fyne.MenuItem
+		for _, mapName := range symbol.T7SymbolsTuning[category] {
+			items = append(items, fyne.NewMenuItem(mapName, func() {
+				mw.openMap(symbol.GetInfo(symbol.ECU_T7, mapName))
+			}))
+		}
+		menus = append(menus, fyne.NewMenu(category, items...))
+	}
+	menu := fyne.NewMainMenu(menus...)
+	mw.Window.SetMainMenu(menu)
 }
 
 func mapToTreeMap(data map[string][]string) map[string][]string {
@@ -437,27 +473,6 @@ func (mw *MainWindow) Layout() *container.Split {
 		),
 	)
 
-	bottomRightSplit := container.NewVSplit(
-		container.New(&layout.MinHeight{Height: 170}, mw.mapSelector),
-		container.NewVBox(
-			mw.dashboardBtn,
-			container.NewGridWithColumns(2,
-				mw.logplayerBtn,
-				mw.logfolderBtn,
-			),
-			mw.helpBtn,
-			mw.freqSlider,
-			container.NewGridWithColumns(4,
-				mw.capturedCounterLabel,
-				mw.errorCounterLabel,
-				mw.errPerSecondCounterLabel,
-				mw.freqValueLabel,
-			),
-		),
-	)
-
-	bottomRightSplit.SetOffset(1)
-
 	return &container.Split{
 		Offset:     0.7,
 		Horizontal: true,
@@ -478,10 +493,24 @@ func (mw *MainWindow) Layout() *container.Split {
 				//mw.progressBar,
 			),
 			Trailing: &container.Split{
-				Offset:     0.4,
+				Offset:     1,
 				Horizontal: false,
 				Leading:    mw.output,
-				Trailing:   bottomRightSplit,
+				Trailing: container.NewVBox(
+					mw.dashboardBtn,
+					container.NewGridWithColumns(2,
+						mw.logplayerBtn,
+						mw.logfolderBtn,
+					),
+					mw.helpBtn,
+					mw.freqSlider,
+					container.NewGridWithColumns(4,
+						mw.capturedCounterLabel,
+						mw.errorCounterLabel,
+						mw.errPerSecondCounterLabel,
+						mw.freqValueLabel,
+					),
+				),
 			},
 		},
 	}
@@ -638,7 +667,7 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	if err != nil {
 		return fmt.Errorf("error loading symbols: %w", err)
 	}
-	//os.WriteFile("symbols.txt", []byte(symbols.Dump()), 0644)
+	os.WriteFile("symbols.txt", []byte(symbols.Dump()), 0644)
 	mw.loadSymbols(symbols)
 	mw.setTitle(filename)
 	return nil
