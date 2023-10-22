@@ -167,7 +167,6 @@ func (mv *MapViewer) createXAxis() {
 		}
 		for i := 0; i < mv.numColumns; i++ {
 			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.xData[i])*mv.xCorrFac, 'f', prec, 64), TextSize: 13}
-			log.Println("createXAxis:", text.Text)
 			mv.xAxis = append(mv.xAxis, text)
 			mv.xAxisButtons.Add(text)
 		}
@@ -180,11 +179,9 @@ func (mv *MapViewer) createYAxis() {
 		prec := 0
 		if mv.yCorrFac < 1 {
 			prec = 2
-
 		}
 		for i := mv.numRows - 1; i >= 0; i-- {
 			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.yData[i])*mv.yCorrFac, 'f', prec, 64), TextSize: 13}
-			log.Println("createYAxis:", text.Text)
 			mv.yAxis = append(mv.yAxis, text)
 			mv.yAxisButtons.Add(text)
 		}

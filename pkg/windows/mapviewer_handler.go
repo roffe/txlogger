@@ -25,7 +25,7 @@ type MapViewerHandler struct {
 func NewMapViewerHandler() *MapViewerHandler {
 	mvh := &MapViewerHandler{
 		subs:        make(map[string][]*widgets.MapViewer),
-		incoming:    make(chan MapViewerEvent, 20),
+		incoming:    make(chan MapViewerEvent, 100),
 		quit:        make(chan struct{}),
 		aggregators: make([]*MapAggregator, 0),
 	}
@@ -82,9 +82,6 @@ func (mvh *MapViewerHandler) run() {
 			}
 			mvh.subsLock.Lock()
 			for _, mv := range mvh.subs[event.SymbolName] {
-				if event.SymbolName == "ActualIn.p_AirInlet" {
-					event.Value = event.Value * 1000
-				}
 				mv.SetValue(event.SymbolName, event.Value)
 			}
 			mvh.subsLock.Unlock()

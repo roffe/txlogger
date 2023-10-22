@@ -199,7 +199,9 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 
 	lp.handler = keyHandler(w, lp.controlChan, lp.slider, lp.toggleBtn, lp.speedSelect)
 	lp.slider.typedKey = lp.handler
-	w.Canvas().SetOnTypedKey(lp.handler)
+
+	lp.setupMenu()
+
 	w.SetContent(lp.render())
 	w.Show()
 
@@ -219,69 +221,32 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 	return lp
 }
 
+func (lp *LogPlayer) setupMenu() {
+	var menus []*fyne.Menu
+	menus = append(menus, fyne.NewMenu("File"))
+	for _, category := range symbol.T7SymbolsTuningOrder {
+		var items []*fyne.MenuItem
+		for _, mapName := range symbol.T7SymbolsTuning[category] {
+			items = append(items, fyne.NewMenuItem(mapName, func() {
+				lp.openMap(mapName)
+			}))
+		}
+		menus = append(menus, fyne.NewMenu(category, items...))
+	}
+	menu := fyne.NewMainMenu(menus...)
+	lp.Window.SetMainMenu(menu)
+}
+
 func (lp *LogPlayer) render() fyne.CanvasObject {
 
 	/*
-		var objects []fyne.CanvasObject
-		var bottom *fyne.Container
-		if lp.logType == ".T7L" {
-			for _, name := range []struct {
-				label string
-				name  string
-			}{
-				{"Fuel", "BFuelCal.Map"},
-				{"Fuel/E85", "BFuelCal.StartMap"},
-				{"Ignition", "IgnNormCal.Map"},
-				{"Ignition/E85", "IgnE85Cal.fi_AbsMap"},
-				{"Ignition/Idle", "IgnIdleCal.fi_IdleMap"},
-			} {
-
-				x, y, z := symbol.GetInfo(symbol.ECU_T7, name.name)
-				if x == "" || y == "" || z == "" {
-					continue
-				}
-				objects = append(objects, lp.newMapBtn(name.label, x, y, z))
-
-			}
-
-			bottom = container.NewGridWithColumns(len(objects), objects...)
-		}
-
 		if lp.logType == ".T8L" {
 			bottom = container.NewGridWithColumns(2,
 				lp.newMapBtn("Fuel", "IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "BFuelCal.TempEnrichFacMap"),
 				lp.newMapBtn("Ignition", "IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "IgnAbsCal.fi_NormalMAP"),
 			)
 		}
-
-		if bottom == nil {
-			bottom = container.NewStack()
-		}
-
-		if lp.symbols == nil {
-			bottom.Hide()
-		}
 	*/
-
-	tree := widget.NewTreeWithStrings(mapToTreeMap(symbol.T7SymbolsTuning))
-	tree.OnSelected = func(uid string) {
-		//		log.Printf("%q", uid)
-		if uid == "" || !strings.Contains(uid, ".") {
-			if !tree.IsBranchOpen(uid) {
-				tree.OpenBranch(uid)
-			} else {
-				tree.CloseBranch(uid)
-			}
-			tree.UnselectAll()
-			return
-		}
-		if lp.symbols == nil {
-			return
-		}
-		if err := lp.OpenMap(uid); err != nil {
-			log.Println(err)
-		}
-	}
 
 	main := container.NewBorder(
 		container.NewBorder(
@@ -301,16 +266,10 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 		nil,
 		lp.db,
 	)
-
-	split := container.NewHSplit(
-		main,
-		container.NewVScroll(tree),
-	)
-	split.Offset = 0.85
-	return split
+	return main
 }
 
-func (lp *LogPlayer) OpenMap(symbolName string) error {
+func (lp *LogPlayer) openMap(symbolName string) error {
 	if symbolName == "" {
 		return errors.New("symbolName is empty")
 	}
@@ -380,58 +339,8 @@ func (lp *LogPlayer) newMapViewerWindow(w fyne.Window, mv *widgets.MapViewer, ax
 	lp.mvh.Subscribe(axis.XFrom, mv)
 	lp.mvh.Subscribe(axis.YFrom, mv)
 
-	if axis.Z == "MAFCal.m_RedundantAirMap" {
-		lp.mvh.Subscribe("MAF.m_AirInlet", mv)
-	}
 	return mw
 }
-
-/*
-func (lp *LogPlayer) addSymbolSub(symbolName string, mv *widgets.MapViewer) {
-	lp.symbolSubs[symbolName] = append(lp.symbolSubs[symbolName], mv)
-}
-
-func (lp *LogPlayer) removeSymbolSub(symbolName string, mv *widgets.MapViewer) {
-	subs, found := lp.symbolSubs[symbolName]
-	if found {
-		for i, sub := range subs {
-			if sub == mv {
-				lp.symbolSubs[symbolName] = append(subs[:i], subs[i+1:]...)
-				break
-			}
-		}
-	}
-}
-*/
-
-/*
-func (lp *LogPlayer) newMapBtn(btnTitle, supXName, supYName, mapName string) *widget.Button {
-	return widget.NewButtonWithIcon(btnTitle, theme.GridIcon(), func() {
-		if lp.symbols == nil {
-			return
-		}
-		mv, found := lp.openMaps[mapName]
-		if !found {
-			w := lp.app.NewWindow("Map Viewer - " + mapName)
-			mv, err := NewMapViewer(w, supXName, supYName, mapName, lp.symbols, interpolate.Interpolate)
-			if err != nil {
-				log.Printf("X: %s Y: %s Z: %s err: %v", supXName, supYName, mapName, err)
-				return
-			}
-
-			w.SetCloseIntercept(func() {
-				delete(lp.openMaps, mapName)
-				w.Close()
-			})
-			lp.openMaps[mapName] = mv
-			w.SetContent(mv)
-			w.Show()
-			return
-		}
-		mv.w.RequestFocus()
-	})
-}
-*/
 
 func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, control <-chan *controlMsg, ww fyne.Window) {
 	play := true

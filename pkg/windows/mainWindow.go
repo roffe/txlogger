@@ -386,6 +386,7 @@ func (mw *MainWindow) setupMenu() {
 	mw.Window.SetMainMenu(menu)
 }
 
+/*
 func mapToTreeMap(data map[string][]string) map[string][]string {
 	result := make(map[string][]string)
 
@@ -407,6 +408,7 @@ func mapToTreeMap(data map[string][]string) map[string][]string {
 
 	return result
 }
+*/
 
 type ratioContainer struct {
 	widths []float32
