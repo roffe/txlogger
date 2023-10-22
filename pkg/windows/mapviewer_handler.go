@@ -41,14 +41,14 @@ func (mvh *MapViewerHandler) Close() {
 }
 
 func (mvh *MapViewerHandler) Subscribe(symbolName string, mv MapViewerWindowWidget) {
-	log.Printf("MapViewerHandler: Subscribe: %s", symbolName)
+	//	log.Printf("MapViewerHandler: Subscribe: %s", symbolName)
 	mvh.subsLock.Lock()
 	defer mvh.subsLock.Unlock()
 	mvh.subs[symbolName] = append(mvh.subs[symbolName], mv)
 }
 
 func (mvh *MapViewerHandler) Unsubscribe(symbolName string, mv MapViewerWindowWidget) {
-	log.Printf("MapViewerHandler: Unsubscribe: %s", symbolName)
+	//	log.Printf("MapViewerHandler: Unsubscribe: %s", symbolName)
 	mvh.subsLock.Lock()
 	defer mvh.subsLock.Unlock()
 	for i, m := range mvh.subs[symbolName] {

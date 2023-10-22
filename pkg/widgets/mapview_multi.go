@@ -56,7 +56,7 @@ func NewMapViewerMulti(symbols symbol.SymbolCollection, mapNames ...string) *Map
 		columns,
 		container.NewBorder(widget.NewLabel(mapNames[0]), nil, nil, nil, mvm.mvs[0]),
 	)
-	mvm.view.SetOffset(0.65)
+	mvm.view.SetOffset(0.2)
 
 	return mvm
 }
