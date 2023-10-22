@@ -132,19 +132,19 @@ func NewAirDIFFAggregator() MapAggregatorHandlerFunc {
 
 func NewDIFFAggregator(first, second, outputName string) *MapAggregator {
 	var firstUpdated, secondUpdated bool
-	var tmpFirst, tmpSecond float64
+	var firstValue, secondValue float64
 	return &MapAggregator{
 		Func: func(mvh *MapViewerHandler, name string, value float64) {
 			if name == first {
-				tmpFirst = value
+				firstValue = value
 				firstUpdated = true
 			}
 			if name == second {
-				tmpSecond = value
+				secondValue = value
 				secondUpdated = true
 			}
 			if firstUpdated && secondUpdated {
-				mvh.SetValue(outputName, tmpSecond-tmpFirst)
+				mvh.SetValue(outputName, secondValue-firstValue)
 				firstUpdated, secondUpdated = false, false
 			}
 		},
