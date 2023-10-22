@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"log"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -90,6 +91,11 @@ func (mv *MapViewer) Info() MapViewerInfo {
 }
 
 func (mv *MapViewer) SetValue(name string, value float64) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println(r)
+		}
+	}()
 	//log.Printf("MapViewer: SetValue: %s: %f", name, value)
 	if mv.SetValueFunc != nil {
 		mv.SetValueFunc(name, value)

@@ -14,7 +14,6 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-
 	"github.com/roffe/txlogger/pkg/kwp2000"
 	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/windows"
@@ -25,12 +24,57 @@ func init() {
 }
 
 func main() {
-	ready := make(chan struct{})
+	/*
+		defer func() {
+			if r := recover(); r != nil {
+				os.WriteFile("panic.txt", []byte(fmt.Sprintf("Recovered from panic: %v", r)), 0644)
+				fmt.Println("Recovered from panic:", r)
+			}
+		}()
+
+		// Check if this is the parent or child process.
+		if len(os.Args) < 2 || os.Args[1] != "child" {
+			launchChild()
+			return
+		}
+	*/
+
+	args := os.Args
+	if len(args) >= 2 && args[1] == "child" {
+		log.Println("Child process started")
+		args = append(args[:1], args[2:]...)
+	}
+	mainz(args)
+}
+
+/*
+// launchChild starts the same program but with a "child" argument.
+func launchChild() {
+	args := append([]string{"child"}, os.Args[1:]...)
+	log.Println(args)
+
+	f, err := os.OpenFile("child.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		panic(err)
+	}
+
+	cmd := exec.Command(os.Args[0], args...)
+
+	cmd.Stdout = io.MultiWriter(os.Stdout, f)
+	cmd.Stderr = io.MultiWriter(os.Stderr, f)
+
+	if err := cmd.Run(); err != nil {
+		log.Fatal(err)
+	}
+}
+*/
+
+func mainz(args []string) {
 	a := app.NewWithID("com.roffe.trl")
 	a.Settings().SetTheme(&myTheme{})
 	vars := kwp2000.NewVarDefinitionList()
-	if len(os.Args) == 2 {
-		filename := os.Args[1]
+	if len(args) == 2 {
+		filename := args[1]
 		if strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") {
 			windows.NewLogPlayer(a, filename, nil, nil).ShowAndRun()
 			return
@@ -38,8 +82,8 @@ func main() {
 
 	}
 	mw := windows.NewMainWindow(a, vars)
-	if len(os.Args) == 2 {
-		filename := os.Args[1]
+	if len(args) == 2 {
+		filename := args[1]
 		if strings.HasSuffix(filename, ".bin") {
 			if err := mw.LoadSymbolsFromFile(filename); err != nil {
 				log.Println(err)
@@ -47,33 +91,33 @@ func main() {
 			}
 		}
 	}
-
-	mw.SetPadded(false)
-	mw.SetOnDropped(func(pos fyne.Position, uri []fyne.URI) {
-		for _, u := range uri {
-			if strings.HasSuffix(u.Path(), ".bin") {
-				log.Println("Loading symbols from", u.Path())
-				if err := mw.LoadSymbolsFromFile(u.Path()); err != nil {
-					log.Println(err)
-					mw.Log(err.Error())
+	/*
+		mw.SetOnDropped(func(pos fyne.Position, uri []fyne.URI) {
+			for _, u := range uri {
+				if strings.HasSuffix(u.Path(), ".bin") {
+					log.Println("Loading symbols from", u.Path())
+					if err := mw.LoadSymbolsFromFile(u.Path()); err != nil {
+						log.Println(err)
+						mw.Log(err.Error())
+						return
+					}
+				}
+				if strings.HasSuffix(u.Path(), ".t7l") || strings.HasSuffix(u.Path(), ".t8l") {
+					log.Println("Loading log file", u.Path())
+					windows.NewLogPlayer(a, u.Path(), nil, nil).ShowAndRun()
 					return
 				}
 			}
-			if strings.HasSuffix(u.Path(), ".t7l") || strings.HasSuffix(u.Path(), ".t8l") {
-				log.Println("Loading log file", u.Path())
-				windows.NewLogPlayer(a, u.Path(), nil, nil).ShowAndRun()
-				return
-			}
-		}
 
-	})
+		})
+	*/
 
 	mw.SetMaster()
 	mw.Resize(fyne.NewSize(1024, 768))
 	mw.SetContent(mw.Layout())
-	close(ready)
 
 	go updateCheck(a, mw)
+
 	mw.ShowAndRun()
 }
 
