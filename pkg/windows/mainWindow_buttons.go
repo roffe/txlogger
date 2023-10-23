@@ -114,7 +114,7 @@ func (mw *MainWindow) createButtons() {
 	mw.dashboardBtn = widget.NewButtonWithIcon("Dashboard", theme.InfoIcon(), func() {
 		onClose := func() {
 			if mw.dlc != nil {
-				mw.dlc.DetachDashboard(mw.dashboard)
+				mw.dlc.Detach(mw.dashboard)
 			}
 			if mw.dashboard != nil {
 				mw.dashboard.Close()
@@ -126,7 +126,7 @@ func (mw *MainWindow) createButtons() {
 
 		mw.dashboard = widgets.NewDashboard(mw.app, mw, false, mw.logBtn, onClose)
 		if mw.dlc != nil {
-			mw.dlc.AttachDashboard(mw.dashboard)
+			mw.dlc.Attach(mw.dashboard)
 		}
 
 		mw.SetContent(mw.dashboard)
@@ -145,7 +145,7 @@ func (mw *MainWindow) createButtons() {
 
 		onClose := func() {
 			if mw.dlc != nil {
-				mw.dlc.DetachDashboard(mw.dashboard)
+				mw.dlc.Detach(mw.dashboard)
 			}
 			mw.dashboard = nil
 			mw.SetFullScreen(false)
@@ -208,10 +208,10 @@ func (mw *MainWindow) createButtons() {
 			mw.disableBtns()
 
 			if mw.dashboard != nil {
-				mw.dlc.AttachDashboard(mw.dashboard)
+				mw.dlc.Attach(mw.dashboard)
 			}
 
-			mw.dlc.AttachDashboard(mw.mvh)
+			mw.dlc.Attach(mw.mvh)
 
 			go func() {
 				defer mw.enableBtns()
@@ -219,9 +219,9 @@ func (mw *MainWindow) createButtons() {
 					mw.Log(err.Error())
 				}
 				if mw.dashboard != nil {
-					mw.dlc.DetachDashboard(mw.dashboard)
+					mw.dlc.Detach(mw.dashboard)
 				}
-				mw.dlc.DetachDashboard(mw.mvh)
+				mw.dlc.Detach(mw.mvh)
 				mw.loggingRunning = false
 				mw.dlc = nil
 				mw.logBtn.SetIcon(theme.MediaPlayIcon())

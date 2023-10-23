@@ -65,15 +65,13 @@ type MapViewer struct {
 	selectedCells []int
 
 	focused bool
-
-	SetValueFunc func(name string, value float64)
 }
 
 func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 	mv := &MapViewer{
 		yAxis:   make([]*canvas.Text, 0),
 		xAxis:   make([]*canvas.Text, 0),
-		setChan: make(chan xyUpdate, 100),
+		setChan: make(chan xyUpdate, 10),
 	}
 	mv.ExtendBaseWidget(mv)
 	for _, option := range options {
@@ -208,10 +206,6 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 		}
 	}()
 	//log.Printf("MapViewer: SetValue: %s: %f", name, value)
-	if mv.SetValueFunc != nil {
-		mv.SetValueFunc(name, value)
-		return
-	}
 	if name == mv.xFrom || (mv.xFrom == "" && name == "MAF.m_AirInlet") {
 		mv.xValue = int(value)
 		mv.tik++
@@ -223,7 +217,12 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 	if mv.tik >= 2 {
 		update := xyUpdate{mv.xValue, mv.yValue}
 		//log.Printf("MapViewer: SetValue: x: %d, y: %d", mv.xValue, mv.yValue)
-		mv.setChan <- update
+		select {
+		case mv.setChan <- update:
+		default:
+			log.Println("MapViewer: setChan full")
+
+		}
 		mv.tik = 0
 	}
 }

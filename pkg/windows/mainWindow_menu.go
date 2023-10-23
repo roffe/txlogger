@@ -44,7 +44,7 @@ func (mw *MainWindow) setupMenu() {
 
 			onClose := func() {
 				if mw.dlc != nil {
-					mw.dlc.DetachDashboard(mw.dashboard)
+					mw.dlc.Detach(mw.dashboard)
 				}
 				mw.dashboard = nil
 				mw.SetFullScreen(false)

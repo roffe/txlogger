@@ -3,7 +3,7 @@ package symbol
 var correctionFactors = map[string]float64{
 	"ActualIn.p_AirBefThrottle":    0.001,
 	"ActualIn.p_AirInlet":          0.001,
-	"AirCompCal.PressMap":          0.1,
+	"AirCompCal.PressMap":          1,
 	"BFuelCal.E85TempEnrichFacMap": 1.0 / 128,
 	"BFuelCal.LambdaOneFacMap":     1.0 / 128,
 	"BFuelCal.Map":                 0.01,

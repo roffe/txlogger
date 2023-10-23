@@ -33,7 +33,7 @@ type T8Client struct {
 	quitChan chan struct{}
 	Config
 	sysvars *ThreadSafeMap
-	dbs     []Dashboard
+	dbs     []DataLoggerClient
 
 	subs map[string][]*func(float64)
 	mu   sync.Mutex
@@ -44,6 +44,7 @@ func (c *T8Client) Close() {
 	time.Sleep(200 * time.Millisecond)
 }
 
+/*
 func (c *T8Client) Subscribe(name string, cb *func(float64)) {
 	subs, found := c.subs[name]
 	if !found {
@@ -71,8 +72,9 @@ func (c *T8Client) Unsubscribe(name string, cb *func(float64)) {
 		}
 	}
 }
+*/
 
-func (c *T8Client) AttachDashboard(db Dashboard) {
+func (c *T8Client) Attach(db DataLoggerClient) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, d := range c.dbs {
@@ -84,7 +86,7 @@ func (c *T8Client) AttachDashboard(db Dashboard) {
 	c.dbs = append(c.dbs, db)
 }
 
-func (c *T8Client) DetachDashboard(db Dashboard) {
+func (c *T8Client) Detach(db DataLoggerClient) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for i, d := range c.dbs {

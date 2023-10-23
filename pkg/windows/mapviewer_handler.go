@@ -23,7 +23,7 @@ type MapViewerHandler struct {
 func NewMapViewerHandler() *MapViewerHandler {
 	mvh := &MapViewerHandler{
 		subs:        make(map[string][]MapViewerWindowWidget),
-		incoming:    make(chan MapViewerEvent, 100),
+		incoming:    make(chan MapViewerEvent, 110),
 		quit:        make(chan struct{}),
 		aggregators: make([]*MapAggregator, 0),
 	}
@@ -64,7 +64,8 @@ func (mvh *MapViewerHandler) SetValue(symbolName string, value float64) {
 	case mvh.incoming <- MapViewerEvent{SymbolName: symbolName, Value: value}:
 		return
 	default:
-		log.Panic("MapViewerHandler: incoming channel full")
+		//log.Panic("MapViewerHandler: incoming channel full")
+		log.Println("dropped update")
 		return
 	}
 }

@@ -153,9 +153,9 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 	lp.toggleBtn.OnTapped = func() {
 		lp.controlChan <- &controlMsg{Op: OpTogglePlayback}
 		if playing {
-			lp.toggleBtn.SetIcon(theme.MediaPlayIcon())
-		} else {
 			lp.toggleBtn.SetIcon(theme.MediaPauseIcon())
+		} else {
+			lp.toggleBtn.SetIcon(theme.MediaPlayIcon())
 		}
 		playing = !playing
 	}
@@ -198,6 +198,8 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 	lp.handler = keyHandler(w, lp.controlChan, lp.slider, lp.toggleBtn, lp.speedSelect)
 	lp.slider.typedKey = lp.handler
 
+	lp.Canvas().SetOnTypedKey(lp.handler)
+
 	lp.setupMenu()
 
 	w.SetContent(lp.render())
@@ -231,19 +233,21 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 	*/
 
 	main := container.NewBorder(
+		nil,
 		container.NewBorder(
 			nil,
 			nil,
-			container.NewGridWithColumns(4,
+			container.NewGridWithColumns(3,
 				lp.prevBtn,
 				lp.toggleBtn,
-				lp.restartBtn,
 				lp.nextBtn,
 			),
-			layout.NewFixedWidth(75, lp.speedSelect),
+			container.NewGridWithColumns(2,
+				lp.restartBtn,
+				layout.NewFixedWidth(75, lp.speedSelect),
+			),
 			container.NewBorder(nil, nil, nil, lp.posLabel, lp.slider),
 		),
-		nil,
 		nil,
 		nil,
 		lp.db,
@@ -317,7 +321,7 @@ func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, co
 		}
 		currentLine.Set(float64(logz.Pos()))
 		if rec := logz.Next(); rec != nil {
-			lp.db.SetTimeText(rec.Time.Format("15:04:05.99"))
+			lp.db.SetTimeText(currentTimeFormatted(rec.Time))
 			delayTilNext := int64(float64(rec.DelayTillNext) * speedMultiplier)
 			if delayTilNext > 1000 {
 				delayTilNext = 100
@@ -338,6 +342,10 @@ func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, co
 			playonce = false
 		}
 	}
+}
+
+func currentTimeFormatted(t time.Time) string {
+	return fmt.Sprintf("%02d:%02d:%02d.%03d", t.Hour(), t.Minute(), t.Second(), t.Nanosecond()/1e6)
 }
 
 func keyHandler(w fyne.Window, controlChan chan *controlMsg, slider *slider, tb *widget.Button, sel *widget.Select) func(ev *fyne.KeyEvent) {

@@ -1,8 +1,6 @@
 package widgets
 
 import (
-	"math"
-
 	"fyne.io/fyne/v2"
 )
 
@@ -22,10 +20,9 @@ func calculateOptimalTextSize(width, height float32, columns, rows int) float32 
 	cellWidth := float64(width / float32(columns))
 	return max(min(float32(cellWidth/5), 21), 12)
 
-	cellHeight := float64(height / float32(rows))
+	//cellHeight := float64(height / float32(rows))
 	// The optimal text size is the smallest of the two dimensions of the cell
-	return float32(int(math.Min(cellWidth, cellHeight)))
-
+	//return float32(int(math.Min(cellWidth, cellHeight)))
 }
 
 func (vr *MapViewerRenderer) Layout(size fyne.Size) {

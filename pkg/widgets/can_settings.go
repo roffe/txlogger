@@ -223,29 +223,29 @@ func (cs *CanSettingsWidget) listPorts() []string {
 }
 
 func (cs *CanSettingsWidget) CreateRenderer() fyne.WidgetRenderer {
-	return &canSettingsWidgetRenderer{
-		obj: cs,
+	return &CanSettingsWidgetRenderer{
+		cs,
 	}
 }
 
-type canSettingsWidgetRenderer struct {
-	obj *CanSettingsWidget
+type CanSettingsWidgetRenderer struct {
+	*CanSettingsWidget
 }
 
-func (cs *canSettingsWidgetRenderer) Layout(size fyne.Size) {
-	cs.obj.container.Resize(size)
+func (cs *CanSettingsWidgetRenderer) Layout(size fyne.Size) {
+	cs.container.Resize(size)
 }
 
-func (cs *canSettingsWidgetRenderer) MinSize() fyne.Size {
-	return cs.obj.container.MinSize()
+func (cs *CanSettingsWidgetRenderer) MinSize() fyne.Size {
+	return cs.container.MinSize()
 }
 
-func (cs *canSettingsWidgetRenderer) Refresh() {
+func (cs *CanSettingsWidgetRenderer) Refresh() {
 }
 
-func (cs *canSettingsWidgetRenderer) Destroy() {
+func (cs *CanSettingsWidgetRenderer) Destroy() {
 }
 
-func (cs *canSettingsWidgetRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{cs.obj.container}
+func (cs *CanSettingsWidgetRenderer) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{cs.container}
 }

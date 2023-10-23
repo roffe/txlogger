@@ -23,10 +23,10 @@ type T7Client struct {
 	quitChan chan struct{}
 	Config
 	sysvars *ThreadSafeMap
-	dbs     []Dashboard
+	dbs     []DataLoggerClient
 
-	subs map[string][]*func(float64)
-	mu   sync.Mutex
+	//subs map[string][]*func(float64)
+	mu sync.Mutex
 }
 
 func NewT7(cfg Config) (*T7Client, error) {
@@ -41,36 +41,8 @@ func NewT7(cfg Config) (*T7Client, error) {
 				"Out.ST_LimpHome":   "0",   // comes from 0x280
 			},
 		},
-		subs: make(map[string][]*func(float64)),
+		//subs: make(map[string][]*func(float64)),
 	}, nil
-}
-
-func (c *T7Client) Subscribe(name string, cb *func(float64)) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	subs, found := c.subs[name]
-	if !found {
-		c.subs[name] = []*func(float64){cb}
-		return
-	}
-	for _, f := range subs {
-		if f == cb {
-			return
-		}
-	}
-	subs = append(subs, cb)
-	c.subs[name] = subs
-}
-
-func (c *T7Client) Unsubscribe(name string, cb *func(float64)) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for i, f := range c.subs[name] {
-		if f == cb {
-			c.subs[name] = append(c.subs[name][:i], c.subs[name][i+1:]...)
-			return
-		}
-	}
 }
 
 func (c *T7Client) Close() {
@@ -78,7 +50,7 @@ func (c *T7Client) Close() {
 	time.Sleep(200 * time.Millisecond)
 }
 
-func (c *T7Client) AttachDashboard(db Dashboard) {
+func (c *T7Client) Attach(db DataLoggerClient) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, d := range c.dbs {
@@ -90,7 +62,7 @@ func (c *T7Client) AttachDashboard(db Dashboard) {
 	c.dbs = append(c.dbs, db)
 }
 
-func (c *T7Client) DetachDashboard(db Dashboard) {
+func (c *T7Client) Detach(db DataLoggerClient) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for i, d := range c.dbs {
@@ -159,16 +131,18 @@ func (c *T7Client) Start() error {
 					c.setDbValue("ActualIn.n_Engine", float64(rpm))
 					c.setDbValue("Out.X_AccPedal", float64(throttle))
 
-					if subs, found := c.subs["ActualIn.n_Engine"]; found {
-						for _, sub := range subs {
-							(*sub)(float64(rpm))
+					/*
+						if subs, found := c.subs["ActualIn.n_Engine"]; found {
+							for _, sub := range subs {
+								(*sub)(float64(rpm))
+							}
 						}
-					}
-					if subs, found := c.subs["Out.X_AccPedal"]; found {
-						for _, sub := range subs {
-							(*sub)(float64(throttle))
+						if subs, found := c.subs["Out.X_AccPedal"]; found {
+							for _, sub := range subs {
+								(*sub)(float64(throttle))
+							}
 						}
-					}
+					*/
 				case 0x280:
 					data := msg.Data()[4]
 					if data&0x20 == 0x20 {
@@ -290,11 +264,11 @@ func (c *T7Client) Start() error {
 						// Set value on dashboards
 						c.setDbValue(va.Name, va.GetFloat64())
 
-						if subs, found := c.subs[va.Name]; found {
-							for _, sub := range subs {
-								(*sub)(va.GetFloat64())
-							}
-						}
+						//if subs, found := c.subs[va.Name]; found {
+						//	for _, sub := range subs {
+						//		(*sub)(va.GetFloat64())
+						//	}
+						//}
 
 					}
 					if r.Len() > 0 {
