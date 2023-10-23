@@ -49,7 +49,11 @@ func (lp *LogPlayer) openMapz(mapNames ...string) {
 			dialog.ShowError(errors.New("no symbols loaded"), lp.Window)
 			return
 		}
-		view := widgets.NewMapViewerMulti(lp.symbols, mapNames...)
+		view, err := widgets.NewMapViewerMulti(lp.symbols, mapNames...)
+		if err != nil {
+			dialog.ShowError(err, lp.Window)
+			return
+		}
 		lp.openMaps[joinedNames] = lp.newMapViewerWindow(w, view, symbol.Axis{})
 
 		for _, mv := range view.Children() {

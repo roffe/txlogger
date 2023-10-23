@@ -23,7 +23,7 @@ type MapViewerHandler struct {
 func NewMapViewerHandler() *MapViewerHandler {
 	mvh := &MapViewerHandler{
 		subs:        make(map[string][]MapViewerWindowWidget),
-		incoming:    make(chan MapViewerEvent, 110),
+		incoming:    make(chan MapViewerEvent, 100),
 		quit:        make(chan struct{}),
 		aggregators: make([]*MapAggregator, 0),
 	}

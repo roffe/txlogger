@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
 	"fyne.io/fyne/v2/data/binding"
 	"github.com/roffe/gocan"
@@ -13,15 +12,20 @@ import (
 
 const ISO8601 = "2006-01-02T15:04:05.999-0700"
 
-type DataLoggerClient interface {
-	SetValue(name string, value float64)
+type Setter interface {
+	SetValue(string, float64)
 }
 
-type DataClient interface {
+type Provider interface {
 	Start() error
 	Close()
-	Attach(DataLoggerClient)
-	Detach(DataLoggerClient)
+}
+
+type Logger interface {
+	Provider
+	Attach(Setter)
+	Detach(Setter)
+	Setter
 }
 
 type Config struct {
@@ -35,43 +39,47 @@ type Config struct {
 	ErrorPerSecondCounter binding.Int
 }
 
-func New(cfg Config) (DataClient, error) {
+type Client struct {
+	cfg Config
+	dbs []Setter
+	mu  sync.Mutex
+	dlc Provider
+}
+
+func New(cfg Config) (Logger, error) {
+	dl := &Client{
+		cfg: cfg,
+	}
+	var err error
 	switch cfg.ECU {
 	case "T7":
-		return NewT7(cfg)
+		dl.dlc, err = NewT7(dl, cfg)
+		if err != nil {
+			return nil, err
+		}
 	case "T8":
-		return NewT8(cfg)
+		dl.dlc, err = NewT8(dl, cfg)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, fmt.Errorf("%s not supported yet", cfg.ECU)
 	}
+
+	return dl, nil
 }
 
-type DataLogger struct {
-	cfg      Config
-	sysvars  *ThreadSafeMap
-	dbs      []DataLoggerClient
-	quitChan chan struct{}
-	mu       sync.Mutex
+func (d *Client) Start() error {
+	return d.dlc.Start()
 }
 
-func NewDataLogger(cfg Config) *DataLogger {
-	return &DataLogger{
-		cfg:      cfg,
-		sysvars:  &ThreadSafeMap{values: make(map[string]string)},
-		quitChan: make(chan struct{}, 2),
+func (d *Client) Close() {
+	if d.dlc != nil {
+		d.dlc.Close()
 	}
 }
 
-func (d *DataLogger) Start() error {
-	return nil
-}
-
-func (d *DataLogger) Close() {
-	close(d.quitChan)
-	time.Sleep(100 * time.Millisecond)
-}
-
-func (d *DataLogger) Attach(db DataLoggerClient) {
+func (d *Client) Attach(db Setter) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	for _, dbz := range d.dbs {
@@ -83,7 +91,7 @@ func (d *DataLogger) Attach(db DataLoggerClient) {
 	d.dbs = append(d.dbs, db)
 }
 
-func (d *DataLogger) Detach(db DataLoggerClient) {
+func (d *Client) Detach(db Setter) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	for i, dbz := range d.dbs {
@@ -94,7 +102,7 @@ func (d *DataLogger) Detach(db DataLoggerClient) {
 	}
 }
 
-func (d *DataLogger) setDbValue(name string, value float64) {
+func (d *Client) SetValue(name string, value float64) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	for _, db := range d.dbs {

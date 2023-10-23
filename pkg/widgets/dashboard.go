@@ -192,7 +192,7 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 
 	//db.dbgBar = db.newDebugBar()
 
-	db.knockIcon.Content().Hide()
+	db.knockIcon.Hide()
 	db.cruise.Hide()
 	db.checkEngine.Hide()
 	db.limpMode.Hide()
@@ -236,7 +236,7 @@ func (db *Dashboard) render() *fyne.Container {
 		db.pwm.Content(),
 		db.checkEngine,
 		db.cruise,
-		db.knockIcon.Content(),
+		db.knockIcon,
 	)
 
 	if !db.logplayer {
@@ -351,9 +351,9 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 				knockValue += 4
 			}
 			db.knockIcon.SetText(fmt.Sprintf("%d", knockValue))
-			db.knockIcon.Content().Show()
+			db.knockIcon.Show()
 		} else {
-			db.knockIcon.Content().Hide()
+			db.knockIcon.Hide()
 		}
 	}
 
@@ -633,10 +633,10 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	tps.Move(fyne.NewPos(space.Width-sixthWidth-tps.Size().Width-8, 25))
 
 	// Cbar
-	db.nblambda.Resize(fyne.NewSize((sixthWidth*3)-10, 65))
+	db.nblambda.Resize(fyne.NewSize((sixthWidth * 3), 65))
 	db.nblambda.Move(fyne.NewPos(sixthWidth*1.5, 0))
 
-	db.wblambda.Resize(fyne.NewSize((sixthWidth*3)-10, 65))
+	db.wblambda.Resize(fyne.NewSize((sixthWidth * 3), 65))
 	db.wblambda.Move(fyne.NewPos(sixthWidth*1.5, space.Height-65))
 
 	// Icons
@@ -646,7 +646,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	db.checkEngine.Resize(fyne.NewSize(sixthWidth/2, thirdHeight/2))
 	db.checkEngine.Move(fyne.NewPos(space.Width-db.engineTemp.Size().Width-db.throttle.Content().Size().Width-db.checkEngine.Size().Width-15, space.Height-db.checkEngine.Size().Height-db.wblambda.Size().Height))
 
-	db.knockIcon.Content().Move(fyne.NewPos((space.Width/2)-(db.checkEngine.Size().Width/2)-(sixthWidth*.7), space.Height/2-60))
+	db.knockIcon.Move(fyne.NewPos((space.Width/2)-(db.checkEngine.Size().Width/2)-(sixthWidth*.7), space.Height/2-60))
 
 	// Buttons
 

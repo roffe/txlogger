@@ -9,6 +9,11 @@ type MapViewerWindow struct {
 	mv MapViewerWindowWidget
 }
 
+type MapViewerWindowInterface interface {
+	RequestFocus()
+	Close()
+}
+
 type MapViewerWindowWidget interface {
 	SetValue(name string, value float64)
 	Close()

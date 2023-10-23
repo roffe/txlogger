@@ -89,7 +89,7 @@ type MainWindow struct {
 	loggingRunning bool
 	//mockRunning    bool
 
-	dlc  datalogger.DataClient
+	dlc  datalogger.Logger
 	vars *kwp2000.VarDefinitionList
 
 	symbols symbol.SymbolCollection
@@ -103,11 +103,6 @@ type MainWindow struct {
 	openMaps map[string]MapViewerWindowInterface
 
 	mvh *MapViewerHandler
-}
-
-type MapViewerWindowInterface interface {
-	RequestFocus()
-	Close()
 }
 
 func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
@@ -191,7 +186,6 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		},
 		func() fyne.CanvasObject {
 			disabled := mw.dlc != nil
-			//log.Println("newList: creating new VarDefinitionWidget")
 			return widgets.NewVarDefinitionWidgetEntry(mw.symbolConfigList, mw.vars, mw.SaveSymbolList, disabled)
 		},
 		func(lii widget.ListItemID, co fyne.CanvasObject) {
@@ -199,10 +193,9 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 			coo.Update(lii, mw.vars.GetPos(lii))
 			if !mw.buttonsDisabled {
 				coo.Enable()
-			} else {
-				coo.Disable()
+				return
 			}
-
+			coo.Disable()
 		},
 	)
 
@@ -261,68 +254,33 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 	},
 		&widget.Label{
 			Text:      "Name",
-			TextStyle: fyne.TextStyle{Monospace: true},
-			Alignment: fyne.TextAlignCenter,
+			Alignment: fyne.TextAlignLeading,
 		},
 		&widget.Label{
 			Text:      "Value",
-			TextStyle: fyne.TextStyle{Monospace: true},
-			Alignment: fyne.TextAlignCenter,
+			Alignment: fyne.TextAlignLeading,
 		},
 		&widget.Label{
 			Text:      "Method",
-			TextStyle: fyne.TextStyle{Monospace: true},
-			Alignment: fyne.TextAlignCenter,
+			Alignment: fyne.TextAlignLeading,
 		},
 		&widget.Label{
 			Text:      "#",
-			TextStyle: fyne.TextStyle{Monospace: true},
-			Alignment: fyne.TextAlignCenter,
+			Alignment: fyne.TextAlignLeading,
 		},
 		//&widget.Label{
 		//	Text:      "Type",
-		//	TextStyle: fyne.TextStyle{Monospace: true},
-		//	Alignment: fyne.TextAlignCenter,
+		//	Alignment: fyne.TextAlignLeading,
 		//},
 		//&widget.Label{
 		//	Text:      "Signed",
-		//	TextStyle: fyne.TextStyle{Monospace: true},
-		//	Alignment: fyne.TextAlignCenter,
+		//	Alignment: fyne.TextAlignLeading,
 		//},
 		&widget.Label{
 			Text:      "Factor",
-			TextStyle: fyne.TextStyle{Monospace: true},
-			Alignment: fyne.TextAlignCenter,
+			Alignment: fyne.TextAlignLeading,
 		},
 	)
-	/*
-		mw.mapSelector = widget.NewTreeWithStrings(mapToTreeMap(symbol.T7SymbolsTuning))
-		mw.mapSelector.OnSelected = func(uid widget.TreeNodeID) {
-			//		log.Printf("%q", uid)
-			if uid == "" || !strings.Contains(uid, ".") {
-				if !mw.mapSelector.IsBranchOpen(uid) {
-					mw.mapSelector.OpenBranch(uid)
-				} else {
-					mw.mapSelector.CloseBranch(uid)
-				}
-				mw.mapSelector.UnselectAll()
-				return
-
-			}
-			mw.openMap(symbol.GetInfo(symbol.ECU_T7, uid))
-			mw.mapSelector.UnselectAll()
-		}
-	*/
-
-	/*
-		widget.NewSelect([]string{"Select map", "Fuel", "Ignition"}, func(s string) {
-			if s == "Select map" {
-				return
-			}
-			mw.openShort(s)
-		})
-		mw.mapSelector.SetSelectedIndex(0)
-	*/
 
 	mw.loadPrefs()
 
@@ -333,30 +291,6 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 
 	return mw
 }
-
-/*
-func mapToTreeMap(data map[string][]string) map[string][]string {
-	result := make(map[string][]string)
-
-	// Sort map keys to maintain a consistent order
-	var sortedKeys []string
-	for key := range data {
-		sortedKeys = append(sortedKeys, key)
-	}
-	sort.Strings(sortedKeys)
-
-	for _, key := range sortedKeys {
-		id := "" + key
-		result[""] = append(result[""], id)
-		items := data[key]
-		// Sort the items if necessary
-		sort.Strings(items)
-		result[id] = append(result[id], items...)
-	}
-
-	return result
-}
-*/
 
 type ratioContainer struct {
 	widths []float32

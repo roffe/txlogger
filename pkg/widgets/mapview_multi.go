@@ -1,8 +1,6 @@
 package widgets
 
 import (
-	"log"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
@@ -16,7 +14,7 @@ type MapViewerMulti struct {
 	view *container.Split
 }
 
-func NewMapViewerMulti(symbols symbol.SymbolCollection, mapNames ...string) *MapViewerMulti {
+func NewMapViewerMulti(symbols symbol.SymbolCollection, mapNames ...string) (*MapViewerMulti, error) {
 	mvm := &MapViewerMulti{}
 	mvm.ExtendBaseWidget(mvm)
 
@@ -25,7 +23,7 @@ func NewMapViewerMulti(symbols symbol.SymbolCollection, mapNames ...string) *Map
 		axis := symbol.GetInfo(symbol.ECU_T7, m)
 		xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := symbols.GetXYZ(axis.X, axis.Y, axis.Z)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		mv, err := NewMapViewer(
 			WithXData(xData),
@@ -39,7 +37,7 @@ func NewMapViewerMulti(symbols symbol.SymbolCollection, mapNames ...string) *Map
 			WithInterPolFunc(interpolate.Interpolate),
 		)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		mvm.mvs[i] = mv
 	}
@@ -58,7 +56,7 @@ func NewMapViewerMulti(symbols symbol.SymbolCollection, mapNames ...string) *Map
 	)
 	mvm.view.SetOffset(0.2)
 
-	return mvm
+	return mvm, nil
 }
 
 func (mvm *MapViewerMulti) Close() {

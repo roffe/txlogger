@@ -6,10 +6,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -20,17 +18,19 @@ import (
 )
 
 type T7Client struct {
-	quitChan chan struct{}
-	Config
-	sysvars *ThreadSafeMap
-	dbs     []DataLoggerClient
+	dl Logger
 
-	//subs map[string][]*func(float64)
-	mu sync.Mutex
+	quitChan chan struct{}
+	sysvars  *ThreadSafeMap
+
+	cc int
+
+	Config
 }
 
-func NewT7(cfg Config) (*T7Client, error) {
+func NewT7(dl Logger, cfg Config) (Provider, error) {
 	return &T7Client{
+		dl:       dl,
 		quitChan: make(chan struct{}, 2),
 		Config:   cfg,
 		sysvars: &ThreadSafeMap{
@@ -41,42 +41,12 @@ func NewT7(cfg Config) (*T7Client, error) {
 				"Out.ST_LimpHome":   "0",   // comes from 0x280
 			},
 		},
-		//subs: make(map[string][]*func(float64)),
 	}, nil
 }
 
 func (c *T7Client) Close() {
 	close(c.quitChan)
 	time.Sleep(200 * time.Millisecond)
-}
-
-func (c *T7Client) Attach(db DataLoggerClient) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for _, d := range c.dbs {
-		if d == db {
-			log.Println("Dropping")
-			return
-		}
-	}
-	c.dbs = append(c.dbs, db)
-}
-
-func (c *T7Client) Detach(db DataLoggerClient) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for i, d := range c.dbs {
-		if d == db {
-			c.dbs = append(c.dbs[:i], c.dbs[i+1:]...)
-			return
-		}
-	}
-}
-
-func (c *T7Client) setDbValue(name string, value float64) {
-	for _, db := range c.dbs {
-		db.SetValue(name, value)
-	}
 }
 
 func (c *T7Client) Start() error {
@@ -88,20 +58,6 @@ func (c *T7Client) Start() error {
 	defer file.Sync()
 	c.OnMessage(fmt.Sprintf("Logging to %s", filename))
 
-	/*
-		csvFilename := fmt.Sprintf("logs/log-%s.csv", time.Now().Format("2006-01-02-15-04-05"))
-		csv, err := os.OpenFile(csvFilename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			return fmt.Errorf("failed to open file: %w", err)
-		}
-		defer csv.Close()
-
-		csvHeader := []string{"Date"}
-		for _, va := range c.Variables {
-			csvHeader = append(csvHeader, va.Name)
-		}
-		fmt.Fprintln(csv, strings.Join(csvHeader, ","))
-	*/
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -116,58 +72,38 @@ func (c *T7Client) Start() error {
 
 	go func() {
 		sub := cl.Subscribe(ctx, 0x1A0, 0x280, 0x3A0)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msg := <-sub:
-				switch msg.Identifier() {
-				case 0x1A0:
-					rpm := binary.BigEndian.Uint16(msg.Data()[1:3])
-					throttle := int(msg.Data()[5])
-					c.sysvars.Set("ActualIn.n_Engine", strconv.Itoa(int(rpm)))
-					c.sysvars.Set("Out.X_AccPedal", strconv.Itoa(throttle)+",0")
-
-					c.setDbValue("ActualIn.n_Engine", float64(rpm))
-					c.setDbValue("Out.X_AccPedal", float64(throttle))
-
-					/*
-						if subs, found := c.subs["ActualIn.n_Engine"]; found {
-							for _, sub := range subs {
-								(*sub)(float64(rpm))
-							}
-						}
-						if subs, found := c.subs["Out.X_AccPedal"]; found {
-							for _, sub := range subs {
-								(*sub)(float64(throttle))
-							}
-						}
-					*/
-				case 0x280:
-					data := msg.Data()[4]
-					if data&0x20 == 0x20 {
-						c.setDbValue("CRUISE", 1)
-					} else {
-						c.setDbValue("CRUISE", 0)
-					}
-					if data&0x80 == 0x80 {
-						c.setDbValue("CEL", 1)
-					} else {
-						c.setDbValue("CEL", 0)
-					}
-					data2 := msg.Data()[3]
-					if data2&0x01 == 0x01 {
-						c.setDbValue("LIMP", 1)
-					} else {
-						c.setDbValue("LIMP", 0)
-					}
-
-				case 0x3A0:
-					speed := uint16(msg.Data()[4]) | uint16(msg.Data()[3])<<8
-					realSpeed := float64(speed) / 10
-					c.sysvars.Set("In.v_Vehicle", strconv.FormatFloat(realSpeed, 'f', 1, 64))
-					c.setDbValue("In.v_Vehicle", realSpeed)
+		for msg := range sub {
+			switch msg.Identifier() {
+			case 0x1A0:
+				rpm := binary.BigEndian.Uint16(msg.Data()[1:3])
+				throttle := int(msg.Data()[5])
+				c.sysvars.Set("ActualIn.n_Engine", strconv.Itoa(int(rpm)))
+				c.sysvars.Set("Out.X_AccPedal", strconv.Itoa(throttle)+",0")
+				c.dl.SetValue("ActualIn.n_Engine", float64(rpm))
+				c.dl.SetValue("Out.X_AccPedal", float64(throttle))
+			case 0x280:
+				data := msg.Data()[4]
+				if data&0x20 == 0x20 {
+					c.dl.SetValue("CRUISE", 1)
+				} else {
+					c.dl.SetValue("CRUISE", 0)
 				}
+				if data&0x80 == 0x80 {
+					c.dl.SetValue("CEL", 1)
+				} else {
+					c.dl.SetValue("CEL", 0)
+				}
+				data2 := msg.Data()[3]
+				if data2&0x01 == 0x01 {
+					c.dl.SetValue("LIMP", 1)
+				} else {
+					c.dl.SetValue("LIMP", 0)
+				}
+			case 0x3A0:
+				speed := uint16(msg.Data()[4]) | uint16(msg.Data()[3])<<8
+				realSpeed := float64(speed) / 10
+				c.sysvars.Set("In.v_Vehicle", strconv.FormatFloat(realSpeed, 'f', 1, 64))
+				c.dl.SetValue("In.v_Vehicle", realSpeed)
 			}
 		}
 	}()
@@ -197,6 +133,10 @@ func (c *T7Client) Start() error {
 		}()
 
 		c.OnMessage("Connected to ECU")
+
+		if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
+			return fmt.Errorf("ClearDynamicallyDefineLocalId: %w", err)
+		}
 
 		for i, v := range c.Variables {
 			//c.onMessage(fmt.Sprintf("%d %s %s %d %X", i, v.Name, v.Method, v.Value, v.Type))
@@ -233,7 +173,7 @@ func (c *T7Client) Start() error {
 				}
 			}
 		})
-
+		var timeStamp time.Time
 		errg.Go(func() error {
 			for {
 				select {
@@ -243,8 +183,7 @@ func (c *T7Client) Start() error {
 				case <-gctx.Done():
 					return nil
 				case <-t.C:
-					//start := time.Now()
-					ts := time.Now()
+					timeStamp = time.Now()
 					data, err := kwp.ReadDataByLocalIdentifier(ctx, 0xF0)
 					if err != nil {
 						errCount++
@@ -253,23 +192,14 @@ func (c *T7Client) Start() error {
 						c.OnMessage(fmt.Sprintf("Failed to read data: %v", err))
 						continue
 					}
-
 					r := bytes.NewReader(data)
 					for _, va := range c.Variables {
 						if err := va.Read(r); err != nil {
 							c.OnMessage(fmt.Sprintf("Failed to read %s: %v", va.Name, err))
 							break
 						}
-
 						// Set value on dashboards
-						c.setDbValue(va.Name, va.GetFloat64())
-
-						//if subs, found := c.subs[va.Name]; found {
-						//	for _, sub := range subs {
-						//		(*sub)(va.GetFloat64())
-						//	}
-						//}
-
+						c.dl.SetValue(va.Name, va.GetFloat64())
 					}
 					if r.Len() > 0 {
 						left := r.Len()
@@ -281,7 +211,7 @@ func (c *T7Client) Start() error {
 						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", left, leftovers[:n]))
 					}
 					//c.produceCSVLine(csv, c.Variables)
-					c.produceLogLine(file, c.Variables, ts)
+					c.produceLogLine(file, c.Variables, timeStamp)
 					count++
 					//cps++
 					if count%10 == 0 {
@@ -290,9 +220,7 @@ func (c *T7Client) Start() error {
 				}
 			}
 		})
-
 		c.OnMessage(fmt.Sprintf("Live logging at %d fps", c.Freq))
-
 		return errg.Wait()
 	},
 		retry.DelayType(retry.FixedDelay),
@@ -306,17 +234,6 @@ func (c *T7Client) Start() error {
 	return err
 }
 
-/*
-func (c *T7Client) produceCSVLine(file io.Writer, vars []*kwp2000.VarDefinition) {
-	var values []string
-	for _, va := range vars {
-		values = append(values, va.StringValue())
-	}
-	fmt.Fprintln(file, time.Now().Format("2006-01-02 15:04:05")+","+strings.Join(values, ","))
-
-}
-*/
-
 func (c *T7Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition, ts time.Time) {
 	file.Write([]byte(ts.Format("02-01-2006 15:04:05.999") + "|"))
 	c.sysvars.Lock()
@@ -327,12 +244,13 @@ func (c *T7Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition,
 	for _, va := range vars {
 		val := va.StringValue()
 		file.Write([]byte(va.Name + "=" + strings.Replace(val, ".", ",", 1) + "|"))
-		if va.Widget != nil {
+		if va.Widget != nil && c.cc == 5 {
 			va.Widget.(*widgets.VarDefinitionWidgetEntry).SetValue(val)
 		}
 	}
+	c.cc++
+	if c.cc > 6 {
+		c.cc = 0
+	}
 	file.Write([]byte("IMPORTANTLINE=0|\n"))
-	//c.Sink.Push(&sink.Message{
-	//	Data: []byte(time.Now().Format(ISO8601) + "|" + strings.Join(ms, ",")),
-	//})
 }

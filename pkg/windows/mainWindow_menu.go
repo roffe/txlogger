@@ -87,7 +87,11 @@ func (mw *MainWindow) openMapz(mapNames ...string) {
 			mw.Log("No binary loaded")
 			return
 		}
-		view := widgets.NewMapViewerMulti(mw.symbols, mapNames...)
+		view, err := widgets.NewMapViewerMulti(mw.symbols, mapNames...)
+		if err != nil {
+			mw.Log(err.Error())
+			return
+		}
 		mw.openMaps[joinedNames] = mw.newMapViewerWindow(w, view, symbol.Axis{})
 
 		for _, mv := range view.Children() {

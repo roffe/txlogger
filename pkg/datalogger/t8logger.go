@@ -5,9 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -18,25 +16,26 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func NewT8(cfg Config) (*T8Client, error) {
+type T8Client struct {
+	dl Logger
+
+	quitChan chan struct{}
+	sysvars  *ThreadSafeMap
+
+	cc int
+
+	Config
+}
+
+func NewT8(dl Logger, cfg Config) (Provider, error) {
 	return &T8Client{
+		dl:       dl,
 		quitChan: make(chan struct{}, 2),
 		Config:   cfg,
 		sysvars: &ThreadSafeMap{
 			values: make(map[string]string),
 		},
-		subs: make(map[string][]*func(float64)),
 	}, nil
-}
-
-type T8Client struct {
-	quitChan chan struct{}
-	Config
-	sysvars *ThreadSafeMap
-	dbs     []DataLoggerClient
-
-	subs map[string][]*func(float64)
-	mu   sync.Mutex
 }
 
 func (c *T8Client) Close() {
@@ -44,64 +43,6 @@ func (c *T8Client) Close() {
 	time.Sleep(200 * time.Millisecond)
 }
 
-/*
-func (c *T8Client) Subscribe(name string, cb *func(float64)) {
-	subs, found := c.subs[name]
-	if !found {
-		c.subs[name] = []*func(float64){cb}
-		return
-	}
-
-	for _, f := range subs {
-		if f == cb {
-			return
-		}
-	}
-
-	subs = append(subs, cb)
-	c.subs[name] = subs
-}
-
-func (c *T8Client) Unsubscribe(name string, cb *func(float64)) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for i, f := range c.subs[name] {
-		if f == cb {
-			c.subs[name] = append(c.subs[name][:i], c.subs[name][i+1:]...)
-			return
-		}
-	}
-}
-*/
-
-func (c *T8Client) Attach(db DataLoggerClient) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for _, d := range c.dbs {
-		if d == db {
-			log.Println("Dropping")
-			return
-		}
-	}
-	c.dbs = append(c.dbs, db)
-}
-
-func (c *T8Client) Detach(db DataLoggerClient) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for i, d := range c.dbs {
-		if d == db {
-			c.dbs = append(c.dbs[:i], c.dbs[i+1:]...)
-			return
-		}
-	}
-}
-
-func (c *T8Client) setDbValue(name string, value float64) {
-	for _, db := range c.dbs {
-		db.SetValue(name, value)
-	}
-}
 func (c *T8Client) Start() error {
 	file, filename, err := createLog("t8l")
 	if err != nil {
@@ -206,13 +147,7 @@ func (c *T8Client) Start() error {
 							c.OnMessage(fmt.Sprintf("Failed to read %s: %v", va.Name, err))
 							break
 						}
-
-						c.setDbValue(va.Name, va.GetFloat64())
-						if subs, found := c.subs[va.Name]; found {
-							for _, sub := range subs {
-								(*sub)(va.GetFloat64())
-							}
-						}
+						c.dl.SetValue(va.Name, va.GetFloat64())
 					}
 					if r.Len() > 0 {
 						left := r.Len()
@@ -252,26 +187,6 @@ func (c *T8Client) Start() error {
 	return err
 }
 
-func (c *T8Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition, ts time.Time) {
-	file.Write([]byte(ts.Format("02-01-2006 15:04:05.999") + "|"))
-	c.sysvars.Lock()
-	for k, v := range c.sysvars.values {
-		file.Write([]byte(k + "=" + strings.Replace(v, ".", ",", 1) + "|"))
-	}
-	c.sysvars.Unlock()
-	for _, va := range vars {
-		val := va.StringValue()
-		file.Write([]byte(va.Name + "=" + strings.Replace(val, ".", ",", 1) + "|"))
-		if va.Widget != nil {
-			va.Widget.(*widgets.VarDefinitionWidgetEntry).SetValue(val)
-		}
-	}
-	file.Write([]byte("IMPORTANTLINE=0|\n"))
-	//c.Sink.Push(&sink.Message{
-	//	Data: []byte(time.Now().Format(ISO8601) + "|" + strings.Join(ms, ",")),
-	//})
-}
-
 func ClearDynamicallyDefinedRegister(ctx context.Context, gm *gmlan.Client) error {
 	if err := gm.WriteDataByIdentifier(ctx, 0x17, []byte{0xF0, 0x04}); err != nil {
 		return fmt.Errorf("ClearDynamicallyDefinedRegister: %w", err)
@@ -294,4 +209,26 @@ func SetUpDynamicallyDefinedRegisterBySymbol(ctx context.Context, gm *gmlan.Clie
 		return fmt.Errorf("SetUpDynamicallyDefinedRegisterBySymbol: %w", err)
 	}
 	return nil
+}
+
+func (c *T8Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition, ts time.Time) {
+	file.Write([]byte(ts.Format("02-01-2006 15:04:05.999") + "|"))
+	c.sysvars.Lock()
+	for k, v := range c.sysvars.values {
+		file.Write([]byte(k + "=" + strings.Replace(v, ".", ",", 1) + "|"))
+	}
+	c.sysvars.Unlock()
+	for _, va := range vars {
+		val := va.StringValue()
+		file.Write([]byte(va.Name + "=" + strings.Replace(val, ".", ",", 1) + "|"))
+		if va.Widget != nil && c.cc == 5 {
+			va.Widget.(*widgets.VarDefinitionWidgetEntry).SetValue(val)
+
+		}
+	}
+	c.cc++
+	if c.cc > 6 {
+		c.cc = 0
+	}
+	file.Write([]byte("IMPORTANTLINE=0|\n"))
 }

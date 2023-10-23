@@ -27,7 +27,7 @@ type VarDefinitionWidgetEntry struct {
 	container              *fyne.Container
 }
 
-func NewVarDefinitionWidgetEntry(ls *widget.List, definedVars *kwp2000.VarDefinitionList, saveSymbols func(), disabled bool) fyne.Widget {
+func NewVarDefinitionWidgetEntry(ls *widget.List, definedVars *kwp2000.VarDefinitionList, saveSymbols func(), disabled bool) *VarDefinitionWidgetEntry {
 	vd := &VarDefinitionWidgetEntry{}
 	vd.ExtendBaseWidget(vd)
 	vd.symbolName = &widget.Entry{
