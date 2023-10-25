@@ -5,13 +5,6 @@ import (
 	"log"
 )
 
-type ECUType int
-
-const (
-	ECU_T7 ECUType = iota
-	ECU_T8
-)
-
 type AxisInformation map[string]Axis
 
 type Axis struct {
@@ -29,62 +22,24 @@ func (a *Axis) String() string {
 	return fmt.Sprintf("X: %s, Y: %s, Z: %s, XFrom: %s, YFrom: %s", a.X, a.Y, a.Z, a.XFrom, a.YFrom)
 }
 
-/*
-var t7airRpm = Axis{
-	"BFuelCal.AirXSP",
-	"BFuelCal.RpmYSP",
-	"",
-	"",
-	"",
-	"",
-}
-
-var axisT7 = AxisInformation{
-	"BFuelCal.Map":      t7airRpm,
-	"BFuelCal.StartMap": t7airRpm,
-	"IgnNormCal.Map":    t7airRpm,
-}
-*/
-
 type AxisCollection map[ECUType]Axis
 
 var axisTranslator = map[ECUType]AxisInformation{
 	ECU_T7: axisT7,
-	ECU_T8: {
-		"BFuelCal.TempEnrichFacMap": Axis{
-			"IgnAbsCal.m_AirNormXSP",
-			"IgnAbsCal.n_EngNormYSP",
-			"BFuelCal.TempEnrichFacMap",
-			"",
-			"",
-			"",
-			"",
-			"",
-		},
-		"IgnAbsCal.fi_NormalMAP": Axis{
-			"IgnAbsCal.m_AirNormXSP",
-			"IgnAbsCal.n_EngNormYSP",
-			"BFuelCal.TempEnrichFacMap",
-			"",
-			"",
-			"",
-			"",
-			"",
-		},
-	},
+	ECU_T8: axisT8,
 }
 
 func GetAxisCollection(ecu ECUType) AxisInformation {
 	return axisTranslator[ecu]
 }
 
-func GetAxis(ecu ECUType, name string) Axis {
+func getAxis(ecu ECUType, name string) Axis {
 	return axisTranslator[ecu][name]
 }
 
 // returns x, y, z axis map name
 func GetInfo(ecu ECUType, name string) Axis {
-	axis := GetAxis(ecu, name)
+	axis := getAxis(ecu, name)
 
 	if axis.XFrom == "" {
 		axis.XFrom = "MAF.m_AirInlet"

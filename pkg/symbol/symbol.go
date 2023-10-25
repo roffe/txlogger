@@ -15,6 +15,24 @@ import (
 	"github.com/roffe/txlogger/pkg/blowfish"
 )
 
+type ECUType int
+
+const (
+	ECU_T7 ECUType = iota // T7
+	ECU_T8                // T8
+)
+
+func (e ECUType) String() {
+	switch e {
+	case ECU_T7:
+		fmt.Println("T7")
+	case ECU_T8:
+		fmt.Println("T8")
+	default:
+		fmt.Println("Unknown")
+	}
+}
+
 type ECUBinary interface {
 	Bytes() []byte
 	Symbols() []*Symbol

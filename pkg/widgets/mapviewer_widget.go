@@ -42,8 +42,8 @@ type MapViewer struct {
 	content   *fyne.Container
 	innerView *fyne.Container
 	grid      *Grid
-	cursor    fyne.CanvasObject
-	crosshair fyne.CanvasObject
+	cursor    *canvas.Rectangle
+	crosshair *canvas.Rectangle
 
 	textValues []*canvas.Text
 
@@ -102,8 +102,10 @@ func (mv *MapViewer) render() {
 	mv.createXAxis()
 
 	mv.crosshair = NewRectangle(color.RGBA{0xfc, 0x4a, 0xFA, 255}, 4)
-	mv.cursor = NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 255}, 4)
 
+	mv.cursor = NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 255}, 4)
+	mv.selectedX = -1
+	mv.cursor.Resize(fyne.NewSize(1, 1))
 	mv.textValues, mv.valueTexts = createTextValues(mv.zData, mv.zCorrFac)
 
 	width := float32(mv.numColumns * cellWidth)
@@ -141,6 +143,7 @@ func (mv *MapViewer) render() {
 		nil,
 		mv.innerView,
 	)
+
 }
 
 func (mv *MapViewer) createXAxis() {

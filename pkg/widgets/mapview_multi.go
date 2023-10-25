@@ -14,13 +14,13 @@ type MapViewerMulti struct {
 	view *container.Split
 }
 
-func NewMapViewerMulti(symbols symbol.SymbolCollection, mapNames ...string) (*MapViewerMulti, error) {
+func NewMapViewerMulti(typ symbol.ECUType, symbols symbol.SymbolCollection, mapNames ...string) (*MapViewerMulti, error) {
 	mvm := &MapViewerMulti{}
 	mvm.ExtendBaseWidget(mvm)
 
 	mvm.mvs = make([]*MapViewer, len(mapNames))
 	for i, m := range mapNames {
-		axis := symbol.GetInfo(symbol.ECU_T7, m)
+		axis := symbol.GetInfo(typ, m)
 		xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := symbols.GetXYZ(axis.X, axis.Y, axis.Z)
 		if err != nil {
 			return nil, err

@@ -13,33 +13,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
-func (lp *LogPlayer) setupMenu() {
-	var menus []*fyne.Menu
-	menus = append(menus, fyne.NewMenu("File"))
-	for _, category := range symbol.T7SymbolsTuningOrder {
-		var items []*fyne.MenuItem
-
-		for _, mapName := range symbol.T7SymbolsTuning[category] {
-			if strings.Contains(mapName, "|") {
-				parts := strings.Split(mapName, "|")
-				names := parts[1:]
-				itm := fyne.NewMenuItem(parts[0], func() {
-					lp.openMapz(names...)
-				})
-				items = append(items, itm)
-				continue
-			}
-			items = append(items, fyne.NewMenuItem(mapName, func() {
-				lp.openMap(mapName)
-			}))
-		}
-		menus = append(menus, fyne.NewMenu(category, items...))
-	}
-	menu := fyne.NewMainMenu(menus...)
-	lp.Window.SetMainMenu(menu)
-}
-
-func (lp *LogPlayer) openMapz(mapNames ...string) {
+func (lp *LogPlayer) openMapz(typ symbol.ECUType, mapNames ...string) {
 	joinedNames := strings.Join(mapNames, "|")
 	mv, found := lp.openMaps[joinedNames]
 	if !found {
@@ -49,7 +23,7 @@ func (lp *LogPlayer) openMapz(mapNames ...string) {
 			dialog.ShowError(errors.New("no symbols loaded"), lp.Window)
 			return
 		}
-		view, err := widgets.NewMapViewerMulti(lp.symbols, mapNames...)
+		view, err := widgets.NewMapViewerMulti(typ, lp.symbols, mapNames...)
 		if err != nil {
 			dialog.ShowError(err, lp.Window)
 			return
@@ -80,18 +54,22 @@ func (lp *LogPlayer) openMapz(mapNames ...string) {
 	mv.RequestFocus()
 }
 
-func (lp *LogPlayer) openMap(symbolName string) error {
-	if symbolName == "" {
-		return errors.New("symbolName is empty")
+func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
+	if lp.symbols == nil {
+		dialog.ShowError(errors.New("no symbols loaded"), lp.Window)
+		return
 	}
-	axis := symbol.GetInfo(symbol.ECU_T7, symbolName)
+	if symbolName == "" {
+		dialog.ShowError(errors.New("no symbol name"), lp.Window)
+	}
+	axis := symbol.GetInfo(typ, symbolName)
 	mw, found := lp.openMaps[axis.Z]
 	if !found {
 		w := lp.app.NewWindow(fmt.Sprintf("Map Viewer - %s", axis.Z))
 
 		xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := lp.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
 		if err != nil {
-			return err
+			dialog.ShowError(err, lp.Window)
 		}
 
 		mv, err := widgets.NewMapViewer(
@@ -106,7 +84,8 @@ func (lp *LogPlayer) openMap(symbolName string) error {
 			widgets.WithInterPolFunc(interpolate.Interpolate),
 		)
 		if err != nil {
-			return fmt.Errorf("x: %s y: %s z: %s err: %w", axis.X, axis.Y, axis.Z, err)
+
+			dialog.ShowError(fmt.Errorf("x: %s y: %s z: %s err: %w", axis.X, axis.Y, axis.Z, err), lp.Window)
 		}
 
 		w.Canvas().SetOnTypedKey(func(ke *fyne.KeyEvent) {
@@ -132,5 +111,4 @@ func (lp *LogPlayer) openMap(symbolName string) error {
 		w.Show()
 	}
 	mw.RequestFocus()
-	return nil
 }

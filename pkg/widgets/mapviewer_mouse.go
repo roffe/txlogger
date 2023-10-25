@@ -44,10 +44,12 @@ func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
 		c.Focus(mv)
 	}
 
+	cellWidth := mv.innerView.Size().Width / float32(mv.numColumns)
+	cellHeight := mv.innerView.Size().Height / float32(mv.numRows)
+
 	if event.Button == desktop.MouseButtonPrimary && event.Modifier == 0 {
 		//mv.moving = true
-		cellWidth := mv.innerView.Size().Width / float32(mv.numColumns)
-		cellHeight := mv.innerView.Size().Height / float32(mv.numRows)
+
 		mv.selectedX = max(0, min(int(event.Position.X-mv.yAxisButtons.Size().Width)/int(cellWidth), mv.numColumns-1))
 		mv.SelectedY = max(0, min(mv.numRows-int(event.Position.Y-mv.xAxisButtons.Size().Height)/int(cellHeight)-1, mv.numRows-1))
 		newY := (float32(mv.numRows-mv.SelectedY-1) * cellHeight)
@@ -59,8 +61,6 @@ func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
 
 	if event.Button == desktop.MouseButtonPrimary /*&& event.Modifier == fyne.KeyModifierShift*/ {
 		mv.selecting = true
-		cellWidth := mv.innerView.Size().Width / float32(mv.numColumns)
-		cellHeight := mv.innerView.Size().Height / float32(mv.numRows)
 		nselectedX := max(0, min(int(event.Position.X-mv.yAxisButtons.Size().Width)/int(cellWidth), mv.numColumns-1))
 		nSelectedY := max(0, min(mv.numRows-int(event.Position.Y-mv.xAxisButtons.Size().Height)/int(cellHeight)-1, mv.numRows-1))
 		difX := int(math.Abs(float64(nselectedX - mv.selectedX)))

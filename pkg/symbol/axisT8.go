@@ -1,8 +1,77 @@
 package symbol
 
-// var axisT7 = AxisInformation{}
-
-var axisT7 = AxisInformation{
+var axisT8 = AxisInformation{
+	"AirCtrlCal.RegMap": Axis{
+		"AirCtrlCal.SetLoadXSP",
+		"BstKnkCal.n_EngYSP",
+		"AirCtrlCal.RegMap",
+		"",
+		"",
+		"",
+		"MAF.m_AirInlet",
+		"ActualIn.n_Engine",
+	},
+	"AirCtrlCal.Ppart_BoostMap": Axis{
+		"AirCtrlCal.PIDXSP",
+		"AirCtrlCal.PIDYSP",
+		"AirCtrlCal.Ppart_BoostMap",
+		"mg/c error",
+		"rpm",
+		"",
+		"AirDIFF",
+		"ActualIn.n_Engine",
+	},
+	"AirCtrlCal.Ipart_BoostMap": Axis{
+		"AirCtrlCal.PIDXSP",
+		"AirCtrlCal.PIDYSP",
+		"AirCtrlCal.Ipart_BoostMap",
+		"mg/c error",
+		"rpm",
+		"",
+		"AirDIFF",
+		"ActualIn.n_Engine",
+	},
+	"AirCtrlCal.Dpart_BoostMap": Axis{
+		"AirCtrlCal.PIDXSP",
+		"AirCtrlCal.PIDYSP",
+		"AirCtrlCal.Dpart_BoostMap",
+		"mg/c error",
+		"rpm",
+		"",
+		"AirDIFF",
+		"ActualIn.n_Engine",
+	},
+	"BFuelCal.TempEnrichFacMap": Axis{
+		"BFuelCal.AirXSP",
+		"BFuelCal.RpmYSP",
+		"BFuelCal.TempEnrichFacMap",
+		"",
+		"",
+		"",
+		"MAF.m_AirInlet",
+		"ActualIn.n_Engine",
+	},
+	"BstKnkCal.MaxAirmass": Axis{
+		"BstKnkCal.OffsetXSP", // BioPower "BstKnkCal.fi_offsetXSP"
+		"BstKnkCal.n_EngYSP",
+		"BstKnkCal.MaxAirmass",
+		"° ignition retard (Ioff)",
+		"rpm",
+		"mg/c",
+		"IgnMastProt.fi_Offset",
+		"ActualIn.n_Engine",
+	},
+	"IgnAbsCal.fi_NormalMAP": Axis{
+		"IgnAbsCal.m_AirNormXSP",
+		"IgnAbsCal.n_EngNormYSP",
+		"IgnAbsCal.fi_NormalMAP",
+		"",
+		"",
+		"",
+		"MAF.m_AirInlet",
+		"ActualIn.n_Engine",
+	},
+	//--------
 	"AdpFuelCal.T_AdaptLim": Axis{
 		"",
 		"",
@@ -511,16 +580,6 @@ var axisT7 = AxisInformation{
 		"rpm",
 		"% PWM",
 		"m_Request",
-		"ActualIn.n_Engine",
-	},
-	"BstKnkCal.MaxAirmass": Axis{
-		"BstKnkCal.OffsetXSP",
-		"BstKnkCal.n_EngYSP",
-		"BstKnkCal.MaxAirmass",
-		"° ignition retard (Ioff)",
-		"rpm",
-		"mg/c",
-		"IgnProt.fi_Offset",
 		"ActualIn.n_Engine",
 	},
 	"BstKnkCal.MaxAirmassAu": Axis{

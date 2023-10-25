@@ -52,6 +52,8 @@ func (s *slider) TypedKey(key *fyne.KeyEvent) {
 type LogPlayer struct {
 	app fyne.App
 
+	menu *MainMenu
+
 	prevBtn     *widget.Button
 	toggleBtn   *widget.Button
 	restartBtn  *widget.Button
@@ -94,11 +96,21 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 		symbols:  symbols,
 		mvh:      NewMapViewerHandler(),
 
-		logType: strings.ToUpper(filepath.Ext(filename)),
-		closed:  false,
+		closed: false,
 
 		Window: w,
 	}
+
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".t7l":
+		lp.logType = "T7"
+	case ".t8l":
+		lp.logType = "T8"
+	}
+
+	lp.menu = NewMainMenu(lp, []*fyne.Menu{
+		fyne.NewMenu("File"),
+	}, lp.openMap, lp.openMapz)
 
 	w.SetCloseIntercept(func() {
 		lp.controlChan <- &controlMsg{Op: OpExit}
@@ -200,8 +212,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 
 	lp.Canvas().SetOnTypedKey(lp.handler)
 
-	lp.setupMenu()
-
+	w.SetMainMenu(lp.menu.GetMenu(lp.logType))
 	w.SetContent(lp.render())
 	w.Show()
 
@@ -275,6 +286,9 @@ func (lp *LogPlayer) newMapViewerWindow(w fyne.Window, mv MapViewerWindowWidget,
 
 func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, control <-chan *controlMsg, ww fyne.Window) {
 	play := true
+	if play {
+		lp.toggleBtn.SetIcon(theme.MediaPauseIcon())
+	}
 	var nextFrame, currentMillis int64
 	var playonce bool
 	speedMultiplier := 1.0

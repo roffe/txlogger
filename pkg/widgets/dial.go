@@ -150,7 +150,7 @@ func (c *Dial) SetValue(value float64) {
 	middle := fyne.NewPos(size.Width/2, size.Height/2)
 	radius := diameter / 2
 
-	c.rotateNeedle(c.needle, middle, value, -radius*.15, radius*1.13)
+	c.rotateNeedle(c.needle, middle, value, -radius*.15, radius*1.14)
 
 	c.displayText.Text = fmt.Sprintf(c.displayString, value)
 	c.displayText.Refresh()
@@ -253,7 +253,7 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 
 	c.needle.StrokeWidth = stroke
 
-	c.rotateNeedle(c.needle, middle, c.value, -radius*.15, radius*1.13)
+	c.rotateNeedle(c.needle, middle, c.value, -radius*.15, radius*1.14)
 
 	c.face.StrokeWidth = smallStroke
 	c.face.Move(topleft)

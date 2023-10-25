@@ -4,6 +4,69 @@ import (
 	"fmt"
 )
 
+var T8SymbolsTuningOrder = []string{
+	"Calibration",
+	"Injectors",
+	"Limiters",
+	"Fuel",
+	"Boost",
+	"Ignition",
+	"Adaption",
+	//"Myrtilos",
+}
+
+var T8SymbolsTuning = map[string][]string{
+	"Calibration": {
+		//"AirCompCal.PressMap",
+		//"MAFCal.m_RedundantAirMap",
+		//"TCompCal.EnrFacE85Tab",
+		//"TCompCal.EnrFacTab",
+		//"VIOSMAFCal.FreqSP",
+		//"VIOSMAFCal.Q_AirInletTab2",
+	},
+	"Injectors": {
+		//"InjCorrCal.BattCorrTab",
+		//"InjCorrCal.BattCorrSP",
+		//"InjCorrCal.InjectorConst",
+	},
+	"Limiters": {
+		"BstKnkCal.MaxAirmass",
+		//"TorqueCal.M_ManGearLim",
+	},
+	"Fuel": {
+		//"BFuelCal.Map",
+		//"BFuelCal.StartMap",
+		//"StartCal.EnrFacE85Tab",
+		//"StartCal.EnrFacTab",
+	},
+	"Boost": {
+		"...|AirCtrlCal.RegMap|AirCtrlCal.Ppart_BoostMap|AirCtrlCal.Ipart_BoostMap|AirCtrlCal.Dpart_BoostMap",
+		"AirCtrlCal.RegMap",
+		"AirCtrlCal.Ppart_BoostMap",
+		"AirCtrlCal.Ipart_BoostMap",
+		"AirCtrlCal.Dpart_BoostMap",
+	},
+	"Ignition": {
+		"IgnAbsCal.fi_NormalMAP",
+		//"IgnIdleCal.fi_IdleMap",
+		//"IgnNormCal.Map",
+		//"IgnStartCal.fi_StartMap",
+	},
+	"Adaption": {
+		//"AdpFuelCal.T_AdaptLim",
+		//"FCutCal.ST_Enable",
+		//"LambdaCal.ST_Enable",
+		//"PurgeCal.ST_PurgeEnable",
+	},
+	"Myrtilos": {
+		//"MyrtilosCal.Launch_DisableSpeed",
+		//"MyrtilosCal.Launch_Ign_fi_Min",
+		//"MyrtilosCal.Launch_RPM",
+		//"MyrtilosCal.Launch_InjFac_at_rpm",
+		//"MyrtilosCal.Launch_PWM_max_at_stand",
+	},
+}
+
 type T8Binary struct {
 }
 

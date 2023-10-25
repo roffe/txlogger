@@ -1,6 +1,8 @@
 package widgets
 
 import (
+	"log"
+
 	"fyne.io/fyne/v2"
 )
 
@@ -74,13 +76,15 @@ func (vr *MapViewerRenderer) Layout(size fyne.Size) {
 	)
 
 	// Position and resize cursor
-	vr.mv.cursor.Resize(fyne.NewSize(widthFactor, heightFactor))
-	vr.mv.cursor.Move(
-		fyne.NewPos(
-			float32(vr.mv.selectedX)*widthFactor,
-			float32(vr.mv.numRows-1-vr.mv.SelectedY)*heightFactor,
-		),
-	)
+	if vr.mv.selectedX >= 0 {
+		vr.mv.cursor.Resize(fyne.NewSize(widthFactor, heightFactor))
+		vr.mv.cursor.Move(
+			fyne.NewPos(
+				float32(vr.mv.selectedX)*widthFactor,
+				float32(vr.mv.numRows-1-vr.mv.SelectedY)*heightFactor,
+			),
+		)
+	}
 }
 
 func (vr *MapViewerRenderer) MinSize() fyne.Size {
@@ -92,6 +96,7 @@ func (vr *MapViewerRenderer) MinSize() fyne.Size {
 }
 
 func (vr *MapViewerRenderer) Refresh() {
+	log.Println("Refresh called in MapViewerRenderer")
 }
 
 func (vr *MapViewerRenderer) Destroy() {

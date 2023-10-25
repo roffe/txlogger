@@ -3,6 +3,7 @@ package windows
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"sort"
 	"strings"
@@ -18,11 +19,13 @@ import (
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ecu"
+	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
+	sdialog "github.com/sqweek/dialog"
 	"golang.org/x/net/context"
 )
 
@@ -35,6 +38,8 @@ const (
 type MainWindow struct {
 	fyne.Window
 	app fyne.App
+
+	menu *MainMenu
 
 	symbolMap map[string]*kwp2000.VarDefinition
 
@@ -107,7 +112,7 @@ type MainWindow struct {
 
 func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 	mw := &MainWindow{
-		Window:                a.NewWindow("TrionicLogger"),
+		Window:                a.NewWindow("txlogger"),
 		app:                   a,
 		symbolMap:             make(map[string]*kwp2000.VarDefinition),
 		outputData:            binding.NewStringList(),
@@ -122,6 +127,8 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		openMaps: make(map[string]MapViewerWindowInterface),
 		mvh:      NewMapViewerHandler(),
 	}
+
+	mw.setupMenu()
 
 	mw.Window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
 		//log.Println(ev.Name)
@@ -165,7 +172,6 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 				return
 			}
 			if err := mw.LoadConfigFromString(preset); err != nil {
-				// dialog.ShowError(err, mw)
 				mw.Log(err.Error())
 				return
 			}
@@ -238,10 +244,11 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 
 	mw.ecuSelect = widget.NewSelect([]string{"T7", "T8"}, func(s string) {
 		mw.app.Preferences().SetString(prefsSelectedECU, s)
+		mw.SetMainMenu(mw.menu.GetMenu(s))
 	})
 
-	mw.symbolsHeader = container.New(&ratioContainer{
-		widths: []float32{
+	mw.symbolsHeader = container.New(&layout.RatioContainer{
+		Widths: []float32{
 			.35, // name
 			.12, // value
 			.14, // method
@@ -284,30 +291,58 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 
 	mw.loadPrefs()
 
-	mw.setupMenu()
-
 	mw.setTitle("No symbols loaded")
-	mw.Resize(fyne.NewSize(1280, 720))
+	mw.SetMaster()
+	mw.Resize(fyne.NewSize(1024, 768))
+	mw.SetContent(mw.Render())
 
 	return mw
 }
 
-type ratioContainer struct {
-	widths []float32
-}
+func (mw *MainWindow) setupMenu() {
+	menus := []*fyne.Menu{
+		fyne.NewMenu("File",
+			fyne.NewMenuItem("Load binary", func() {
+				filename, err := sdialog.File().Filter("Binary file", "bin").Load()
+				if err != nil {
+					if err.Error() == "Cancelled" {
+						return
+					}
+					// dialog.ShowError(err, mw)
+					mw.Log(err.Error())
+					return
+				}
+				if err := mw.LoadSymbolsFromFile(filename); err != nil {
+					// dialog.ShowError(err, mw)
+					mw.Log(err.Error())
+					return
+				}
+				mw.SyncSymbols()
+			}),
+			fyne.NewMenuItem("Load log", func() {
+				filename, err := sdialog.File().Filter("trionic logfile", "t7l", "t8l").SetStartDir("logs").Load()
+				if err != nil {
+					if err.Error() == "Cancelled" {
+						return
+					}
+					// dialog.ShowError(err, mw)
+					mw.Log(err.Error())
+					return
+				}
 
-func (d *ratioContainer) MinSize(objects []fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(400, 34)
-}
-
-func (d *ratioContainer) Layout(objects []fyne.CanvasObject, size fyne.Size) {
-	var x float32
-	for i, o := range objects {
-		az := size.Width * d.widths[i]
-		o.Resize(fyne.NewSize(az, size.Height))
-		o.Move(fyne.NewPos(x, 0))
-		x += o.Size().Width + size.Width*.015
+				onClose := func() {
+					if mw.dlc != nil {
+						mw.dlc.Detach(mw.dashboard)
+					}
+					mw.dashboard = nil
+					mw.SetFullScreen(false)
+					mw.SetContent(mw.Content())
+				}
+				go NewLogPlayer(mw.app, filename, mw.symbols, onClose)
+			}),
+		),
 	}
+	mw.menu = NewMainMenu(mw, menus, mw.openMap, mw.openMapz)
 }
 
 func (mw *MainWindow) loadPrefs() {
@@ -325,7 +360,7 @@ func (mw *MainWindow) setTitle(str string) {
 	mw.SetTitle(fmt.Sprintf("txlogger v%s Build %d - %s", meta.Version, meta.Build, str))
 }
 
-func (mw *MainWindow) Layout() *container.Split {
+func (mw *MainWindow) Render() *container.Split {
 	mw.leading = container.NewBorder(
 		container.NewVBox(
 			container.NewBorder(
@@ -478,10 +513,10 @@ func (mw *MainWindow) SyncSymbols() {
 }
 
 func (mw *MainWindow) Content() fyne.CanvasObject {
-	return mw.Layout()
+	return mw.Render()
 }
 
-func (mw *MainWindow) disableBtns() {
+func (mw *MainWindow) DisableBtns() {
 	mw.buttonsDisabled = true
 	mw.addSymbolBtn.Disable()
 	mw.loadConfigBtn.Disable()
@@ -503,7 +538,7 @@ func (mw *MainWindow) disableBtns() {
 	}
 }
 
-func (mw *MainWindow) enableBtns() {
+func (mw *MainWindow) EnableBtns() {
 	mw.buttonsDisabled = false
 	mw.addSymbolBtn.Enable()
 	mw.loadConfigBtn.Enable()
@@ -523,7 +558,7 @@ func (mw *MainWindow) enableBtns() {
 	}
 }
 
-func (mw *MainWindow) loadSymbolsFromECU() error {
+func (mw *MainWindow) LoadSymbolsFromECU() error {
 	device, err := mw.canSettings.GetAdapter(mw.ecuSelect.Selected, mw.Log)
 	if err != nil {
 		return err
@@ -629,4 +664,97 @@ func (mw *MainWindow) newSymbolnameTypeahead() {
 			mw.symbolLookup.ShowCompletion()
 		}
 	}
+}
+
+func (mw *MainWindow) openMapz(typ symbol.ECUType, mapNames ...string) {
+	joinedNames := strings.Join(mapNames, "|")
+	mv, found := mw.openMaps[joinedNames]
+	if !found {
+		w := mw.app.NewWindow("Map Viewer - " + strings.Join(mapNames, ", "))
+		//w.SetFixedSize(true)
+		if mw.symbols == nil {
+			mw.Log("No binary loaded")
+			return
+		}
+		view, err := widgets.NewMapViewerMulti(typ, mw.symbols, mapNames...)
+		if err != nil {
+			mw.Log(err.Error())
+			return
+		}
+		mw.openMaps[joinedNames] = mw.newMapViewerWindow(w, view, symbol.Axis{})
+
+		for _, mv := range view.Children() {
+			mw.mvh.Subscribe(mv.Info().XFrom, mv)
+			mw.mvh.Subscribe(mv.Info().YFrom, mv)
+		}
+
+		w.SetCloseIntercept(func() {
+			log.Println("closing", joinedNames)
+			delete(mw.openMaps, joinedNames)
+			for _, mv := range view.Children() {
+				mw.mvh.Unsubscribe(mv.Info().XFrom, mv)
+				mw.mvh.Unsubscribe(mv.Info().YFrom, mv)
+			}
+
+			w.Close()
+		})
+
+		w.SetContent(view)
+		w.Show()
+		return
+	}
+	mv.RequestFocus()
+}
+
+func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
+	axis := symbol.GetInfo(typ, mapName)
+	//log.Printf("openMap: %s %s %s", axis.X, axis.Y, axis.Z)
+	mv, found := mw.openMaps[axis.Z]
+	if !found {
+		w := mw.app.NewWindow("Map Viewer - " + axis.Z)
+		//w.SetFixedSize(true)
+		if mw.symbols == nil {
+			mw.Log("No binary loaded")
+			return
+		}
+		xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := mw.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
+		if err != nil {
+			mw.Log(err.Error())
+			return
+		}
+
+		mv, err := widgets.NewMapViewer(
+			widgets.WithXData(xData),
+			widgets.WithYData(yData),
+			widgets.WithZData(zData),
+			widgets.WithXCorrFac(xCorrFac),
+			widgets.WithYCorrFac(yCorrFac),
+			widgets.WithZCorrFac(zCorrFac),
+			widgets.WithXFrom(axis.XFrom),
+			widgets.WithYFrom(axis.YFrom),
+			widgets.WithInterPolFunc(interpolate.Interpolate),
+		)
+		if err != nil {
+			mw.Log(err.Error())
+			return
+		}
+
+		w.Canvas().SetOnTypedKey(mv.TypedKey)
+
+		w.SetCloseIntercept(func() {
+			log.Println("closing", axis.Z)
+			delete(mw.openMaps, axis.Z)
+			mw.mvh.Unsubscribe(axis.XFrom, mv)
+			mw.mvh.Unsubscribe(axis.YFrom, mv)
+
+			w.Close()
+		})
+
+		mw.openMaps[axis.Z] = mw.newMapViewerWindow(w, mv, axis)
+		w.SetContent(mv)
+		w.Show()
+
+		return
+	}
+	mv.RequestFocus()
 }

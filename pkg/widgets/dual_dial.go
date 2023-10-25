@@ -188,7 +188,7 @@ func (c *DualDial) SetValue(value float64) {
 	radius := diameter / 2
 
 	//c.rotateNeedle(c.needle, middle, value, radius*.15, radius*.85)
-	c.rotateNeedle(c.needle, middle, value, -radius*.15, radius*1.13)
+	c.rotateNeedle(c.needle, middle, value, -radius*.15, radius*1.14)
 
 	c.displayText.Text = fmt.Sprintf(c.displayString, value)
 	c.displayText.Refresh()
@@ -213,7 +213,7 @@ func (c *DualDial) SetValue2(value float64) {
 	radius := diameter / 2
 
 	//c.rotateNeedle(c.needle, middle, value, radius*.15, radius*.85)
-	c.rotateNeedle(c.needle2, middle, value, -radius*.15, radius*1.13)
+	c.rotateNeedle(c.needle2, middle, value, -radius*.15, radius*1.14)
 
 	c.displayText2.Text = fmt.Sprintf(c.displayString, value)
 	c.displayText2.Refresh()
@@ -320,8 +320,8 @@ func (dr *DualDialRenderer) Layout(space fyne.Size) {
 
 	c.needle.StrokeWidth = stroke
 	//c.rotateNeedle(c.needle, middle, c.value, radius*.15, radius*.85)
-	c.rotateNeedle(c.needle, middle, c.value, -radius*.15, radius*1.13)
-	c.rotateNeedle(c.needle2, middle, c.value2, -radius*.15, radius*1.13)
+	c.rotateNeedle(c.needle, middle, c.value, -radius*.15, radius*1.14)
+	c.rotateNeedle(c.needle2, middle, c.value2, -radius*.15, radius*1.14)
 
 	c.face.StrokeWidth = smallStroke
 	c.face.Move(topleft)

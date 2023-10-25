@@ -112,10 +112,6 @@ func mainz(args []string) {
 		})
 	*/
 
-	mw.SetMaster()
-	mw.Resize(fyne.NewSize(1024, 768))
-	mw.SetContent(mw.Layout())
-
 	go updateCheck(a, mw)
 
 	mw.ShowAndRun()

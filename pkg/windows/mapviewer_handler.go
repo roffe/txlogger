@@ -10,18 +10,29 @@ type MapViewerEvent struct {
 	Value      float64
 }
 
-type MapViewerHandler struct {
-	incoming    chan MapViewerEvent
-	subs        map[string][]MapViewerWindowWidget
-	aggregators []*MapAggregator
+type MapViewerSubscriber struct {
+	SymbolName string
+	Widget     MapViewerWindowWidget
+}
 
-	quit            chan struct{}
-	subsLock        sync.Mutex
+type MapViewerHandler struct {
+	subs map[string][]MapViewerWindowWidget
+
+	subChan   chan MapViewerSubscriber
+	unsubChan chan MapViewerSubscriber
+
+	incoming chan MapViewerEvent
+
+	quit chan struct{}
+
+	aggregators     []*MapAggregator
 	aggregatorsLock sync.Mutex
 }
 
 func NewMapViewerHandler() *MapViewerHandler {
 	mvh := &MapViewerHandler{
+		subChan:     make(chan MapViewerSubscriber, 10),
+		unsubChan:   make(chan MapViewerSubscriber, 10),
 		subs:        make(map[string][]MapViewerWindowWidget),
 		incoming:    make(chan MapViewerEvent, 100),
 		quit:        make(chan struct{}),
@@ -30,6 +41,7 @@ func NewMapViewerHandler() *MapViewerHandler {
 
 	mvh.AddAggregator(
 		NewDIFFAggregator("MAF.m_AirInlet", "m_Request", "AirDIFF"),
+		NewDIFFAggregator("MAF.m_AirInlet", "AirMassMast.m_Request", "AirDIFF"),
 	)
 
 	go mvh.run()
@@ -41,22 +53,11 @@ func (mvh *MapViewerHandler) Close() {
 }
 
 func (mvh *MapViewerHandler) Subscribe(symbolName string, mv MapViewerWindowWidget) {
-	//	log.Printf("MapViewerHandler: Subscribe: %s", symbolName)
-	mvh.subsLock.Lock()
-	defer mvh.subsLock.Unlock()
-	mvh.subs[symbolName] = append(mvh.subs[symbolName], mv)
+	mvh.subChan <- MapViewerSubscriber{SymbolName: symbolName, Widget: mv}
 }
 
 func (mvh *MapViewerHandler) Unsubscribe(symbolName string, mv MapViewerWindowWidget) {
-	//	log.Printf("MapViewerHandler: Unsubscribe: %s", symbolName)
-	mvh.subsLock.Lock()
-	defer mvh.subsLock.Unlock()
-	for i, m := range mvh.subs[symbolName] {
-		if m == mv {
-			mvh.subs[symbolName] = append(mvh.subs[symbolName][:i], mvh.subs[symbolName][i+1:]...)
-			break
-		}
-	}
+	mvh.unsubChan <- MapViewerSubscriber{SymbolName: symbolName, Widget: mv}
 }
 
 func (mvh *MapViewerHandler) SetValue(symbolName string, value float64) {
@@ -64,7 +65,6 @@ func (mvh *MapViewerHandler) SetValue(symbolName string, value float64) {
 	case mvh.incoming <- MapViewerEvent{SymbolName: symbolName, Value: value}:
 		return
 	default:
-		//log.Panic("MapViewerHandler: incoming channel full")
 		log.Println("dropped update")
 		return
 	}
@@ -75,15 +75,22 @@ func (mvh *MapViewerHandler) run() {
 		select {
 		case <-mvh.quit:
 			return
-		case event := <-mvh.incoming:
-			for _, agg := range mvh.aggregators {
-				agg.Func(mvh, event.SymbolName, event.Value)
+		case sub := <-mvh.subChan:
+			mvh.subs[sub.SymbolName] = append(mvh.subs[sub.SymbolName], sub.Widget)
+		case unsub := <-mvh.unsubChan:
+			for i, m := range mvh.subs[unsub.SymbolName] {
+				if m == unsub.Widget {
+					mvh.subs[unsub.SymbolName] = append(mvh.subs[unsub.SymbolName][:i], mvh.subs[unsub.SymbolName][i+1:]...)
+					break
+				}
 			}
-			mvh.subsLock.Lock()
+		case event := <-mvh.incoming:
 			for _, mv := range mvh.subs[event.SymbolName] {
 				mv.SetValue(event.SymbolName, event.Value)
 			}
-			mvh.subsLock.Unlock()
+			for _, agg := range mvh.aggregators {
+				agg.Func(mvh, event.SymbolName, event.Value)
+			}
 		}
 	}
 }

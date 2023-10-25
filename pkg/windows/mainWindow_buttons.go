@@ -52,11 +52,11 @@ func (mw *MainWindow) createButtons() {
 
 	mw.loadSymbolsEcuBtn = widget.NewButtonWithIcon("Load from ECU", theme.DownloadIcon(), func() {
 		//		mw.progressBar.Start()
-		mw.disableBtns()
+		mw.DisableBtns()
 		go func() {
-			defer mw.enableBtns()
+			defer mw.EnableBtns()
 			//		defer mw.progressBar.Stop()
-			if err := mw.loadSymbolsFromECU(); err != nil {
+			if err := mw.LoadSymbolsFromECU(); err != nil {
 				// dialog.ShowError(err, mw)
 				mw.Log(err.Error())
 				return
@@ -205,7 +205,7 @@ func (mw *MainWindow) createButtons() {
 			mw.loggingRunning = true
 			mw.logBtn.SetIcon(theme.MediaStopIcon())
 			mw.logBtn.SetText("Stop logging")
-			mw.disableBtns()
+			mw.DisableBtns()
 
 			if mw.dashboard != nil {
 				mw.dlc.Attach(mw.dashboard)
@@ -214,7 +214,7 @@ func (mw *MainWindow) createButtons() {
 			mw.dlc.Attach(mw.mvh)
 
 			go func() {
-				defer mw.enableBtns()
+				defer mw.EnableBtns()
 				if err := mw.dlc.Start(); err != nil {
 					mw.Log(err.Error())
 				}

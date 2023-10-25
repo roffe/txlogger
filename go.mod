@@ -77,4 +77,4 @@ require (
 	honnef.co/go/js/dom v0.0.0-20230808055721-96db8f4d5e3b // indirect
 )
 
-// replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
+replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
