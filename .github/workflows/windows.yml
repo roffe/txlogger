@@ -25,7 +25,7 @@ jobs:
       with:
         submodules: recursive
     
-    - run: choco uninstall mingw -y --force
+    #- run: choco uninstall mingw -y --force
     - run: choco install mingw -y --x86 --force
 
     - name: Install libusb using Vcpkg
