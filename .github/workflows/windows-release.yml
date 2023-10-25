@@ -65,7 +65,7 @@ jobs:
 
     - name: Creating Zip
       if: startsWith(github.ref, 'refs/tags/')
-      run: 7z a txlogger.zip txlogger.exe lzhuf.dll libusb-1.0.dll
+      run: 7z a txlogger.zip txlogger.exe libusb-1.0.dll
 
     - name: Release
       uses: softprops/action-gh-release@v1
