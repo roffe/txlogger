@@ -101,9 +101,9 @@ func (mv *MapViewer) render() {
 	mv.createYAxis()
 	mv.createXAxis()
 
-	mv.crosshair = NewRectangle(color.RGBA{0xfc, 0x4a, 0xFA, 255}, 4)
+	mv.crosshair = NewRectangle(color.RGBA{0xfc, 0x4a, 0xFA, 235}, 4)
 
-	mv.cursor = NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 255}, 4)
+	mv.cursor = NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 235}, 4)
 	mv.selectedX = -1
 	mv.cursor.Resize(fyne.NewSize(1, 1))
 	mv.textValues, mv.valueTexts = createTextValues(mv.zData, mv.zCorrFac)
@@ -120,12 +120,12 @@ func (mv *MapViewer) render() {
 
 	mv.innerView = container.NewStack(
 		mv.valueMap,
-		mv.grid,
-		mv.valueTexts,
 		container.NewWithoutLayout(
 			mv.crosshair,
 			mv.cursor,
 		),
+		mv.grid,
+		mv.valueTexts,
 	)
 
 	mv.content = container.NewBorder(
