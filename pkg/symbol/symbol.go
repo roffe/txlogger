@@ -9,10 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
-	"unsafe"
 
 	"github.com/roffe/txlogger/pkg/blowfish"
+	"github.com/roffe/txlogger/pkg/lzhuf"
 )
 
 type ECUType int
@@ -208,28 +207,7 @@ func ExpandCompressedSymbolNames(in []byte) ([]string, error) {
 
 	out := make([]byte, expandedFileSize)
 
-	path, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	dll, err := syscall.LoadDLL(path + `\lzhuf.dll`)
-	if err != nil {
-		return nil, err
-	}
-	defer dll.Release()
-
-	decode, err := dll.FindProc("Decode")
-	if err != nil {
-		log.Println(err)
-		return nil, fmt.Errorf("error finding Decode in lzhuf.dll: %w", err)
-	}
-
-	r0, r1, err := decode.Call(uintptr(unsafe.Pointer(&in[0])), uintptr(unsafe.Pointer(&out[0])))
-	if r1 == 0 {
-		if err != nil {
-			return nil, fmt.Errorf("error decoding compressed symbol table: %w", err)
-		}
-	}
+	r0 := lzhuf.Decode(in, out)
 
 	if int(r0) != expandedFileSize {
 		return nil, fmt.Errorf("decoded data size missmatch: %d != %d", r0, expandedFileSize)
