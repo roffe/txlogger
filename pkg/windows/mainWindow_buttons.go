@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/datalogger"
@@ -176,6 +177,17 @@ func (mw *MainWindow) createButtons() {
 	})
 
 	mw.logBtn = widget.NewButtonWithIcon("Start logging", theme.MediaPlayIcon(), func() {
+		for _, v := range mw.vars.Get() {
+			if v.Name == "AirMassMast.m_Request" && mw.ecuSelect.Selected == "T7" {
+				dialog.ShowError(fmt.Errorf("AirMassMast.m_Request is not supported on T7, Did you forget to change preset?"), mw)
+				return
+			}
+			if v.Name == "m_Request" && mw.ecuSelect.Selected == "T8" {
+				dialog.ShowError(fmt.Errorf("m_Request is not supported on T8, Did you forget to change preset?"), mw)
+				return
+			}
+		}
+
 		if mw.loggingRunning {
 			if mw.dlc != nil {
 				mw.dlc.Close()

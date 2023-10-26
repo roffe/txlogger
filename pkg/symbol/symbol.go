@@ -21,14 +21,14 @@ const (
 	ECU_T8                // T8
 )
 
-func (e ECUType) String() {
+func (e ECUType) String() string {
 	switch e {
 	case ECU_T7:
-		fmt.Println("T7")
+		return "T7"
 	case ECU_T8:
-		fmt.Println("T8")
+		return "T8"
 	default:
-		fmt.Println("Unknown")
+		return "Unknown"
 	}
 }
 
@@ -169,23 +169,34 @@ func (s *Symbol) DataToInt16() []int {
 	return values
 }
 
-func LoadSymbols(filename string, ecu string, cb func(string)) (SymbolCollection, error) {
+func LoadSymbols(filename string, cb func(string)) (ECUType, SymbolCollection, error) {
+	// check so filename is under 2mb
+	fi, err := os.Stat(filename)
+	if err != nil {
+		return -1, nil, err
+	}
+	if fi.Size() > 2*1024*1024 {
+		return -1, nil, fmt.Errorf("file too large: %d", fi.Size())
+	}
+
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, err
+		return -1, nil, err
 	}
 
 	cb(fmt.Sprintf("Loading %s", filepath.Base(filename)))
 
-	switch ecu {
-	case "T7":
-		return LoadT7Symbols(data, cb)
-	case "T8":
-		return LoadT8Symbols(data, cb)
-	default:
-		return nil, fmt.Errorf("unknown ECU type: %s", ecu)
+	if err := ValidateTrionic7File(data); err == nil {
+		sym, err := LoadT7Symbols(data, cb)
+		return ECU_T7, sym, err
 	}
 
+	if err := ValidateTrionic8File(data); err == nil {
+		sym, err := LoadT8Symbols(data, cb)
+		return ECU_T8, sym, err
+	}
+
+	return -1, nil, fmt.Errorf("unknown file format: %s", filename)
 }
 
 func ExpandCompressedSymbolNames(in []byte) ([]string, error) {

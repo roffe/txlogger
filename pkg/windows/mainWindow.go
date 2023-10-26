@@ -585,10 +585,11 @@ func (mw *MainWindow) LoadSymbolsFromECU() error {
 }
 
 func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
-	symbols, err := symbol.LoadSymbols(filename, mw.ecuSelect.Selected, mw.Log)
+	ecuType, symbols, err := symbol.LoadSymbols(filename, mw.Log)
 	if err != nil {
 		return fmt.Errorf("error loading symbols: %w", err)
 	}
+	mw.ecuSelect.SetSelected(ecuType.String())
 	os.WriteFile("symbols.txt", []byte(symbols.Dump()), 0644)
 	mw.loadSymbols(symbols)
 	mw.setTitle(filename)
