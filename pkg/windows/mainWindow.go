@@ -253,11 +253,9 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 			.12, // value
 			.14, // method
 			.12, // number
-			//.08, // type
-			//.06, // signed
 			.11, // correctionfactor
-			.08, // deletebtn
 		},
+		Spacing: .015,
 	},
 		&widget.Label{
 			Text:      "Name",
@@ -275,14 +273,6 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 			Text:      "#",
 			Alignment: fyne.TextAlignLeading,
 		},
-		//&widget.Label{
-		//	Text:      "Type",
-		//	Alignment: fyne.TextAlignLeading,
-		//},
-		//&widget.Label{
-		//	Text:      "Signed",
-		//	Alignment: fyne.TextAlignLeading,
-		//},
 		&widget.Label{
 			Text:      "Factor",
 			Alignment: fyne.TextAlignLeading,

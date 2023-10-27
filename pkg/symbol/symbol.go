@@ -38,17 +38,13 @@ type ECUBinary interface {
 }
 
 type Symbol struct {
-	Name string
-
-	Number int
-
-	Address uint32
-	Length  uint16
-	Mask    uint16
-
-	Type         uint8
-	ExtendedType uint8
-
+	Name             string
+	Number           int
+	Address          uint32
+	Length           uint16
+	Mask             uint16
+	Type             uint8
+	ExtendedType     uint8
 	Correctionfactor float64
 	Unit             string
 

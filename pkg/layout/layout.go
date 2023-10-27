@@ -110,11 +110,12 @@ func (d *FixedWidthContainer) Layout(objects []fyne.CanvasObject, containerSize 
 }
 
 type RatioContainer struct {
-	Widths []float32
+	Widths  []float32
+	Spacing float32
 }
 
 func (d *RatioContainer) MinSize(objects []fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(400, 34)
+	return fyne.NewSize(400, 35)
 }
 
 func (d *RatioContainer) Layout(objects []fyne.CanvasObject, size fyne.Size) {
@@ -123,6 +124,6 @@ func (d *RatioContainer) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 		az := size.Width * d.Widths[i]
 		o.Resize(fyne.NewSize(az, size.Height))
 		o.Move(fyne.NewPos(x, 0))
-		x += o.Size().Width + size.Width*.015
+		x += o.Size().Width + size.Width*d.Spacing
 	}
 }
