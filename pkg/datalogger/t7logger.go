@@ -181,7 +181,6 @@ func (c *T7Client) Start() error {
 				case <-gctx.Done():
 					return nil
 				case <-t.C:
-					timeStamp = time.Now()
 					data, err := kwp.ReadDataByLocalIdentifier(ctx, 0xF0)
 					if err != nil {
 						errCount++
@@ -190,6 +189,7 @@ func (c *T7Client) Start() error {
 						c.OnMessage(err.Error())
 						continue
 					}
+					timeStamp = time.Now()
 					r := bytes.NewReader(data)
 					for _, va := range c.Symbols {
 						if err := va.Read(r); err != nil {
@@ -211,7 +211,6 @@ func (c *T7Client) Start() error {
 						}
 						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", left, leftovers[:n]))
 					}
-					//c.produceCSVLine(csv, c.Variables)
 					c.produceLogLine(file, c.Symbols, timeStamp)
 					count++
 					//cps++

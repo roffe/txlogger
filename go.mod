@@ -62,7 +62,7 @@ require (
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
 	github.com/tevino/abool v1.2.0 // indirect
-	github.com/yuin/goldmark v1.5.6 // indirect
+	github.com/yuin/goldmark v1.6.0 // indirect
 	go.einride.tech/can v0.7.0 // indirect
 	golang.org/x/crypto v0.14.0
 	golang.org/x/image v0.13.0

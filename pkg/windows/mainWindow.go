@@ -24,6 +24,7 @@ import (
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/skratchdot/open-golang/open"
 	sdialog "github.com/sqweek/dialog"
 	"golang.org/x/net/context"
 )
@@ -40,10 +41,7 @@ type MainWindow struct {
 
 	menu *MainMenu
 
-	//symbolMap map[string]*kwp2000.VarDefinition
-
 	symbolLookup *xwidget.CompletionEntry
-	//symbolConfigList *widget.List
 
 	output     *widget.List
 	outputData binding.StringList
@@ -54,7 +52,6 @@ type MainWindow struct {
 
 	addSymbolBtn *widget.Button
 	logBtn       *widget.Button
-	//mockBtn            *widget.Button
 
 	loadSymbolsEcuBtn  *widget.Button
 	loadSymbolsFileBtn *widget.Button
@@ -62,12 +59,7 @@ type MainWindow struct {
 
 	dashboardBtn *widget.Button
 
-	//mapSelector *widget.Tree
-	//fuelBtn     *widget.Button
-	//ignitionBtn *widget.Button
-
 	logplayerBtn *widget.Button
-	logfolderBtn *widget.Button
 	helpBtn      *widget.Button
 
 	loadConfigBtn *widget.Button
@@ -78,7 +70,6 @@ type MainWindow struct {
 	errorCounter          binding.Int
 	errorPerSecondCounter binding.Int
 	freqValue             binding.Float
-	//progressBar           *widget.ProgressBarInfinite
 
 	freqSlider *widget.Slider
 
@@ -259,7 +250,7 @@ func (mw *MainWindow) setupMenu() {
 				}
 				mw.SyncSymbols()
 			}),
-			fyne.NewMenuItem("Load log", func() {
+			fyne.NewMenuItem("Play log", func() {
 				filename, err := sdialog.File().Filter("trionic logfile", "t7l", "t8l").SetStartDir("logs").Load()
 				if err != nil {
 					if err.Error() == "Cancelled" {
@@ -279,6 +270,20 @@ func (mw *MainWindow) setupMenu() {
 					mw.SetContent(mw.Content())
 				}
 				go NewLogPlayer(mw.app, filename, mw.symbols, onClose)
+			}),
+			fyne.NewMenuItem("Open log folder", func() {
+				if _, err := os.Stat("logs"); os.IsNotExist(err) {
+					if err := os.Mkdir("logs", 0755); err != nil {
+						if err != os.ErrExist {
+							mw.Log(fmt.Sprintf("failed to create logs dir: %s", err))
+							return
+						}
+					}
+				}
+
+				if err := open.Run(datalogger.LOGPATH); err != nil {
+					fyne.LogError("Failed to open logs folder", err)
+				}
 			}),
 		),
 	}
@@ -354,10 +359,7 @@ func (mw *MainWindow) Render() *container.Split {
 				Leading:    mw.output,
 				Trailing: container.NewVBox(
 					mw.dashboardBtn,
-					container.NewGridWithColumns(2,
-						mw.logplayerBtn,
-						mw.logfolderBtn,
-					),
+					mw.logplayerBtn,
 					mw.helpBtn,
 					mw.freqSlider,
 					container.NewGridWithColumns(4,
@@ -455,7 +457,7 @@ func (mw *MainWindow) Content() fyne.CanvasObject {
 	return mw.Render()
 }
 
-func (mw *MainWindow) DisableBtns() {
+func (mw *MainWindow) Disable() {
 	mw.buttonsDisabled = true
 	mw.addSymbolBtn.Disable()
 	mw.loadConfigBtn.Disable()
@@ -473,7 +475,7 @@ func (mw *MainWindow) DisableBtns() {
 	mw.symbolList.Disable()
 }
 
-func (mw *MainWindow) EnableBtns() {
+func (mw *MainWindow) Enable() {
 	mw.buttonsDisabled = false
 	mw.addSymbolBtn.Enable()
 	mw.loadConfigBtn.Enable()

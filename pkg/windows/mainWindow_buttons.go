@@ -2,7 +2,6 @@ package windows
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -12,7 +11,6 @@ import (
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
-	"github.com/skratchdot/open-golang/open"
 	sdialog "github.com/sqweek/dialog"
 )
 
@@ -48,9 +46,9 @@ func (mw *MainWindow) createButtons() {
 
 	mw.loadSymbolsEcuBtn = widget.NewButtonWithIcon("Load from ECU", theme.DownloadIcon(), func() {
 		//		mw.progressBar.Start()
-		mw.DisableBtns()
+		mw.Disable()
 		go func() {
-			defer mw.EnableBtns()
+			defer mw.Enable()
 			//		defer mw.progressBar.Stop()
 			if err := mw.LoadSymbolsFromECU(); err != nil {
 				// dialog.ShowError(err, mw)
@@ -148,21 +146,6 @@ func (mw *MainWindow) createButtons() {
 		go NewLogPlayer(mw.app, filename, mw.symbols, onClose)
 	})
 
-	mw.logfolderBtn = widget.NewButtonWithIcon("Logs Folder", theme.FolderOpenIcon(), func() {
-		if _, err := os.Stat("logs"); os.IsNotExist(err) {
-			if err := os.Mkdir("logs", 0755); err != nil {
-				if err != os.ErrExist {
-					mw.Log(fmt.Sprintf("failed to create logs dir: %s", err))
-					return
-				}
-			}
-		}
-
-		if err := open.Run(datalogger.LOGPATH); err != nil {
-			fyne.LogError("Failed to open logs folder", err)
-		}
-	})
-
 	mw.logBtn = widget.NewButtonWithIcon("Start logging", theme.MediaPlayIcon(), func() {
 		for _, v := range mw.symbolList.Symbols() {
 			if v.Name == "AirMassMast.m_Request" && mw.ecuSelect.Selected == "T7" {
@@ -204,7 +187,7 @@ func (mw *MainWindow) createButtons() {
 			mw.loggingRunning = true
 			mw.logBtn.SetIcon(theme.MediaStopIcon())
 			mw.logBtn.SetText("Stop logging")
-			mw.DisableBtns()
+			mw.Disable()
 
 			if mw.dashboard != nil {
 				mw.dlc.Attach(mw.dashboard)
@@ -214,7 +197,7 @@ func (mw *MainWindow) createButtons() {
 			mw.dlc.Attach(mw.symbolList)
 
 			go func() {
-				defer mw.EnableBtns()
+				defer mw.Enable()
 				if err := mw.dlc.Start(); err != nil {
 					mw.Log(err.Error())
 				}
