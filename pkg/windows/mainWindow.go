@@ -20,7 +20,6 @@ import (
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/interpolate"
-	"github.com/roffe/txlogger/pkg/kwp2000"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/symbol"
@@ -41,10 +40,10 @@ type MainWindow struct {
 
 	menu *MainMenu
 
-	symbolMap map[string]*kwp2000.VarDefinition
+	//symbolMap map[string]*kwp2000.VarDefinition
 
-	symbolLookup     *xwidget.CompletionEntry
-	symbolConfigList *widget.List
+	symbolLookup *xwidget.CompletionEntry
+	//symbolConfigList *widget.List
 
 	output     *widget.List
 	outputData binding.StringList
@@ -74,7 +73,6 @@ type MainWindow struct {
 	loadConfigBtn *widget.Button
 	saveConfigBtn *widget.Button
 	presetSelect  *widget.Select
-	symbolsHeader *fyne.Container
 
 	captureCounter        binding.Int
 	errorCounter          binding.Int
@@ -94,8 +92,10 @@ type MainWindow struct {
 	loggingRunning bool
 	//mockRunning    bool
 
-	dlc  datalogger.Logger
-	vars *kwp2000.VarDefinitionList
+	dlc datalogger.Logger
+	//vars *kwp2000.VarDefinitionList
+
+	symbolList *widgets.SymbolListWidget
 
 	symbols symbol.SymbolCollection
 
@@ -110,11 +110,11 @@ type MainWindow struct {
 	mvh *MapViewerHandler
 }
 
-func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
+func NewMainWindow(a fyne.App) *MainWindow {
 	mw := &MainWindow{
-		Window:                a.NewWindow("txlogger"),
-		app:                   a,
-		symbolMap:             make(map[string]*kwp2000.VarDefinition),
+		Window: a.NewWindow("txlogger"),
+		app:    a,
+		//symbolMap:             make(map[string]*kwp2000.VarDefinition),
 		outputData:            binding.NewStringList(),
 		canSettings:           widgets.NewCanSettingsWidget(a),
 		captureCounter:        binding.NewInt(),
@@ -123,7 +123,8 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		freqValue:             binding.NewFloat(),
 		//progressBar:           widget.NewProgressBarInfinite(),
 		//sinkManager:           singMgr,
-		vars:     vars,
+		symbolList: widgets.NewSymbolListWidget(),
+		//vars:     widgets.NewSymbolListWidget(),
 		openMaps: make(map[string]MapViewerWindowInterface),
 		mvh:      NewMapViewerHandler(),
 	}
@@ -175,7 +176,7 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 				mw.Log(err.Error())
 				return
 			}
-			mw.symbolConfigList.Refresh()
+			mw.symbolList.Refresh()
 			mw.presetSelect.SetSelected("Select preset")
 			mw.SyncSymbols()
 		},
@@ -185,25 +186,6 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 
 	mw.freqSlider = widget.NewSliderWithData(1, 120, mw.freqValue)
 	mw.freqValue.Set(25)
-
-	mw.symbolConfigList = widget.NewList(
-		func() int {
-			return mw.vars.Len()
-		},
-		func() fyne.CanvasObject {
-			disabled := mw.dlc != nil
-			return widgets.NewVarDefinitionWidgetEntry(mw.symbolConfigList, mw.vars, mw.SaveSymbolList, disabled)
-		},
-		func(lii widget.ListItemID, co fyne.CanvasObject) {
-			coo := co.(*widgets.VarDefinitionWidgetEntry)
-			coo.Update(lii, mw.vars.GetPos(lii))
-			if !mw.buttonsDisabled {
-				coo.Enable()
-				return
-			}
-			coo.Disable()
-		},
-	)
 
 	mw.newOutputList()
 	mw.newSymbolnameTypeahead()
@@ -246,38 +228,6 @@ func NewMainWindow(a fyne.App, vars *kwp2000.VarDefinitionList) *MainWindow {
 		mw.app.Preferences().SetString(prefsSelectedECU, s)
 		mw.SetMainMenu(mw.menu.GetMenu(s))
 	})
-
-	mw.symbolsHeader = container.New(&layout.RatioContainer{
-		Widths: []float32{
-			.35, // name
-			.12, // value
-			.14, // method
-			.12, // number
-			.11, // correctionfactor
-		},
-		Spacing: .015,
-	},
-		&widget.Label{
-			Text:      "Name",
-			Alignment: fyne.TextAlignLeading,
-		},
-		&widget.Label{
-			Text:      "Value",
-			Alignment: fyne.TextAlignLeading,
-		},
-		&widget.Label{
-			Text:      "Method",
-			Alignment: fyne.TextAlignLeading,
-		},
-		&widget.Label{
-			Text:      "#",
-			Alignment: fyne.TextAlignLeading,
-		},
-		&widget.Label{
-			Text:      "Factor",
-			Alignment: fyne.TextAlignLeading,
-		},
-	)
 
 	mw.loadPrefs()
 
@@ -376,13 +326,7 @@ func (mw *MainWindow) Render() *container.Split {
 		),
 		nil,
 		nil,
-		container.NewBorder(
-			mw.symbolsHeader,
-			nil,
-			nil,
-			nil,
-			mw.symbolConfigList,
-		),
+		mw.symbolList,
 	)
 
 	return &container.Split{
@@ -437,7 +381,7 @@ func (mw *MainWindow) Log(s string) {
 }
 
 func (mw *MainWindow) SaveSymbolList() {
-	b, err := json.Marshal(mw.vars.Get())
+	b, err := json.Marshal(mw.symbolList.Symbols())
 	if err != nil {
 		// dialog.ShowError(err, mw)
 		mw.Log(err.Error())
@@ -447,7 +391,7 @@ func (mw *MainWindow) SaveSymbolList() {
 }
 
 func (mw *MainWindow) SaveConfig(filename string) error {
-	b, err := json.Marshal(mw.vars.Get())
+	b, err := json.Marshal(mw.symbolList.Symbols())
 	if err != nil {
 		return fmt.Errorf("failed to marshal config file: %w", err)
 	}
@@ -462,44 +406,49 @@ func (mw *MainWindow) LoadConfig(filename string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read config file: %w", err)
 	}
-	var cfg []*kwp2000.VarDefinition
+	var cfg []*symbol.Symbol
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return fmt.Errorf("failed to unmarshal config file: %w", err)
 	}
-	mw.vars.Set(cfg)
+	mw.symbolList.LoadSymbols(cfg...)
 	mw.app.Preferences().SetString(prefsSymbolList, string(b))
 	return nil
 }
 
 func (mw *MainWindow) LoadConfigFromString(str string) error {
-	var cfg []*kwp2000.VarDefinition
+	var cfg []*symbol.Symbol
 	if err := json.Unmarshal([]byte(str), &cfg); err != nil {
 		return fmt.Errorf("failed to unmarshal config file: %w", err)
 	}
-	mw.vars.Set(cfg)
+	mw.symbolList.LoadSymbols(cfg...)
 	mw.SaveSymbolList()
 	return nil
 }
 
 func (mw *MainWindow) SyncSymbols() {
-	if len(mw.symbolMap) == 0 {
+	if mw.symbols == nil {
 		// dialog.ShowError(errors.New("Load bin to sync symbols"), mw.Window) //lint:ignore ST1005 ignore error
 		mw.Log("Load bin to sync symbols")
 		return
 	}
 	cnt := 0
-	for i, v := range mw.vars.Get() {
-		for k, vv := range mw.symbolMap {
-			if strings.EqualFold(k, v.Name) {
-				mw.vars.UpdatePos(i, vv)
-				cnt++
-				break
-			}
+	for _, v := range mw.symbolList.Symbols() {
+		sym := mw.symbols.GetByName(v.Name)
+		if sym != nil {
+			v.Name = sym.Name
+			v.Number = sym.Number
+			v.Address = sym.Address
+			v.Length = sym.Length
+			v.Mask = sym.Mask
+			v.Type = sym.Type
+			v.Unit = sym.Unit
+			v.Correctionfactor = sym.Correctionfactor
+			cnt++
 		}
 	}
-	mw.symbolConfigList.Refresh()
+	mw.symbolList.Refresh()
 	mw.SaveSymbolList()
-	mw.Log(fmt.Sprintf("Synced %d / %d symbols", cnt, mw.vars.Len()))
+	mw.Log(fmt.Sprintf("Synced %d / %d symbols", cnt, len(mw.symbolList.Symbols())))
 }
 
 func (mw *MainWindow) Content() fyne.CanvasObject {
@@ -521,11 +470,7 @@ func (mw *MainWindow) DisableBtns() {
 	mw.ecuSelect.Disable()
 	mw.canSettings.Disable()
 	mw.presetSelect.Disable()
-	for _, v := range mw.vars.Get() {
-		if v.Widget != nil {
-			v.Widget.(*widgets.VarDefinitionWidgetEntry).Disable()
-		}
-	}
+	mw.symbolList.Disable()
 }
 
 func (mw *MainWindow) EnableBtns() {
@@ -541,11 +486,7 @@ func (mw *MainWindow) EnableBtns() {
 	mw.ecuSelect.Enable()
 	mw.canSettings.Enable()
 	mw.presetSelect.Enable()
-	for _, v := range mw.vars.Get() {
-		if v.Widget != nil {
-			v.Widget.(*widgets.VarDefinitionWidgetEntry).Enable()
-		}
-	}
+	mw.symbolList.Enable()
 }
 
 func (mw *MainWindow) LoadSymbolsFromECU() error {
@@ -561,13 +502,15 @@ func (mw *MainWindow) LoadSymbolsFromECU() error {
 		if err != nil {
 			return err
 		}
-		mw.loadSymbols(symbols)
+		mw.symbols = symbols
+		mw.SyncSymbols()
 	case "T8":
 		symbols, err := ecu.GetSymbolsT8(ctx, device, mw.Log)
 		if err != nil {
 			return err
 		}
-		mw.loadSymbols(symbols)
+		mw.symbols = symbols
+		mw.SyncSymbols()
 	}
 
 	mw.setTitle("Symbols loaded from ECU " + time.Now().Format("2006-01-02 15:04:05.000"))
@@ -581,26 +524,10 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	}
 	mw.ecuSelect.SetSelected(ecuType.String())
 	os.WriteFile("symbols.txt", []byte(symbols.Dump()), 0644)
-	mw.loadSymbols(symbols)
-	mw.setTitle(filename)
-	return nil
-}
-
-func (mw *MainWindow) loadSymbols(symbols symbol.SymbolCollection) {
-	newSymbolMap := make(map[string]*kwp2000.VarDefinition)
-	for _, s := range symbols.Symbols() {
-		newSymbolMap[s.Name] = &kwp2000.VarDefinition{
-			Name:             s.Name,
-			Method:           kwp2000.VAR_METHOD_SYMBOL,
-			Value:            s.Number,
-			Type:             s.Type,
-			Length:           s.Length,
-			Correctionfactor: s.Correctionfactor,
-			Unit:             s.Unit,
-		}
-	}
-	mw.symbolMap = newSymbolMap
 	mw.symbols = symbols
+	mw.setTitle(filename)
+	mw.SyncSymbols()
+	return nil
 }
 
 func (mw *MainWindow) newOutputList() {
@@ -630,6 +557,9 @@ func (mw *MainWindow) newSymbolnameTypeahead() {
 	mw.symbolLookup.PlaceHolder = "Type to search for symbols"
 	// When the use typed text, complete the list.
 	mw.symbolLookup.OnChanged = func(s string) {
+		if mw.symbols == nil {
+			return
+		}
 		// completion start for text length >= 3
 		if len(s) < 3 && s != "*" {
 			mw.symbolLookup.HideCompletion()
@@ -637,7 +567,7 @@ func (mw *MainWindow) newSymbolnameTypeahead() {
 		}
 		// Get the list of possible completion
 		var results []string
-		for _, sym := range mw.symbolMap {
+		for _, sym := range mw.symbols.Symbols() {
 			if strings.Contains(strings.ToLower(sym.Name), strings.ToLower(s)) || s == "*" {
 				results = append(results, sym.Name)
 			}

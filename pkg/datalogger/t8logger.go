@@ -11,8 +11,7 @@ import (
 	"github.com/avast/retry-go/v4"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/gmlan"
-	"github.com/roffe/txlogger/pkg/kwp2000"
-	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/symbol"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -21,8 +20,6 @@ type T8Client struct {
 
 	quitChan chan struct{}
 	sysvars  *ThreadSafeMap
-
-	cc int
 
 	Config
 }
@@ -57,7 +54,7 @@ func (c *T8Client) Start() error {
 
 	cl, err := gocan.NewWithOpts(
 		ctx,
-		c.Dev,
+		c.Device,
 	)
 	if err != nil {
 		return err
@@ -82,8 +79,8 @@ func (c *T8Client) Start() error {
 		}
 		c.OnMessage("Cleared dynamic register")
 
-		for _, sym := range c.Config.Variables {
-			if err := SetUpDynamicallyDefinedRegisterBySymbol(ctx, gm, uint16(sym.Value)); err != nil {
+		for _, sym := range c.Symbols {
+			if err := SetUpDynamicallyDefinedRegisterBySymbol(ctx, gm, uint16(sym.Number)); err != nil {
 				return err
 			}
 			//c.OnMessage(fmt.Sprintf("Configured dynamic register %d: %s %d", i, sym.Name, sym.Value))
@@ -142,12 +139,12 @@ func (c *T8Client) Start() error {
 					if err != nil {
 						return err
 					}
-					for _, va := range c.Variables {
+					for _, va := range c.Symbols {
 						if err := va.Read(r); err != nil {
 							c.OnMessage(fmt.Sprintf("Failed to read %s: %v", va.Name, err))
 							break
 						}
-						c.dl.SetValue(va.Name, va.GetFloat64())
+						c.dl.SetValue(va.Name, va.Float64())
 					}
 					if r.Len() > 0 {
 						left := r.Len()
@@ -158,7 +155,7 @@ func (c *T8Client) Start() error {
 						}
 						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", left, leftovers[:n]))
 					}
-					c.produceLogLine(file, c.Variables, ts)
+					c.produceLogLine(file, c.Symbols, ts)
 					//cps++
 					count++
 					if count%10 == 0 {
@@ -211,7 +208,7 @@ func SetUpDynamicallyDefinedRegisterBySymbol(ctx context.Context, gm *gmlan.Clie
 	return nil
 }
 
-func (c *T8Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition, ts time.Time) {
+func (c *T8Client) produceLogLine(file io.Writer, vars []*symbol.Symbol, ts time.Time) {
 	file.Write([]byte(ts.Format("02-01-2006 15:04:05.999") + "|"))
 	c.sysvars.Lock()
 	for k, v := range c.sysvars.values {
@@ -221,14 +218,6 @@ func (c *T8Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition,
 	for _, va := range vars {
 		val := va.StringValue()
 		file.Write([]byte(va.Name + "=" + strings.Replace(val, ".", ",", 1) + "|"))
-		if va.Widget != nil && c.cc == 5 {
-			va.Widget.(*widgets.VarDefinitionWidgetEntry).SetValue(val)
-
-		}
-	}
-	c.cc++
-	if c.cc > 6 {
-		c.cc = 0
 	}
 	file.Write([]byte("IMPORTANTLINE=0|\n"))
 }

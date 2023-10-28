@@ -11,6 +11,7 @@ import (
 
 	"github.com/avast/retry-go/v4"
 	"github.com/roffe/gocan"
+	"github.com/roffe/txlogger/pkg/symbol"
 )
 
 type Client struct {
@@ -326,17 +327,20 @@ func (t *Client) ClearDynamicallyDefineLocalId(ctx context.Context) error {
 	return nil
 }
 
-func (t *Client) DynamicallyDefineLocalIdRequest(ctx context.Context, index int, v *VarDefinition) error {
+func (t *Client) DynamicallyDefineLocalIdRequest(ctx context.Context, index int, v *symbol.Symbol) error {
 	buff := bytes.NewBuffer(nil)
 	buff.WriteByte(0xF0)
-	switch v.Method {
-	case VAR_METHOD_ADDRESS:
-		buff.Write([]byte{DM_DBMA, byte(index), uint8(v.Length), byte(v.Value >> 16), byte(v.Value >> 8), byte(v.Value)})
-	case VAR_METHOD_LOCID:
-		buff.Write([]byte{DM_DBLI, byte(index), 0x00, byte(v.Value), 0x00})
-	case VAR_METHOD_SYMBOL:
-		buff.Write([]byte{DM_DBMA, byte(index), 0x00, 0x80, byte(v.Value >> 8), byte(v.Value)})
-	}
+	/*
+		switch v.Method {
+		case VAR_METHOD_ADDRESS:
+			buff.Write([]byte{DM_DBMA, byte(index), uint8(v.Length), byte(v.Value >> 16), byte(v.Value >> 8), byte(v.Value)})
+		case VAR_METHOD_LOCID:
+			buff.Write([]byte{DM_DBLI, byte(index), 0x00, byte(v.Value), 0x00})
+		case VAR_METHOD_SYMBOL:
+			buff.Write([]byte{DM_DBMA, byte(index), 0x00, 0x80, byte(v.Value >> 8), byte(v.Value)})
+		}
+	*/
+	buff.Write([]byte{DM_DBMA, byte(index), 0x00, 0x80, byte(v.Number >> 8), byte(v.Number)})
 
 	message := append([]byte{byte(buff.Len()), DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER}, buff.Bytes()...)
 	for _, msg := range t.splitRequest(message) {

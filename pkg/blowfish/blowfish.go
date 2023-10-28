@@ -53,44 +53,53 @@ var tagDict = map[string][]byte{
 }
 
 func DecryptSymbolNames(data []byte) ([]string, error) {
-	if !bytes.HasPrefix(data, []byte{0xF1, 0x1A, 0x06, 0x5B, 0xA2, 0x6B, 0xCC, 0x6F}) {
-		return nil, errors.New("invalid blowfish signature")
+	if err := checkHeader(data); err != nil {
+		return nil, err
 	}
+
 	r := bytes.NewReader(data[8:])
 
-	header := make([]byte, 16)
-	n, err := r.Read(header)
+	header, err := readData(r, 16)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read header: %w", err)
-	}
-	if n != 16 {
-		return nil, errors.New("failed to read 16 byte header")
+		return nil, err
 	}
 
-	zipBody := make([]byte, len(data)-24)
-	n, err = r.Read(zipBody)
+	zipEncrypted, err := readData(r, len(data)-24)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read body: %w", err)
-	}
-	if n != len(zipBody) {
-		return nil, errors.New("failed to read zip body")
+		return nil, err
 	}
 
-	decryptedHeader := decrypt(header, key)
+	decryptedHeader, err := decrypt(header, key)
+	if err != nil {
+		return nil, err
+	}
 
 	zipBlowfishKey, found := tagDict[strings.ReplaceAll(string(decryptedHeader), "\x00", "")]
 	if !found {
 		return nil, errors.New("blowfish key not found")
 	}
 
-	rest2 := decrypt(zipBody, zipBlowfishKey)
-
-	zr, err := zip.NewReader(bytes.NewReader(rest2), int64(len(rest2)))
+	zipBody, err := decrypt(zipEncrypted, zipBlowfishKey)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, f := range zr.File {
+	return unzipSymbols(zipBody)
+}
+
+func checkHeader(data []byte) error {
+	if !bytes.HasPrefix(data, []byte{0xF1, 0x1A, 0x06, 0x5B, 0xA2, 0x6B, 0xCC, 0x6F}) {
+		return errors.New("invalid blowfish signature")
+	}
+	return nil
+}
+
+func unzipSymbols(zipBody []byte) ([]string, error) {
+	zipReader, err := zip.NewReader(bytes.NewReader(zipBody), int64(len(zipBody)))
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range zipReader.File {
 		if f.IsEncrypted() {
 			f.SetPassword(zipPassword)
 		}
@@ -105,16 +114,28 @@ func DecryptSymbolNames(data []byte) ([]string, error) {
 		}
 		return strings.Split(strings.TrimSuffix(string(buf), "\r\n"), "\r\n"), nil //lint:ignore SA4004 we know
 	}
-	return nil, errors.New("no symbol names found")
+	return nil, errors.New("no symbols found")
 }
 
-func decrypt(ct, key []byte) []byte {
+func readData(r io.Reader, size int) ([]byte, error) {
+	data := make([]byte, size)
+	n, err := r.Read(data)
+	if err != nil {
+		return nil, fmt.Errorf("readData failed to read: %w", err)
+	}
+	if n != len(data) {
+		return nil, fmt.Errorf("readData failed to read %d bytes, got %d", len(data), n)
+	}
+	return data, nil
+}
+
+func decrypt(ct, key []byte) ([]byte, error) {
 	block, err := blowfish.NewCipher(key)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 	mode := ecb.NewECBDecrypter(block, true)
 	pt := make([]byte, len(ct))
 	mode.CryptBlocks(pt, ct)
-	return pt
+	return pt, nil
 }

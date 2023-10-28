@@ -16,8 +16,6 @@ type TxLogfile struct {
 	records []*Record
 	length  int
 	pos     int
-	// mu      sync.Mutex
-	// timeFormat string
 }
 
 func NewFromTxLogfile(filename string) (Logfile, error) {
@@ -37,8 +35,6 @@ func NewFromTxLogfile(filename string) (Logfile, error) {
 }
 
 func (l *TxLogfile) Next() *Record {
-	//l.mu.Lock()
-	//defer l.mu.Unlock()
 	if l.pos+1 > l.length-1 || l.pos+1 < 0 {
 		return nil
 	}
@@ -47,8 +43,6 @@ func (l *TxLogfile) Next() *Record {
 }
 
 func (l *TxLogfile) Prev() *Record {
-	//l.mu.Lock()
-	//defer l.mu.Unlock()
 	if l.pos-1 < 0 {
 		return nil
 	}
@@ -57,8 +51,6 @@ func (l *TxLogfile) Prev() *Record {
 }
 
 func (l *TxLogfile) Seek(pos int) *Record {
-	//l.mu.Lock()
-	//defer l.mu.Unlock()
 	if pos < 0 || pos >= l.length {
 		return nil
 	}
@@ -67,8 +59,6 @@ func (l *TxLogfile) Seek(pos int) *Record {
 }
 
 func (l *TxLogfile) Pos() int {
-	//l.mu.Lock()
-	//defer l.mu.Unlock()
 	return l.pos
 }
 
@@ -130,7 +120,6 @@ func parseTxLogfile(filename string) ([]*Record, error) {
 	records := make([]*Record, noLines)
 	semChan := make(chan struct{}, runtime.NumCPU())
 	var wg sync.WaitGroup
-
 	for pos := 0; pos < noLines; pos++ {
 		semChan <- struct{}{}
 		wg.Add(1)
@@ -188,7 +177,7 @@ func parseValue(valueString string) (string, float64, error) {
 	parts := strings.Split(valueString, "=")
 	val, err := strconv.ParseFloat(strings.Replace(parts[1], ",", ".", 1), 64)
 	if err != nil {
-		return "", 0, err
+		return "", -1, err
 	}
 	return parts[0], val, nil
 }

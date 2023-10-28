@@ -13,7 +13,7 @@ import (
 	"github.com/avast/retry-go/v4"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/kwp2000"
-	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/symbol"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -22,8 +22,6 @@ type T7Client struct {
 
 	quitChan chan struct{}
 	sysvars  *ThreadSafeMap
-
-	cc int
 
 	Config
 }
@@ -63,7 +61,7 @@ func (c *T7Client) Start() error {
 
 	cl, err := gocan.NewWithOpts(
 		ctx,
-		c.Dev,
+		c.Device,
 	)
 	if err != nil {
 		return err
@@ -138,7 +136,7 @@ func (c *T7Client) Start() error {
 			return fmt.Errorf("ClearDynamicallyDefineLocalId: %w", err)
 		}
 
-		for i, v := range c.Variables {
+		for i, v := range c.Symbols {
 			//c.onMessage(fmt.Sprintf("%d %s %s %d %X", i, v.Name, v.Method, v.Value, v.Type))
 			if err := kwp.DynamicallyDefineLocalIdRequest(ctx, i, v); err != nil {
 				return fmt.Errorf("DynamicallyDefineLocalIdRequest: %w", err)
@@ -189,17 +187,20 @@ func (c *T7Client) Start() error {
 						errCount++
 						errPerSecond++
 						c.ErrorCounter.Set(errCount)
-						c.OnMessage(fmt.Sprintf("Failed to read data: %v", err))
+						c.OnMessage(err.Error())
 						continue
 					}
 					r := bytes.NewReader(data)
-					for _, va := range c.Variables {
+					for _, va := range c.Symbols {
 						if err := va.Read(r); err != nil {
-							c.OnMessage(fmt.Sprintf("Failed to read %s: %v", va.Name, err))
+							errCount++
+							errPerSecond++
+							c.ErrorCounter.Set(errCount)
+							c.OnMessage(err.Error())
 							break
 						}
 						// Set value on dashboards
-						c.dl.SetValue(va.Name, va.GetFloat64())
+						c.dl.SetValue(va.Name, va.Float64())
 					}
 					if r.Len() > 0 {
 						left := r.Len()
@@ -211,7 +212,7 @@ func (c *T7Client) Start() error {
 						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", left, leftovers[:n]))
 					}
 					//c.produceCSVLine(csv, c.Variables)
-					c.produceLogLine(file, c.Variables, timeStamp)
+					c.produceLogLine(file, c.Symbols, timeStamp)
 					count++
 					//cps++
 					if count%10 == 0 {
@@ -234,7 +235,7 @@ func (c *T7Client) Start() error {
 	return err
 }
 
-func (c *T7Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition, ts time.Time) {
+func (c *T7Client) produceLogLine(file io.Writer, vars []*symbol.Symbol, ts time.Time) {
 	file.Write([]byte(ts.Format("02-01-2006 15:04:05.999") + "|"))
 	c.sysvars.Lock()
 	for k, v := range c.sysvars.values {
@@ -244,13 +245,6 @@ func (c *T7Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition,
 	for _, va := range vars {
 		val := va.StringValue()
 		file.Write([]byte(va.Name + "=" + strings.Replace(val, ".", ",", 1) + "|"))
-		if va.Widget != nil && c.cc == 5 {
-			va.Widget.(*widgets.VarDefinitionWidgetEntry).SetValue(val)
-		}
-	}
-	c.cc++
-	if c.cc > 6 {
-		c.cc = 0
 	}
 	file.Write([]byte("IMPORTANTLINE=0|\n"))
 }

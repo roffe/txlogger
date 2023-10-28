@@ -7,12 +7,6 @@ import (
 )
 
 func createLog(extension string) (*os.File, string, error) {
-	/*
-		dir, err := getLogDir()
-		if err != nil {
-			return nil, "", err
-		}
-	*/
 	if _, err := os.Stat("logs"); os.IsNotExist(err) {
 		if err := os.Mkdir("logs", 0755); err != nil {
 			if err != os.ErrExist {

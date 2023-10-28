@@ -14,7 +14,6 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/txlogger/pkg/kwp2000"
 	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/windows"
 )
@@ -70,9 +69,9 @@ func launchChild() {
 */
 
 func mainz(args []string) {
-	a := app.NewWithID("com.roffe.trl")
+	a := app.NewWithID("com.roffe.txlogger")
 	a.Settings().SetTheme(&myTheme{})
-	vars := kwp2000.NewVarDefinitionList()
+	//vars := kwp2000.NewVarDefinitionList()
 	if len(args) == 2 {
 		filename := args[1]
 		if strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") {
@@ -81,7 +80,7 @@ func mainz(args []string) {
 		}
 
 	}
-	mw := windows.NewMainWindow(a, vars)
+	mw := windows.NewMainWindow(a)
 	if len(args) == 2 {
 		filename := args[1]
 		if strings.HasSuffix(filename, ".bin") {

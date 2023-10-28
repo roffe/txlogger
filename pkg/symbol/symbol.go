@@ -5,14 +5,20 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/roffe/txlogger/pkg/blowfish"
 	"github.com/roffe/txlogger/pkg/lzhuf"
 )
+
+type Number interface {
+	uint8 | int8 | uint16 | int16 | uint32 | int32 | uint64 | int64 | float64
+}
 
 type ECUType int
 
@@ -51,12 +57,182 @@ type Symbol struct {
 	data []byte
 }
 
+func GetValue[V Number](sym *Symbol) V {
+	return sym.Decode().(V)
+}
+
+func (s *Symbol) Decode() interface{} {
+	switch {
+	case s.Length == 1:
+		if len(s.data) != 1 {
+			return -1
+		}
+		if s.Type&SIGNED != 0 {
+			return s.Int8()
+		}
+		return s.Uint8()
+	case s.Length == 2:
+		if len(s.data) != 2 {
+			return -1
+		}
+		if s.Type&SIGNED != 0 {
+			return s.Int16()
+		}
+		return s.Uint16()
+	case s.Length == 4:
+		if len(s.data) != 4 {
+			return -1
+		}
+		if s.Type&SIGNED != 0 {
+			return s.Int32()
+		}
+		return s.Uint32()
+	case s.Length == 8:
+		if len(s.data) != 8 {
+			return -1
+		}
+		if s.Type&SIGNED != 0 {
+			return s.Int64()
+		}
+		return s.Uint64()
+	default:
+		return -1
+	}
+}
+
+func (s *Symbol) Read(r io.Reader) error {
+	symbolData := make([]byte, s.Length)
+	n, err := r.Read(symbolData)
+	if err != nil {
+		return fmt.Errorf("Symbol failed to Read: %w", err)
+	}
+	if n != int(s.Length) {
+		return fmt.Errorf("Symbol expected %d bytes, got %d", s.Length, n)
+	}
+	s.data = symbolData
+	return nil
+}
+
 func (s *Symbol) Bytes() []byte {
 	return s.data
 }
 
 func (s *Symbol) String() string {
 	return fmt.Sprintf("%s #%d @%08X type: %02X len: %d", s.Name, s.Number, s.Address, s.Type, s.Length)
+}
+
+func (s *Symbol) StringValue() string {
+	if s.Correctionfactor != 1 {
+		var result float64
+		switch t := s.Decode().(type) {
+		case int8:
+			result = float64(t) * s.Correctionfactor
+		case uint8:
+			result = float64(t) * s.Correctionfactor
+		case int16:
+			result = float64(t) * s.Correctionfactor
+		case uint16:
+			result = float64(t) * s.Correctionfactor
+		case int32:
+			result = float64(t) * s.Correctionfactor
+		case uint32:
+			result = float64(t) * s.Correctionfactor
+		}
+
+		//var format string
+		var precission int
+		switch {
+		case s.Correctionfactor == 0.1:
+			precission = 1
+		//	format = "%.1f"
+		case s.Correctionfactor == 0.01:
+			//	format = "%.2f"
+			precission = 2
+		case s.Correctionfactor == 0.001:
+			//	format = "%.3f"
+			precission = 3
+		}
+		return strconv.FormatFloat(result, 'f', precission, 64)
+		//return fmt.Sprintf(format, roundFloat(result, precission))
+
+	}
+	return fmt.Sprintf("%v", s.Decode())
+}
+
+func (s *Symbol) Bool() bool {
+	return s.data[0] == 1
+}
+
+func (s *Symbol) Uint8() uint8 {
+	return uint8(s.data[0])
+}
+
+func (s *Symbol) Int8() int8 {
+	return int8(s.data[0])
+}
+
+func (s *Symbol) Uint16() uint16 {
+	return binary.BigEndian.Uint16(s.data)
+}
+
+func (s *Symbol) Int16() int16 {
+	return int16(binary.BigEndian.Uint16(s.data))
+}
+
+func (s *Symbol) Uint32() uint32 {
+	return binary.BigEndian.Uint32(s.data)
+}
+
+func (s *Symbol) Int32() int32 {
+	return int32(binary.BigEndian.Uint32(s.data))
+}
+
+func (s *Symbol) Uint64() uint64 {
+	return binary.BigEndian.Uint64(s.data)
+}
+
+func (s *Symbol) Int64() int64 {
+	return int64(binary.BigEndian.Uint64(s.data))
+}
+
+func (s *Symbol) Float64() float64 {
+	switch {
+	case s.Length == 1:
+		if len(s.data) != 1 {
+			return -1
+		}
+		if s.Type&SIGNED != 0 {
+			return float64(s.Int8()) * s.Correctionfactor
+		}
+		return float64(s.Uint8()) * s.Correctionfactor
+	case s.Length == 2:
+		if len(s.data) != 2 {
+			return -1
+		}
+		if s.Type&SIGNED != 0 {
+
+			return float64(s.Int16()) * s.Correctionfactor
+		}
+		return float64(s.Uint16()) * s.Correctionfactor
+	case s.Length == 4:
+		if len(s.data) != 4 {
+			return -1
+		}
+		if s.Type&SIGNED != 0 {
+			return float64(s.Int32()) * s.Correctionfactor
+		}
+		return float64(s.Uint32()) * s.Correctionfactor
+	case s.Length == 8:
+		if len(s.data) != 8 {
+			return -1
+		}
+		if s.Type&SIGNED != 0 {
+			return float64(s.Int64()) * s.Correctionfactor
+		}
+		return float64(s.Uint64()) * s.Correctionfactor
+	default:
+		return 0.0
+	}
 }
 
 func (s *Symbol) IntFromData() []int {
@@ -203,10 +379,8 @@ func ExpandCompressedSymbolNames(in []byte) ([]string, error) {
 	if bytes.HasPrefix(in, []byte{0xF1, 0x1A, 0x06, 0x5B, 0xA2, 0x6B, 0xCC, 0x6F}) {
 		return blowfish.DecryptSymbolNames(in)
 	}
-	var expandedFileSize int
-	for i := 0; i < 4; i++ {
-		expandedFileSize |= int(in[i]) << uint(i*8)
-	}
+
+	expandedFileSize := int(in[0]) | (int(in[1]) << 8) | (int(in[2]) << 16) | (int(in[3]) << 24)
 
 	if expandedFileSize == -1 {
 		return nil, errors.New("invalid expanded file size")
@@ -214,16 +388,17 @@ func ExpandCompressedSymbolNames(in []byte) ([]string, error) {
 
 	out := make([]byte, expandedFileSize)
 
-	r0 := lzhuf.Decode(in, out)
+	returnedSize := lzhuf.Decode(in, out)
 
-	if int(r0) != expandedFileSize {
-		return nil, fmt.Errorf("decoded data size missmatch: %d != %d", r0, expandedFileSize)
+	if returnedSize != expandedFileSize {
+		return nil, fmt.Errorf("decoded data size missmatch: %d != %d", returnedSize, expandedFileSize)
 	}
 
 	return strings.Split(strings.TrimSuffix(string(out), "\r\n"), "\r\n"), nil
 }
 
-func bytePatternSearch(data []byte, search []byte, startOffset int64) int {
+/*
+func bytePatternSearch2(data []byte, search []byte, startOffset int64) int {
 	if startOffset < 0 || startOffset >= int64(len(data)) {
 		return -1
 	}
@@ -239,4 +414,59 @@ func bytePatternSearch(data []byte, search []byte, startOffset int64) int {
 		}
 	}
 	return -1
+}
+*/
+
+// Knuth-Morris-Pratt (KMP) algorithm
+func bytePatternSearch(data []byte, search []byte, startOffset int64) int {
+	if startOffset < 0 || startOffset >= int64(len(data)) || len(search) == 0 {
+		return -1
+	}
+
+	lps := computeLPSArray(search)
+
+	i, j := startOffset, 0
+
+	for i < int64(len(data)) {
+		if search[j] == data[i] {
+			i++
+			j++
+		}
+
+		if j == len(search) {
+			return int(i) - j
+		} else if i < int64(len(data)) && search[j] != data[i] {
+			if j != 0 {
+				j = lps[j-1]
+			} else {
+				i++
+			}
+		}
+	}
+
+	return -1
+}
+
+func computeLPSArray(pattern []byte) []int {
+	length := 0
+	lps := make([]int, len(pattern))
+	lps[0] = 0
+	i := 1
+
+	for i < len(pattern) {
+		if pattern[i] == pattern[length] {
+			length++
+			lps[i] = length
+			i++
+		} else {
+			if length != 0 {
+				length = lps[length-1]
+			} else {
+				lps[i] = 0
+				i++
+			}
+		}
+	}
+
+	return lps
 }

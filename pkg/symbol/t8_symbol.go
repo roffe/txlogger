@@ -58,13 +58,13 @@ var T8SymbolsTuning = map[string][]string{
 		//"LambdaCal.ST_Enable",
 		//"PurgeCal.ST_PurgeEnable",
 	},
-	"Myrtilos": {
-		//"MyrtilosCal.Launch_DisableSpeed",
-		//"MyrtilosCal.Launch_Ign_fi_Min",
-		//"MyrtilosCal.Launch_RPM",
-		//"MyrtilosCal.Launch_InjFac_at_rpm",
-		//"MyrtilosCal.Launch_PWM_max_at_stand",
-	},
+	//"Myrtilos": {
+	//"MyrtilosCal.Launch_DisableSpeed",
+	//"MyrtilosCal.Launch_Ign_fi_Min",
+	//"MyrtilosCal.Launch_RPM",
+	//"MyrtilosCal.Launch_InjFac_at_rpm",
+	//"MyrtilosCal.Launch_PWM_max_at_stand",
+	//},
 }
 
 type T8Binary struct {

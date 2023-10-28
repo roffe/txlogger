@@ -2,23 +2,22 @@ package datalogger
 
 import (
 	"fmt"
-	"log"
 	"sync"
 
 	"fyne.io/fyne/v2/data/binding"
 	"github.com/roffe/gocan"
-	"github.com/roffe/txlogger/pkg/kwp2000"
+	"github.com/roffe/txlogger/pkg/symbol"
 )
 
 const ISO8601 = "2006-01-02T15:04:05.999-0700"
 
-type Setter interface {
-	SetValue(string, float64)
-}
-
 type Provider interface {
 	Start() error
 	Close()
+}
+
+type Setter interface {
+	SetValue(string, float64)
 }
 
 type Logger interface {
@@ -30,8 +29,8 @@ type Logger interface {
 
 type Config struct {
 	ECU                   string
-	Dev                   gocan.Adapter
-	Variables             []*kwp2000.VarDefinition
+	Device                gocan.Adapter
+	Symbols               []*symbol.Symbol
 	Freq                  int
 	OnMessage             func(string)
 	CaptureCounter        binding.Int
@@ -84,7 +83,6 @@ func (d *Client) Attach(db Setter) {
 	defer d.mu.Unlock()
 	for _, dbz := range d.dbs {
 		if db == dbz {
-			log.Println("Dropping")
 			return
 		}
 	}

@@ -2,7 +2,6 @@ package windows
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -11,7 +10,6 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/datalogger"
-	"github.com/roffe/txlogger/pkg/kwp2000"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/skratchdot/open-golang/open"
@@ -20,15 +18,13 @@ import (
 
 func (mw *MainWindow) createButtons() {
 	mw.addSymbolBtn = widget.NewButtonWithIcon("Add", theme.ContentAddIcon(), func() {
-		defer mw.symbolConfigList.Refresh()
-		s, ok := mw.symbolMap[mw.symbolLookup.Text]
-		if !ok {
-			mw.vars.Add(&kwp2000.VarDefinition{
-				Name: mw.symbolLookup.Text,
-			})
+		sym := mw.symbols.GetByName(mw.symbolLookup.Text)
+		if sym == nil {
+			dialog.ShowError(fmt.Errorf("symbol not found"), mw)
 			return
 		}
-		mw.vars.Add(s)
+
+		mw.symbolList.Add(sym)
 		mw.SaveSymbolList()
 		//log.Printf("Name: %s, Method: %d, Value: %d, Type: %X", s.Name, s.Method, s.Value, s.Type)
 	})
@@ -48,7 +44,6 @@ func (mw *MainWindow) createButtons() {
 			mw.Log(err.Error())
 			return
 		}
-		mw.SyncSymbols()
 	})
 
 	mw.loadSymbolsEcuBtn = widget.NewButtonWithIcon("Load from ECU", theme.DownloadIcon(), func() {
@@ -62,7 +57,6 @@ func (mw *MainWindow) createButtons() {
 				mw.Log(err.Error())
 				return
 			}
-			mw.SyncSymbols()
 		}()
 	})
 
@@ -81,7 +75,6 @@ func (mw *MainWindow) createButtons() {
 			mw.Log(err.Error())
 			return
 		}
-		mw.symbolConfigList.Refresh()
 		mw.SyncSymbols()
 	})
 
@@ -165,19 +158,13 @@ func (mw *MainWindow) createButtons() {
 			}
 		}
 
-		path, err := os.Getwd()
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		if err := open.Run(path + "\\logs"); err != nil {
-			log.Println(err)
+		if err := open.Run(datalogger.LOGPATH); err != nil {
+			fyne.LogError("Failed to open logs folder", err)
 		}
 	})
 
 	mw.logBtn = widget.NewButtonWithIcon("Start logging", theme.MediaPlayIcon(), func() {
-		for _, v := range mw.vars.Get() {
+		for _, v := range mw.symbolList.Symbols() {
 			if v.Name == "AirMassMast.m_Request" && mw.ecuSelect.Selected == "T7" {
 				dialog.ShowError(fmt.Errorf("AirMassMast.m_Request is not supported on T7, Did you forget to change preset?"), mw)
 				return
@@ -202,8 +189,8 @@ func (mw *MainWindow) createButtons() {
 			}
 			mw.dlc, err = datalogger.New(datalogger.Config{
 				ECU:                   mw.ecuSelect.Selected,
-				Dev:                   device,
-				Variables:             mw.vars.Get(),
+				Device:                device,
+				Symbols:               mw.symbolList.Symbols(),
 				Freq:                  int(mw.freqSlider.Value),
 				OnMessage:             mw.Log,
 				CaptureCounter:        mw.captureCounter,
@@ -224,6 +211,7 @@ func (mw *MainWindow) createButtons() {
 			}
 
 			mw.dlc.Attach(mw.mvh)
+			mw.dlc.Attach(mw.symbolList)
 
 			go func() {
 				defer mw.EnableBtns()
@@ -259,49 +247,3 @@ func (mw *MainWindow) newMapViewerWindow(w fyne.Window, mv MapViewerWindowWidget
 	mw.mvh.Subscribe(axis.YFrom, mv)
 	return mww
 }
-
-/*
-func (mw *MainWindow) newMapBtn(btnTitle, supXName, supYName, mapName string) *widget.Button {
-	return widget.NewButtonWithIcon(btnTitle, theme.GridIcon(), func() {
-		mv, found := mw.openMaps[mapName]
-		if !found {
-			w := mw.app.NewWindow("Map Viewer - " + mapName)
-			if mw.symbols == nil {
-				mw.Log("No binary loaded")
-				return
-			}
-			mv, err := NewMapViewer(w, supXName, supYName, mapName, mw.symbols, interpolate.Interpolate)
-			if err != nil {
-				mw.Log(err.Error())
-				return
-			}
-
-			var tmpRpm float64
-			setRpm := func(v float64) {
-				tmpRpm = v
-			}
-			setAir := func(v float64) {
-				mv.SetXY(int(v), int(tmpRpm))
-			}
-			w.SetCloseIntercept(func() {
-				delete(mw.openMaps, mapName)
-				if mw.dlc != nil {
-					mw.dlc.Unsubscribe("ActualIn.n_Engine", &setRpm)
-					mw.dlc.Unsubscribe("MAF.m_AirInlet", &setAir)
-				}
-				w.Close()
-			})
-			if mw.dlc != nil {
-				mw.dlc.Subscribe("ActualIn.n_Engine", &setRpm)
-				mw.dlc.Subscribe("MAF.m_AirInlet", &setAir)
-			}
-			mw.openMaps[mapName] = mv
-			w.SetContent(mv)
-			w.Show()
-
-			return
-		}
-		mv.w.RequestFocus()
-	})
-}
-*/
