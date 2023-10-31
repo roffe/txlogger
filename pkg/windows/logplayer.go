@@ -15,6 +15,8 @@ import (
 	"github.com/roffe/txlogger/pkg/capture"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
+	"github.com/roffe/txlogger/pkg/mainmenu"
+	"github.com/roffe/txlogger/pkg/mapviewerhandler"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
@@ -52,7 +54,7 @@ func (s *slider) TypedKey(key *fyne.KeyEvent) {
 type LogPlayer struct {
 	app fyne.App
 
-	menu *MainMenu
+	menu *mainmenu.MainMenu
 
 	prevBtn     *widget.Button
 	toggleBtn   *widget.Button
@@ -71,9 +73,9 @@ type LogPlayer struct {
 
 	logType string
 
-	openMaps map[string]MapViewerWindowInterface
+	openMaps map[string]mapviewerhandler.MapViewerWindowInterface
 
-	mvh *MapViewerHandler
+	mvh *mapviewerhandler.MapViewerHandler
 
 	handler func(ev *fyne.KeyEvent)
 
@@ -92,9 +94,9 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 
 		controlChan: make(chan *controlMsg, 10),
 
-		openMaps: make(map[string]MapViewerWindowInterface),
+		openMaps: make(map[string]mapviewerhandler.MapViewerWindowInterface),
 		symbols:  symbols,
-		mvh:      NewMapViewerHandler(),
+		mvh:      mapviewerhandler.New(),
 
 		closed: false,
 
@@ -108,7 +110,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 		lp.logType = "T8"
 	}
 
-	lp.menu = NewMainMenu(lp, []*fyne.Menu{
+	lp.menu = mainmenu.New(lp, []*fyne.Menu{
 		fyne.NewMenu("File"),
 	}, lp.openMap, lp.openMapz)
 
@@ -266,8 +268,8 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 	return main
 }
 
-func (lp *LogPlayer) newMapViewerWindow(w fyne.Window, mv MapViewerWindowWidget, axis symbol.Axis) *MapViewerWindow {
-	mw := &MapViewerWindow{Window: w, mv: mv}
+func (lp *LogPlayer) newMapViewerWindow(w fyne.Window, mv mapviewerhandler.MapViewerWindowWidget, axis symbol.Axis) *mapviewerhandler.MapViewerWindow {
+	mw := mapviewerhandler.NewWindow(w, mv)
 	lp.openMaps[axis.Z] = mw
 
 	if axis.XFrom == "" {

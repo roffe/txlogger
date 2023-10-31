@@ -188,7 +188,7 @@ outer:
 
 	// log.Printf("Search pattern: %X", searchPattern)
 
-	addressTableOffset := bytePatternSearch(data, searchPattern, 0)
+	addressTableOffset := BytePatternSearch(data, searchPattern, 0)
 	cb(fmt.Sprintf("Address table offset: %X", addressTableOffset))
 
 	if addressTableOffset == -1 {
@@ -345,7 +345,7 @@ func binaryPacked(data []byte, cb func(string)) (SymbolCollection, error) {
 }
 
 func readAllT7SymbolsData(fileBytes []byte, symbols []*Symbol) error {
-	dataLocationOffset := bytePatternSearch(fileBytes, searchPattern, 0x30000) - 10
+	dataLocationOffset := BytePatternSearch(fileBytes, searchPattern, 0x30000) - 10
 	dataOffsetValue := binary.BigEndian.Uint32(fileBytes[dataLocationOffset : dataLocationOffset+4])
 
 	//sram_offset, err := GetAddressFromOffset(fileBytes, dataLocationOffset+4)
@@ -368,6 +368,7 @@ func readAllT7SymbolsData(fileBytes []byte, symbols []*Symbol) error {
 	//	log.Printf("sramOffset: %X", sramOffset)
 
 	for _, sym := range symbols {
+		sym.SramOffset = sramOffset
 		if sym.Address < 0x0F00000 {
 			sym.data, err = readSymbolData(fileBytes, sym, 0)
 			if err != nil {
@@ -422,7 +423,7 @@ func determineVersion(data []byte) (string, error) {
 	switch {
 	case bytes.Contains(data, []byte("EU0CF01O")):
 		return "EU0CF01O", nil
-	case bytes.Contains(data, []byte("EU0AF01C")), bytes.Contains(data, []byte("EU0BF01C")), bytes.Contains(data, []byte("EU0CF01C")):
+	case bytes.Contains(data, []byte("C10FA0UE")), bytes.Contains(data, []byte("EU0AF01C")), bytes.Contains(data, []byte("EU0BF01C")), bytes.Contains(data, []byte("EU0CF01C")):
 		return "EU0AF01C", nil
 	}
 	return "", ErrVersionNotFound
@@ -434,13 +435,11 @@ var searchPattern = []byte{0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 //var searchPattern3 = []byte{0x73, 0x59, 0x4D, 0x42, 0x4F, 0x4C, 0x74, 0x41, 0x42, 0x4C, 0x45, 0x00} // 12
 
 func getOffsets(data []byte, cb func(string)) (bool, int, int, int, error) {
-	addressTableOffset := bytePatternSearch(data, searchPattern, 0x30000) - 0x06
-	//	log.Printf("Address table offset: %08X", addressTableOffset)
+	addressTableOffset := BytePatternSearch(data, searchPattern, 0x30000) - 0x06
 	cb(fmt.Sprintf("Address table offset: %08X", addressTableOffset))
 
-	//sramTableOffset := getAddressFromOffset(file, addressTableOffset-0x04)
-	//log.Printf("SRAM table offset: %08X", sramTableOffset)
-	//cb(fmt.Sprintf("SRAM table offset: %08X", sramTableOffset))
+	sramTableOffset := getAddressFromOffset(data, addressTableOffset-0x04)
+	cb(fmt.Sprintf("SRAM table offset: %08X", sramTableOffset))
 
 	symbolNameTableOffset := getAddressFromOffset(data, addressTableOffset)
 	//	log.Printf("Symbol table offset: %08X", symbolNameTableOffset)

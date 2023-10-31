@@ -40,6 +40,14 @@ func (c *T8Client) Close() {
 	time.Sleep(200 * time.Millisecond)
 }
 
+func (c *T8Client) SetRAM(address uint32, data []byte) error {
+	return nil
+}
+
+func (c *T8Client) GetRAM(address uint32, length uint32) ([]byte, error) {
+	return nil, nil
+}
+
 func (c *T8Client) Start() error {
 	file, filename, err := createLog("t8l")
 	if err != nil {
@@ -66,7 +74,7 @@ func (c *T8Client) Start() error {
 	c.ErrorCounter.Set(errCount)
 
 	errPerSecond := 0
-	c.ErrorPerSecondCounter.Set(errPerSecond)
+	//c.ErrorPerSecondCounter.Set(errPerSecond)
 
 	// cps := 0
 	retries := 0
@@ -90,7 +98,7 @@ func (c *T8Client) Start() error {
 		secondTicker := time.NewTicker(time.Second)
 		defer secondTicker.Stop()
 
-		t := time.NewTicker(time.Second / time.Duration(c.Freq))
+		t := time.NewTicker(time.Second / time.Duration(c.Rate))
 		defer t.Stop()
 
 		//first := true
@@ -107,7 +115,7 @@ func (c *T8Client) Start() error {
 				case <-secondTicker.C:
 					//log.Println("cps:", cps)
 					//cps = 0
-					c.ErrorPerSecondCounter.Set(errPerSecond)
+					//c.ErrorPerSecondCounter.Set(errPerSecond)
 					if errPerSecond > 10 {
 						errPerSecond = 0
 						return fmt.Errorf("too many errors")
@@ -141,6 +149,9 @@ func (c *T8Client) Start() error {
 					}
 					for _, va := range c.Symbols {
 						if err := va.Read(r); err != nil {
+							errCount++
+							errPerSecond++
+							c.ErrorCounter.Set(errCount)
 							c.OnMessage(fmt.Sprintf("Failed to read %s: %v", va.Name, err))
 							break
 						}
@@ -168,7 +179,7 @@ func (c *T8Client) Start() error {
 			}
 		})
 
-		c.OnMessage(fmt.Sprintf("Live logging at %d fps", c.Freq))
+		c.OnMessage(fmt.Sprintf("Live logging at %d fps", c.Rate))
 
 		return errg.Wait()
 

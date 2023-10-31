@@ -1,4 +1,4 @@
-package windows
+package mainmenu
 
 import (
 	"strings"
@@ -8,18 +8,18 @@ import (
 )
 
 type MainMenu struct {
-	w     fyne.Window
-	menus []*fyne.Menu
-	one   func(symbol.ECUType, string)
-	mul   func(symbol.ECUType, ...string)
+	w         fyne.Window
+	menus     []*fyne.Menu
+	oneFunc   func(symbol.ECUType, string)
+	multiFunc func(symbol.ECUType, ...string)
 }
 
-func NewMainMenu(w fyne.Window, menus []*fyne.Menu, one func(symbol.ECUType, string), mul func(symbol.ECUType, ...string)) *MainMenu {
+func New(w fyne.Window, menus []*fyne.Menu, oneFunc func(symbol.ECUType, string), multiFunc func(symbol.ECUType, ...string)) *MainMenu {
 	return &MainMenu{
-		w:     w,
-		one:   one,
-		mul:   mul,
-		menus: menus,
+		w:         w,
+		oneFunc:   oneFunc,
+		multiFunc: multiFunc,
+		menus:     menus,
 	}
 }
 
@@ -48,13 +48,13 @@ func (mw *MainMenu) GetMenu(name string) *fyne.MainMenu {
 				parts := strings.Split(mapName, "|")
 				names := parts[1:]
 				itm := fyne.NewMenuItem(parts[0], func() {
-					mw.mul(typ, names...)
+					mw.multiFunc(typ, names...)
 				})
 				items = append(items, itm)
 				continue
 			}
 			itm := fyne.NewMenuItem(mapName, func() {
-				mw.one(typ, mapName)
+				mw.oneFunc(typ, mapName)
 			})
 			items = append(items, itm)
 		}

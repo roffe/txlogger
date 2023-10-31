@@ -229,7 +229,7 @@ func CountNq(data []byte, offset int) int {
 
 func GetEndOfSymbolTable(data []byte) (int, error) {
 	pattern := []byte{0x73, 0x59, 0x4D, 0x42, 0x4F, 0x4C, 0x74, 0x41, 0x42, 0x4C, 0x45}
-	pos := bytePatternSearch(data, pattern, 0)
+	pos := BytePatternSearch(data, pattern, 0)
 	if pos == -1 {
 		return -1, ErrEndOfSymbolTableNotFound
 	}
@@ -297,7 +297,7 @@ outer:
 }
 
 func FindAddressTableOffset(data []byte) error {
-	pos := bytePatternSearch(data, []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20}, 0x3000)
+	pos := BytePatternSearch(data, []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20}, 0x3000)
 	if pos == -1 {
 		return ErrAddressTableOffsetNotFound
 	}

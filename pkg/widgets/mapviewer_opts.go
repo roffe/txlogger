@@ -69,3 +69,30 @@ func WithInterPolFunc(ipf interpolate.InterPolFunc) MapViewerOption {
 		return nil
 	}
 }
+
+type UpdateFunc func(idx, value int)
+
+func WithUpdateFunc(updateFunc UpdateFunc) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.updateFunc = updateFunc
+		return nil
+	}
+}
+
+type LoadFunc func()
+
+func WithLoadFunc(loadFunc LoadFunc) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.loadFunc = loadFunc
+		return nil
+	}
+}
+
+type SaveFunc func()
+
+func WithSaveFunc(saveFunc SaveFunc) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.saveFunc = saveFunc
+		return nil
+	}
+}

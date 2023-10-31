@@ -261,7 +261,7 @@ func (db *Dashboard) Focused() bool {
 }
 
 func (db *Dashboard) Close() {
-	// close(db.metricsChan)
+
 }
 
 func (db *Dashboard) SetTime(t time.Time) {

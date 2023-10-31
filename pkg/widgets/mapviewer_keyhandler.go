@@ -1,6 +1,7 @@
 package widgets
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 
@@ -20,26 +21,70 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 	log.Println("TypedKey", key.Name, shifted, key.Physical.ScanCode)
 	var refresh, updateCursor bool
 	switch key.Name {
-	case fyne.KeyPageUp:
+	case fyne.KeyEnter:
+
+	case fyne.KeyBackspace:
+		for _, cell := range mv.selectedCells {
+			str := strconv.Itoa(mv.zData[cell])
+			str = str[:len(str)-1]
+			num, err := strconv.Atoi(str)
+			if err == nil {
+				mv.zData[cell] = num
+				mv.textValues[cell].Text = str
+				mv.textValues[cell].Refresh()
+				mv.updateFunc(cell, mv.zData[cell])
+				mv.Refresh()
+			}
+		}
+	case "1", "2", "3", "4", "5", "6", "7", "8", "9", "0":
+		for _, cell := range mv.selectedCells {
+			num, err := strconv.Atoi(fmt.Sprintf("%d%s", mv.zData[cell], string(key.Name)))
+			if err == nil {
+				mv.zData[cell] = num
+				mv.textValues[cell].Text = strconv.Itoa(num)
+				mv.textValues[cell].Refresh()
+				mv.updateFunc(cell, mv.zData[cell])
+				mv.Refresh()
+			}
+		}
+	case fyne.KeyPageUp, "S":
 		for _, cell := range mv.selectedCells {
 			mv.zData[cell] += int((mv.zCorrFac * 10) * (1.0 / mv.zCorrFac))
 		}
+		if mv.updateFunc != nil {
+			for _, cell := range mv.selectedCells {
+				mv.updateFunc(cell, mv.zData[cell])
+			}
+		}
 		refresh = true
-	case fyne.KeyPageDown:
+	case fyne.KeyPageDown, "X":
 		for _, cell := range mv.selectedCells {
 			mv.zData[cell] -= int((mv.zCorrFac * 10) * (1.0 / mv.zCorrFac))
 		}
+		if mv.updateFunc != nil {
+			for _, cell := range mv.selectedCells {
+				mv.updateFunc(cell, mv.zData[cell])
+			}
+		}
 		refresh = true
-	case "+":
-		//mv.zData[index]++
+	case "+", "A":
 		for _, cell := range mv.selectedCells {
 			mv.zData[cell] += int(mv.zCorrFac * (1.0 / mv.zCorrFac))
 		}
+		if mv.updateFunc != nil {
+			for _, cell := range mv.selectedCells {
+				mv.updateFunc(cell, mv.zData[cell])
+			}
+		}
 		refresh = true
-	case "-":
-		//mv.zData[index]--
+	case "-", "Z":
 		for _, cell := range mv.selectedCells {
 			mv.zData[cell] -= int(mv.zCorrFac * (1.0 / mv.zCorrFac))
+		}
+		if mv.updateFunc != nil {
+			for _, cell := range mv.selectedCells {
+				mv.updateFunc(cell, mv.zData[cell])
+			}
 		}
 		refresh = true
 	case "Up":
@@ -87,7 +132,7 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 				prec = 0
 			}
 			t := mv.textValues[textIndex]
-			t.Text = strconv.FormatFloat(float64(mv.zData[index])*mv.zCorrFac, 'f', prec, 64)
+			t.Text = strconv.FormatFloat(float64(mv.zData[textIndex])*mv.zCorrFac, 'f', prec, 64)
 			t.Refresh()
 		}
 		mv.Refresh()

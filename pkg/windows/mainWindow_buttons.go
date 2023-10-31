@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/datalogger"
-	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
 	sdialog "github.com/sqweek/dialog"
 )
@@ -113,7 +111,7 @@ func (mw *MainWindow) createButtons() {
 			}
 			mw.dashboard = nil
 			mw.SetFullScreen(false)
-			mw.SetContent(mw.Content())
+			mw.SetContent(mw.Render())
 		}
 
 		mw.dashboard = widgets.NewDashboard(mw.app, mw, false, mw.logBtn, onClose)
@@ -171,14 +169,14 @@ func (mw *MainWindow) createButtons() {
 				return
 			}
 			mw.dlc, err = datalogger.New(datalogger.Config{
-				ECU:                   mw.ecuSelect.Selected,
-				Device:                device,
-				Symbols:               mw.symbolList.Symbols(),
-				Freq:                  int(mw.freqSlider.Value),
-				OnMessage:             mw.Log,
-				CaptureCounter:        mw.captureCounter,
-				ErrorCounter:          mw.errorCounter,
-				ErrorPerSecondCounter: mw.errorPerSecondCounter,
+				ECU:            mw.ecuSelect.Selected,
+				Device:         device,
+				Symbols:        mw.symbolList.Symbols(),
+				Rate:           int(mw.freqSlider.Value),
+				OnMessage:      mw.Log,
+				CaptureCounter: mw.captureCounter,
+				ErrorCounter:   mw.errorCounter,
+				//ErrorPerSecondCounter: mw.errorPerSecondCounter,
 			})
 			if err != nil {
 				mw.Log(err.Error())
@@ -212,21 +210,4 @@ func (mw *MainWindow) createButtons() {
 			}()
 		}
 	})
-}
-
-func (mw *MainWindow) newMapViewerWindow(w fyne.Window, mv MapViewerWindowWidget, axis symbol.Axis) MapViewerWindowInterface {
-	mww := &MapViewerWindow{Window: w, mv: mv}
-	mw.openMaps[axis.Z] = mww
-
-	if axis.XFrom == "" {
-		axis.XFrom = "MAF.m_AirInlet"
-	}
-
-	if axis.YFrom == "" {
-		axis.YFrom = "ActualIn.n_Engine"
-	}
-
-	mw.mvh.Subscribe(axis.XFrom, mv)
-	mw.mvh.Subscribe(axis.YFrom, mv)
-	return mww
 }

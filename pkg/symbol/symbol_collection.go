@@ -2,7 +2,6 @@ package symbol
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 )
@@ -94,18 +93,18 @@ func (c *Collection) GetXYZ(xAxis, yAxis, zAxis string) ([]int, []int, []int, fl
 
 	var xOut, yOut []int
 
-	zOut := symz.IntFromData()
+	zOut := symz.Ints()
 	xFac, yFac := 1.0, 1.0
 	if xAxis == "" {
 		xOut = []int{0}
 	} else if xAxis != "" && symx != nil {
-		xOut = symx.IntFromData()
+		xOut = symx.Ints()
 		xFac = symx.Correctionfactor
 	}
 	if yAxis == "" {
 		yOut = make([]int, len(zOut))
 	} else if yAxis != "" && symy != nil {
-		yOut = symy.IntFromData()
+		yOut = symy.Ints()
 		yFac = symy.Correctionfactor
 	}
 	if len(xOut) >= 1 || len(yOut) >= 1 {
@@ -118,7 +117,6 @@ func (c *Collection) GetXYZ(xAxis, yAxis, zAxis string) ([]int, []int, []int, fl
 	}
 	for k, v := range asd {
 		if v == nil {
-			log.Println("xxx")
 			return nil, nil, nil, 0, 0, 0, fmt.Errorf("failed to find %s", k)
 		}
 	}

@@ -134,9 +134,9 @@ func (c *Dial) GetValue() float64 {
 }
 
 func (c *Dial) SetValue(value float64) {
-	if value == c.value {
-		return
-	}
+	//if value == c.value {
+	//	return
+	//}
 	if value > c.max {
 		value = c.max
 	}

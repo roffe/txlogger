@@ -1,9 +1,30 @@
-package windows
+package mapviewerhandler
 
 import (
 	"log"
 	"sync"
+
+	"fyne.io/fyne/v2"
 )
+
+type MapViewerWindowInterface interface {
+	RequestFocus()
+	Close()
+}
+
+type MapViewerWindowWidget interface {
+	SetValue(name string, value float64)
+	Close()
+}
+
+type MapViewerWindow struct {
+	fyne.Window
+	mv MapViewerWindowWidget
+}
+
+func NewWindow(w fyne.Window, mv MapViewerWindowWidget) *MapViewerWindow {
+	return &MapViewerWindow{Window: w, mv: mv}
+}
 
 type MapViewerEvent struct {
 	SymbolName string
@@ -29,7 +50,7 @@ type MapViewerHandler struct {
 	aggregatorsLock sync.Mutex
 }
 
-func NewMapViewerHandler() *MapViewerHandler {
+func New() *MapViewerHandler {
 	mvh := &MapViewerHandler{
 		subChan:     make(chan MapViewerSubscriber, 10),
 		unsubChan:   make(chan MapViewerSubscriber, 10),

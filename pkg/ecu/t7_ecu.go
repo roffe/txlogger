@@ -44,7 +44,7 @@ func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (symb
 
 	cb("Downloading symbol table")
 	start := time.Now()
-	symTable, err := k.TransferData(ctx)
+	symTable, err := k.TransferData(ctx, 0)
 	if err != nil {
 		return nil, err
 	}

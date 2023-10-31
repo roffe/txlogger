@@ -16,7 +16,7 @@ const (
 	DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER = 0x2C // present in Trionic 7
 	WRITE_DATA_BY_LOCAL_IDENTIFIER      = 0x3B // present in Trionic 7
 	WRITE_DATA_BY_COMMON_IDENTIFIER     = 0x2E
-	WRITE_MEMORY_BY_ADDRESS             = 0x3D // present in Trionic 7
+	WRITE_DATA_BY_ADDRESS               = 0x3D // present in Trionic 7
 	SET_DATA_RATES                      = 0x26
 
 	/* STORED DATA TRANSMISSION FUNCTIONAL UNIT */
@@ -31,7 +31,7 @@ const (
 	INPUT_OUTPUT_CONTROL_BY_LOCAL_IDENTIFIER  = 0x30 // present in Trionic 7
 
 	/* REMOTE ACTIVATION OF ROUTINE FUNCTIONAL UNIT */
-	START_ROUTINE_BY_LOCAL_IDENTIFIER           = 0x31 // present in Trionic 7
+	START_ROUTINE_BY_IDENTIFIER                 = 0x31 // present in Trionic 7
 	START_ROUTINE_BY_ADDRESS                    = 0x38
 	STOP_ROUTINE_BY_LOCAL_IDENTIFIER            = 0x32
 	STOP_ROUTINE_BY_ADDRESS                     = 0x39
@@ -55,4 +55,15 @@ const (
 	DM_DBLI  = 0x01
 	DM_DBMA  = 0x03
 	DM_CDDLI = 0x04
+
+	/* Start Routine by local ID definitions */
+	RLI_DD        = 0x40 /* Define Debug frame contents */
+	RLI_DMC       = 0x41 /* Set operational mode */
+	RLI_RM        = 0x42 /* Read Mode status */
+	RLI_RC        = 0x43 /* Read Debug frame contents */
+	RLI_SYM       = 0x50 /* Setup for symbol table reading */
+	RLI_CHSUM     = 0x51 /* Setup for symbol table checksum */
+	RLI_EOL_START = 0x52 /* Start of EOL programming */
+	RLI_ERASE     = 0x53
+	RLI_END_EOL   = 0x54
 )

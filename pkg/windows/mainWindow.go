@@ -3,10 +3,9 @@ package windows
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
-	"sort"
-	"strings"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -19,17 +18,17 @@ import (
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ecu"
-	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/layout"
+	"github.com/roffe/txlogger/pkg/mainmenu"
+	"github.com/roffe/txlogger/pkg/mapviewerhandler"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
-	"github.com/skratchdot/open-golang/open"
-	sdialog "github.com/sqweek/dialog"
 	"golang.org/x/net/context"
 )
 
 const (
+	prefsLastBinFile = "lastBinFile"
 	prefsLastConfig  = "lastConfig"
 	prefsSelectedECU = "lastECU"
 	prefsSymbolList  = "symbolList"
@@ -39,7 +38,7 @@ type MainWindow struct {
 	fyne.Window
 	app fyne.App
 
-	menu *MainMenu
+	menu *mainmenu.MainMenu
 
 	symbolLookup *xwidget.CompletionEntry
 
@@ -66,81 +65,66 @@ type MainWindow struct {
 	saveConfigBtn *widget.Button
 	presetSelect  *widget.Select
 
-	captureCounter        binding.Int
-	errorCounter          binding.Int
-	errorPerSecondCounter binding.Int
-	freqValue             binding.Float
+	captureCounter binding.Int
+	errorCounter   binding.Int
+	//errorPerSecondCounter binding.Int
+	freqValue binding.Float
 
 	freqSlider *widget.Slider
 
-	capturedCounterLabel     *widget.Label
-	errorCounterLabel        *widget.Label
-	errPerSecondCounterLabel *widget.Label
-	freqValueLabel           *widget.Label
-
-	//sinkManager *sink.Manager
+	capturedCounterLabel *widget.Label
+	errorCounterLabel    *widget.Label
+	//errPerSecondCounterLabel *widget.Label
+	freqValueLabel *widget.Label
 
 	loggingRunning bool
-	//mockRunning    bool
-
-	dlc datalogger.Logger
-	//vars *kwp2000.VarDefinitionList
 
 	symbolList *widgets.SymbolListWidget
+	symbols    symbol.SymbolCollection
 
-	symbols symbol.SymbolCollection
-
+	dlc       datalogger.Logger
 	dashboard *widgets.Dashboard
-	//metricChan chan *model.DashboardMetric
+	mvh       *mapviewerhandler.MapViewerHandler
+
 	buttonsDisabled bool
 
 	leading *fyne.Container
 
-	openMaps map[string]MapViewerWindowInterface
-
-	mvh *MapViewerHandler
+	openMaps map[string]mapviewerhandler.MapViewerWindowInterface
 }
 
-func NewMainWindow(a fyne.App) *MainWindow {
+func NewMainWindow(a fyne.App, filename string) *MainWindow {
 	mw := &MainWindow{
-		Window: a.NewWindow("txlogger"),
-		app:    a,
-		//symbolMap:             make(map[string]*kwp2000.VarDefinition),
-		outputData:            binding.NewStringList(),
-		canSettings:           widgets.NewCanSettingsWidget(a),
-		captureCounter:        binding.NewInt(),
-		errorCounter:          binding.NewInt(),
-		errorPerSecondCounter: binding.NewInt(),
-		freqValue:             binding.NewFloat(),
-		//progressBar:           widget.NewProgressBarInfinite(),
-		//sinkManager:           singMgr,
-		symbolList: widgets.NewSymbolListWidget(),
-		//vars:     widgets.NewSymbolListWidget(),
-		openMaps: make(map[string]MapViewerWindowInterface),
-		mvh:      NewMapViewerHandler(),
+		Window:         a.NewWindow("txlogger"),
+		app:            a,
+		outputData:     binding.NewStringList(),
+		canSettings:    widgets.NewCanSettingsWidget(a),
+		captureCounter: binding.NewInt(),
+		errorCounter:   binding.NewInt(),
+		freqValue:      binding.NewFloat(),
+		symbolList:     widgets.NewSymbolListWidget(),
+		openMaps:       make(map[string]mapviewerhandler.MapViewerWindowInterface),
+		mvh:            mapviewerhandler.New(),
 	}
 
 	mw.setupMenu()
 
 	mw.Window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
-		//log.Println(ev.Name)
 		switch ev.Name {
 		case fyne.KeyF12:
 			capture.Screenshot(mw.Canvas())
 		}
 	})
 
-	/*
-		quitChan := make(chan os.Signal, 2)
-		signal.Notify(quitChan, os.Interrupt, syscall.SIGTERM)
-		go func() {
-			<-quitChan
-			if mw.dlc != nil {
-				mw.dlc.Close()
-			}
-			mw.app.Quit()
-			}()
-	*/
+	quitChan := make(chan os.Signal, 2)
+	signal.Notify(quitChan, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-quitChan
+		if mw.dlc != nil {
+			mw.dlc.Close()
+		}
+		mw.app.Quit()
+	}()
 
 	mw.Window.SetCloseIntercept(func() {
 		mw.SaveSymbolList()
@@ -173,8 +157,6 @@ func NewMainWindow(a fyne.App) *MainWindow {
 		},
 	}
 
-	//mw.progressBar.Stop()
-
 	mw.freqSlider = widget.NewSliderWithData(1, 120, mw.freqValue)
 	mw.freqValue.Set(25)
 
@@ -199,15 +181,6 @@ func NewMainWindow(a fyne.App) *MainWindow {
 		}
 	}))
 
-	mw.errPerSecondCounterLabel = &widget.Label{
-		Alignment: fyne.TextAlignLeading,
-	}
-	mw.errorPerSecondCounter.AddListener(binding.NewDataListener(func() {
-		if val, err := mw.errorPerSecondCounter.Get(); err == nil {
-			mw.errPerSecondCounterLabel.SetText(fmt.Sprintf("Err/s: %d", val))
-		}
-	}))
-
 	mw.freqValueLabel = widget.NewLabel("")
 	mw.freqValue.AddListener(binding.NewDataListener(func() {
 		if val, err := mw.freqValue.Get(); err == nil {
@@ -220,89 +193,15 @@ func NewMainWindow(a fyne.App) *MainWindow {
 		mw.SetMainMenu(mw.menu.GetMenu(s))
 	})
 
-	mw.loadPrefs()
-
-	mw.setTitle("No symbols loaded")
+	mw.loadPrefs(filename)
+	if mw.symbols == nil {
+		mw.setTitle("No symbols loaded")
+	}
 	mw.SetMaster()
 	mw.Resize(fyne.NewSize(1024, 768))
 	mw.SetContent(mw.Render())
 
 	return mw
-}
-
-func (mw *MainWindow) setupMenu() {
-	menus := []*fyne.Menu{
-		fyne.NewMenu("File",
-			fyne.NewMenuItem("Load binary", func() {
-				filename, err := sdialog.File().Filter("Binary file", "bin").Load()
-				if err != nil {
-					if err.Error() == "Cancelled" {
-						return
-					}
-					// dialog.ShowError(err, mw)
-					mw.Log(err.Error())
-					return
-				}
-				if err := mw.LoadSymbolsFromFile(filename); err != nil {
-					// dialog.ShowError(err, mw)
-					mw.Log(err.Error())
-					return
-				}
-				mw.SyncSymbols()
-			}),
-			fyne.NewMenuItem("Play log", func() {
-				filename, err := sdialog.File().Filter("trionic logfile", "t7l", "t8l").SetStartDir("logs").Load()
-				if err != nil {
-					if err.Error() == "Cancelled" {
-						return
-					}
-					// dialog.ShowError(err, mw)
-					mw.Log(err.Error())
-					return
-				}
-
-				onClose := func() {
-					if mw.dlc != nil {
-						mw.dlc.Detach(mw.dashboard)
-					}
-					mw.dashboard = nil
-					mw.SetFullScreen(false)
-					mw.SetContent(mw.Content())
-				}
-				go NewLogPlayer(mw.app, filename, mw.symbols, onClose)
-			}),
-			fyne.NewMenuItem("Open log folder", func() {
-				if _, err := os.Stat("logs"); os.IsNotExist(err) {
-					if err := os.Mkdir("logs", 0755); err != nil {
-						if err != os.ErrExist {
-							mw.Log(fmt.Sprintf("failed to create logs dir: %s", err))
-							return
-						}
-					}
-				}
-
-				if err := open.Run(datalogger.LOGPATH); err != nil {
-					fyne.LogError("Failed to open logs folder", err)
-				}
-			}),
-		),
-	}
-	mw.menu = NewMainMenu(mw, menus, mw.openMap, mw.openMapz)
-}
-
-func (mw *MainWindow) loadPrefs() {
-	if cfg := mw.app.Preferences().String(prefsSymbolList); cfg != "" {
-		mw.LoadConfigFromString(cfg)
-	}
-
-	if ecu := mw.app.Preferences().StringWithFallback(prefsSelectedECU, "T7"); ecu != "" {
-		mw.ecuSelect.SetSelected(ecu)
-	}
-}
-
-func (mw *MainWindow) setTitle(str string) {
-	meta := mw.app.Metadata()
-	mw.SetTitle(fmt.Sprintf("txlogger v%s Build %d - %s", meta.Version, meta.Build, str))
 }
 
 func (mw *MainWindow) Render() *container.Split {
@@ -311,7 +210,6 @@ func (mw *MainWindow) Render() *container.Split {
 			container.NewBorder(
 				nil,
 				nil,
-				//widget.NewLabel("Search"),
 				widget.NewIcon(theme.SearchIcon()),
 				container.NewHBox(
 					mw.addSymbolBtn,
@@ -351,7 +249,6 @@ func (mw *MainWindow) Render() *container.Split {
 				),
 				mw.canSettings,
 				mw.logBtn,
-				//mw.progressBar,
 			),
 			Trailing: &container.Split{
 				Offset:     1,
@@ -362,10 +259,9 @@ func (mw *MainWindow) Render() *container.Split {
 					mw.logplayerBtn,
 					mw.helpBtn,
 					mw.freqSlider,
-					container.NewGridWithColumns(4,
+					container.NewGridWithColumns(3,
 						mw.capturedCounterLabel,
 						mw.errorCounterLabel,
-						mw.errPerSecondCounterLabel,
 						mw.freqValueLabel,
 					),
 				),
@@ -382,54 +278,8 @@ func (mw *MainWindow) Log(s string) {
 	mw.output.ScrollToBottom()
 }
 
-func (mw *MainWindow) SaveSymbolList() {
-	b, err := json.Marshal(mw.symbolList.Symbols())
-	if err != nil {
-		// dialog.ShowError(err, mw)
-		mw.Log(err.Error())
-		return
-	}
-	mw.app.Preferences().SetString(prefsSymbolList, string(b))
-}
-
-func (mw *MainWindow) SaveConfig(filename string) error {
-	b, err := json.Marshal(mw.symbolList.Symbols())
-	if err != nil {
-		return fmt.Errorf("failed to marshal config file: %w", err)
-	}
-	if err := os.WriteFile(filename, b, 0644); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
-	}
-	return nil
-}
-
-func (mw *MainWindow) LoadConfig(filename string) error {
-	b, err := os.ReadFile(filename)
-	if err != nil {
-		return fmt.Errorf("failed to read config file: %w", err)
-	}
-	var cfg []*symbol.Symbol
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		return fmt.Errorf("failed to unmarshal config file: %w", err)
-	}
-	mw.symbolList.LoadSymbols(cfg...)
-	mw.app.Preferences().SetString(prefsSymbolList, string(b))
-	return nil
-}
-
-func (mw *MainWindow) LoadConfigFromString(str string) error {
-	var cfg []*symbol.Symbol
-	if err := json.Unmarshal([]byte(str), &cfg); err != nil {
-		return fmt.Errorf("failed to unmarshal config file: %w", err)
-	}
-	mw.symbolList.LoadSymbols(cfg...)
-	mw.SaveSymbolList()
-	return nil
-}
-
 func (mw *MainWindow) SyncSymbols() {
 	if mw.symbols == nil {
-		// dialog.ShowError(errors.New("Load bin to sync symbols"), mw.Window) //lint:ignore ST1005 ignore error
 		mw.Log("Load bin to sync symbols")
 		return
 	}
@@ -453,10 +303,6 @@ func (mw *MainWindow) SyncSymbols() {
 	mw.Log(fmt.Sprintf("Synced %d / %d symbols", cnt, len(mw.symbolList.Symbols())))
 }
 
-func (mw *MainWindow) Content() fyne.CanvasObject {
-	return mw.Render()
-}
-
 func (mw *MainWindow) Disable() {
 	mw.buttonsDisabled = true
 	mw.addSymbolBtn.Disable()
@@ -468,7 +314,6 @@ func (mw *MainWindow) Disable() {
 	if !mw.loggingRunning {
 		mw.logBtn.Disable()
 	}
-	//	mw.mockBtn.Disable()
 	mw.ecuSelect.Disable()
 	mw.canSettings.Disable()
 	mw.presetSelect.Disable()
@@ -484,7 +329,6 @@ func (mw *MainWindow) Enable() {
 	mw.loadSymbolsEcuBtn.Enable()
 	mw.syncSymbolsBtn.Enable()
 	mw.logBtn.Enable()
-	//	mw.mockBtn.Enable()
 	mw.ecuSelect.Enable()
 	mw.canSettings.Enable()
 	mw.presetSelect.Enable()
@@ -524,160 +368,58 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	if err != nil {
 		return fmt.Errorf("error loading symbols: %w", err)
 	}
-	mw.ecuSelect.SetSelected(ecuType.String())
-	os.WriteFile("symbols.txt", []byte(symbols.Dump()), 0644)
-	mw.symbols = symbols
 	mw.setTitle(filename)
+	mw.app.Preferences().SetString(prefsLastBinFile, filename)
+
+	mw.ecuSelect.SetSelected(ecuType.String())
+
+	mw.symbols = symbols
 	mw.SyncSymbols()
+
+	//os.WriteFile("symbols.txt", []byte(symbols.Dump()), 0644)
 	return nil
 }
 
-func (mw *MainWindow) newOutputList() {
-	mw.output = widget.NewListWithData(
-		mw.outputData,
-		func() fyne.CanvasObject {
-			return &widget.Label{
-				Alignment: fyne.TextAlignLeading,
-				Wrapping:  fyne.TextWrapBreak,
-				TextStyle: fyne.TextStyle{Monospace: true},
-			}
-		},
-		func(item binding.DataItem, obj fyne.CanvasObject) {
-			i := item.(binding.String)
-			txt, err := i.Get()
-			if err != nil {
-				mw.Log(err.Error())
-				return
-			}
-			obj.(*widget.Label).SetText(txt)
-		},
-	)
-}
-
-func (mw *MainWindow) newSymbolnameTypeahead() {
-	mw.symbolLookup = xwidget.NewCompletionEntry([]string{})
-	mw.symbolLookup.PlaceHolder = "Type to search for symbols"
-	// When the use typed text, complete the list.
-	mw.symbolLookup.OnChanged = func(s string) {
-		if mw.symbols == nil {
-			return
-		}
-		// completion start for text length >= 3
-		if len(s) < 3 && s != "*" {
-			mw.symbolLookup.HideCompletion()
-			return
-		}
-		// Get the list of possible completion
-		var results []string
-		for _, sym := range mw.symbols.Symbols() {
-			if strings.Contains(strings.ToLower(sym.Name), strings.ToLower(s)) || s == "*" {
-				results = append(results, sym.Name)
-			}
-		}
-		// no results
-		if len(results) == 0 {
-			mw.symbolLookup.HideCompletion()
-			return
-		}
-		sort.Slice(results, func(i, j int) bool { return strings.ToLower(results[i]) < strings.ToLower(results[j]) })
-
-		// then show them
-		if len(results) > 0 {
-			mw.symbolLookup.SetOptions(results)
-			mw.symbolLookup.ShowCompletion()
-		}
+func (mw *MainWindow) LoadConfig(filename string) error {
+	b, err := os.ReadFile(filename)
+	if err != nil {
+		return fmt.Errorf("failed to read config file: %w", err)
 	}
+	var cfg []*symbol.Symbol
+	if err := json.Unmarshal(b, &cfg); err != nil {
+		return fmt.Errorf("failed to unmarshal config file: %w", err)
+	}
+	mw.symbolList.LoadSymbols(cfg...)
+	mw.app.Preferences().SetString(prefsSymbolList, string(b))
+	return nil
 }
 
-func (mw *MainWindow) openMapz(typ symbol.ECUType, mapNames ...string) {
-	joinedNames := strings.Join(mapNames, "|")
-	mv, found := mw.openMaps[joinedNames]
-	if !found {
-		w := mw.app.NewWindow("Map Viewer - " + strings.Join(mapNames, ", "))
-		//w.SetFixedSize(true)
-		if mw.symbols == nil {
-			mw.Log("No binary loaded")
-			return
-		}
-		view, err := widgets.NewMapViewerMulti(typ, mw.symbols, mapNames...)
-		if err != nil {
-			mw.Log(err.Error())
-			return
-		}
-		mw.openMaps[joinedNames] = mw.newMapViewerWindow(w, view, symbol.Axis{})
+func (mw *MainWindow) LoadConfigFromString(str string) error {
+	var cfg []*symbol.Symbol
+	if err := json.Unmarshal([]byte(str), &cfg); err != nil {
+		return fmt.Errorf("failed to unmarshal config file: %w", err)
+	}
+	mw.symbolList.LoadSymbols(cfg...)
+	mw.SaveSymbolList()
+	return nil
+}
 
-		for _, mv := range view.Children() {
-			mw.mvh.Subscribe(mv.Info().XFrom, mv)
-			mw.mvh.Subscribe(mv.Info().YFrom, mv)
-		}
-
-		w.SetCloseIntercept(func() {
-			log.Println("closing", joinedNames)
-			delete(mw.openMaps, joinedNames)
-			for _, mv := range view.Children() {
-				mw.mvh.Unsubscribe(mv.Info().XFrom, mv)
-				mw.mvh.Unsubscribe(mv.Info().YFrom, mv)
-			}
-
-			w.Close()
-		})
-
-		w.SetContent(view)
-		w.Show()
+func (mw *MainWindow) SaveSymbolList() {
+	b, err := json.Marshal(mw.symbolList.Symbols())
+	if err != nil {
+		mw.Log(err.Error())
 		return
 	}
-	mv.RequestFocus()
+	mw.app.Preferences().SetString(prefsSymbolList, string(b))
 }
 
-func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
-	axis := symbol.GetInfo(typ, mapName)
-	//log.Printf("openMap: %s %s %s", axis.X, axis.Y, axis.Z)
-	mv, found := mw.openMaps[axis.Z]
-	if !found {
-		w := mw.app.NewWindow("Map Viewer - " + axis.Z)
-		//w.SetFixedSize(true)
-		if mw.symbols == nil {
-			mw.Log("No binary loaded")
-			return
-		}
-		xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := mw.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
-		if err != nil {
-			mw.Log(err.Error())
-			return
-		}
-
-		mv, err := widgets.NewMapViewer(
-			widgets.WithXData(xData),
-			widgets.WithYData(yData),
-			widgets.WithZData(zData),
-			widgets.WithXCorrFac(xCorrFac),
-			widgets.WithYCorrFac(yCorrFac),
-			widgets.WithZCorrFac(zCorrFac),
-			widgets.WithXFrom(axis.XFrom),
-			widgets.WithYFrom(axis.YFrom),
-			widgets.WithInterPolFunc(interpolate.Interpolate),
-		)
-		if err != nil {
-			mw.Log(err.Error())
-			return
-		}
-
-		w.Canvas().SetOnTypedKey(mv.TypedKey)
-
-		w.SetCloseIntercept(func() {
-			log.Println("closing", axis.Z)
-			delete(mw.openMaps, axis.Z)
-			mw.mvh.Unsubscribe(axis.XFrom, mv)
-			mw.mvh.Unsubscribe(axis.YFrom, mv)
-
-			w.Close()
-		})
-
-		mw.openMaps[axis.Z] = mw.newMapViewerWindow(w, mv, axis)
-		w.SetContent(mv)
-		w.Show()
-
-		return
+func (mw *MainWindow) SaveConfig(filename string) error {
+	b, err := json.Marshal(mw.symbolList.Symbols())
+	if err != nil {
+		return fmt.Errorf("failed to marshal config file: %w", err)
 	}
-	mv.RequestFocus()
+	if err := os.WriteFile(filename, b, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+	return nil
 }

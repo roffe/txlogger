@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/layout"
@@ -26,29 +27,30 @@ type xyUpdate struct {
 }
 
 type MapViewer struct {
-	tik uint8
-
 	widget.BaseWidget
 
-	//xName, yName, zName string
+	focused    bool
+	updateFunc UpdateFunc
+	loadFunc   LoadFunc
+	saveFunc   SaveFunc
+
+	tik uint8
+
+	xData, yData, zData          []int
 	xValue, yValue               int
 	xCorrFac, yCorrFac, zCorrFac float64
-
-	xFrom, yFrom string
-
+	xFrom, yFrom                 string
 	numColumns, numRows, numData int
-	xData, yData, zData          []int
-
-	content   *fyne.Container
-	innerView *fyne.Container
-	grid      *Grid
-	cursor    *canvas.Rectangle
-	crosshair *canvas.Rectangle
-
-	textValues []*canvas.Text
 
 	xAxisButtons, yAxisButtons *fyne.Container
-	xAxis, yAxis               []*canvas.Text
+	xAxisTexts, yAxisTexts     []*canvas.Text
+
+	content    *fyne.Container
+	innerView  *fyne.Container
+	grid       *Grid
+	cursor     *canvas.Rectangle
+	crosshair  *canvas.Rectangle
+	textValues []*canvas.Text
 
 	ipf interpolate.InterPolFunc
 
@@ -60,18 +62,20 @@ type MapViewer struct {
 	xIdx, yIdx           float64
 	selectedX, SelectedY int
 
+	// Mouse
 	moving        bool
 	selecting     bool
 	selectedCells []int
-
-	focused bool
 }
 
 func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 	mv := &MapViewer{
-		yAxis:   make([]*canvas.Text, 0),
-		xAxis:   make([]*canvas.Text, 0),
-		setChan: make(chan xyUpdate, 10),
+		yAxisTexts: make([]*canvas.Text, 0),
+		xAxisTexts: make([]*canvas.Text, 0),
+		setChan:    make(chan xyUpdate, 10),
+		updateFunc: func(idx, value int) {
+			log.Printf("MapViewer: updateFunc: idx: %d value: %d", idx, value)
+		},
 	}
 	mv.ExtendBaseWidget(mv)
 	for _, option := range options {
@@ -94,6 +98,12 @@ func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 	}()
 
 	return mv, nil
+}
+
+func (mv *MapViewer) SetZ(zData []int) {
+	mv.zData = zData
+	mv.numData = len(zData)
+	mv.Refresh()
 }
 
 func (mv *MapViewer) render() {
@@ -130,20 +140,24 @@ func (mv *MapViewer) render() {
 
 	mv.content = container.NewBorder(
 		mv.xAxisButtons,
-		nil,
-		//container.NewGridWithColumns(2,
-		//	widget.NewButtonWithIcon("Load", theme.DocumentIcon(), func() {
-		//		log.Println("Load")
-		//	}),
-		//	widget.NewButtonWithIcon("Save", theme.DocumentSaveIcon(), func() {
-		//		log.Println("Save")
-		//	}),
-		//),
+		container.NewGridWithColumns(2,
+			widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
+				log.Println("Load")
+				if mv.loadFunc != nil {
+					mv.loadFunc()
+				}
+			}),
+			widget.NewButtonWithIcon("Save", theme.DocumentSaveIcon(), func() {
+				log.Println("Save")
+				if mv.saveFunc != nil {
+					mv.saveFunc()
+				}
+			}),
+		),
 		mv.yAxisButtons,
 		nil,
 		mv.innerView,
 	)
-
 }
 
 func (mv *MapViewer) createXAxis() {
@@ -155,7 +169,7 @@ func (mv *MapViewer) createXAxis() {
 		}
 		for i := 0; i < mv.numColumns; i++ {
 			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.xData[i])*mv.xCorrFac, 'f', prec, 64), TextSize: 13}
-			mv.xAxis = append(mv.xAxis, text)
+			mv.xAxisTexts = append(mv.xAxisTexts, text)
 			mv.xAxisButtons.Add(text)
 		}
 	}
@@ -170,14 +184,21 @@ func (mv *MapViewer) createYAxis() {
 		}
 		for i := mv.numRows - 1; i >= 0; i-- {
 			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.yData[i])*mv.yCorrFac, 'f', prec, 64), TextSize: 13}
-			mv.yAxis = append(mv.yAxis, text)
+			mv.yAxisTexts = append(mv.yAxisTexts, text)
 			mv.yAxisButtons.Add(text)
 		}
 	}
 }
 
 func (mv *MapViewer) Refresh() {
-	log.Println("MapViewer: Refresh")
+	prec := 0
+	if mv.zCorrFac < 1 {
+		prec = 2
+	}
+	for i, tv := range mv.textValues {
+		tv.Text = strconv.FormatFloat(float64(mv.zData[i])*mv.zCorrFac, 'f', prec, 64)
+		tv.Refresh()
+	}
 	mv.valueMap.Image = createImage(mv.xData, mv.yData, mv.zData, mv.zCorrFac)
 	mv.valueMap.Refresh()
 }
@@ -276,6 +297,37 @@ func createImage(xData, yData []int, zData []int, correctionFactor float64) *ima
 
 	// Create a new RGBA image
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	min, max := findMinMax(zData)
+	minCorrected := float64(min) * correctionFactor
+	maxCorrected := float64(max) * correctionFactor
+
+	// Calculate the colors for each cell based on data
+	for y := 0; y < lenY; y++ {
+		for x := 0; x < lenX; x++ {
+			cellStartX := x * cellWidth
+			cellStartY := (lenY - 1 - y) * cellHeight
+
+			index := y*lenX + x
+			value := float64(zData[index]) * correctionFactor
+			color := getColorInterpolation(minCorrected, maxCorrected, value)
+
+			cellRect := image.Rect(cellStartX, cellStartY, cellStartX+cellWidth, cellStartY+cellHeight)
+			draw.Draw(img, cellRect, &image.Uniform{color}, image.Point{0, 0}, draw.Src)
+		}
+	}
+	return img
+}
+
+/*
+func createImage2(xData, yData []int, zData []int, correctionFactor float64) *image.RGBA {
+	lenX := len(xData)
+	lenY := len(yData)
+	width := lenX * cellWidth
+	height := lenY * cellHeight
+
+	// Create a new RGBA image
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
 	min, max := findMinMax(zData)
 	// Calculate the colors for each cell based on data
 	for y := 0; y < lenY; y++ {
@@ -292,6 +344,7 @@ func createImage(xData, yData []int, zData []int, correctionFactor float64) *ima
 	}
 	return img
 }
+*/
 
 func createTextValues(zData []int, corrFac float64) ([]*canvas.Text, *fyne.Container) {
 	var values []*canvas.Text

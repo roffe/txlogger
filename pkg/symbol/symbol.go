@@ -46,15 +46,24 @@ type ECUBinary interface {
 type Symbol struct {
 	Name             string
 	Number           int
+	SramOffset       uint32
 	Address          uint32
 	Length           uint16
 	Mask             uint16
 	Type             uint8
 	ExtendedType     uint8
 	Correctionfactor float64
-	Unit             string
+	Unit             string `json:",omitempty"`
 
 	data []byte
+}
+
+func (s *Symbol) SetData(data []byte) error {
+	if len(data) != int(s.Length) {
+		return fmt.Errorf("Symbol %s expected %d bytes, got %d", s.Name, s.Length, len(data))
+	}
+	s.data = data
+	return nil
 }
 
 func GetValue[V Number](sym *Symbol) V {
@@ -67,7 +76,7 @@ func (s *Symbol) Decode() interface{} {
 		if len(s.data) != 1 {
 			return -1
 		}
-		if s.Type&SIGNED != 0 {
+		if s.Type&SIGNED == SIGNED {
 			return s.Int8()
 		}
 		return s.Uint8()
@@ -75,7 +84,7 @@ func (s *Symbol) Decode() interface{} {
 		if len(s.data) != 2 {
 			return -1
 		}
-		if s.Type&SIGNED != 0 {
+		if s.Type&SIGNED == SIGNED {
 			return s.Int16()
 		}
 		return s.Uint16()
@@ -83,7 +92,7 @@ func (s *Symbol) Decode() interface{} {
 		if len(s.data) != 4 {
 			return -1
 		}
-		if s.Type&SIGNED != 0 {
+		if s.Type&SIGNED == SIGNED {
 			return s.Int32()
 		}
 		return s.Uint32()
@@ -91,7 +100,7 @@ func (s *Symbol) Decode() interface{} {
 		if len(s.data) != 8 {
 			return -1
 		}
-		if s.Type&SIGNED != 0 {
+		if s.Type&SIGNED == SIGNED {
 			return s.Int64()
 		}
 		return s.Uint64()
@@ -104,7 +113,7 @@ func (s *Symbol) Read(r io.Reader) error {
 	symbolData := make([]byte, s.Length)
 	n, err := r.Read(symbolData)
 	if err != nil {
-		return fmt.Errorf("Symbol failed to Read: %w", err)
+		return err
 	}
 	if n != int(s.Length) {
 		return fmt.Errorf("Symbol expected %d bytes, got %d", s.Length, n)
@@ -118,7 +127,7 @@ func (s *Symbol) Bytes() []byte {
 }
 
 func (s *Symbol) String() string {
-	return fmt.Sprintf("%s #%d @%08X type: %02X len: %d", s.Name, s.Number, s.Address, s.Type, s.Length)
+	return fmt.Sprintf("%s #%d @%X $%X type: %02X len: %d", s.Name, s.Number, s.Address, s.SramOffset, s.Type, s.Length)
 }
 
 func (s *Symbol) StringValue() string {
@@ -139,22 +148,16 @@ func (s *Symbol) StringValue() string {
 			result = float64(t) * s.Correctionfactor
 		}
 
-		//var format string
 		var precission int
 		switch {
 		case s.Correctionfactor == 0.1:
-			precission = 1
 		//	format = "%.1f"
 		case s.Correctionfactor == 0.01:
-			//	format = "%.2f"
 			precission = 2
 		case s.Correctionfactor == 0.001:
-			//	format = "%.3f"
 			precission = 3
 		}
 		return strconv.FormatFloat(result, 'f', precission, 64)
-		//return fmt.Sprintf(format, roundFloat(result, precission))
-
 	}
 	return fmt.Sprintf("%v", s.Decode())
 }
@@ -235,60 +238,43 @@ func (s *Symbol) Float64() float64 {
 	}
 }
 
-func (s *Symbol) IntFromData() []int {
-	signed := s.Type&SIGNED == 1
+func (s *Symbol) EncodeInt(input int) []byte {
+	//signed := s.Type&SIGNED == SIGNED
+	//konst := s.Type&KONST == KONST
+	char := s.Type&CHAR == CHAR
+	long := s.Type&LONG == LONG
+	buff := bytes.NewBuffer(nil)
+	switch {
+	case char:
+		binary.Write(buff, binary.BigEndian, uint8(input))
+	case long:
+		binary.Write(buff, binary.BigEndian, uint32(input))
+	default:
+		binary.Write(buff, binary.BigEndian, uint16(input))
+	}
+	return buff.Bytes()
+}
+
+func (s *Symbol) Ints() []int {
+	signed := s.Type&SIGNED == SIGNED
 	konst := s.Type&KONST == KONST
 	char := s.Type&CHAR == CHAR
+	long := s.Type&LONG == LONG
+	log.Printf("Ints From Data %s signed: %t konst: %t char: %t long: %t len: %d: type %X", s.Name, signed, konst, char, long, s.Length, s.Type)
 
-	log.Printf("IntFromData %s signed: %t konst: %t chat: %t len: %d: type %X", s.Name, signed, konst, char, s.Length, s.Type)
-
-	if konst && char {
+	switch {
+	case char && !signed:
 		return s.DataToUint8()
-	}
-
-	if s.Name == "VIOSMAFCal.Q_AirInletTab2" {
-		return s.DataToUint16()
-	}
-
-	if s.Name == "BstKnkCal.MaxAirmass" {
-		return s.DataToInt16()
-	}
-
-	/*
-		if yLen*xLen == int(s.Length) {
-			if signed {
-				return s.DataToInt8()
-			}
-			return s.DataToUint8()
-		}
-
-		if yLen*xLen*2 == int(s.Length/2) {
-			if signed {
-				return s.DataToInt16()
-			}
-			return s.DataToUint16()
-		}
-	*/
-	if !signed && s.Length == 1 {
-		return s.DataToUint8()
-	}
-	if signed && s.Length == 1 {
+	case char && signed:
 		return s.DataToInt8()
-	}
-	if !signed && s.Length == 2 {
+	case !char && !long && !signed:
 		return s.DataToUint16()
-	}
-	if signed && s.Length == 2 {
+	case !char && !long && signed:
 		return s.DataToInt16()
-	}
-	if !signed && (s.Length == 22 || s.Length == 30 || s.Length == 36) {
-		return s.DataToUint16()
-	}
-	if signed && (s.Length == 22 || s.Length == 30 || s.Length == 36) {
-		return s.DataToInt16()
-	}
-	if !signed {
-		return s.DataToUint16()
+	case !char && long && !signed:
+		return s.DataToUint32()
+	case !char && long && signed:
+		return s.DataToInt32()
 	}
 	return s.DataToInt16()
 }
@@ -337,7 +323,37 @@ func (s *Symbol) DataToInt16() []int {
 		value := int16(binary.BigEndian.Uint16(s.data[i*2 : i*2+2]))
 		values[i] = int(value)
 	}
+	return values
+}
 
+func (s *Symbol) DataToUint32() []int {
+	if len(s.data)%4 != 0 {
+		log.Panicf("data length is not even: %d", len(s.data))
+	}
+
+	count := len(s.data) / 4
+	values := make([]int, count)
+
+	for i := 0; i < count; i++ {
+		value := binary.BigEndian.Uint32(s.data[i*4 : i*4+4])
+		values[i] = int(value)
+	}
+
+	return values
+}
+
+func (s *Symbol) DataToInt32() []int {
+	if len(s.data)%4 != 0 {
+		log.Panicf("data length is not even: %d", len(s.data))
+	}
+
+	count := len(s.data) / 4
+	values := make([]int, count)
+
+	for i := 0; i < count; i++ {
+		value := int32(binary.BigEndian.Uint32(s.data[i*4 : i*4+4]))
+		values[i] = int(value)
+	}
 	return values
 }
 
@@ -418,7 +434,7 @@ func bytePatternSearch2(data []byte, search []byte, startOffset int64) int {
 */
 
 // Knuth-Morris-Pratt (KMP) algorithm
-func bytePatternSearch(data []byte, search []byte, startOffset int64) int {
+func BytePatternSearch(data []byte, search []byte, startOffset int64) int {
 	if startOffset < 0 || startOffset >= int64(len(data)) || len(search) == 0 {
 		return -1
 	}

@@ -10,6 +10,7 @@ tmp2
 *.bin
 *.exe
 *.zip
+debug.log
 symbols.txt
 *.o
 lzhuf/lzhuf.dll

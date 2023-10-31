@@ -36,7 +36,7 @@ require (
 	github.com/bendikro/dl v0.0.0-20190410215913-e41fdb9069d4 // indirect
 	github.com/creack/goselect v0.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/fatih/color v1.15.0 // indirect
+	github.com/fatih/color v1.15.0
 	github.com/fredbi/uri v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fyne-io/gl-js v0.0.0-20230506162202-1fdaa286a934 // indirect
@@ -74,7 +74,7 @@ require (
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/tools v0.14.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	honnef.co/go/js/dom v0.0.0-20230808055721-96db8f4d5e3b // indirect
+	honnef.co/go/js/dom v0.0.0-20231030024858-cb489e859d05 // indirect
 )
 
 //replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan

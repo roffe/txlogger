@@ -170,9 +170,9 @@ func (c *DualDial) Value2() float64 {
 }
 
 func (c *DualDial) SetValue(value float64) {
-	if value == c.value {
-		return
-	}
+	//if value == c.value {
+	//	return
+	//}
 	if value > c.max {
 		value = c.max
 	}
@@ -195,9 +195,9 @@ func (c *DualDial) SetValue(value float64) {
 }
 
 func (c *DualDial) SetValue2(value float64) {
-	if value == c.value2 {
-		return
-	}
+	//if value == c.value2 {
+	//	return
+	//}
 	if value > c.max {
 		value = c.max
 	}

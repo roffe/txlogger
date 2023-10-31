@@ -20,6 +20,9 @@ import (
 type T7Client struct {
 	dl Logger
 
+	updateChan chan *RamUpdate
+	readChan   chan *ReadRequest
+
 	quitChan chan struct{}
 	sysvars  *ThreadSafeMap
 
@@ -28,9 +31,11 @@ type T7Client struct {
 
 func NewT7(dl Logger, cfg Config) (Provider, error) {
 	return &T7Client{
-		dl:       dl,
-		quitChan: make(chan struct{}, 2),
-		Config:   cfg,
+		dl:         dl,
+		updateChan: make(chan *RamUpdate, 1),
+		readChan:   make(chan *ReadRequest, 1),
+		quitChan:   make(chan struct{}, 2),
+		Config:     cfg,
 		sysvars: &ThreadSafeMap{
 			values: map[string]string{
 				"ActualIn.n_Engine": "0",   // comes from 0x1A0
@@ -45,6 +50,18 @@ func NewT7(dl Logger, cfg Config) (Provider, error) {
 func (c *T7Client) Close() {
 	close(c.quitChan)
 	time.Sleep(200 * time.Millisecond)
+}
+
+func (c *T7Client) SetRAM(address uint32, data []byte) error {
+	upd := NewRamUpdate(address, data)
+	c.updateChan <- upd
+	return upd.Wait()
+}
+
+func (c *T7Client) GetRAM(address uint32, length uint32) ([]byte, error) {
+	req := NewReadRequest(address, length)
+	c.readChan <- req
+	return req.Data, req.Wait()
 }
 
 func (c *T7Client) Start() error {
@@ -113,7 +130,7 @@ func (c *T7Client) Start() error {
 	c.ErrorCounter.Set(errCount)
 
 	errPerSecond := 0
-	c.ErrorPerSecondCounter.Set(errPerSecond)
+	//c.ErrorPerSecondCounter.Set(errPerSecond)
 
 	//cps := 0
 	retries := 0
@@ -132,12 +149,22 @@ func (c *T7Client) Start() error {
 
 		c.OnMessage("Connected to ECU")
 
+		granted, err := kwp.RequestSecurityAccess(ctx, false)
+		if err != nil {
+			return err
+		}
+
+		if !granted {
+			c.OnMessage("Security access not granted!")
+		} else {
+			c.OnMessage("Security access granted")
+		}
+
 		if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
 			return fmt.Errorf("ClearDynamicallyDefineLocalId: %w", err)
 		}
 
 		for i, v := range c.Symbols {
-			//c.onMessage(fmt.Sprintf("%d %s %s %d %X", i, v.Name, v.Method, v.Value, v.Type))
 			if err := kwp.DynamicallyDefineLocalIdRequest(ctx, i, v); err != nil {
 				return fmt.Errorf("DynamicallyDefineLocalIdRequest: %w", err)
 			}
@@ -147,7 +174,7 @@ func (c *T7Client) Start() error {
 		secondTicker := time.NewTicker(time.Second)
 		defer secondTicker.Stop()
 
-		t := time.NewTicker(time.Second / time.Duration(c.Freq))
+		t := time.NewTicker(time.Second / time.Duration(c.Rate))
 		defer t.Stop()
 
 		errg, gctx := errgroup.WithContext(ctx)
@@ -162,8 +189,8 @@ func (c *T7Client) Start() error {
 				case <-secondTicker.C:
 					//log.Println("cps:", cps)
 					//cps = 0
-					c.ErrorPerSecondCounter.Set(errPerSecond)
-					if errPerSecond > 10 {
+					//c.ErrorPerSecondCounter.Set(errPerSecond)
+					if errPerSecond > 5 {
 						errPerSecond = 0
 						return fmt.Errorf("too many errors")
 					}
@@ -180,6 +207,15 @@ func (c *T7Client) Start() error {
 					return nil
 				case <-gctx.Done():
 					return nil
+				case read := <-c.readChan:
+					data, err := kwp.ReadMemoryByAddress(ctx, int(read.Address), int(read.Length))
+					if err != nil {
+						read.Complete(err)
+					}
+					read.Data = data
+					read.Complete(nil)
+				case upd := <-c.updateChan:
+					upd.Complete(kwp.WriteDataByAddress(ctx, upd.Address, upd.Data))
 				case <-t.C:
 					data, err := kwp.ReadDataByLocalIdentifier(ctx, 0xF0)
 					if err != nil {
@@ -196,6 +232,9 @@ func (c *T7Client) Start() error {
 							errCount++
 							errPerSecond++
 							c.ErrorCounter.Set(errCount)
+							if err == io.EOF {
+								return fmt.Errorf("EOF reading symbol %s", va.Name)
+							}
 							c.OnMessage(err.Error())
 							break
 						}
@@ -220,7 +259,7 @@ func (c *T7Client) Start() error {
 				}
 			}
 		})
-		c.OnMessage(fmt.Sprintf("Live logging at %d fps", c.Freq))
+		c.OnMessage(fmt.Sprintf("Live logging at %d fps", c.Rate))
 		return errg.Wait()
 	},
 		retry.DelayType(retry.FixedDelay),

@@ -1,8 +1,6 @@
 package widgets
 
 import (
-	"log"
-
 	"fyne.io/fyne/v2"
 )
 
@@ -55,12 +53,12 @@ func (vr *MapViewerRenderer) Layout(size fyne.Size) {
 	}
 
 	// Update x and y axes
-	for _, xb := range vr.mv.xAxis {
+	for _, xb := range vr.mv.xAxisTexts {
 		xb.TextSize = textSize
 		xb.Resize(xb.MinSize())
 		xb.Refresh()
 	}
-	for _, yb := range vr.mv.yAxis {
+	for _, yb := range vr.mv.yAxisTexts {
 		yb.TextSize = textSize
 		yb.Resize(yb.MinSize())
 		yb.Refresh()
@@ -96,7 +94,6 @@ func (vr *MapViewerRenderer) MinSize() fyne.Size {
 }
 
 func (vr *MapViewerRenderer) Refresh() {
-	log.Println("Refresh called in MapViewerRenderer")
 }
 
 func (vr *MapViewerRenderer) Destroy() {
