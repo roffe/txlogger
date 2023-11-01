@@ -73,6 +73,7 @@ func (r *ReadRequest) Len() int {
 }
 
 func (r *ReadRequest) Complete(err error) {
+	defer func() { recover() }()
 	select {
 	case r.respChan <- err:
 	default:

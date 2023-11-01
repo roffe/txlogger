@@ -238,6 +238,80 @@ func (s *Symbol) Float64() float64 {
 	}
 }
 
+func (s *Symbol) BytesToInts(data []byte) []int {
+	signed := s.Type&SIGNED == SIGNED
+	char := s.Type&CHAR == CHAR
+	long := s.Type&LONG == LONG
+	var ints []int
+	r := bytes.NewReader(data)
+	switch {
+	case signed && char:
+		// log.Println("int8")
+		x := make([]int8, s.Length)
+		if err := binary.Read(r, binary.BigEndian, &x); err != nil {
+			log.Println(err)
+		}
+		for _, v := range x {
+			ints = append(ints, int(v))
+		}
+	case !signed && char:
+		// log.Println("uint8")
+		x := make([]uint8, s.Length)
+		if err := binary.Read(r, binary.BigEndian, &x); err != nil {
+			log.Println(err)
+		}
+		for _, v := range x {
+			ints = append(ints, int(v))
+		}
+	case signed && !char && !long:
+		// log.Println("int16")
+		x := make([]int16, s.Length/2)
+		if err := binary.Read(r, binary.BigEndian, &x); err != nil {
+			log.Println(err)
+		}
+		for _, v := range x {
+			ints = append(ints, int(v))
+		}
+	case !signed && !char && !long:
+		// log.Println("uint16")
+		x := make([]uint16, s.Length/2)
+		if err := binary.Read(r, binary.BigEndian, &x); err != nil {
+			log.Println(err)
+		}
+		for _, v := range x {
+			ints = append(ints, int(v))
+		}
+	case signed && !char && long:
+		// log.Println("int32")
+		x := make([]uint32, s.Length/4)
+		if err := binary.Read(r, binary.BigEndian, &x); err != nil {
+			log.Println(err)
+		}
+		for _, v := range x {
+			ints = append(ints, int(v))
+		}
+	case !signed && !char && long:
+		// log.Println("uint32")
+		x := make([]uint32, s.Length/4)
+		if err := binary.Read(r, binary.BigEndian, &x); err != nil {
+			log.Println(err)
+		}
+		for _, v := range x {
+			ints = append(ints, int(v))
+		}
+	default:
+		// log.Println("uint16")
+		x := make([]uint16, s.Length/2)
+		if err := binary.Read(r, binary.BigEndian, &x); err != nil {
+			log.Println(err)
+		}
+		for _, v := range x {
+			ints = append(ints, int(v))
+		}
+	}
+	return ints
+}
+
 func (s *Symbol) EncodeInt(input int) []byte {
 	//signed := s.Type&SIGNED == SIGNED
 	//konst := s.Type&KONST == KONST
@@ -245,9 +319,11 @@ func (s *Symbol) EncodeInt(input int) []byte {
 	long := s.Type&LONG == LONG
 	buff := bytes.NewBuffer(nil)
 	switch {
-	case char:
+	case char && !long:
 		binary.Write(buff, binary.BigEndian, uint8(input))
-	case long:
+	case !char && !long:
+		binary.Write(buff, binary.BigEndian, uint16(input))
+	case long && !char:
 		binary.Write(buff, binary.BigEndian, uint32(input))
 	default:
 		binary.Write(buff, binary.BigEndian, uint16(input))

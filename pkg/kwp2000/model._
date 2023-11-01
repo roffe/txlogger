@@ -1,0 +1,21 @@
+package kwp2000
+
+type Method int
+
+const (
+	VAR_METHOD_ADDRESS Method = iota
+	VAR_METHOD_LOCID
+	VAR_METHOD_SYMBOL
+)
+
+func (m Method) String() string {
+	switch m {
+	case VAR_METHOD_ADDRESS:
+		return "Address"
+	case VAR_METHOD_LOCID:
+		return "Locid"
+	case VAR_METHOD_SYMBOL:
+		return "Symbol"
+	}
+	return "Unknown"
+}

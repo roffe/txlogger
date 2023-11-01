@@ -1,8 +1,6 @@
 package windows
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"log"
 	"os"
@@ -170,10 +168,6 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 		var mv *widgets.MapViewer
 
-		signed := symZ.Type&symbol.SIGNED == symbol.SIGNED
-		char := symZ.Type&symbol.CHAR == symbol.CHAR
-		long := symZ.Type&symbol.LONG == symbol.LONG
-
 		loadFunc := func() {
 			start := time.Now()
 			if mw.dlc != nil {
@@ -182,65 +176,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 					dialog.ShowError(err, w)
 					return
 				}
-				var ints []int
-				r := bytes.NewReader(data)
-
-				switch {
-				case signed && char:
-					log.Println("int8")
-					x := make([]int8, symZ.Length)
-					if err := binary.Read(r, binary.BigEndian, &x); err != nil {
-						log.Println(err)
-					}
-					for _, v := range x {
-						ints = append(ints, int(v))
-					}
-				case !signed && char:
-					log.Println("uint8")
-					x := make([]uint8, symZ.Length)
-					if err := binary.Read(r, binary.BigEndian, &x); err != nil {
-						log.Println(err)
-					}
-					for _, v := range x {
-						ints = append(ints, int(v))
-					}
-				case signed && !char && !long:
-					log.Println("int16")
-					x := make([]int16, symZ.Length/2)
-					if err := binary.Read(r, binary.BigEndian, &x); err != nil {
-						log.Println(err)
-					}
-					for _, v := range x {
-						ints = append(ints, int(v))
-					}
-				case !signed && !char && !long:
-					log.Println("uint16")
-					x := make([]uint16, symZ.Length/2)
-					if err := binary.Read(r, binary.BigEndian, &x); err != nil {
-						log.Println(err)
-					}
-					for _, v := range x {
-						ints = append(ints, int(v))
-					}
-				case signed && !char && long:
-					log.Println("int32")
-					x := make([]uint32, symZ.Length/4)
-					if err := binary.Read(r, binary.BigEndian, &x); err != nil {
-						log.Println(err)
-					}
-					for _, v := range x {
-						ints = append(ints, int(v))
-					}
-				case !signed && !char && long:
-					log.Println("uint32")
-					x := make([]uint32, symZ.Length/4)
-					if err := binary.Read(r, binary.BigEndian, &x); err != nil {
-						log.Println(err)
-					}
-					for _, v := range x {
-						ints = append(ints, int(v))
-					}
-				}
+				ints := symZ.BytesToInts(data)
 				mv.SetZ(ints)
 			}
 			log.Printf("get %s took %s", axis.Z, time.Since(start))

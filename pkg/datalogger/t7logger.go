@@ -166,7 +166,7 @@ func (c *T7Client) Start() error {
 
 		for i, v := range c.Symbols {
 			if err := kwp.DynamicallyDefineLocalIdRequest(ctx, i, v); err != nil {
-				return fmt.Errorf("DynamicallyDefineLocalIdRequest: %w", err)
+				return err
 			}
 			time.Sleep(5 * time.Millisecond)
 		}
@@ -217,7 +217,7 @@ func (c *T7Client) Start() error {
 				case upd := <-c.updateChan:
 					upd.Complete(kwp.WriteDataByAddress(ctx, upd.Address, upd.Data))
 				case <-t.C:
-					data, err := kwp.ReadDataByLocalIdentifier(ctx, 0xF0)
+					data, err := kwp.ReadDataByIdentifier(ctx, 0xF0)
 					if err != nil {
 						errCount++
 						errPerSecond++
@@ -269,6 +269,7 @@ func (c *T7Client) Start() error {
 			retries++
 			c.OnMessage(fmt.Sprintf("Retry %d: %v", n, err))
 		}),
+		retry.LastErrorOnly(true),
 	)
 	return err
 }
