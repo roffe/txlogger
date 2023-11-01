@@ -1,5 +1,5 @@
 # txlogger
-![Windows Build](https://github.com/roffe/txlogger/actions/workflows/windows-release.yml/badge.svg)
+![Windows Build](https://github.com/roffe/txlogger/actions/workflows/windows-release.yml/badge.svg) ![Develop](https://github.com/roffe/txlogger/actions/workflows/windows.yml/badge.svg)
 
 Blazing fast data logging for Trionic 7 & 8 ECU's found in Saab 9-5 & 9-3
 
