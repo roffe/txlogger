@@ -71,8 +71,24 @@ func (s *SymbolListWidget) render() {
 func (s *SymbolListWidget) SetValue(name string, value float64) {
 	val, found := s.entryMap[name]
 	if found {
-		val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 2, 64))
-		return
+		f := val.symbol.Correctionfactor
+		switch f {
+		case 1:
+			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 0, 64))
+			return
+		case 0.1:
+			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 1, 64))
+			return
+		case 0.01:
+			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 2, 64))
+			return
+		case 0.001:
+			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 3, 64))
+			return
+		default:
+			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 2, 64))
+			return
+		}
 	}
 }
 

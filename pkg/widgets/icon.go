@@ -26,10 +26,8 @@ func NewIcon(cfg *IconConfig) *Icon {
 	ic := &Icon{
 		cfg: cfg,
 	}
-
 	cfg.Image.FillMode = canvas.ImageFillContain
 	cfg.Image.SetMinSize(cfg.Minsize)
-
 	ic.render()
 	return ic
 }
@@ -50,7 +48,9 @@ func (ic *Icon) SetText(text string) {
 }
 
 func (ic *Icon) CreateRenderer() fyne.WidgetRenderer {
-	return &CanSettingsWidgetRenderer{}
+	return &IconRenderer{
+		ic: ic,
+	}
 }
 
 type IconRenderer struct {

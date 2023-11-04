@@ -88,7 +88,7 @@ func WithLoadFunc(loadFunc LoadFunc) MapViewerOption {
 	}
 }
 
-type SaveFunc func()
+type SaveFunc func([]int)
 
 func WithSaveFunc(saveFunc SaveFunc) MapViewerOption {
 	return func(mv *MapViewer) error {

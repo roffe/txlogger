@@ -7,6 +7,7 @@ import (
 	"image/draw"
 	"log"
 	"strconv"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -24,6 +25,12 @@ const (
 
 type xyUpdate struct {
 	x, y int
+}
+
+type MapViewerInfo struct {
+	XName, YName, ZName string
+	XLen, YLen, ZLen    int
+	XFrom, YFrom        string
 }
 
 type MapViewer struct {
@@ -66,6 +73,10 @@ type MapViewer struct {
 	moving        bool
 	selecting     bool
 	selectedCells []int
+
+	// Keyboard
+	inputBuffer   strings.Builder
+	restoreValues bool
 }
 
 func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
@@ -98,119 +109,6 @@ func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 	}()
 
 	return mv, nil
-}
-
-func (mv *MapViewer) SetZ(zData []int) {
-	mv.zData = zData
-	mv.numData = len(zData)
-	mv.Refresh()
-}
-
-func (mv *MapViewer) render() {
-	// y must be created before x as it's width is used to calculate x's offset
-	mv.createYAxis()
-	mv.createXAxis()
-
-	mv.crosshair = NewRectangle(color.RGBA{0xfc, 0x4a, 0xFA, 235}, 4)
-
-	mv.cursor = NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 235}, 4)
-	mv.selectedX = -1
-	mv.cursor.Resize(fyne.NewSize(1, 1))
-	mv.textValues, mv.valueTexts = createTextValues(mv.zData, mv.zCorrFac)
-
-	width := float32(mv.numColumns * cellWidth)
-	height := float32(mv.numRows * cellHeight)
-
-	mv.valueMap = canvas.NewImageFromImage(createImage(mv.xData, mv.yData, mv.zData, mv.zCorrFac))
-	mv.valueMap.ScaleMode = canvas.ImageScalePixels
-	mv.valueMap.SetMinSize(fyne.NewSize(width, height))
-	//mv.valueMap.Resize(fyne.NewSize(width, height))
-
-	mv.grid = NewGrid(mv.numColumns, mv.numRows)
-
-	mv.innerView = container.NewStack(
-		mv.valueMap,
-		container.NewWithoutLayout(
-			mv.crosshair,
-			mv.cursor,
-		),
-		mv.grid,
-		mv.valueTexts,
-	)
-
-	mv.content = container.NewBorder(
-		mv.xAxisButtons,
-		container.NewGridWithColumns(2,
-			widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
-				log.Println("Load")
-				if mv.loadFunc != nil {
-					mv.loadFunc()
-				}
-			}),
-			widget.NewButtonWithIcon("Save", theme.DocumentSaveIcon(), func() {
-				log.Println("Save")
-				if mv.saveFunc != nil {
-					mv.saveFunc()
-				}
-			}),
-		),
-		mv.yAxisButtons,
-		nil,
-		mv.innerView,
-	)
-}
-
-func (mv *MapViewer) createXAxis() {
-	mv.xAxisButtons = container.New(&layout.Horizontal{Offset: mv.yAxisButtons})
-	if mv.numColumns > 1 {
-		prec := 0
-		if mv.xCorrFac < 1 {
-			prec = 2
-		}
-		for i := 0; i < mv.numColumns; i++ {
-			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.xData[i])*mv.xCorrFac, 'f', prec, 64), TextSize: 13}
-			mv.xAxisTexts = append(mv.xAxisTexts, text)
-			mv.xAxisButtons.Add(text)
-		}
-	}
-}
-
-func (mv *MapViewer) createYAxis() {
-	mv.yAxisButtons = container.New(&layout.Vertical{})
-	if mv.numRows > 1 {
-		prec := 0
-		if mv.yCorrFac < 1 {
-			prec = 2
-		}
-		for i := mv.numRows - 1; i >= 0; i-- {
-			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.yData[i])*mv.yCorrFac, 'f', prec, 64), TextSize: 13}
-			mv.yAxisTexts = append(mv.yAxisTexts, text)
-			mv.yAxisButtons.Add(text)
-		}
-	}
-}
-
-func (mv *MapViewer) Refresh() {
-	prec := 0
-	if mv.zCorrFac < 1 {
-		prec = 2
-	}
-	for i, tv := range mv.textValues {
-		tv.Text = strconv.FormatFloat(float64(mv.zData[i])*mv.zCorrFac, 'f', prec, 64)
-		tv.Refresh()
-	}
-	mv.valueMap.Image = createImage(mv.xData, mv.yData, mv.zData, mv.zCorrFac)
-	mv.valueMap.Refresh()
-}
-
-func (mv *MapViewer) Close() {
-	close(mv.setChan)
-}
-
-type MapViewerInfo struct {
-	XName, YName, ZName string
-	XLen, YLen, ZLen    int
-	XFrom, YFrom        string
 }
 
 func (mv *MapViewer) Info() MapViewerInfo {
@@ -248,6 +146,115 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 
 		}
 		mv.tik = 0
+	}
+}
+
+func (mv *MapViewer) SetZ(zData []int) {
+	mv.zData = zData
+	mv.numData = len(zData)
+	mv.Refresh()
+}
+
+func (mv *MapViewer) Refresh() {
+	prec := 0
+	if mv.zCorrFac < 1 {
+		prec = 2
+	}
+	for i, tv := range mv.textValues {
+		tv.Text = strconv.FormatFloat(float64(mv.zData[i])*mv.zCorrFac, 'f', prec, 64)
+		tv.Refresh()
+	}
+	mv.valueMap.Image = createImage(mv.xData, mv.yData, mv.zData, mv.zCorrFac)
+	mv.valueMap.Refresh()
+}
+
+func (mv *MapViewer) Close() {
+	close(mv.setChan)
+}
+
+func (mv *MapViewer) render() {
+	// y must be created before x as it's width is used to calculate x's offset
+	mv.createYAxis()
+	mv.createXAxis()
+
+	mv.crosshair = NewRectangle(color.RGBA{0xfc, 0x4a, 0xFA, 235}, 4)
+
+	mv.cursor = NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 235}, 4)
+	mv.selectedX = -1
+	mv.cursor.Resize(fyne.NewSize(1, 1))
+	mv.textValues, mv.valueTexts = createTextValues(mv.zData, mv.zCorrFac)
+
+	width := float32(mv.numColumns * cellWidth)
+	height := float32(mv.numRows * cellHeight)
+
+	mv.valueMap = canvas.NewImageFromImage(createImage(mv.xData, mv.yData, mv.zData, mv.zCorrFac))
+	mv.valueMap.ScaleMode = canvas.ImageScalePixels
+	mv.valueMap.SetMinSize(fyne.NewSize(width, height))
+	//mv.valueMap.Resize(fyne.NewSize(width, height))
+
+	mv.grid = NewGrid(mv.numColumns, mv.numRows)
+
+	mv.innerView = container.NewStack(
+		mv.valueMap,
+		container.NewWithoutLayout(
+			mv.crosshair,
+			mv.cursor,
+		),
+		mv.grid,
+		mv.valueTexts,
+	)
+
+	mv.content = container.NewBorder(
+		mv.xAxisButtons,
+		container.NewGridWithColumns(4,
+			widget.NewButtonWithIcon("Load from File", theme.DocumentIcon(), func() {
+			}),
+			widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
+				if mv.loadFunc != nil {
+					mv.loadFunc()
+				}
+			}),
+			widget.NewButtonWithIcon("Save to File", theme.DocumentSaveIcon(), func() {
+			}),
+			widget.NewButtonWithIcon("Save to ECU", theme.DocumentSaveIcon(), func() {
+				if mv.saveFunc != nil {
+					mv.saveFunc(mv.zData)
+				}
+			}),
+		),
+		mv.yAxisButtons,
+		nil,
+		mv.innerView,
+	)
+}
+
+func (mv *MapViewer) createXAxis() {
+	mv.xAxisButtons = container.New(&layout.Horizontal{Offset: mv.yAxisButtons})
+	if mv.numColumns > 1 {
+		prec := 0
+		if mv.xCorrFac < 1 {
+			prec = 2
+		}
+		for i := 0; i < mv.numColumns; i++ {
+			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.xData[i])*mv.xCorrFac, 'f', prec, 64), TextSize: 13}
+			mv.xAxisTexts = append(mv.xAxisTexts, text)
+			mv.xAxisButtons.Add(text)
+		}
+	}
+}
+
+func (mv *MapViewer) createYAxis() {
+	mv.yAxisButtons = container.New(&layout.Vertical{})
+	if mv.numRows > 1 {
+		prec := 0
+		if mv.yCorrFac < 1 {
+			prec = 2
+		}
+		for i := mv.numRows - 1; i >= 0; i-- {
+			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.yData[i])*mv.yCorrFac, 'f', prec, 64), TextSize: 13}
+			mv.yAxisTexts = append(mv.yAxisTexts, text)
+			mv.yAxisButtons.Add(text)
+		}
 	}
 }
 

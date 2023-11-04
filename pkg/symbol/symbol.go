@@ -3,17 +3,12 @@ package symbol
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
-
-	"github.com/roffe/txlogger/pkg/blowfish"
-	"github.com/roffe/txlogger/pkg/lzhuf"
 )
 
 type Number interface {
@@ -58,55 +53,42 @@ type Symbol struct {
 	data []byte
 }
 
+func LoadSymbols(filename string, cb func(string)) (ECUType, SymbolCollection, error) {
+	// check so filename is under 2mb
+	fi, err := os.Stat(filename)
+	if err != nil {
+		return -1, nil, err
+	}
+	if fi.Size() > 2*1024*1024 {
+		return -1, nil, fmt.Errorf("file too large: %d", fi.Size())
+	}
+
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return -1, nil, err
+	}
+
+	cb(fmt.Sprintf("Loading %s", filepath.Base(filename)))
+
+	if err := ValidateTrionic7File(data); err == nil {
+		sym, err := LoadT7Symbols(data, cb)
+		return ECU_T7, sym, err
+	}
+
+	if err := ValidateTrionic8File(data); err == nil {
+		sym, err := LoadT8Symbols(data, cb)
+		return ECU_T8, sym, err
+	}
+
+	return -1, nil, fmt.Errorf("unknown file format: %s", filename)
+}
+
 func (s *Symbol) SetData(data []byte) error {
 	if len(data) != int(s.Length) {
 		return fmt.Errorf("Symbol %s expected %d bytes, got %d", s.Name, s.Length, len(data))
 	}
 	s.data = data
 	return nil
-}
-
-func GetValue[V Number](sym *Symbol) V {
-	return sym.Decode().(V)
-}
-
-func (s *Symbol) Decode() interface{} {
-	switch {
-	case s.Length == 1:
-		if len(s.data) != 1 {
-			return -1
-		}
-		if s.Type&SIGNED == SIGNED {
-			return s.Int8()
-		}
-		return s.Uint8()
-	case s.Length == 2:
-		if len(s.data) != 2 {
-			return -1
-		}
-		if s.Type&SIGNED == SIGNED {
-			return s.Int16()
-		}
-		return s.Uint16()
-	case s.Length == 4:
-		if len(s.data) != 4 {
-			return -1
-		}
-		if s.Type&SIGNED == SIGNED {
-			return s.Int32()
-		}
-		return s.Uint32()
-	case s.Length == 8:
-		if len(s.data) != 8 {
-			return -1
-		}
-		if s.Type&SIGNED == SIGNED {
-			return s.Int64()
-		}
-		return s.Uint64()
-	default:
-		return -1
-	}
 }
 
 func (s *Symbol) Read(r io.Reader) error {
@@ -122,6 +104,39 @@ func (s *Symbol) Read(r io.Reader) error {
 	return nil
 }
 
+/*
+	func (s *Symbol) Decode() interface{} {
+		switch {
+		case s.Length == 1:
+			if len(s.data) != 1 {
+				return -1
+			}
+			if s.Type&SIGNED == SIGNED {
+				return s.Int8()
+			}
+			return s.Uint8()
+		case s.Length == 2:
+			if len(s.data) != 2 {
+				return -1
+			}
+			if s.Type&SIGNED == SIGNED {
+				return s.Int16()
+			}
+			return s.Uint16()
+		case s.Length == 4:
+			if len(s.data) != 4 {
+				return -1
+			}
+			if s.Type&SIGNED == SIGNED {
+				return s.Int32()
+			}
+			return s.Uint32()
+		default:
+			return -1
+		}
+	}
+*/
+
 func (s *Symbol) Bytes() []byte {
 	return s.data
 }
@@ -130,36 +145,23 @@ func (s *Symbol) String() string {
 	return fmt.Sprintf("%s #%d @%X $%X type: %02X len: %d", s.Name, s.Number, s.Address, s.SramOffset, s.Type, s.Length)
 }
 
-func (s *Symbol) StringValue() string {
-	if s.Correctionfactor != 1 {
-		var result float64
-		switch t := s.Decode().(type) {
-		case int8:
-			result = float64(t) * s.Correctionfactor
-		case uint8:
-			result = float64(t) * s.Correctionfactor
-		case int16:
-			result = float64(t) * s.Correctionfactor
-		case uint16:
-			result = float64(t) * s.Correctionfactor
-		case int32:
-			result = float64(t) * s.Correctionfactor
-		case uint32:
-			result = float64(t) * s.Correctionfactor
-		}
-
-		var precission int
-		switch {
-		case s.Correctionfactor == 0.1:
-		//	format = "%.1f"
-		case s.Correctionfactor == 0.01:
-			precission = 2
-		case s.Correctionfactor == 0.001:
-			precission = 3
-		}
-		return strconv.FormatFloat(result, 'f', precission, 64)
+func toValueString[N Number](number N, correctionfactor float64) string {
+	var precission int
+	switch {
+	case correctionfactor == 0.1:
+		precission = 1
+	case correctionfactor == 0.01:
+		precission = 2
+	case correctionfactor == 0.001:
+		precission = 3
+	default:
+		precission = 0
 	}
-	return fmt.Sprintf("%v", s.Decode())
+	return strconv.FormatFloat(float64(number)*correctionfactor, 'f', precission, 64)
+}
+
+func (s *Symbol) StringValue() string {
+	return toValueString(s.Float64(), s.Correctionfactor)
 }
 
 func (s *Symbol) Bool() bool {
@@ -317,18 +319,37 @@ func (s *Symbol) EncodeInt(input int) []byte {
 	//konst := s.Type&KONST == KONST
 	char := s.Type&CHAR == CHAR
 	long := s.Type&LONG == LONG
-	buff := bytes.NewBuffer(nil)
 	switch {
 	case char && !long:
-		binary.Write(buff, binary.BigEndian, uint8(input))
+		return []byte{byte(input)}
 	case !char && !long:
-		binary.Write(buff, binary.BigEndian, uint16(input))
+		return []byte{byte(input >> 8), byte(input)}
 	case long && !char:
-		binary.Write(buff, binary.BigEndian, uint32(input))
+		return []byte{byte(input >> 24), byte(input >> 16), byte(input >> 8), byte(input)}
 	default:
-		binary.Write(buff, binary.BigEndian, uint16(input))
+		return []byte{byte(input >> 8), byte(input)}
 	}
-	return buff.Bytes()
+}
+
+func (s *Symbol) EncodeInts(input []int) []byte {
+	//signed := s.Type&SIGNED == SIGNED
+	//konst := s.Type&KONST == KONST
+	char := s.Type&CHAR == CHAR
+	long := s.Type&LONG == LONG
+	buf := bytes.NewBuffer(nil)
+	for _, v := range input {
+		switch {
+		case char && !long:
+			buf.Write([]byte{byte(v)})
+		case !char && !long:
+			buf.Write([]byte{byte(v >> 8), byte(v)})
+		case long && !char:
+			buf.Write([]byte{byte(v >> 24), byte(v >> 16), byte(v >> 8), byte(v)})
+		default:
+			buf.Write([]byte{byte(v >> 8), byte(v)})
+		}
+	}
+	return buf.Bytes()
 }
 
 func (s *Symbol) Ints() []int {
@@ -340,174 +361,84 @@ func (s *Symbol) Ints() []int {
 
 	switch {
 	case char && !signed:
-		return s.DataToUint8()
+		return s.Uint8s()
 	case char && signed:
-		return s.DataToInt8()
+		return s.Int8s()
 	case !char && !long && !signed:
-		return s.DataToUint16()
+		return s.Uint16s()
 	case !char && !long && signed:
-		return s.DataToInt16()
+		return s.Int16s()
 	case !char && long && !signed:
-		return s.DataToUint32()
+		return s.Uint32s()
 	case !char && long && signed:
-		return s.DataToInt32()
+		return s.Int32s()
 	}
-	return s.DataToInt16()
+	return s.Int16s()
 }
 
-func (s *Symbol) DataToInt8() []int {
-	values := make([]int, len(s.data))
-	for i, b := range s.data {
-		values[i] = int(int8(b))
-	}
-	return values
-}
-
-func (s *Symbol) DataToUint8() []int {
-	values := make([]int, len(s.data))
-	for i, b := range s.data {
-		values[i] = int(b)
+func (s *Symbol) Int8s() []int {
+	values := make([]int, 0, len(s.data))
+	for _, b := range s.data {
+		values = append(values, int(int8(b)))
 	}
 	return values
 }
 
-func (s *Symbol) DataToUint16() []int {
+func (s *Symbol) Uint8s() []int {
+	values := make([]int, 0, len(s.data))
+	for _, b := range s.data {
+		values = append(values, int(b))
+	}
+	return values
+}
+
+func (s *Symbol) Uint16s() []int {
 	if len(s.data)%2 != 0 {
 		log.Panicf("data length is not even: %d", len(s.data))
 	}
-
-	count := len(s.data) / 2
-	values := make([]int, count)
-
-	for i := 0; i < count; i++ {
-		value := binary.BigEndian.Uint16(s.data[i*2 : i*2+2])
-		values[i] = int(value)
+	values := make([]int, 0, len(s.data)/2)
+	for i := 0; i < len(s.data); i += 2 {
+		value := binary.BigEndian.Uint16(s.data[i : i+2])
+		values = append(values, int(value))
 	}
-
 	return values
 }
 
-func (s *Symbol) DataToInt16() []int {
+func (s *Symbol) Int16s() []int {
 	if len(s.data)%2 != 0 {
 		log.Panicf("data length is not even: %d", len(s.data))
 	}
-
-	count := len(s.data) / 2
-	values := make([]int, count)
-
-	for i := 0; i < count; i++ {
-		value := int16(binary.BigEndian.Uint16(s.data[i*2 : i*2+2]))
-		values[i] = int(value)
+	values := make([]int, 0, len(s.data)/2)
+	for i := 0; i < len(s.data); i += 2 {
+		value := int16(binary.BigEndian.Uint16(s.data[i : i+2]))
+		values = append(values, int(value))
 	}
 	return values
 }
 
-func (s *Symbol) DataToUint32() []int {
+func (s *Symbol) Uint32s() []int {
 	if len(s.data)%4 != 0 {
 		log.Panicf("data length is not even: %d", len(s.data))
 	}
-
-	count := len(s.data) / 4
-	values := make([]int, count)
-
-	for i := 0; i < count; i++ {
-		value := binary.BigEndian.Uint32(s.data[i*4 : i*4+4])
-		values[i] = int(value)
+	values := make([]int, 0, len(s.data)/4)
+	for i := 0; i < len(s.data); i += 4 {
+		value := binary.BigEndian.Uint32(s.data[i : i+4])
+		values = append(values, int(value))
 	}
-
 	return values
 }
 
-func (s *Symbol) DataToInt32() []int {
+func (s *Symbol) Int32s() []int {
 	if len(s.data)%4 != 0 {
 		log.Panicf("data length is not even: %d", len(s.data))
 	}
-
-	count := len(s.data) / 4
-	values := make([]int, count)
-
-	for i := 0; i < count; i++ {
-		value := int32(binary.BigEndian.Uint32(s.data[i*4 : i*4+4]))
-		values[i] = int(value)
+	values := make([]int, 0, len(s.data)/4)
+	for i := 0; i < len(s.data); i += 4 {
+		value := int32(binary.BigEndian.Uint32(s.data[i : i+4]))
+		values = append(values, int(value))
 	}
 	return values
 }
-
-func LoadSymbols(filename string, cb func(string)) (ECUType, SymbolCollection, error) {
-	// check so filename is under 2mb
-	fi, err := os.Stat(filename)
-	if err != nil {
-		return -1, nil, err
-	}
-	if fi.Size() > 2*1024*1024 {
-		return -1, nil, fmt.Errorf("file too large: %d", fi.Size())
-	}
-
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return -1, nil, err
-	}
-
-	cb(fmt.Sprintf("Loading %s", filepath.Base(filename)))
-
-	if err := ValidateTrionic7File(data); err == nil {
-		sym, err := LoadT7Symbols(data, cb)
-		return ECU_T7, sym, err
-	}
-
-	if err := ValidateTrionic8File(data); err == nil {
-		sym, err := LoadT8Symbols(data, cb)
-		return ECU_T8, sym, err
-	}
-
-	return -1, nil, fmt.Errorf("unknown file format: %s", filename)
-}
-
-func ExpandCompressedSymbolNames(in []byte) ([]string, error) {
-	if len(in) < 0x1000 {
-		return nil, errors.New("invalid symbol table size")
-	}
-	//os.WriteFile("compressedSymbolTable.bin", in, 0644)
-	if bytes.HasPrefix(in, []byte{0xF1, 0x1A, 0x06, 0x5B, 0xA2, 0x6B, 0xCC, 0x6F}) {
-		return blowfish.DecryptSymbolNames(in)
-	}
-
-	expandedFileSize := int(in[0]) | (int(in[1]) << 8) | (int(in[2]) << 16) | (int(in[3]) << 24)
-
-	if expandedFileSize == -1 {
-		return nil, errors.New("invalid expanded file size")
-	}
-
-	out := make([]byte, expandedFileSize)
-
-	returnedSize := lzhuf.Decode(in, out)
-
-	if returnedSize != expandedFileSize {
-		return nil, fmt.Errorf("decoded data size missmatch: %d != %d", returnedSize, expandedFileSize)
-	}
-
-	return strings.Split(strings.TrimSuffix(string(out), "\r\n"), "\r\n"), nil
-}
-
-/*
-func bytePatternSearch2(data []byte, search []byte, startOffset int64) int {
-	if startOffset < 0 || startOffset >= int64(len(data)) {
-		return -1
-	}
-	ix := 0
-	for i := startOffset; i < int64(len(data)); i++ {
-		if search[ix] == data[i] {
-			ix++
-			if ix == len(search) {
-				return int(i - int64(ix) + 1)
-			}
-		} else {
-			ix = 0
-		}
-	}
-	return -1
-}
-*/
 
 // Knuth-Morris-Pratt (KMP) algorithm
 func BytePatternSearch(data []byte, search []byte, startOffset int64) int {

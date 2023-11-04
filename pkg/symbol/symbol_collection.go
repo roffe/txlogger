@@ -88,25 +88,30 @@ func (c *Collection) Dump() string {
 func (c *Collection) GetXYZ(xAxis, yAxis, zAxis string) ([]int, []int, []int, float64, float64, float64, error) {
 	symx, symy, symz := c.GetByName(xAxis), c.GetByName(yAxis), c.GetByName(zAxis)
 	if symz == nil {
-		return nil, nil, nil, 0, 0, 0, fmt.Errorf("failed to find %s", zAxis)
+		return nil, nil, nil, 0, 0, 0, fmt.Errorf("%s not found", zAxis)
 	}
 
 	var xOut, yOut []int
-
 	zOut := symz.Ints()
 	xFac, yFac := 1.0, 1.0
-	if xAxis == "" {
+	if symx == nil {
 		xOut = []int{0}
-	} else if xAxis != "" && symx != nil {
+	} else {
 		xOut = symx.Ints()
 		xFac = symx.Correctionfactor
 	}
-	if yAxis == "" {
-		yOut = make([]int, len(zOut))
-	} else if yAxis != "" && symy != nil {
+
+	if symy == nil {
+		if symx == nil {
+			yOut = make([]int, len(zOut))
+		} else {
+			yOut = []int{0}
+		}
+	} else {
 		yOut = symy.Ints()
 		yFac = symy.Correctionfactor
 	}
+
 	if len(xOut) >= 1 || len(yOut) >= 1 {
 		return xOut, yOut, zOut, xFac, yFac, symz.Correctionfactor, nil
 	}

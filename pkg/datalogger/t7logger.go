@@ -256,6 +256,7 @@ func (c *T7Client) Start() error {
 					if count%10 == 0 {
 						c.CaptureCounter.Set(count)
 					}
+
 				}
 			}
 		})

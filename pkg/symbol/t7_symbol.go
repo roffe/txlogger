@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 
@@ -281,6 +282,8 @@ func binaryPacked(data []byte, cb func(string)) (SymbolCollection, error) {
 
 	var symb_count int
 	var symbols []*Symbol
+
+	os.WriteFile("adresstable.bin", data[addressTableOffset:], 0644)
 
 	// parse addresstable and create symbols with generic names
 	for pos := addressTableOffset; pos < len(data)+10; pos += 10 {

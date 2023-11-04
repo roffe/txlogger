@@ -9,27 +9,15 @@ require (
 	github.com/roffe/gocan v0.0.0-20230923211524-653f77516da0
 	github.com/sqweek/dialog v0.0.0-20220809060634-e981b270ebbf
 	go.bug.st/serial v1.6.1
-)
-
-require (
 	github.com/avast/retry-go/v4 v4.5.0
 	github.com/yeka/zip v0.0.0-20180914125537-d046722c6feb
-)
-
-require (
-	fyne.io/x/fyne v0.0.0-20231020065621-89b4a4aea27d
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
-)
-
-require (
+	fyne.io/x/fyne v0.0.0-20231020065621-89b4a4aea27d
 	github.com/go-text/render v0.0.0-20230619120952-35bccb6164b8 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/rogpeppe/go-internal v1.8.0 // indirect
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
-)
-
-require (
 	fyne.io/systray v1.10.1-0.20230722100817-88df1e0ffa9a // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
@@ -43,8 +31,8 @@ require (
 	github.com/fyne-io/glfw-js v0.0.0-20220517201726-bebc2019cd33 // indirect
 	github.com/fyne-io/image v0.0.0-20230811065323-ed435dc8bca6 // indirect
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71 // indirect
-	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20221017161538-93cebf72946b // indirect
-	github.com/go-text/typesetting v0.0.0-20231013144250-6cc35dbfae7d // indirect
+	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20231102141658-eca20e8abded // indirect
+	github.com/go-text/typesetting v0.0.0-20231101082850-a36c1d9288f6 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect

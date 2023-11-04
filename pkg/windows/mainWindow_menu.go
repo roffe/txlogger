@@ -1,8 +1,8 @@
 package windows
 
 import (
+	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -18,6 +18,8 @@ import (
 	"github.com/skratchdot/open-golang/open"
 	sdialog "github.com/sqweek/dialog"
 )
+
+const chunkSize = 128
 
 func (mw *MainWindow) setupMenu() {
 	menus := []*fyne.Menu{
@@ -69,7 +71,6 @@ func (mw *MainWindow) setupMenu() {
 						}
 					}
 				}
-
 				if err := open.Run(datalogger.LOGPATH); err != nil {
 					fyne.LogError("Failed to open logs folder", err)
 				}
@@ -154,23 +155,21 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 		symZ := mw.symbols.GetByName(axis.Z)
 
-		log.Println("symZ", symZ)
+		var mv *widgets.MapViewer
+
 		updateFunc := func(idx, value int) {
-			buff := symZ.EncodeInt(value)
 			if mw.dlc != nil {
+				buff := symZ.EncodeInt(value)
 				start := time.Now()
 				if err := mw.dlc.SetRAM(symZ.Address+uint32(idx*len(buff)), buff); err != nil {
 					mw.Log(err.Error())
 				}
-				log.Printf("set %s idx: %d value: %d took %s", axis.Z, idx, value, time.Since(start))
+				mw.Log(fmt.Sprintf("set %s idx: %d took %s", axis.Z, idx, time.Since(start)))
 			}
 		}
-
-		var mv *widgets.MapViewer
-
 		loadFunc := func() {
-			start := time.Now()
 			if mw.dlc != nil {
+				start := time.Now()
 				data, err := mw.dlc.GetRAM(symZ.Address, uint32(symZ.Length))
 				if err != nil {
 					dialog.ShowError(err, w)
@@ -178,12 +177,33 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 				}
 				ints := symZ.BytesToInts(data)
 				mv.SetZ(ints)
+				mw.Log(fmt.Sprintf("load %s took %s", axis.Z, time.Since(start)))
 			}
-			log.Printf("get %s took %s", axis.Z, time.Since(start))
 		}
 
-		saveFunc := func() {
-			log.Println("saveFunc")
+		saveFunc := func(data []int) {
+			if mw.dlc == nil {
+				return
+			}
+			start := time.Now()
+			buff := bytes.NewBuffer(symZ.EncodeInts(data))
+			startPos := symZ.Address
+			for buff.Len() > 0 {
+				if buff.Len() > chunkSize {
+					if err := mw.dlc.SetRAM(startPos, buff.Next(chunkSize)); err != nil {
+						mw.Log(err.Error())
+						return
+					}
+				} else {
+					if err := mw.dlc.SetRAM(startPos, buff.Bytes()); err != nil {
+						mw.Log(err.Error())
+						return
+					}
+					buff.Reset()
+				}
+				startPos += chunkSize
+			}
+			mw.Log(fmt.Sprintf("save %s took %s", axis.Z, time.Since(start)))
 		}
 
 		mv, err = widgets.NewMapViewer(
@@ -216,12 +236,12 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 		mw.openMaps[axis.Z] = mw.newMapViewerWindow(w, mv, axis)
 		w.SetContent(mv)
-		w.Show()
-
 		// if we are online, try to load the map from ECU
 		if mw.dlc != nil {
 			go func() { loadFunc() }()
 		}
+
+		w.Show()
 		return
 	}
 	mv.RequestFocus()

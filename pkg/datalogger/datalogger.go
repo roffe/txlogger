@@ -160,6 +160,11 @@ func New(cfg Config) (Logger, error) {
 }
 
 func (d *Client) Start() error {
+	//fyne.CurrentApp().SendNotification(&fyne.Notification{
+	//	Title:   "txlogger",
+	//	Content: fmt.Sprintf("Connecting to %s", d.cfg.Device.Name()),
+	//})
+
 	return d.p.Start()
 }
 

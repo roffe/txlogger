@@ -43,8 +43,9 @@ func (mw *MainWindow) newOutputList() {
 		func() fyne.CanvasObject {
 			return &widget.Label{
 				Alignment: fyne.TextAlignLeading,
-				Wrapping:  fyne.TextWrapBreak,
 				TextStyle: fyne.TextStyle{Monospace: true},
+				//Wrapping:   fyne.TextWrapBreak,
+				Truncation: fyne.TextTruncateEllipsis,
 			}
 		},
 		func(item binding.DataItem, obj fyne.CanvasObject) {
@@ -54,7 +55,12 @@ func (mw *MainWindow) newOutputList() {
 				mw.Log(err.Error())
 				return
 			}
+
+			//l := obj.(*container.Scroll)
+			//l.Content.(*widget.Label).SetText(txt)
+
 			obj.(*widget.Label).SetText(txt)
+
 		},
 	)
 }
