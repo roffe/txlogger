@@ -229,7 +229,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 	lp.slider.Max = float64(logz.Len())
 	lp.posLabel.SetText("0.0%")
 	lp.slider.Refresh()
-	lp.PlayLog(lp.currLine, logz, lp.controlChan, w)
+	go lp.PlayLog(lp.currLine, logz, lp.controlChan, w)
 
 	return lp
 }

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	//	_ "net/http/pprof"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
@@ -20,6 +22,11 @@ import (
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
+	//go func() {
+	//	if err := http.ListenAndServe(":8080", nil); err != nil {
+	//		log.Println(err)
+	//	}
+	//}()
 }
 
 func main() {

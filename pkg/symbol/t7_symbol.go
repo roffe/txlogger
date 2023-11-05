@@ -96,7 +96,7 @@ func ValidateTrionic7File(data []byte) error {
 	return nil
 }
 
-func NewFromT7Bytes(data []byte, symb_count int) *Symbol {
+func NewFromT7Bytes(data []byte, symbol_number int) *Symbol {
 	extractUint32 := func(data []byte, start int) uint32 {
 		return uint32(data[start])<<24 | uint32(data[start+1])<<16 | uint32(data[start+2])<<8 | uint32(data[start+3])
 	}
@@ -108,7 +108,7 @@ func NewFromT7Bytes(data []byte, symb_count int) *Symbol {
 	internall_address := extractUint32(data, 0)
 
 	symbol_length := uint16(0x08)
-	if symb_count != 0 {
+	if symbol_number != 0 {
 		symbol_length = extractUint16(data, 4)
 	}
 
@@ -117,8 +117,8 @@ func NewFromT7Bytes(data []byte, symb_count int) *Symbol {
 	symbol_type := data[8]
 
 	return &Symbol{
-		Name:    "Symbol-" + strconv.Itoa(symb_count),
-		Number:  symb_count,
+		Name:    "Symbol-" + strconv.Itoa(symbol_number),
+		Number:  symbol_number,
 		Address: internall_address,
 		Length:  symbol_length,
 		Mask:    symbol_mask,

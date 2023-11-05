@@ -39,7 +39,6 @@ type Config struct {
 	OnMessage      func(string)
 	CaptureCounter binding.Int
 	ErrorCounter   binding.Int
-	//ErrorPerSecondCounter binding.Int
 }
 
 type Client struct {

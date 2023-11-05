@@ -161,7 +161,7 @@ func (c *T7Client) Start() error {
 		}
 
 		if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
-			return fmt.Errorf("ClearDynamicallyDefineLocalId: %w", err)
+			return err
 		}
 
 		for i, v := range c.Symbols {

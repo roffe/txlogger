@@ -1,6 +1,9 @@
 package widgets
 
-import "github.com/roffe/txlogger/pkg/interpolate"
+import (
+	"github.com/roffe/txlogger/pkg/interpolate"
+	"github.com/roffe/txlogger/pkg/symbol"
+)
 
 type MapViewerOption func(*MapViewer) error
 
@@ -70,7 +73,7 @@ func WithInterPolFunc(ipf interpolate.InterPolFunc) MapViewerOption {
 	}
 }
 
-type UpdateFunc func(idx, value int)
+type UpdateFunc func(idx int, value []int)
 
 func WithUpdateFunc(updateFunc UpdateFunc) MapViewerOption {
 	return func(mv *MapViewer) error {
@@ -93,6 +96,13 @@ type SaveFunc func([]int)
 func WithSaveFunc(saveFunc SaveFunc) MapViewerOption {
 	return func(mv *MapViewer) error {
 		mv.saveFunc = saveFunc
+		return nil
+	}
+}
+
+func WithSymbol(symbol *symbol.Symbol) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.symbol = symbol
 		return nil
 	}
 }

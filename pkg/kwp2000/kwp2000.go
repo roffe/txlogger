@@ -42,7 +42,7 @@ func New(c *gocan.Client /*canID uint32, recvID ...uint32*/) *Client {
 		c: c,
 		//canID:          canID,
 		//recvID:         recvID,
-		defaultTimeout: 40 * time.Millisecond,
+		defaultTimeout: 60 * time.Millisecond,
 	}
 }
 
@@ -308,7 +308,7 @@ func (t *Client) RequestTransferExit(ctx context.Context) error {
 func (t *Client) ClearDynamicallyDefineLocalId(ctx context.Context) error {
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER, DM_CDDLI}, gocan.ResponseRequired)
 	//	log.Println(frame.String())
-	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout*2, t.responseID)
 	if err != nil {
 		return fmt.Errorf("DynamicallyClearDefineLocalId: %w", err)
 	}
@@ -366,7 +366,7 @@ func (t *Client) RequestSecurityAccess(ctx context.Context, force bool) (bool, e
 		}
 	}
 
-	return false, errors.New("RequestSecurityAccess: access was not granted")
+	return false, retry.Unrecoverable(fmt.Errorf("RequestSecurityAccess: access was not granted"))
 }
 
 func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
@@ -376,8 +376,12 @@ func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 	f, err := t.c.SendAndPoll(ctx, gocan.NewFrame(REQ_MSG_ID, msg, gocan.ResponseRequired), t.defaultTimeout, t.responseID)
 	if err != nil {
 		return false, fmt.Errorf("request seed: %v", err)
-
 	}
+
+	if err := checkErr(f); err != nil {
+		return false, err
+	}
+
 	d := f.Data()
 	t.Ack(d[0], gocan.ResponseRequired)
 
@@ -387,7 +391,9 @@ func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 	msgReply[5] = byte(int(k) >> 8 & int(0xFF))
 	msgReply[6] = byte(k) & 0xFF
 
-	f2, err := t.c.SendAndPoll(ctx, gocan.NewFrame(REQ_MSG_ID, msgReply, gocan.ResponseRequired), t.defaultTimeout, t.responseID)
+	time.Sleep(10 * time.Millisecond)
+
+	f2, err := t.c.SendAndPoll(ctx, gocan.NewFrame(REQ_MSG_ID, msgReply, gocan.ResponseRequired), t.defaultTimeout*2, t.responseID)
 	if err != nil {
 		return false, fmt.Errorf("send seed: %v", err)
 

@@ -75,6 +75,9 @@ func (mw *MainWindow) setupMenu() {
 					fyne.LogError("Failed to open logs folder", err)
 				}
 			}),
+			fyne.NewMenuItem("Settings", func() {
+				mw.Window.SetContent(mw.settings)
+			}),
 		),
 	}
 	mw.menu = mainmenu.New(mw, menus, mw.openMap, mw.openMapz)
@@ -157,16 +160,24 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 		var mv *widgets.MapViewer
 
-		updateFunc := func(idx, value int) {
-			if mw.dlc != nil {
-				buff := symZ.EncodeInt(value)
+		updateFunc := func(idx int, value []int) {
+			if mw.dlc != nil && mw.settings.GetAutoSave() {
+				buff := bytes.NewBuffer([]byte{})
+				var dataLen int
+				for i, val := range value {
+					buff.Write(symZ.EncodeInt(val))
+					if i == 0 {
+						dataLen = buff.Len()
+					}
+				}
 				start := time.Now()
-				if err := mw.dlc.SetRAM(symZ.Address+uint32(idx*len(buff)), buff); err != nil {
+				if err := mw.dlc.SetRAM(symZ.Address+uint32(idx*dataLen), buff.Bytes()); err != nil {
 					mw.Log(err.Error())
 				}
 				mw.Log(fmt.Sprintf("set %s idx: %d took %s", axis.Z, idx, time.Since(start)))
 			}
 		}
+
 		loadFunc := func() {
 			if mw.dlc != nil {
 				start := time.Now()
@@ -207,6 +218,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		}
 
 		mv, err = widgets.NewMapViewer(
+			widgets.WithSymbol(symZ),
 			widgets.WithXData(xData),
 			widgets.WithYData(yData),
 			widgets.WithZData(zData),
@@ -237,7 +249,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		mw.openMaps[axis.Z] = mw.newMapViewerWindow(w, mv, axis)
 		w.SetContent(mv)
 		// if we are online, try to load the map from ECU
-		if mw.dlc != nil {
+		if mw.dlc != nil && mw.settings.GetAutoLoad() {
 			go func() { loadFunc() }()
 		}
 

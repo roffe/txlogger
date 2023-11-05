@@ -36,7 +36,10 @@ type Horizontal struct {
 }
 
 func (l *Horizontal) Layout(objects []fyne.CanvasObject, size fyne.Size) {
-	offset := l.Offset.Size().Width
+	var offset float32
+	if l.Offset != nil {
+		offset = l.Offset.Size().Width
+	}
 	width := (size.Width - offset) / float32(len(objects))
 	for i, o := range objects {
 		o.Resize(fyne.NewSize(o.MinSize().Width, o.MinSize().Height))
@@ -45,7 +48,10 @@ func (l *Horizontal) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 }
 
 func (l *Horizontal) MinSize(objects []fyne.CanvasObject) fyne.Size {
-	offset := l.Offset.Size().Width
+	var offset float32
+	if l.Offset != nil {
+		offset = l.Offset.Size().Width
+	}
 	var width, height int
 	for _, o := range objects {
 		width += int(o.MinSize().Width)

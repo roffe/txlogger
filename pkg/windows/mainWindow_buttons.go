@@ -113,12 +113,17 @@ func (mw *MainWindow) createButtons() {
 			mw.dashboard = nil
 			mw.SetFullScreen(false)
 			mw.SetContent(mw.Render())
+			mw.SetCloseIntercept(mw.closeIntercept)
 		}
 
 		mw.dashboard = widgets.NewDashboard(mw.app, mw, false, mw.logBtn, onClose)
 		if mw.dlc != nil {
 			mw.dlc.Attach(mw.dashboard)
 		}
+
+		mw.SetCloseIntercept(func() {
+			onClose()
+		})
 
 		mw.SetContent(mw.dashboard)
 	})
@@ -164,6 +169,18 @@ func (mw *MainWindow) createButtons() {
 		}
 		mw.startLogging()
 	})
+	mw.settingsBtn = mw.newSettingsBtn()
+}
+
+func (mw *MainWindow) newSettingsBtn() *widget.Button {
+	btn := widget.NewButtonWithIcon("Settings", theme.SettingsIcon(), func() {
+		mw.SetContent(mw.settings)
+		mw.SetCloseIntercept(func() {
+			mw.SetCloseIntercept(mw.closeIntercept)
+			mw.SetContent(mw.Render())
+		})
+	})
+	return btn
 }
 
 func (mw *MainWindow) startLogging() {
@@ -185,6 +202,11 @@ func (mw *MainWindow) startLogging() {
 	mw.logBtn.SetText("Stop logging")
 	mw.Disable()
 
+	if mw.settings.GetLivePreview() {
+		// Attach our symbol list message handler
+		mw.dlc.Attach(mw.symbolList)
+	}
+
 	if mw.dashboard != nil {
 		// Attach our dashboard message handler
 		mw.dlc.Attach(mw.dashboard)
@@ -192,9 +214,6 @@ func (mw *MainWindow) startLogging() {
 
 	// Attach our mapview message handler
 	mw.dlc.Attach(mw.mvh)
-
-	// Attach our symbol list message handler
-	mw.dlc.Attach(mw.symbolList)
 
 	go mw.logDaemon()
 }
@@ -204,7 +223,7 @@ func (mw *MainWindow) newDataLogger(device gocan.Adapter) (datalogger.Logger, er
 		ECU:            mw.ecuSelect.Selected,
 		Device:         device,
 		Symbols:        mw.symbolList.Symbols(),
-		Rate:           int(mw.freqSlider.Value),
+		Rate:           mw.settings.GetFreq(),
 		OnMessage:      mw.Log,
 		CaptureCounter: mw.captureCounter,
 		ErrorCounter:   mw.errorCounter,

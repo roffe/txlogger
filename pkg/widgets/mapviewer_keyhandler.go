@@ -15,15 +15,6 @@ func (mv *MapViewer) TypedRune(r rune) {
 	log.Println("TypedRune", string(r))
 }
 
-func (mv *MapViewer) SetCellText(idx int, value int) {
-	prec := 0
-	if mv.zCorrFac < 1 {
-		prec = 2
-	}
-	mv.textValues[idx].Text = strconv.FormatFloat(float64(value)*mv.zCorrFac, 'f', prec, 64)
-	mv.textValues[idx].Refresh()
-}
-
 func (mv *MapViewer) restoreSelectedValues() {
 	if mv.restoreValues {
 		mv.inputBuffer.Reset()
@@ -105,7 +96,7 @@ func (mv *MapViewer) paste() {
 		mv.zData[index] = value
 		mv.SetCellText(index, value)
 		if len(split) < 30 {
-			mv.updateFunc(index, mv.zData[index])
+			mv.updateFunc(index, []int{mv.zData[index]})
 		}
 	}
 	if len(split) >= 30 {
@@ -178,9 +169,8 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 					mv.zData[cell] = num
 				}
 			}
-			mv.SetCellText(cell, mv.zData[cell])
-			mv.updateFunc(cell, mv.zData[cell])
 		}
+		mv.updateCells()
 		mv.Refresh()
 		mv.restoreValues = false
 		mv.inputBuffer.Reset()
@@ -188,41 +178,25 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 		for _, cell := range mv.selectedCells {
 			mv.zData[cell] += int((mv.zCorrFac * 10) * (1.0 / mv.zCorrFac))
 		}
-		if mv.updateFunc != nil {
-			for _, cell := range mv.selectedCells {
-				mv.updateFunc(cell, mv.zData[cell])
-			}
-		}
+		mv.updateCells()
 		refresh = true
 	case fyne.KeyPageDown, "X":
 		for _, cell := range mv.selectedCells {
 			mv.zData[cell] -= int((mv.zCorrFac * 10) * (1.0 / mv.zCorrFac))
 		}
-		if mv.updateFunc != nil {
-			for _, cell := range mv.selectedCells {
-				mv.updateFunc(cell, mv.zData[cell])
-			}
-		}
+		mv.updateCells()
 		refresh = true
 	case "+", "A":
 		for _, cell := range mv.selectedCells {
 			mv.zData[cell] += int(mv.zCorrFac * (1.0 / mv.zCorrFac))
 		}
-		if mv.updateFunc != nil {
-			for _, cell := range mv.selectedCells {
-				mv.updateFunc(cell, mv.zData[cell])
-			}
-		}
+		mv.updateCells()
 		refresh = true
 	case "-", "Z":
 		for _, cell := range mv.selectedCells {
 			mv.zData[cell] -= int(mv.zCorrFac * (1.0 / mv.zCorrFac))
 		}
-		if mv.updateFunc != nil {
-			for _, cell := range mv.selectedCells {
-				mv.updateFunc(cell, mv.zData[cell])
-			}
-		}
+		mv.updateCells()
 		refresh = true
 	case "Up":
 
@@ -279,4 +253,64 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 		}
 		mv.Refresh()
 	}
+}
+
+func (mv *MapViewer) updateCells() {
+	var updates []updateBlock
+
+	slices.Sort(mv.selectedCells)
+	for _, cell := range mv.selectedCells {
+		data := mv.zData[cell]
+
+		// if first, add the first entry
+		if len(updates) == 0 {
+			updates = append(updates, updateBlock{cell, cell, []int{data}})
+			continue
+		}
+
+		last := updates[len(updates)-1]
+
+		if cell-1 == last.end {
+			last.end = cell
+			last.data = append(last.data, data)
+			updates[len(updates)-1] = last
+			continue
+		}
+
+		updates = append(updates, updateBlock{cell, cell, []int{data}})
+	}
+
+	for _, update := range updates {
+		log.Println("update", update.idx, update.end, update.data)
+
+		if update.end-update.idx <= 244 {
+			if mv.updateFunc != nil {
+				mv.updateFunc(update.idx, update.data)
+			}
+		} else {
+			if mv.saveFunc != nil {
+				mv.saveFunc(mv.zData)
+				break
+			}
+		}
+	}
+	/*
+		if mv.updateFunc != nil {
+			if len(mv.selectedCells) <= 20 {
+				for _, cell := range mv.selectedCells {
+					mv.updateFunc(cell, []int{mv.zData[cell]})
+				}
+				return
+			}
+			if mv.saveFunc != nil {
+				mv.saveFunc(mv.zData)
+			}
+		}
+	*/
+}
+
+type updateBlock struct {
+	idx  int
+	end  int
+	data []int
 }

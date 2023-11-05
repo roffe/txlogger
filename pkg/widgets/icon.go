@@ -37,8 +37,7 @@ func (ic *Icon) render() {
 	ic.text.TextSize = 25
 	ic.text.TextStyle.Monospace = true
 	ic.text.Alignment = fyne.TextAlignLeading
-	c := container.NewWithoutLayout(ic.cfg.Image, ic.text)
-	ic.container = c
+	ic.container = container.NewWithoutLayout(ic.cfg.Image, ic.text)
 }
 
 func (ic *Icon) SetText(text string) {

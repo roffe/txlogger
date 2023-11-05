@@ -55,7 +55,6 @@ type Dashboard struct {
 
 	onClose func()
 
-	//metricsChan chan *model.ashboardMetric
 	metrics map[string]func(float64)
 
 	logplayer bool
@@ -204,10 +203,7 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 	db.limpMode.FillMode = canvas.ImageFillContain
 	db.limpMode.SetMinSize(fyne.NewSize(110, 85))
 	db.limpMode.Resize(fyne.NewSize(110, 85))
-
 	db.container = db.render()
-
-	//db.knockIcon.Hide()
 
 	return db
 }
@@ -285,7 +281,9 @@ func (db *Dashboard) SetValue(key string, value float64) {
 	}()
 
 	if fun, ok := db.metrics[key]; ok {
-		fun(value)
+		if fun != nil {
+			fun(value)
+		}
 	}
 
 	/*

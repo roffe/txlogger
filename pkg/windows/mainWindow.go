@@ -60,6 +60,7 @@ type MainWindow struct {
 
 	logplayerBtn *widget.Button
 	helpBtn      *widget.Button
+	settingsBtn  *widget.Button
 
 	loadConfigBtn *widget.Button
 	saveConfigBtn *widget.Button
@@ -67,15 +68,9 @@ type MainWindow struct {
 
 	captureCounter binding.Int
 	errorCounter   binding.Int
-	//errorPerSecondCounter binding.Int
-	freqValue binding.Float
-
-	freqSlider *widget.Slider
 
 	capturedCounterLabel *widget.Label
 	errorCounterLabel    *widget.Label
-	//errPerSecondCounterLabel *widget.Label
-	freqValueLabel *widget.Label
 
 	loggingRunning bool
 
@@ -90,6 +85,8 @@ type MainWindow struct {
 
 	leading *fyne.Container
 
+	settings *widgets.SettingsWidget
+
 	openMaps map[string]mapviewerhandler.MapViewerWindowInterface
 }
 
@@ -101,10 +98,15 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		canSettings:    widgets.NewCanSettingsWidget(a),
 		captureCounter: binding.NewInt(),
 		errorCounter:   binding.NewInt(),
-		freqValue:      binding.NewFloat(),
 		symbolList:     widgets.NewSymbolListWidget(),
 		openMaps:       make(map[string]mapviewerhandler.MapViewerWindowInterface),
 		mvh:            mapviewerhandler.New(),
+		settings:       widgets.NewSettingsWidget(),
+	}
+
+	mw.settings.OnClose = func() {
+		mw.SetCloseIntercept(mw.closeIntercept)
+		mw.SetContent(mw.Render())
 	}
 
 	mw.setupMenu()
@@ -126,14 +128,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		mw.app.Quit()
 	}()
 
-	mw.Window.SetCloseIntercept(func() {
-		mw.SaveSymbolList()
-		debug.Close()
-		if mw.dlc != nil {
-			mw.dlc.Close()
-		}
-		mw.Close()
-	})
+	mw.Window.SetCloseIntercept(mw.closeIntercept)
 
 	mw.createButtons()
 
@@ -157,9 +152,6 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		},
 	}
 
-	mw.freqSlider = widget.NewSliderWithData(1, 120, mw.freqValue)
-	mw.freqValue.Set(25)
-
 	mw.newOutputList()
 	mw.newSymbolnameTypeahead()
 
@@ -181,13 +173,6 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		}
 	}))
 
-	mw.freqValueLabel = widget.NewLabel("")
-	mw.freqValue.AddListener(binding.NewDataListener(func() {
-		if val, err := mw.freqValue.Get(); err == nil {
-			mw.freqValueLabel.SetText(fmt.Sprintf("Freq: %0.f", val))
-		}
-	}))
-
 	mw.ecuSelect = widget.NewSelect([]string{"T7", "T8"}, func(s string) {
 		mw.app.Preferences().SetString(prefsSelectedECU, s)
 		mw.SetMainMenu(mw.menu.GetMenu(s))
@@ -197,14 +182,22 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 	if mw.symbols == nil {
 		mw.setTitle("No symbols loaded")
 	}
+
 	mw.SetMaster()
 	mw.Resize(fyne.NewSize(1024, 768))
 	mw.SetContent(mw.Render())
-
 	return mw
 }
+func (mw *MainWindow) closeIntercept() {
+	mw.SaveSymbolList()
+	debug.Close()
+	if mw.dlc != nil {
+		mw.dlc.Close()
+	}
+	mw.Close()
+}
 
-func (mw *MainWindow) Render() *container.Split {
+func (mw *MainWindow) createLeading() {
 	mw.leading = container.NewBorder(
 		container.NewVBox(
 			container.NewBorder(
@@ -231,7 +224,10 @@ func (mw *MainWindow) Render() *container.Split {
 		nil,
 		mw.symbolList,
 	)
+}
 
+func (mw *MainWindow) Render() *container.Split {
+	mw.createLeading()
 	return &container.Split{
 		Offset:     0.7,
 		Horizontal: true,
@@ -258,11 +254,10 @@ func (mw *MainWindow) Render() *container.Split {
 					mw.dashboardBtn,
 					mw.logplayerBtn,
 					mw.helpBtn,
-					mw.freqSlider,
-					container.NewGridWithColumns(3,
+					mw.settingsBtn,
+					container.NewGridWithColumns(2,
 						mw.capturedCounterLabel,
 						mw.errorCounterLabel,
-						mw.freqValueLabel,
 					),
 				),
 			},
