@@ -239,6 +239,8 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 		w.Canvas().SetOnTypedKey(mv.TypedKey)
 
+		mw.openMaps[axis.Z] = mw.newMapViewerWindow(w, mv, axis)
+
 		w.SetCloseIntercept(func() {
 			delete(mw.openMaps, axis.Z)
 			mw.mvh.Unsubscribe(axis.XFrom, mv)
@@ -246,13 +248,12 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			w.Close()
 		})
 
-		mw.openMaps[axis.Z] = mw.newMapViewerWindow(w, mv, axis)
-		w.SetContent(mv)
 		// if we are online, try to load the map from ECU
 		if mw.dlc != nil && mw.settings.GetAutoLoad() {
 			go func() { loadFunc() }()
 		}
 
+		w.SetContent(mv)
 		w.Show()
 		return
 	}

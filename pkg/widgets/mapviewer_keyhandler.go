@@ -36,6 +36,10 @@ func (mv *MapViewer) TypedShortcut(shortcut fyne.Shortcut) {
 
 }
 
+const (
+	copyPasteSeparator = "~"
+)
+
 func (mv *MapViewer) copy() {
 	var copyString strings.Builder
 	slices.Sort(mv.selectedCells)
@@ -50,19 +54,23 @@ func (mv *MapViewer) copy() {
 				x += 200
 			}
 		}
-		copyString.WriteString(fmt.Sprintf("%d:%d:%d:~", x, y, mv.zData[cell]))
+		copyString.WriteString(fmt.Sprintf("%d:%d:%d:"+copyPasteSeparator, x, y, mv.zData[cell]))
 	}
 	fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(copyString.String())
 }
 
 func (mv *MapViewer) paste() {
 	cb := fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().Content()
-	split := strings.Split(cb, "~")
+	split := strings.Split(cb, copyPasteSeparator)
 	for i, part := range split {
 		if len(part) < 3 {
 			continue
 		}
 		pp := strings.Split(part, ":")
+
+		if len(pp) < 3 {
+			continue
+		}
 
 		x, err := strconv.Atoi(pp[0])
 		if err != nil {
@@ -72,7 +80,7 @@ func (mv *MapViewer) paste() {
 
 		if i == 0 && x >= 200 {
 			x -= 200
-		} else if x >= 20 {
+		} else if i == 0 && x >= 20 {
 			x -= 20
 		}
 
@@ -94,24 +102,47 @@ func (mv *MapViewer) paste() {
 			continue
 		}
 		mv.zData[index] = value
-		mv.SetCellText(index, value)
 		if len(split) < 30 {
 			mv.updateFunc(index, []int{mv.zData[index]})
 		}
 	}
 	if len(split) >= 30 {
 		mv.saveFunc(mv.zData)
+	}
+	mv.Refresh()
+}
+
+func (mv *MapViewer) smooth() {
+	values := make([]int, len(mv.selectedCells))
+
+	for i, idx := range mv.selectedCells {
+		values[i] = mv.zData[idx]
+	}
+
+	if len(values) <= 2 {
+		// Not enough elements to interpolate
 		return
+	}
+
+	start := values[0]
+	end := values[len(values)-1]
+
+	// Calculate the step for interpolation for the internal elements
+	step := float64(end-start) / float64(len(values)-1)
+
+	// Interpolate internal values
+	for i := 1; i < len(values)-1; i++ {
+		values[i] = start + int(float64(i)*step+0.5) // Adding 0.5 for rounding to nearest integer
+	}
+
+	for i, idx := range mv.selectedCells {
+		mv.zData[idx] = values[i]
 	}
 	mv.Refresh()
 }
 
 func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
-	shifted := false
-	if key.Name == "LeftShift" {
-		shifted = true
-	}
-	log.Println("TypedKey", key.Name, shifted, key.Physical.ScanCode)
+	//	log.Println("TypedKey", key.Name, shifted, key.Physical.ScanCode)
 	var refresh, updateCursor bool
 	switch key.Name {
 	case fyne.KeyEscape:
@@ -242,26 +273,23 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 	}
 
 	if refresh {
-		for _, textIndex := range mv.selectedCells {
-			prec := 2
-			if mv.zCorrFac == 1 {
-				prec = 0
-			}
-			t := mv.textValues[textIndex]
-			t.Text = strconv.FormatFloat(float64(mv.zData[textIndex])*mv.zCorrFac, 'f', prec, 64)
-			t.Refresh()
-		}
 		mv.Refresh()
 	}
+}
+
+type updateBlock struct {
+	idx  int
+	end  int
+	data []int
 }
 
 func (mv *MapViewer) updateCells() {
 	var updates []updateBlock
 
 	slices.Sort(mv.selectedCells)
+
 	for _, cell := range mv.selectedCells {
 		data := mv.zData[cell]
-
 		// if first, add the first entry
 		if len(updates) == 0 {
 			updates = append(updates, updateBlock{cell, cell, []int{data}})
@@ -276,41 +304,22 @@ func (mv *MapViewer) updateCells() {
 			updates[len(updates)-1] = last
 			continue
 		}
-
 		updates = append(updates, updateBlock{cell, cell, []int{data}})
 	}
 
-	for _, update := range updates {
-		log.Println("update", update.idx, update.end, update.data)
-
-		if update.end-update.idx <= 244 {
-			if mv.updateFunc != nil {
-				mv.updateFunc(update.idx, update.data)
-			}
-		} else {
-			if mv.saveFunc != nil {
-				mv.saveFunc(mv.zData)
-				break
-			}
+	// Bigger than 60% of the map, sync the whole thing
+	if float32(len(mv.selectedCells)) > float32(mv.numColumns*mv.numRows)*.60 || len(updates) > 127 {
+		if mv.saveFunc != nil {
+			mv.saveFunc(mv.zData)
+			return
 		}
 	}
-	/*
-		if mv.updateFunc != nil {
-			if len(mv.selectedCells) <= 20 {
-				for _, cell := range mv.selectedCells {
-					mv.updateFunc(cell, []int{mv.zData[cell]})
-				}
-				return
-			}
-			if mv.saveFunc != nil {
-				mv.saveFunc(mv.zData)
-			}
-		}
-	*/
-}
 
-type updateBlock struct {
-	idx  int
-	end  int
-	data []int
+	// Do partial updates
+	for _, update := range updates {
+		//		log.Println("update", update.idx, update.end, update.data)
+		if mv.updateFunc != nil {
+			mv.updateFunc(update.idx, update.data)
+		}
+	}
 }

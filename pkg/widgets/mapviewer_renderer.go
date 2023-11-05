@@ -15,39 +15,47 @@ type MapViewerRenderer struct {
 }
 
 func calculateOptimalTextSize(width, height float32, columns, rows int) float32 {
-
-	// Calculate the width and height of a single cell
 	cellWidth := float64(width / float32(columns))
 	return max(min(float32(cellWidth/5), 21), 12)
-
-	//cellHeight := float64(height / float32(rows))
-	// The optimal text size is the smallest of the two dimensions of the cell
-	//return float32(int(math.Min(cellWidth, cellHeight)))
 }
 
 func (vr *MapViewerRenderer) Layout(size fyne.Size) {
 	vr.mv.content.Resize(size)
 	sz := vr.mv.innerView.Size()
+
 	// Calculate shared factors
 	numColumnsFloat := float32(vr.mv.numColumns)
 	numRowsFloat := float32(vr.mv.numRows)
 	widthFactor := sz.Width / numColumnsFloat
 	heightFactor := sz.Height / numRowsFloat
 
-	// Use the more restrictive factor to determine text size
+	// Position and resize crosshair
+	vr.mv.crosshair.Resize(fyne.NewSize(widthFactor, heightFactor))
+	vr.mv.crosshair.Move(
+		fyne.NewPos(
+			float32(vr.mv.xIdx)*widthFactor,
+			float32(float64(vr.mv.numRows)-1-vr.mv.yIdx)*heightFactor,
+		),
+	)
 
 	// Calculate text size
 	textSize := calculateOptimalTextSize(sz.Width, sz.Height, vr.mv.numColumns, vr.mv.numRows)
 
 	// Position and resize text values
-	for i := len(vr.mv.yData); i > 0; i-- {
-		for j := 0; j < len(vr.mv.xData); j++ {
-			t := vr.mv.textValues[(i*vr.mv.numColumns)-(vr.mv.numColumns-j)]
+	for i := vr.mv.numRows; i > 0; i-- {
+		for j := 0; j < vr.mv.numColumns; j++ {
+			iDx := (i * vr.mv.numColumns) - (vr.mv.numColumns - j)
+			t := vr.mv.textValues[iDx]
 			t.TextSize = textSize
 			t.Resize(t.MinSize())
 			t.Move(fyne.NewPos(
 				(float32(j)*widthFactor)+(widthFactor/2)-(t.MinSize().Width/2),
 				(sz.Height-float32(i)*heightFactor)+(heightFactor/2)-(t.MinSize().Height/2),
+			))
+			vr.mv.zDataRects[iDx].Resize(fyne.NewSize(widthFactor, heightFactor))
+			vr.mv.zDataRects[iDx].Move(fyne.NewPos(
+				float32(j)*widthFactor,
+				(sz.Height - float32(i)*heightFactor),
 			))
 		}
 	}
@@ -64,33 +72,60 @@ func (vr *MapViewerRenderer) Layout(size fyne.Size) {
 		yb.Refresh()
 	}
 
-	// Position and resize crosshair
-	vr.mv.crosshair.Resize(fyne.NewSize(widthFactor, heightFactor))
-	vr.mv.crosshair.Move(
-		fyne.NewPos(
-			float32(vr.mv.xIdx)*widthFactor,
-			float32(float64(vr.mv.numRows)-1-vr.mv.yIdx)*heightFactor,
-		),
-	)
+	vr.resizeCursor(sz, numColumnsFloat, numRowsFloat, widthFactor, heightFactor)
+}
 
+func (vr *MapViewerRenderer) resizeCursor(viewportSize fyne.Size, numColumnsFloat, numRowsFloat, widthFactor, heightFactor float32) {
 	// Position and resize cursor
 	if vr.mv.selectedX >= 0 {
-		vr.mv.cursor.Resize(fyne.NewSize(widthFactor, heightFactor))
-		vr.mv.cursor.Move(
-			fyne.NewPos(
-				float32(vr.mv.selectedX)*widthFactor,
-				float32(vr.mv.numRows-1-vr.mv.SelectedY)*heightFactor,
-			),
-		)
+		if len(vr.mv.selectedCells) > 1 {
+			mv := vr.mv
+			// if multiple cells are selected, we need to calculate the bounding box
+			// of the selection area
+			minX := mv.numColumns
+			maxX := 0
+			minY := mv.numRows
+			maxY := 0
+			for _, cell := range mv.selectedCells {
+				x := cell % mv.numColumns
+				y := cell / mv.numColumns
+				if x < minX {
+					minX = x
+				}
+				if x > maxX {
+					maxX = x
+				}
+				if y < minY {
+					minY = y
+				}
+				if y > maxY {
+					maxY = y
+				}
+			}
+			widthFactor := viewportSize.Width / numColumnsFloat
+			heightFactor := viewportSize.Height / numRowsFloat
+			topLeftX := float32(minX) * widthFactor
+			topLeftY := float32(mv.numRows-1-maxY) * heightFactor
+			width := float32(maxX-minX+1) * widthFactor
+			height := float32(maxY-minY+1) * heightFactor
+			vr.mv.cursor.Resize(fyne.NewSize(width, height))
+			vr.mv.cursor.Move(fyne.NewPos(topLeftX, topLeftY))
+
+		} else {
+			vr.mv.cursor.Resize(fyne.NewSize(widthFactor, heightFactor))
+			vr.mv.cursor.Move(
+				fyne.NewPos(
+					float32(vr.mv.selectedX)*widthFactor,
+					float32(vr.mv.numRows-1-vr.mv.SelectedY)*heightFactor,
+				),
+			)
+		}
 	}
 }
 
 func (vr *MapViewerRenderer) MinSize() fyne.Size {
-	s := vr.mv.content.MinSize()
-	return fyne.NewSize(
-		float32(int(s.Width)),
-		float32(int(s.Height)),
-	)
+	min := fyne.NewSize(float32(vr.mv.numColumns)*40, float32(vr.mv.numRows)*23)
+	return min.Max(vr.mv.content.MinSize())
 }
 
 func (vr *MapViewerRenderer) Refresh() {
