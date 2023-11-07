@@ -76,6 +76,7 @@ var T7SymbolsTuning = map[string][]string{
 		"FCutCal.ST_Enable",
 		"LambdaCal.ST_Enable",
 		"PurgeCal.ST_PurgeEnable",
+		"E85Cal.ST_Enable",
 	},
 	"Myrtilos": {
 		"MyrtilosCal.Launch_DisableSpeed",

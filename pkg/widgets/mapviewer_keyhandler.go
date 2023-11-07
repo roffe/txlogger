@@ -113,15 +113,15 @@ func (mv *MapViewer) paste() {
 }
 
 func (mv *MapViewer) smooth() {
+	// Not enough elements to interpolate
+	if len(mv.selectedCells) < 3 {
+		return
+	}
+
 	values := make([]int, len(mv.selectedCells))
 
 	for i, idx := range mv.selectedCells {
 		values[i] = mv.zData[idx]
-	}
-
-	if len(values) <= 2 {
-		// Not enough elements to interpolate
-		return
 	}
 
 	start := values[0]
@@ -134,10 +134,10 @@ func (mv *MapViewer) smooth() {
 	for i := 1; i < len(values)-1; i++ {
 		values[i] = start + int(float64(i)*step+0.5) // Adding 0.5 for rounding to nearest integer
 	}
-
 	for i, idx := range mv.selectedCells {
 		mv.zData[idx] = values[i]
 	}
+	mv.updateCells()
 	mv.Refresh()
 }
 
@@ -230,7 +230,6 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 		mv.updateCells()
 		refresh = true
 	case "Up":
-
 		mv.SelectedY++
 		if mv.SelectedY >= mv.numRows {
 			mv.SelectedY = mv.numRows - 1
@@ -262,13 +261,13 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 	index := mv.SelectedY*mv.numColumns + mv.selectedX
 
 	if updateCursor {
-		sz := mv.innerView.Size()
+		size := mv.innerView.Size()
+		mv.selectedCells = []int{index}
 		xPosFactor := float32(mv.selectedX)
 		yPosFactor := float32(float64(mv.numRows-1) - float64(mv.SelectedY))
-		xPos := xPosFactor * (sz.Width / float32(mv.numColumns))
-		yPos := yPosFactor * (sz.Height / float32(mv.numRows))
-		mv.selectedCells = []int{index}
-		mv.cursor.Resize(fyne.NewSize(sz.Width/float32(mv.numColumns), sz.Height/float32(mv.numRows)))
+		xPos := xPosFactor * (size.Width / float32(mv.numColumns))
+		yPos := yPosFactor * (size.Height / float32(mv.numRows))
+		mv.cursor.Resize(fyne.NewSize(size.Width/float32(mv.numColumns), size.Height/float32(mv.numRows)))
 		mv.cursor.Move(fyne.NewPos(xPos, yPos))
 	}
 
@@ -284,40 +283,48 @@ type updateBlock struct {
 }
 
 func (mv *MapViewer) updateCells() {
-	var updates []updateBlock
+	if len(mv.selectedCells) == 0 {
+		return
+	}
 
 	slices.Sort(mv.selectedCells)
-
-	for _, cell := range mv.selectedCells {
+	updates := []updateBlock{{mv.selectedCells[0], mv.selectedCells[0], []int{mv.zData[mv.selectedCells[0]]}}}
+	for _, cell := range mv.selectedCells[1:] {
 		data := mv.zData[cell]
-		// if first, add the first entry
-		if len(updates) == 0 {
-			updates = append(updates, updateBlock{cell, cell, []int{data}})
-			continue
-		}
-
-		last := updates[len(updates)-1]
+		last := &updates[len(updates)-1]
 
 		if cell-1 == last.end {
 			last.end = cell
 			last.data = append(last.data, data)
-			updates[len(updates)-1] = last
-			continue
-		}
-		updates = append(updates, updateBlock{cell, cell, []int{data}})
-	}
-
-	// Bigger than 60% of the map, sync the whole thing
-	if float32(len(mv.selectedCells)) > float32(mv.numColumns*mv.numRows)*.60 || len(updates) > 127 {
-		if mv.saveFunc != nil {
-			mv.saveFunc(mv.zData)
-			return
+		} else {
+			updates = append(updates, updateBlock{cell, cell, []int{data}})
 		}
 	}
 
-	// Do partial updates
+	if mv.shouldFullSync(updates) {
+		mv.fullSync()
+		return
+	}
+
+	mv.partialSync(updates)
+}
+
+func (mv *MapViewer) shouldFullSync(updates []updateBlock) bool {
+	var lenUpdates int
 	for _, update := range updates {
-		//		log.Println("update", update.idx, update.end, update.data)
+		lenUpdates += len(update.data)
+	}
+	return float32(len(mv.selectedCells)) > float32(mv.numColumns*mv.numRows)*0.60 || lenUpdates > 127
+}
+
+func (mv *MapViewer) fullSync() {
+	if mv.saveFunc != nil {
+		mv.saveFunc(mv.zData)
+	}
+}
+
+func (mv *MapViewer) partialSync(updates []updateBlock) {
+	for _, update := range updates {
 		if mv.updateFunc != nil {
 			mv.updateFunc(update.idx, update.data)
 		}

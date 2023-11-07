@@ -151,11 +151,16 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 }
 
 func (mv *MapViewer) SetCellText(idx int, value int) {
-	prec := 0
-	if mv.zCorrFac < 1 {
-		prec = 2
+	precission := 0
+	switch mv.zCorrFac {
+	case 0.1:
+		precission = 1
+	case 0.01:
+		precission = 2
+	case 0.001:
+		precission = 3
 	}
-	textValue := strconv.FormatFloat(float64(value)*mv.zCorrFac, 'f', prec, 64)
+	textValue := strconv.FormatFloat(float64(value)*mv.zCorrFac, 'f', precission, 64)
 	if mv.textValues[idx].Text != textValue {
 		mv.textValues[idx].Text = textValue
 		mv.textValues[idx].Refresh()
@@ -173,10 +178,12 @@ func (mv *MapViewer) Refresh() {
 	for i, tv := range mv.zData {
 		mv.SetCellText(i, tv)
 	}
-
 	for idx, r := range mv.zDataRects {
-		r.FillColor = GetColorInterpolation(float64(mv.min)*mv.zCorrFac, float64(mv.max)*mv.zCorrFac, float64(mv.zData[idx])*mv.zCorrFac)
-		r.Refresh()
+		col := GetColorInterpolation(float64(mv.min)*mv.zCorrFac, float64(mv.max)*mv.zCorrFac, float64(mv.zData[idx])*mv.zCorrFac)
+		if col != r.FillColor {
+			r.FillColor = col
+			r.Refresh()
+		}
 	}
 
 	//mv.valueMap.Image = createImage(mv.xData, mv.yData, mv.zData, mv.zCorrFac)

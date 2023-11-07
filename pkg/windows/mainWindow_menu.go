@@ -87,7 +87,7 @@ func (mw *MainWindow) openMapz(typ symbol.ECUType, mapNames ...string) {
 	joinedNames := strings.Join(mapNames, "|")
 	mv, found := mw.openMaps[joinedNames]
 	if !found {
-		w := mw.app.NewWindow("Map Viewer - " + strings.Join(mapNames, ", "))
+		w := mw.app.NewWindow(strings.Join(mapNames, ", ") + " - Map Viewer")
 		if mw.symbols == nil {
 			mw.Log("No binary loaded")
 			return
@@ -144,7 +144,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	mv, found := mw.openMaps[axis.Z]
 	if !found {
 		//w := fyne.CurrentApp().Driver().CreateWindow("Map Viewer - " + axis.Z)
-		w := mw.app.NewWindow("Map Viewer - " + axis.Z)
+		w := mw.app.NewWindow(axis.Z + " - Map Viewer")
 		//w.SetFixedSize(true)
 		if mw.symbols == nil {
 			mw.Log("No binary loaded")
