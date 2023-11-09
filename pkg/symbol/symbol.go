@@ -200,6 +200,14 @@ func (s *Symbol) Int64() int64 {
 	return int64(binary.BigEndian.Uint64(s.data))
 }
 
+func (s *Symbol) Float64s() []float64 {
+	var floats []float64
+	for _, v := range s.Ints() {
+		floats = append(floats, float64(v)*s.Correctionfactor)
+	}
+	return floats
+}
+
 func (s *Symbol) Float64() float64 {
 	switch {
 	case s.Length == 1:

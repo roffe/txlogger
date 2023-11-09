@@ -52,7 +52,7 @@ type MapViewer struct {
 	xAxisTexts, yAxisTexts   []*canvas.Text
 	zDataRects               []*canvas.Rectangle
 
-	content    *fyne.Container
+	content    fyne.CanvasObject
 	innerView  *fyne.Container
 	grid       *Grid
 	cursor     *canvas.Rectangle
@@ -82,10 +82,7 @@ type MapViewer struct {
 
 func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 	mv := &MapViewer{
-		yAxisTexts: make([]*canvas.Text, 0),
-		xAxisTexts: make([]*canvas.Text, 0),
-		zDataRects: make([]*canvas.Rectangle, 0),
-		setChan:    make(chan xyUpdate, 10),
+		setChan: make(chan xyUpdate, 10),
 	}
 	mv.ExtendBaseWidget(mv)
 	for _, option := range options {
@@ -214,12 +211,12 @@ func createTextValues(zData []int, corrFac float64) ([]*canvas.Text, *fyne.Conta
 	return values, valueContainer
 }
 
-func (mv *MapViewer) render() *fyne.Container {
+func (mv *MapViewer) render() fyne.CanvasObject {
 
 	// y must be created before x as it's width is used to calculate x's offset
-	mv.createYAxis()
-	mv.createXAxis()
-	mv.createZdata()
+	mv.yAxisLabels = mv.createYAxis()
+	mv.xAxisLabels = mv.createXAxis()
+	mv.zDataRects = mv.createZdata()
 
 	mv.crosshair = NewRectangle(color.RGBA{0xfc, 0x4a, 0xFA, 235}, 4)
 
@@ -255,36 +252,40 @@ func (mv *MapViewer) render() *fyne.Container {
 		)
 	}
 
-	return container.NewBorder(
-		mv.xAxisLabels,
-		container.NewGridWithColumns(3,
-			widget.NewButtonWithIcon("Load from File", theme.DocumentIcon(), func() {
-				if mv.symbol != nil {
-					mv.zData = mv.symbol.Ints()
-					mv.Refresh()
-				}
-			}),
-			widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
-				if mv.loadFunc != nil {
-					mv.loadFunc()
-				}
-			}),
-			//widget.NewButtonWithIcon("Save to File", theme.DocumentSaveIcon(), func() {
-			//}),
-			widget.NewButtonWithIcon("Save to ECU", theme.DocumentSaveIcon(), func() {
-				if mv.saveFunc != nil {
-					mv.saveFunc(mv.zData)
-				}
-			}),
+	return container.NewVSplit(
+		container.NewBorder(
+			mv.xAxisLabels,
+			container.NewGridWithColumns(3,
+				widget.NewButtonWithIcon("Load from File", theme.DocumentIcon(), func() {
+					if mv.symbol != nil {
+						mv.zData = mv.symbol.Ints()
+						mv.Refresh()
+					}
+				}),
+				widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
+					if mv.loadFunc != nil {
+						mv.loadFunc()
+					}
+				}),
+				//widget.NewButtonWithIcon("Save to File", theme.DocumentSaveIcon(), func() {
+				//}),
+				widget.NewButtonWithIcon("Save to ECU", theme.DocumentSaveIcon(), func() {
+					if mv.saveFunc != nil {
+						mv.saveFunc(mv.zData)
+					}
+				}),
+			),
+			mv.yAxisLabels,
+			nil,
+			mv.innerView,
 		),
-		mv.yAxisLabels,
-		nil,
-		mv.innerView,
+		NewMeshgrid(mv.symbol.Float64s(), mv.numColumns, mv.numRows),
 	)
+
 }
 
-func (mv *MapViewer) createXAxis() {
-	mv.xAxisLabels = container.New(&layout.Horizontal{Offset: mv.yAxisLabels})
+func (mv *MapViewer) createXAxis() *fyne.Container {
+	labels := container.New(&layout.Horizontal{Offset: mv.yAxisLabels})
 	if mv.numColumns >= 1 {
 		prec := 0
 		if mv.xCorrFac < 1 {
@@ -293,13 +294,14 @@ func (mv *MapViewer) createXAxis() {
 		for i := 0; i < mv.numColumns; i++ {
 			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.xData[i])*mv.xCorrFac, 'f', prec, 64), TextSize: 13}
 			mv.xAxisTexts = append(mv.xAxisTexts, text)
-			mv.xAxisLabels.Add(text)
+			labels.Add(text)
 		}
 	}
+	return labels
 }
 
-func (mv *MapViewer) createYAxis() {
-	mv.yAxisLabels = container.New(&layout.Vertical{})
+func (mv *MapViewer) createYAxis() *fyne.Container {
+	labels := container.New(&layout.Vertical{})
 	if mv.numRows >= 1 {
 		prec := 0
 		if mv.yCorrFac < 1 {
@@ -308,12 +310,14 @@ func (mv *MapViewer) createYAxis() {
 		for i := mv.numRows - 1; i >= 0; i-- {
 			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.yData[i])*mv.yCorrFac, 'f', prec, 64), TextSize: 13}
 			mv.yAxisTexts = append(mv.yAxisTexts, text)
-			mv.yAxisLabels.Add(text)
+			labels.Add(text)
 		}
 	}
+	return labels
 }
 
-func (mv *MapViewer) createZdata() {
+func (mv *MapViewer) createZdata() []*canvas.Rectangle {
+	var rects []*canvas.Rectangle
 	minCorrected := float64(mv.min) * mv.zCorrFac
 	maxCorrected := float64(mv.max) * mv.zCorrFac
 	// Calculate the colors for each cell based on data
@@ -323,9 +327,10 @@ func (mv *MapViewer) createZdata() {
 			value := float64(mv.zData[index]) * mv.zCorrFac
 			color := GetColorInterpolation(minCorrected, maxCorrected, value)
 			rect := &canvas.Rectangle{FillColor: color}
-			mv.zDataRects = append(mv.zDataRects, rect)
+			rects = append(rects, rect)
 		}
 	}
+	return rects
 }
 
 func (mv *MapViewer) setXY(xValue, yValue int) error {
@@ -377,19 +382,13 @@ func findMinMax(data []int) (int, int) {
 	return min, max
 }
 
-func lerp(a, b, t float64) float64 {
-	return a + (b-a)*t
-}
-
 // getColorInterpolation returns a color interpolated on the color spectrum green to yellow to red.
 // value should be between min and max.
 func GetColorInterpolation(min, max, value float64) color.RGBA {
 	//log.Println("getColorInterpolation", min, max, value)
 	// Normalize the value to a 0-1 range
 	t := (value - min) / (max - min)
-
 	divider := .5
-
 	var r, g, b float64
 	if t < divider { // Green to Yellow interpolation
 		r = lerp(0, 1, t/divider)
@@ -399,7 +398,6 @@ func GetColorInterpolation(min, max, value float64) color.RGBA {
 		g = lerp(1, 0, (t-divider)/(1-divider))
 	}
 	b = 0
-
 	// Convert from 0-1 range to 0-255 for color.RGBA
 	return color.RGBA{
 		R: uint8(r * 255),
