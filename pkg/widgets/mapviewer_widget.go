@@ -61,12 +61,15 @@ type MapViewer struct {
 
 	ipf interpolate.InterPolFunc
 
+	valueRects *fyne.Container
 	valueTexts *fyne.Container
 
 	setChan chan xyUpdate
 
 	xIdx, yIdx           float64
 	selectedX, SelectedY int
+
+	mesh *Meshgrid
 
 	// Mouse
 	selecting     bool
@@ -107,6 +110,109 @@ func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 	}()
 
 	return mv, nil
+}
+
+func (mv *MapViewer) render() fyne.CanvasObject {
+
+	// y must be created before x as it's width is used to calculate x's offset
+	mv.yAxisLabels = mv.createYAxis()
+	mv.xAxisLabels = mv.createXAxis()
+	mv.zDataRects = mv.createZdata()
+
+	mv.crosshair = NewRectangle(color.RGBA{0xfc, 0x4a, 0xFA, 235}, 4)
+
+	mv.cursor = NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 235}, 4)
+	mv.selectedX = -1
+	mv.cursor.Resize(fyne.NewSize(1, 1))
+
+	mv.textValues = createTextValues(mv.zData, mv.zCorrFac)
+
+	mv.valueTexts = container.New(&layout.Grid{Cols: mv.numColumns, Rows: mv.numRows, Text: true})
+	for _, t := range mv.textValues {
+		mv.valueTexts.Add(t)
+	}
+
+	mv.valueRects = container.New(&layout.Grid{Cols: mv.numColumns, Rows: mv.numRows})
+	for _, r := range mv.zDataRects {
+		mv.valueRects.Add(r)
+	}
+
+	mv.grid = NewGrid(mv.numColumns, mv.numRows)
+
+	mv.innerView = container.NewStack(
+		mv.valueRects,
+		container.NewWithoutLayout(
+			mv.crosshair,
+			mv.cursor,
+		),
+		mv.grid,
+		mv.valueTexts,
+	)
+
+	if mv.symbol == nil {
+		return container.NewBorder(
+			mv.xAxisLabels,
+			nil,
+			mv.yAxisLabels,
+			nil,
+			mv.innerView,
+		)
+	}
+
+	mv.mesh = NewMeshgrid(mv.symbol.Float64s(), mv.numColumns, mv.numRows)
+
+	return container.NewVSplit(
+		container.NewBorder(
+			mv.xAxisLabels,
+			container.NewGridWithColumns(3,
+				widget.NewButtonWithIcon("Load from File", theme.DocumentIcon(), func() {
+					if mv.symbol != nil {
+						mv.zData = mv.symbol.Ints()
+						mv.Refresh()
+					}
+				}),
+				widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
+					if mv.loadFunc != nil {
+						mv.loadFunc()
+					}
+				}),
+				//widget.NewButtonWithIcon("Save to File", theme.DocumentSaveIcon(), func() {
+				//}),
+				widget.NewButtonWithIcon("Save to ECU", theme.DocumentSaveIcon(), func() {
+					if mv.saveFunc != nil {
+						mv.saveFunc(mv.zData)
+					}
+				}),
+			),
+			mv.yAxisLabels,
+			nil,
+			mv.innerView,
+		),
+		container.NewBorder(
+			nil,
+			container.NewGridWithColumns(4,
+				widget.NewButton("<", func() {
+					mv.mesh.RotateMeshgrid(0, -1, 0)
+					mv.mesh.Refresh()
+				}),
+				widget.NewButton("^", func() {
+					mv.mesh.RotateMeshgrid(1, 0, 0)
+					mv.mesh.Refresh()
+				}),
+				widget.NewButton("v", func() {
+					mv.mesh.RotateMeshgrid(-1, 0, 0)
+					mv.mesh.Refresh()
+				}),
+				widget.NewButton(">", func() {
+					mv.mesh.RotateMeshgrid(0, 1, 0)
+					mv.mesh.Refresh()
+				}),
+			),
+			nil,
+			nil,
+			mv.mesh,
+		),
+	)
 }
 
 func (mv *MapViewer) Info() MapViewerInfo {
@@ -170,6 +276,115 @@ func (mv *MapViewer) SetZ(zData []int) {
 	mv.Refresh()
 }
 
+func (mv *MapViewer) resize(size fyne.Size) {
+	mv.content.Resize(size)
+	sz := mv.innerView.Size()
+
+	// Calculate shared factors
+	numColumnsFloat := float32(mv.numColumns)
+	numRowsFloat := float32(mv.numRows)
+	widthFactor := sz.Width / numColumnsFloat
+	heightFactor := sz.Height / numRowsFloat
+
+	// Position and resize crosshair
+	mv.crosshair.Resize(fyne.NewSize(widthFactor, heightFactor))
+	mv.crosshair.Move(
+		fyne.NewPos(
+			float32(mv.xIdx)*widthFactor,
+			float32(float64(mv.numRows)-1-mv.yIdx)*heightFactor,
+		),
+	)
+
+	// Calculate text size
+	textSize := calculateOptimalTextSize(sz.Width, sz.Height, mv.numColumns, mv.numRows)
+
+	// Position and resize text values
+	for i := mv.numRows; i > 0; i-- {
+		for j := 0; j < mv.numColumns; j++ {
+			iDx := (i * mv.numColumns) - (mv.numColumns - j)
+			t := mv.textValues[iDx]
+			t.TextSize = textSize
+			// t.Resize(t.MinSize())
+			// t.Move(fyne.NewPos(
+			// 	(float32(j)*widthFactor)+(widthFactor/2)-(t.MinSize().Width/2),
+			// 	(sz.Height-float32(i)*heightFactor)+(heightFactor/2)-(t.MinSize().Height/2),
+			// ))
+			// mv.zDataRects[iDx].Resize(fyne.NewSize(widthFactor, heightFactor))
+			// mv.zDataRects[iDx].Move(fyne.NewPos(
+			// 	float32(j)*widthFactor,
+			// 	(sz.Height - float32(i)*heightFactor),
+			// ))
+		}
+	}
+
+	// Update x and y axes
+	for _, xb := range mv.xAxisTexts {
+		xb.TextSize = textSize
+		xb.Resize(xb.MinSize())
+		xb.Refresh()
+	}
+	for _, yb := range mv.yAxisTexts {
+		yb.TextSize = textSize
+		yb.Resize(yb.MinSize())
+		yb.Refresh()
+	}
+
+	mv.resizeCursor(sz, numColumnsFloat, numRowsFloat, widthFactor, heightFactor)
+}
+
+func calculateOptimalTextSize(width, height float32, columns, rows int) float32 {
+	cellWidth := float64(width / float32(columns))
+	return max(min(float32(cellWidth/5), 21), 12)
+}
+
+func (mv *MapViewer) resizeCursor(viewportSize fyne.Size, numColumnsFloat, numRowsFloat, widthFactor, heightFactor float32) {
+	// Position and resize cursor
+	if mv.selectedX >= 0 {
+		if len(mv.selectedCells) > 1 {
+			mv := mv
+			// if multiple cells are selected, we need to calculate the bounding box
+			// of the selection area
+			minX := mv.numColumns
+			maxX := 0
+			minY := mv.numRows
+			maxY := 0
+			for _, cell := range mv.selectedCells {
+				x := cell % mv.numColumns
+				y := cell / mv.numColumns
+				if x < minX {
+					minX = x
+				}
+				if x > maxX {
+					maxX = x
+				}
+				if y < minY {
+					minY = y
+				}
+				if y > maxY {
+					maxY = y
+				}
+			}
+			widthFactor := viewportSize.Width / numColumnsFloat
+			heightFactor := viewportSize.Height / numRowsFloat
+			topLeftX := float32(minX) * widthFactor
+			topLeftY := float32(mv.numRows-1-maxY) * heightFactor
+			width := float32(maxX-minX+1) * widthFactor
+			height := float32(maxY-minY+1) * heightFactor
+			mv.cursor.Resize(fyne.NewSize(width, height))
+			mv.cursor.Move(fyne.NewPos(topLeftX, topLeftY))
+
+		} else {
+			mv.cursor.Resize(fyne.NewSize(widthFactor, heightFactor))
+			mv.cursor.Move(
+				fyne.NewPos(
+					float32(mv.selectedX)*widthFactor,
+					float32(mv.numRows-1-mv.SelectedY)*heightFactor,
+				),
+			)
+		}
+	}
+}
+
 func (mv *MapViewer) Refresh() {
 	mv.min, mv.max = findMinMax(mv.zData)
 	for i, tv := range mv.zData {
@@ -182,18 +397,21 @@ func (mv *MapViewer) Refresh() {
 			r.Refresh()
 		}
 	}
-
-	//mv.valueMap.Image = createImage(mv.xData, mv.yData, mv.zData, mv.zCorrFac)
-	//mv.valueMap.Refresh()
+	if mv.mesh != nil {
+		var values []float64
+		for _, v := range mv.zData {
+			values = append(values, float64(v)*mv.zCorrFac)
+		}
+		mv.mesh.LoadFloat64s(values)
+	}
 }
 
 func (mv *MapViewer) Close() {
 	close(mv.setChan)
 }
 
-func createTextValues(zData []int, corrFac float64) ([]*canvas.Text, *fyne.Container) {
+func createTextValues(zData []int, corrFac float64) []*canvas.Text {
 	var values []*canvas.Text
-	valueContainer := container.NewWithoutLayout()
 	prec := 0
 	if corrFac < 1 {
 		prec = 2
@@ -206,82 +424,8 @@ func createTextValues(zData []int, corrFac float64) ([]*canvas.Text, *fyne.Conta
 			TextStyle: fyne.TextStyle{Monospace: false},
 		}
 		values = append(values, text)
-		valueContainer.Add(text)
 	}
-	return values, valueContainer
-}
-
-func (mv *MapViewer) render() fyne.CanvasObject {
-
-	// y must be created before x as it's width is used to calculate x's offset
-	mv.yAxisLabels = mv.createYAxis()
-	mv.xAxisLabels = mv.createXAxis()
-	mv.zDataRects = mv.createZdata()
-
-	mv.crosshair = NewRectangle(color.RGBA{0xfc, 0x4a, 0xFA, 235}, 4)
-
-	mv.cursor = NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 235}, 4)
-	mv.selectedX = -1
-	mv.cursor.Resize(fyne.NewSize(1, 1))
-	mv.textValues, mv.valueTexts = createTextValues(mv.zData, mv.zCorrFac)
-
-	mv.grid = NewGrid(mv.numColumns, mv.numRows)
-
-	valueRects := container.NewWithoutLayout()
-	for _, r := range mv.zDataRects {
-		valueRects.Add(r)
-	}
-
-	mv.innerView = container.NewStack(
-		valueRects,
-		container.NewWithoutLayout(
-			mv.crosshair,
-			mv.cursor,
-		),
-		mv.grid,
-		mv.valueTexts,
-	)
-
-	if mv.symbol == nil {
-		return container.NewBorder(
-			mv.xAxisLabels,
-			nil,
-			mv.yAxisLabels,
-			nil,
-			mv.innerView,
-		)
-	}
-
-	return container.NewVSplit(
-		container.NewBorder(
-			mv.xAxisLabels,
-			container.NewGridWithColumns(3,
-				widget.NewButtonWithIcon("Load from File", theme.DocumentIcon(), func() {
-					if mv.symbol != nil {
-						mv.zData = mv.symbol.Ints()
-						mv.Refresh()
-					}
-				}),
-				widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
-					if mv.loadFunc != nil {
-						mv.loadFunc()
-					}
-				}),
-				//widget.NewButtonWithIcon("Save to File", theme.DocumentSaveIcon(), func() {
-				//}),
-				widget.NewButtonWithIcon("Save to ECU", theme.DocumentSaveIcon(), func() {
-					if mv.saveFunc != nil {
-						mv.saveFunc(mv.zData)
-					}
-				}),
-			),
-			mv.yAxisLabels,
-			nil,
-			mv.innerView,
-		),
-		NewMeshgrid(mv.symbol.Float64s(), mv.numColumns, mv.numRows),
-	)
-
+	return values
 }
 
 func (mv *MapViewer) createXAxis() *fyne.Container {
