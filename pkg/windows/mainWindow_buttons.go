@@ -112,7 +112,7 @@ func (mw *MainWindow) createButtons() {
 			}
 			mw.dashboard = nil
 			mw.SetFullScreen(false)
-			mw.SetContent(mw.Render())
+			mw.SetContent(mw.render())
 			mw.SetCloseIntercept(mw.closeIntercept)
 		}
 
@@ -177,7 +177,7 @@ func (mw *MainWindow) newSettingsBtn() *widget.Button {
 		mw.SetContent(mw.settings)
 		mw.SetCloseIntercept(func() {
 			mw.SetCloseIntercept(mw.closeIntercept)
-			mw.SetContent(mw.Render())
+			mw.SetContent(mw.render())
 		})
 	})
 	return btn

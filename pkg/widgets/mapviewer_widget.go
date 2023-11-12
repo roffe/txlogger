@@ -149,7 +149,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		mv.valueTexts,
 	)
 
-	if mv.symbol == nil {
+	if mv.symbol == nil || mv.numColumns == 1 && mv.numRows == 1 {
 		return container.NewBorder(
 			mv.xAxisLabels,
 			nil,
@@ -161,7 +161,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 
 	mv.mesh = NewMeshgrid(mv.symbol.Float64s(), mv.numColumns, mv.numRows)
 
-	return container.NewVSplit(
+	return container.NewBorder(
 		container.NewBorder(
 			mv.xAxisLabels,
 			container.NewGridWithColumns(3,
@@ -188,30 +188,36 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 			nil,
 			mv.innerView,
 		),
-		container.NewBorder(
-			nil,
-			container.NewGridWithColumns(4,
-				widget.NewButton("<", func() {
-					mv.mesh.RotateMeshgrid(0, -1, 0)
-					mv.mesh.Refresh()
-				}),
-				widget.NewButton("^", func() {
-					mv.mesh.RotateMeshgrid(1, 0, 0)
-					mv.mesh.Refresh()
-				}),
-				widget.NewButton("v", func() {
-					mv.mesh.RotateMeshgrid(-1, 0, 0)
-					mv.mesh.Refresh()
-				}),
-				widget.NewButton(">", func() {
-					mv.mesh.RotateMeshgrid(0, 1, 0)
-					mv.mesh.Refresh()
-				}),
+		nil,
+		nil,
+		nil,
+		/*
+			container.NewBorder(
+				nil,
+				container.NewGridWithColumns(4,
+					widget.NewButton("<", func() {
+						mv.mesh.RotateMeshgrid(0, -1, 0)
+						mv.mesh.Refresh()
+					}),
+					widget.NewButton("^", func() {
+						mv.mesh.RotateMeshgrid(1, 0, 0)
+						mv.mesh.Refresh()
+					}),
+					widget.NewButton("v", func() {
+						mv.mesh.RotateMeshgrid(-1, 0, 0)
+						mv.mesh.Refresh()
+					}),
+					widget.NewButton(">", func() {
+						mv.mesh.RotateMeshgrid(0, 1, 0)
+						mv.mesh.Refresh()
+					}),
+				),
+				nil,
+				nil,
+				mv.mesh,
 			),
-			nil,
-			nil,
-			mv.mesh,
-		),
+		*/
+		mv.mesh,
 	)
 }
 
@@ -320,12 +326,12 @@ func (mv *MapViewer) resize(size fyne.Size) {
 	// Update x and y axes
 	for _, xb := range mv.xAxisTexts {
 		xb.TextSize = textSize
-		xb.Resize(xb.MinSize())
+		//xb.Resize(xb.MinSize())
 		xb.Refresh()
 	}
 	for _, yb := range mv.yAxisTexts {
 		yb.TextSize = textSize
-		yb.Resize(yb.MinSize())
+		//yb.Resize(yb.MinSize())
 		yb.Refresh()
 	}
 
@@ -397,6 +403,9 @@ func (mv *MapViewer) Refresh() {
 			r.Refresh()
 		}
 	}
+	mv.mesh.SetMin(float64(mv.min) * mv.zCorrFac)
+	mv.mesh.SetMax(float64(mv.max) * mv.zCorrFac)
+
 	if mv.mesh != nil {
 		var values []float64
 		for _, v := range mv.zData {
@@ -410,15 +419,26 @@ func (mv *MapViewer) Close() {
 	close(mv.setChan)
 }
 
+func getPrecission(corrFac float64) int {
+	precission := 0
+	switch corrFac {
+	case 0.1:
+		precission = 1
+	case 0.01:
+		precission = 2
+	case 0.001:
+		precission = 3
+	case 1.0 / 128:
+		precission = 3
+	}
+	return precission
+}
+
 func createTextValues(zData []int, corrFac float64) []*canvas.Text {
 	var values []*canvas.Text
-	prec := 0
-	if corrFac < 1 {
-		prec = 2
-	}
 	for _, v := range zData {
 		text := &canvas.Text{
-			Text:      strconv.FormatFloat(float64(v)*corrFac, 'f', prec, 64),
+			Text:      strconv.FormatFloat(float64(v)*corrFac, 'f', getPrecission(corrFac), 64),
 			TextSize:  13,
 			Color:     color.Black,
 			TextStyle: fyne.TextStyle{Monospace: false},
@@ -431,12 +451,9 @@ func createTextValues(zData []int, corrFac float64) []*canvas.Text {
 func (mv *MapViewer) createXAxis() *fyne.Container {
 	labels := container.New(&layout.Horizontal{Offset: mv.yAxisLabels})
 	if mv.numColumns >= 1 {
-		prec := 0
-		if mv.xCorrFac < 1 {
-			prec = 2
-		}
+
 		for i := 0; i < mv.numColumns; i++ {
-			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.xData[i])*mv.xCorrFac, 'f', prec, 64), TextSize: 13}
+			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.xData[i])*mv.xCorrFac, 'f', getPrecission(mv.xCorrFac), 64), TextSize: 13}
 			mv.xAxisTexts = append(mv.xAxisTexts, text)
 			labels.Add(text)
 		}
@@ -447,12 +464,8 @@ func (mv *MapViewer) createXAxis() *fyne.Container {
 func (mv *MapViewer) createYAxis() *fyne.Container {
 	labels := container.New(&layout.Vertical{})
 	if mv.numRows >= 1 {
-		prec := 0
-		if mv.yCorrFac < 1 {
-			prec = 2
-		}
 		for i := mv.numRows - 1; i >= 0; i-- {
-			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.yData[i])*mv.yCorrFac, 'f', prec, 64), TextSize: 13}
+			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.yData[i])*mv.yCorrFac, 'f', getPrecission(mv.yCorrFac), 64), TextSize: 13}
 			mv.yAxisTexts = append(mv.yAxisTexts, text)
 			labels.Add(text)
 		}

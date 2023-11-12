@@ -106,7 +106,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 
 	mw.settings.OnClose = func() {
 		mw.SetCloseIntercept(mw.closeIntercept)
-		mw.SetContent(mw.Render())
+		mw.SetContent(mw.render())
 	}
 
 	mw.setupMenu()
@@ -185,7 +185,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 
 	mw.SetMaster()
 	mw.Resize(fyne.NewSize(1024, 768))
-	mw.SetContent(mw.Render())
+	mw.SetContent(mw.render())
 	return mw
 }
 func (mw *MainWindow) closeIntercept() {
@@ -226,7 +226,7 @@ func (mw *MainWindow) createLeading() {
 	)
 }
 
-func (mw *MainWindow) Render() *container.Split {
+func (mw *MainWindow) render() *container.Split {
 	mw.createLeading()
 	return &container.Split{
 		Offset:     0.7,

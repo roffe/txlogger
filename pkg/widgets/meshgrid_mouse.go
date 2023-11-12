@@ -24,12 +24,9 @@ func (m *Meshgrid) MouseMoved(event *desktop.MouseEvent) {
 		if event.Button&desktop.MouseButtonPrimary == desktop.MouseButtonPrimary {
 			m.ax += -dy * rotationSensitivity // Rotate around X-axis
 			m.ay += dx * rotationSensitivity  // Rotate around Y-axis
-			//m.rotateMeshgrid(ax, ay, 0)     // Assuming no rotation around Z-axis for simplicity
 		}
 		if event.Button&desktop.MouseButtonSecondary == desktop.MouseButtonSecondary {
-			m.ax += -dy * rotationSensitivity // Rotate around X-axis
-			m.az += dx * rotationSensitivity  // Rotate around Z-axis
-			//m.rotateMeshgrid(ax, 0, az)
+			m.az += dx * rotationSensitivity // Rotate around Z-axis
 		}
 		if event.Button&desktop.MouseButtonTertiary == desktop.MouseButtonTertiary {
 			m.px += -dx // Move along X-axis
@@ -39,22 +36,22 @@ func (m *Meshgrid) MouseMoved(event *desktop.MouseEvent) {
 		if m.ax > 90 {
 			m.ax = 90
 		}
-		if m.ax < -90 {
-			m.ax = -90
+		if m.ax < -0 {
+			m.ax = 0
 		}
 
 		if m.ay > 90 {
 			m.ay = 90
 		}
-		if m.ay < -90 {
-			m.ay = -90
+		if m.ay < -0 {
+			m.ay = 0
 		}
 
-		if m.az > 90 {
-			m.az = 90
+		if m.az > 45 {
+			m.az = 45
 		}
-		if m.az < -90 {
-			m.az = -90
+		if m.az < -45 {
+			m.az = -45
 		}
 
 		m.Refresh()

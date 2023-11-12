@@ -1,8 +1,6 @@
 package widgets
 
 import (
-	"log"
-
 	"fyne.io/fyne/v2"
 )
 
@@ -26,7 +24,6 @@ func (vr *MapViewerRenderer) MinSize() fyne.Size {
 }
 
 func (vr *MapViewerRenderer) Refresh() {
-	log.Println("Refresh")
 }
 
 func (vr *MapViewerRenderer) Destroy() {

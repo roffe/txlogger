@@ -26,7 +26,11 @@ func NewT7File(data []byte) (*T7File, error) {
 }
 func (t7 *T7File) Checksum() uint32 {
 	x := findChecksumArea(t7.data)
-	return uint32(x)
+	crc, err := calculateChecksum(t7.data, x, 0x100)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return uint32(crc)
 }
 
 func findChecksumArea(data []byte) int {

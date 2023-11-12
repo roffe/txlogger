@@ -32,6 +32,7 @@ var correctionFactors = map[string]float64{
 	"Out.X_AccPedal":               0.1,
 	"Out.X_AccPos":                 0.1,
 	"BstKnkCal.OffsetXSP":          0.1,
+	"InjCorrCal.BattCorrSP":        0.1,
 }
 
 func GetCorrectionfactor(name string) float64 {
