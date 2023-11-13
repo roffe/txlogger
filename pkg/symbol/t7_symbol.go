@@ -135,7 +135,7 @@ func LoadT7Symbols(data []byte, cb func(string)) (SymbolCollection, error) {
 	for _, h := range GetAllT7HeaderFields(data) {
 		switch h.ID {
 		case 0x91, 0x94, 0x95, 0x97:
-			cb(h.String())
+			cb(h.PrettyString())
 		}
 	}
 
@@ -567,22 +567,6 @@ func GetT7HeaderField(bin []byte, id byte) ([]byte, error) {
 	return nil, fmt.Errorf("did not find header for id 0x%02x", id)
 }
 
-type T7HeaderField struct {
-	ID     byte
-	Length byte
-	Data   []byte
-}
-
-func (h *T7HeaderField) String() string {
-	if h.Length == 4 {
-		return fmt.Sprintf("0x%02x %d> 0x%08X  %q", h.ID, len(h.Data), binary.BigEndian.Uint32(h.Data), h.Data)
-	} else if h.Length == 2 {
-		return fmt.Sprintf("0x%02x %d> 0x%04X  %q", h.ID, len(h.Data), binary.BigEndian.Uint16(h.Data), h.Data)
-	} else {
-		return fmt.Sprintf("0x%02x> %s", h.ID, string(h.Data))
-	}
-}
-
 func GetAllT7HeaderFields(bin []byte) []*T7HeaderField {
 	binLength := len(bin)
 	addr := binLength - 1
@@ -617,6 +601,5 @@ func GetAllT7HeaderFields(bin []byte) []*T7HeaderField {
 		})
 		//		log.Printf("0x%02x %d> %q len: %d", fieldID, len(fieldData), string(fieldData), fieldLength)
 	}
-
 	return fields
 }

@@ -106,3 +106,10 @@ func WithSymbol(symbol *symbol.Symbol) MapViewerOption {
 		return nil
 	}
 }
+
+func WithMeshView(meshView bool) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.meshView = meshView
+		return nil
+	}
+}

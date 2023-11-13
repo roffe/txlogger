@@ -40,8 +40,8 @@ func (m *Meshgrid) MouseMoved(event *desktop.MouseEvent) {
 			m.ax = 0
 		}
 
-		if m.ay > 90 {
-			m.ay = 90
+		if m.ay > 180 {
+			m.ay = 180
 		}
 		if m.ay < -0 {
 			m.ay = 0

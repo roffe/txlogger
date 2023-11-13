@@ -69,7 +69,8 @@ type MapViewer struct {
 	xIdx, yIdx           float64
 	selectedX, SelectedY int
 
-	mesh *Meshgrid
+	meshView bool
+	mesh     *Meshgrid
 
 	// Mouse
 	selecting     bool
@@ -159,66 +160,46 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		)
 	}
 
-	mv.mesh = NewMeshgrid(mv.symbol.Float64s(), mv.numColumns, mv.numRows)
-
-	return container.NewBorder(
-		container.NewBorder(
-			mv.xAxisLabels,
-			container.NewGridWithColumns(3,
-				widget.NewButtonWithIcon("Load from File", theme.DocumentIcon(), func() {
-					if mv.symbol != nil {
-						mv.zData = mv.symbol.Ints()
-						mv.Refresh()
-					}
-				}),
-				widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
-					if mv.loadFunc != nil {
-						mv.loadFunc()
-					}
-				}),
-				//widget.NewButtonWithIcon("Save to File", theme.DocumentSaveIcon(), func() {
-				//}),
-				widget.NewButtonWithIcon("Save to ECU", theme.DocumentSaveIcon(), func() {
-					if mv.saveFunc != nil {
-						mv.saveFunc(mv.zData)
-					}
-				}),
-			),
-			mv.yAxisLabels,
-			nil,
-			mv.innerView,
+	fixed := container.NewBorder(
+		mv.xAxisLabels,
+		container.NewGridWithColumns(3,
+			widget.NewButtonWithIcon("Load from File", theme.DocumentIcon(), func() {
+				if mv.symbol != nil {
+					mv.zData = mv.symbol.Ints()
+					mv.Refresh()
+				}
+			}),
+			widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
+				if mv.loadFunc != nil {
+					mv.loadFunc()
+				}
+			}),
+			//widget.NewButtonWithIcon("Save to File", theme.DocumentSaveIcon(), func() {
+			//}),
+			widget.NewButtonWithIcon("Save to ECU", theme.DocumentSaveIcon(), func() {
+				if mv.saveFunc != nil {
+					mv.saveFunc(mv.zData)
+				}
+			}),
 		),
+		mv.yAxisLabels,
 		nil,
-		nil,
-		nil,
-		/*
-			container.NewBorder(
-				nil,
-				container.NewGridWithColumns(4,
-					widget.NewButton("<", func() {
-						mv.mesh.RotateMeshgrid(0, -1, 0)
-						mv.mesh.Refresh()
-					}),
-					widget.NewButton("^", func() {
-						mv.mesh.RotateMeshgrid(1, 0, 0)
-						mv.mesh.Refresh()
-					}),
-					widget.NewButton("v", func() {
-						mv.mesh.RotateMeshgrid(-1, 0, 0)
-						mv.mesh.Refresh()
-					}),
-					widget.NewButton(">", func() {
-						mv.mesh.RotateMeshgrid(0, 1, 0)
-						mv.mesh.Refresh()
-					}),
-				),
-				nil,
-				nil,
-				mv.mesh,
-			),
-		*/
-		mv.mesh,
+		mv.innerView,
 	)
+
+	if mv.meshView {
+		mv.mesh = NewMeshgrid(mv.symbol.Float64s(), mv.numColumns, mv.numRows)
+		return container.NewBorder(
+			fixed,
+			nil,
+			nil,
+			nil,
+			mv.mesh,
+		)
+	}
+
+	return fixed
+
 }
 
 func (mv *MapViewer) Info() MapViewerInfo {
@@ -403,10 +384,10 @@ func (mv *MapViewer) Refresh() {
 			r.Refresh()
 		}
 	}
-	mv.mesh.SetMin(float64(mv.min) * mv.zCorrFac)
-	mv.mesh.SetMax(float64(mv.max) * mv.zCorrFac)
 
 	if mv.mesh != nil {
+		mv.mesh.SetMin(float64(mv.min) * mv.zCorrFac)
+		mv.mesh.SetMax(float64(mv.max) * mv.zCorrFac)
 		var values []float64
 		for _, v := range mv.zData {
 			values = append(values, float64(v)*mv.zCorrFac)

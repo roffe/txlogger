@@ -231,6 +231,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			widgets.WithUpdateFunc(updateFunc),
 			widgets.WithLoadFunc(loadFunc),
 			widgets.WithSaveFunc(saveFunc),
+			widgets.WithMeshView(mw.settings.GetMeshView()),
 		)
 		if err != nil {
 			mw.Log(err.Error())

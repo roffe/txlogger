@@ -197,8 +197,8 @@ func (mw *MainWindow) closeIntercept() {
 	mw.Close()
 }
 
-func (mw *MainWindow) createLeading() {
-	mw.leading = container.NewBorder(
+func (mw *MainWindow) createLeading() *fyne.Container {
+	return container.NewBorder(
 		container.NewVBox(
 			container.NewBorder(
 				nil,
@@ -226,9 +226,10 @@ func (mw *MainWindow) createLeading() {
 	)
 }
 
-func (mw *MainWindow) render() *container.Split {
-	mw.createLeading()
-	return &container.Split{
+func (mw *MainWindow) render() fyne.CanvasObject {
+	mw.leading = mw.createLeading()
+	tab := container.NewAppTabs()
+	tab.Append(container.NewTabItem("Realtime", &container.Split{
 		Offset:     0.7,
 		Horizontal: true,
 		Leading:    mw.leading,
@@ -254,7 +255,7 @@ func (mw *MainWindow) render() *container.Split {
 					mw.dashboardBtn,
 					mw.logplayerBtn,
 					mw.helpBtn,
-					mw.settingsBtn,
+					//mw.settingsBtn,
 					container.NewGridWithColumns(2,
 						mw.capturedCounterLabel,
 						mw.errorCounterLabel,
@@ -262,8 +263,11 @@ func (mw *MainWindow) render() *container.Split {
 				),
 			},
 		},
-	}
+	}))
 
+	tab.Append(container.NewTabItem("Maps", widget.NewLabel("Maps")))
+	tab.Append(container.NewTabItem("Settings", mw.settings))
+	return tab
 }
 
 func (mw *MainWindow) Log(s string) {

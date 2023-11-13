@@ -2,11 +2,10 @@ package widgets
 
 import (
 	"errors"
-	"fmt"
 	"log"
+	"strconv"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
@@ -19,6 +18,7 @@ const (
 	prefsAutoUpdateLoadEcu = "autoUpdateLoadEcu"
 	prefsAutoUpdateSaveEcu = "autoUpdateSaveEcu"
 	prefsLivePreview       = "livePreview"
+	prefsMeshView          = "liveMeshView"
 )
 
 type SettingsWidget struct {
@@ -29,6 +29,7 @@ type SettingsWidget struct {
 	autoSave    *widget.Check
 	autoLoad    *widget.Check
 	livePreview *widget.Check
+	meshView    *widget.Check
 
 	container *fyne.Container
 
@@ -51,6 +52,10 @@ func (sw *SettingsWidget) GetLivePreview() bool {
 	return sw.livePreview.Checked
 }
 
+func (sw *SettingsWidget) GetMeshView() bool {
+	return sw.meshView.Checked
+}
+
 func NewSettingsWidget() *SettingsWidget {
 	sw := &SettingsWidget{}
 	sw.ExtendBaseWidget(sw)
@@ -61,22 +66,12 @@ func NewSettingsWidget() *SettingsWidget {
 	sw.autoSave = sw.newAutoUpdateSave()
 	sw.autoLoad = sw.newAutoUpdateLoad()
 	sw.livePreview = sw.newLivePreview()
+	sw.meshView = sw.newMeshView()
 
 	logPath := widget.NewEntry()
 	logPath.SetText(datalogger.LOGPATH)
 
-	sw.container = container.NewBorder(
-		container.NewVBox(
-			widget.NewLabel("Settings"),
-			canvas.NewLine(theme.SeparatorColor()),
-		),
-		widget.NewButtonWithIcon("Save & Close", theme.ConfirmIcon(), func() {
-			if sw.OnClose != nil {
-				sw.OnClose()
-			}
-		}),
-		nil,
-		nil,
+	sw.container =
 		container.NewVBox(
 			container.NewBorder(
 				nil,
@@ -126,8 +121,15 @@ func NewSettingsWidget() *SettingsWidget {
 				nil,
 				sw.livePreview,
 			),
-		),
-	)
+			widget.NewSeparator(),
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewIcon(theme.ViewFullScreenIcon()),
+				nil,
+				sw.meshView,
+			),
+		)
 	sw.loadPrefs()
 	return sw
 }
@@ -135,13 +137,19 @@ func NewSettingsWidget() *SettingsWidget {
 func (sw *SettingsWidget) newFreqSlider() *widget.Slider {
 	slider := widget.NewSlider(5, 100)
 	slider.OnChanged = func(f float64) {
-		sw.freqValue.SetText(fmt.Sprintf("Freq: %0.f", f))
+		sw.freqValue.SetText(strconv.FormatFloat(f, 'f', 0, 64))
 	}
 	slider.OnChangeEnded = func(f float64) {
 		fyne.CurrentApp().Preferences().SetInt(prefsFreq, int(f))
 	}
 
 	return slider
+}
+
+func (sw *SettingsWidget) newMeshView() *widget.Check {
+	return widget.NewCheck("3D Mesh on map viewing", func(b bool) {
+		fyne.CurrentApp().Preferences().SetBool(prefsMeshView, b)
+	})
 }
 
 func (sw *SettingsWidget) newAutoUpdateLoad() *widget.Check {
@@ -169,6 +177,7 @@ func (sw *SettingsWidget) loadPrefs() {
 	sw.autoLoad.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsAutoUpdateLoadEcu, true))
 	sw.autoSave.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsAutoUpdateSaveEcu, false))
 	sw.livePreview.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsLivePreview, true))
+	sw.meshView.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsMeshView, true))
 }
 
 func (sw *SettingsWidget) CreateRenderer() fyne.WidgetRenderer {
