@@ -9,7 +9,7 @@ require (
 	github.com/avast/retry-go/v4 v4.5.0
 	github.com/fatih/color v1.16.0
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
-	github.com/roffe/gocan v0.0.0-20231104103628-3a773dab6fec
+	github.com/roffe/gocan v0.0.0-20231114170752-115691aa6b7d
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/sqweek/dialog v0.0.0-20220809060634-e981b270ebbf
 	github.com/yeka/zip v0.0.0-20180914125537-d046722c6feb
@@ -68,4 +68,4 @@ require (
 	honnef.co/go/js/dom v0.0.0-20231030024858-cb489e859d05 // indirect
 )
 
-//replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
+// replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
