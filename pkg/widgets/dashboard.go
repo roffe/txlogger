@@ -96,14 +96,14 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 			Min:     0,
 			Max:     100,
 			Steps:   20,
-			Minsize: fyne.NewSize(75, 100),
+			Minsize: fyne.NewSize(50, 100),
 		}),
 		pwm: NewVBar(&VBarConfig{
 			Title:   "PWM",
 			Min:     0,
 			Max:     100,
 			Steps:   20,
-			Minsize: fyne.NewSize(75, 100),
+			Minsize: fyne.NewSize(50, 100),
 		}),
 		engineTemp: NewDial(DialConfig{
 			Title: "tEng",
@@ -228,8 +228,8 @@ func (db *Dashboard) render() *fyne.Container {
 
 		db.nblambda,
 		db.wblambda,
-		db.throttle.Content(),
-		db.pwm.Content(),
+		db.throttle,
+		db.pwm,
 		db.checkEngine,
 		db.cruise,
 		db.knockIcon,
@@ -280,9 +280,11 @@ func (db *Dashboard) SetValue(key string, value float64) {
 		}
 	}()
 
-	if fun, ok := db.metrics[key]; ok {
-		if fun != nil {
-			fun(value)
+	if db != nil {
+		if fun, ok := db.metrics[key]; ok {
+			if fun != nil {
+				fun(value)
+			}
 		}
 	}
 
@@ -622,11 +624,11 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	db.speed.Move(fyne.NewPos(space.Width/2-db.speed.Size().Width/2, space.Height/2-db.speed.Size().Height/2+25))
 
 	// Vbar
-	pwm := db.pwm.Content()
+	pwm := db.pwm
 	pwm.Resize(fyne.NewSize(sixthWidth/3, space.Height-125))
 	pwm.Move(fyne.NewPos(sixthWidth+8, 25))
 
-	tps := db.throttle.Content()
+	tps := db.throttle
 	tps.Resize(fyne.NewSize(sixthWidth/3, space.Height-125))
 	tps.Move(fyne.NewPos(space.Width-sixthWidth-tps.Size().Width-8, 25))
 
@@ -642,7 +644,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	db.limpMode.Move(fyne.NewPos(space.Width/2-db.limpMode.Size().Width/2, space.Height/2-db.limpMode.Size().Height/2-(thirdHeight/2)))
 
 	db.checkEngine.Resize(fyne.NewSize(sixthWidth/2, thirdHeight/2))
-	db.checkEngine.Move(fyne.NewPos(space.Width-db.engineTemp.Size().Width-db.throttle.Content().Size().Width-db.checkEngine.Size().Width-15, space.Height-db.checkEngine.Size().Height-db.wblambda.Size().Height))
+	db.checkEngine.Move(fyne.NewPos(space.Width-db.engineTemp.Size().Width-db.throttle.Size().Width-db.checkEngine.Size().Width-15, space.Height-db.checkEngine.Size().Height-db.wblambda.Size().Height))
 
 	db.knockIcon.Move(fyne.NewPos((space.Width/2)-(db.checkEngine.Size().Width/2)-(sixthWidth*.7), space.Height/2-60))
 

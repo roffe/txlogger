@@ -22,6 +22,7 @@ func WithYFrom(yFrom string) MapViewerOption {
 }
 
 func WithXData(xData []int) MapViewerOption {
+	//	log.Println("WithXData", xData)
 	return func(mv *MapViewer) error {
 		mv.numColumns = len(xData)
 		mv.xData = xData
@@ -30,6 +31,7 @@ func WithXData(xData []int) MapViewerOption {
 }
 
 func WithYData(yData []int) MapViewerOption {
+	//	log.Println("WithYData", yData)
 	return func(mv *MapViewer) error {
 		mv.numRows = len(yData)
 		mv.yData = yData
@@ -38,6 +40,7 @@ func WithYData(yData []int) MapViewerOption {
 }
 
 func WithZData(zData []int) MapViewerOption {
+	//	log.Println("WithZData", zData)
 	return func(mv *MapViewer) error {
 		mv.numData = len(zData)
 		mv.zData = zData

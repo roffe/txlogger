@@ -1,6 +1,7 @@
 package widgets
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -45,10 +46,10 @@ type Meshgrid struct {
 }
 
 // NewMeshgrid creates a new Meshgrid given width, height, depth and spacing.
-func NewMeshgrid(values []float64, cols, rows int) *Meshgrid {
+func NewMeshgrid(values []float64, cols, rows int) (*Meshgrid, error) {
 	// Check if the provided values slice has the correct number of elements
 	if len(values) != cols*rows {
-		panic("The number of Z values does not match the meshgrid dimensions.")
+		return nil, fmt.Errorf("The number of Z values does not match the meshgrid dimensions.")
 	}
 	// Find min and max Z values for normalization
 	minZ, maxZ, rangeZ := findMinMaxRange(values)
@@ -104,7 +105,7 @@ func NewMeshgrid(values []float64, cols, rows int) *Meshgrid {
 	m.image.ScaleMode = canvas.ImageScaleFastest
 	m.container = container.NewStack(m.image)
 
-	return m
+	return m, nil
 }
 
 func (m *Meshgrid) createVertices(width, height float32) {
@@ -334,6 +335,15 @@ func dimmedColor(col color.RGBA) color.RGBA {
 	}
 }
 
+func dimmedColor2(col color.RGBA) color.RGBA {
+	return color.RGBA{
+		R: uint8(float64(col.R) * .10),
+		G: uint8(float64(col.G) * .10),
+		B: uint8(float64(col.B) * .10),
+		A: 127, // Use a fully opaque alpha
+	}
+}
+
 func (m *Meshgrid) drawMeshgridLines(img *image.RGBA) {
 	ti := 0
 	for i := m.rows - 1; i >= 0; i-- {
@@ -342,11 +352,40 @@ func (m *Meshgrid) drawMeshgridLines(img *image.RGBA) {
 			value := m.values[i*m.cols+j]
 			x1, y1 := m.project(vertice)
 			lineColor := m.getColorInterpolation(value)
-			dimmedLineColor := color.RGBA{
-				R: uint8(float64(lineColor.R) * dimmfactor),
-				G: uint8(float64(lineColor.G) * dimmfactor),
-				B: uint8(float64(lineColor.B) * dimmfactor),
-				A: 255, // Use a fully opaque alpha
+			dimmedLineColor := dimmedColor(lineColor)
+
+			if ti == 0 {
+				// Draw diagonal line down-right
+				if i < m.rows-1 && j < m.cols-1 {
+					downRight := m.vertices[i+1][j+1]
+					valueDownRight := m.values[(i+1)*m.cols+j+1]
+					x2, y2 := m.project(downRight)
+					endColor := m.getColorInterpolation(m.values[(i+1)*m.cols+j+1])
+					if value > valueDownRight {
+						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, dimmedColor2(endColor))
+					} else if value == valueDownRight {
+						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, endColor)
+					} else {
+						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, dimmedColor2(lineColor), endColor)
+					}
+				}
+			}
+
+			if ti == 0 {
+				// Draw diagonal line down-left
+				if j > 0 && i < m.rows-1 {
+					downLeft := m.vertices[i+1][j-1]
+					valueDownLeft := m.values[(i+1)*m.cols+j-1]
+					x2, y2 := m.project(downLeft)
+					endColor := m.getColorInterpolation(valueDownLeft)
+					if value > valueDownLeft {
+						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, dimmedColor2(endColor))
+					} else if value == valueDownLeft {
+						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, endColor)
+					} else {
+						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, dimmedColor2(lineColor), endColor)
+					}
+				}
 			}
 
 			// Draw line downward
@@ -384,40 +423,6 @@ func (m *Meshgrid) drawMeshgridLines(img *image.RGBA) {
 					m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, dimmedLineColor, endColor)
 				}
 
-			}
-
-			if ti == 0 {
-				// Draw diagonal line down-right
-				if i < m.rows-1 && j < m.cols-1 {
-					downRight := m.vertices[i+1][j+1]
-					valueDownRight := m.values[(i+1)*m.cols+j+1]
-					x2, y2 := m.project(downRight)
-					endColor := m.getColorInterpolation(m.values[(i+1)*m.cols+j+1])
-					if value > valueDownRight {
-						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, dimmedColor(endColor))
-					} else if value == valueDownRight {
-						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, endColor)
-					} else {
-						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, dimmedLineColor, endColor)
-					}
-				}
-			}
-
-			if ti == 0 {
-				// Draw diagonal line down-left
-				if j > 0 && i < m.rows-1 {
-					downLeft := m.vertices[i+1][j-1]
-					valueDownLeft := m.values[(i+1)*m.cols+j-1]
-					x2, y2 := m.project(downLeft)
-					endColor := m.getColorInterpolation(valueDownLeft)
-					if value > valueDownLeft {
-						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, dimmedColor(endColor))
-					} else if value == valueDownLeft {
-						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, endColor)
-					} else {
-						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, dimmedLineColor, endColor)
-					}
-				}
 			}
 			ti++
 			if ti == 2 {

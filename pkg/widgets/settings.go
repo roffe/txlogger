@@ -19,17 +19,19 @@ const (
 	prefsAutoUpdateSaveEcu = "autoUpdateSaveEcu"
 	prefsLivePreview       = "livePreview"
 	prefsMeshView          = "liveMeshView"
+	prefsRealtimeBars      = "realtimeBars"
 )
 
 type SettingsWidget struct {
 	widget.BaseWidget
 
-	freqSlider  *widget.Slider
-	freqValue   *widget.Label
-	autoSave    *widget.Check
-	autoLoad    *widget.Check
-	livePreview *widget.Check
-	meshView    *widget.Check
+	freqSlider   *widget.Slider
+	freqValue    *widget.Label
+	autoSave     *widget.Check
+	autoLoad     *widget.Check
+	livePreview  *widget.Check
+	meshView     *widget.Check
+	realtimeBars *widget.Check
 
 	container *fyne.Container
 
@@ -52,6 +54,10 @@ func (sw *SettingsWidget) GetLivePreview() bool {
 	return sw.livePreview.Checked
 }
 
+func (sw *SettingsWidget) GetRealtimeBars() bool {
+	return sw.realtimeBars.Checked
+}
+
 func (sw *SettingsWidget) GetMeshView() bool {
 	return sw.meshView.Checked
 }
@@ -67,6 +73,7 @@ func NewSettingsWidget() *SettingsWidget {
 	sw.autoLoad = sw.newAutoUpdateLoad()
 	sw.livePreview = sw.newLivePreview()
 	sw.meshView = sw.newMeshView()
+	sw.realtimeBars = sw.newRealtimeBars()
 
 	logPath := widget.NewEntry()
 	logPath.SetText(datalogger.LOGPATH)
@@ -76,7 +83,7 @@ func NewSettingsWidget() *SettingsWidget {
 			container.NewBorder(
 				nil,
 				nil,
-				widget.NewLabel("Frequency (Hz)"),
+				widget.NewLabel("Logging rate (Hz)"),
 				sw.freqValue,
 				sw.freqSlider,
 			),
@@ -119,8 +126,12 @@ func NewSettingsWidget() *SettingsWidget {
 				nil,
 				widget.NewIcon(theme.SearchIcon()),
 				nil,
-				sw.livePreview,
+				container.NewVBox(
+					sw.livePreview,
+					sw.realtimeBars,
+				),
 			),
+
 			widget.NewSeparator(),
 			container.NewBorder(
 				nil,
@@ -170,14 +181,20 @@ func (sw *SettingsWidget) newLivePreview() *widget.Check {
 	})
 }
 
+func (sw *SettingsWidget) newRealtimeBars() *widget.Check {
+	return widget.NewCheck("Bars on live preview of values (uncheck this if you have a slow pc)", func(b bool) {
+		fyne.CurrentApp().Preferences().SetBool(prefsRealtimeBars, b)
+	})
+}
+
 func (sw *SettingsWidget) loadPrefs() {
 	freq := fyne.CurrentApp().Preferences().IntWithFallback(prefsFreq, 25)
 	sw.freqSlider.SetValue(float64(freq))
-
 	sw.autoLoad.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsAutoUpdateLoadEcu, true))
 	sw.autoSave.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsAutoUpdateSaveEcu, false))
 	sw.livePreview.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsLivePreview, true))
 	sw.meshView.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsMeshView, true))
+	sw.realtimeBars.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsRealtimeBars, true))
 }
 
 func (sw *SettingsWidget) CreateRenderer() fyne.WidgetRenderer {

@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	rotationSensitivity = 1 // Adjust as necessary
+	rotationSensitivity = .5 // Adjust as necessary
 )
 
 func (m *Meshgrid) MouseIn(_ *desktop.MouseEvent) {

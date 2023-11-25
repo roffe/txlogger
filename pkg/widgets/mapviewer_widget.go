@@ -188,18 +188,20 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 	)
 
 	if mv.meshView {
-		mv.mesh = NewMeshgrid(mv.symbol.Float64s(), mv.numColumns, mv.numRows)
-		return container.NewBorder(
-			fixed,
-			nil,
-			nil,
-			nil,
-			mv.mesh,
-		)
+		var err error
+		mv.mesh, err = NewMeshgrid(mv.symbol.Float64s(), mv.numColumns, mv.numRows)
+		if err == nil {
+			return container.NewBorder(
+				fixed,
+				nil,
+				nil,
+				nil,
+				mv.mesh,
+			)
+		}
 	}
 
 	return fixed
-
 }
 
 func (mv *MapViewer) Info() MapViewerInfo {

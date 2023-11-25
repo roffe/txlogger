@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 
@@ -59,7 +58,7 @@ var T7SymbolsTuning = map[string][]string{
 		"StartCal.EnrFacTab",
 	},
 	"Boost": {
-		"...|BoostCal.RegMap|BoostCal.PMap|BoostCal.IMap|BoostCal.DMap",
+		//"...|BoostCal.RegMap|BoostCal.PMap|BoostCal.IMap|BoostCal.DMap",
 		"BoostCal.RegMap",
 		"BoostCal.PMap",
 		"BoostCal.IMap",
@@ -284,7 +283,7 @@ func binaryPacked(data []byte, cb func(string)) (SymbolCollection, error) {
 	var symb_count int
 	var symbols []*Symbol
 
-	os.WriteFile("adresstable.bin", data[addressTableOffset:], 0644)
+	//os.WriteFile("adresstable.bin", data[addressTableOffset:], 0644)
 
 	// parse addresstable and create symbols with generic names
 	for pos := addressTableOffset; pos < len(data)+10; pos += 10 {

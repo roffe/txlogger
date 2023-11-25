@@ -265,7 +265,7 @@ func (mw *MainWindow) render() fyne.CanvasObject {
 		},
 	}))
 
-	tab.Append(container.NewTabItem("Maps", widget.NewLabel("Maps")))
+	//tab.Append(container.NewTabItem("Maps", widget.NewLabel("Maps")))
 	tab.Append(container.NewTabItem("Settings", mw.settings))
 	return tab
 }
@@ -273,8 +273,8 @@ func (mw *MainWindow) render() fyne.CanvasObject {
 func (mw *MainWindow) Log(s string) {
 	debug.Log(s)
 	mw.outputData.Append(s)
-	mw.output.Refresh()
 	mw.output.ScrollToBottom()
+	mw.output.Refresh()
 }
 
 func (mw *MainWindow) SyncSymbols() {

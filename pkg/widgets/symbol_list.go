@@ -2,10 +2,12 @@ package widgets
 
 import (
 	"fmt"
+	"image/color"
 	"strconv"
 	"sync"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
@@ -15,13 +17,14 @@ import (
 
 type SymbolListWidget struct {
 	widget.BaseWidget
-	symbols   []*symbol.Symbol
-	entryMap  map[string]*SymbolWidgetEntry
-	entrys    []*SymbolWidgetEntry
-	container *fyne.Container
-	scroll    fyne.CanvasObject
-	mu        sync.Mutex
-	border    *fyne.Container
+	symbols    []*symbol.Symbol
+	entryMap   map[string]*SymbolWidgetEntry
+	entrys     []*SymbolWidgetEntry
+	container  *fyne.Container
+	scroll     fyne.CanvasObject
+	mu         sync.Mutex
+	border     *fyne.Container
+	updateBars bool
 }
 
 func NewSymbolListWidget(symbols ...*symbol.Symbol) *SymbolListWidget {
@@ -68,10 +71,33 @@ func (s *SymbolListWidget) render() {
 	)
 }
 
+func (s *SymbolListWidget) UpdateBars(enabled bool) {
+	s.updateBars = enabled
+}
+
 func (s *SymbolListWidget) SetValue(name string, value float64) {
 	val, found := s.entryMap[name]
 	if found {
 		f := val.symbol.Correctionfactor
+		val.value = value
+		if !val.valueSet {
+			//val.min = value
+			val.max = value
+			val.valueSet = true
+		}
+		if value < val.min {
+			val.min = value
+		}
+		if value > val.max {
+			val.max = value
+		}
+		if s.updateBars {
+			factor := float32((value - val.min) / (val.max - val.min))
+			col := GetColorInterpolation(val.min, val.max, value)
+			col.A = 30
+			val.valueBar.FillColor = col
+			val.valueBar.Resize(fyne.NewSize(factor*100, 26))
+		}
 		switch f {
 		case 1:
 			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 0, 64))
@@ -228,7 +254,6 @@ func (sr *SymbolListWidgetRenderer) Objects() []fyne.CanvasObject {
 
 type SymbolWidgetEntry struct {
 	widget.BaseWidget
-
 	symbol                 *symbol.Symbol
 	symbolName             *widget.Entry
 	symbolValue            *widget.Label
@@ -236,10 +261,15 @@ type SymbolWidgetEntry struct {
 	symbolType             *widget.Label
 	symbolCorrectionfactor *widget.Entry
 	deleteBTN              *widget.Button
+	valueBar               *canvas.Rectangle
 
 	container *fyne.Container
 
 	deleteFunc func(*SymbolWidgetEntry)
+
+	valueSet bool
+	value    float64
+	min, max float64
 }
 
 func NewSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry)) *SymbolWidgetEntry {
@@ -261,7 +291,11 @@ func NewSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry
 			sw.deleteFunc(sw)
 		}
 	})
+
+	sw.valueBar = canvas.NewRectangle(color.RGBA{255, 0, 0, 255})
+
 	sw.container = container.NewWithoutLayout(
+		sw.valueBar,
 		sw.symbolName,
 		sw.symbolValue,
 		sw.symbolNumber,
@@ -269,7 +303,6 @@ func NewSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry
 		sw.symbolCorrectionfactor,
 		sw.deleteBTN,
 	)
-
 	return sw
 }
 
@@ -335,6 +368,7 @@ func (sr *SymbolWidgetEntryRenderer) Layout(size fyne.Size) {
 	x += sw.symbolName.Size().Width + padd
 
 	sw.symbolValue.Move(fyne.NewPos(x, 0))
+	sw.valueBar.Move(fyne.NewPos(x, 6))
 	x += sw.symbolValue.Size().Width + padd
 
 	sw.symbolNumber.Move(fyne.NewPos(x, 0))

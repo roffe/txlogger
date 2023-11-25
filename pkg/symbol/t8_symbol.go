@@ -1,7 +1,9 @@
 package symbol
 
 import (
+	"encoding/binary"
 	"fmt"
+	"log"
 )
 
 var T8SymbolsTuningOrder = []string{
@@ -116,7 +118,42 @@ func LoadT8Symbols(fileBytes []byte, cb func(string)) (SymbolCollection, error) 
 		return nil, err
 	}
 
+	nqCount := CountNq(fileBytes, NqNqNqOffset-2)
+
+	priOffset, err := GetAddressFromOffset(fileBytes, NqNqNqOffset-((nqCount*2)+6))
+	if err != nil {
+		return nil, err
+	}
+
+	secOffset := DetermineSecondaryOffset(fileBytes)
+	log.Printf("priOffset: 0x%X\n", priOffset)
+	log.Printf("secOffset: 0x%X\n", secOffset)
+
+	openBin := false
+
 	for i, sym := range symbols {
+		if sym.Address >= 0x100000 {
+			if sym.Type != 0xFF && sym.Type&0x22 == 0x02 {
+				//				log.Println("asdXX")
+				var actAddress uint32
+				if !openBin {
+					if sym.Address+uint32(sym.Length) <= (0x100000+32768) && sym.Address >= uint32(priOffset) {
+						actAddress = sym.Address - uint32(priOffset)
+					}
+				} else {
+					if sym.Address+uint32(sym.Length) <= (0x100000+32768) && sym.Address >= uint32(secOffset) {
+						actAddress = sym.Address - uint32(secOffset)
+					} else if sym.Address >= (0x100000+32768) && sym.Address >= uint32(priOffset) {
+						actAddress = sym.Address - uint32(priOffset)
+					}
+				}
+				if actAddress+uint32(sym.Length) <= 0x100000 && actAddress > 0 {
+					sym.Address = actAddress
+				}
+			}
+
+		}
+
 		sym.Name = names[i+1]
 		sym.Unit = GetUnit(sym.Name)
 		sym.Correctionfactor = GetCorrectionfactor(sym.Name)
@@ -139,7 +176,7 @@ func LoadT8Symbols(fileBytes []byte, cb func(string)) (SymbolCollection, error) 
 
 func extractT8SymbolData(sym *Symbol, data []byte) {
 	if sym.Address < 0x020000 || sym.Address+uint32(sym.Length) > uint32(len(data)) {
-		//log.Println("out of fisring")
+		//	log.Printf("Symbol %s out of range: 0x%X - 0x%X\n", sym.Name, sym.Address, sym.Address+uint32(sym.Length))
 		return
 	}
 	sym.data = data[sym.Address : sym.Address+uint32(sym.Length)]
@@ -302,6 +339,82 @@ func FindAddressTableOffset(data []byte) error {
 		return ErrAddressTableOffsetNotFound
 	}
 	return nil
+}
+
+// readU32 reads a 32-bit unsigned integer from a byte slice at a specified position.
+func readU32(data []byte, pos uint32) uint32 {
+	return binary.BigEndian.Uint32(data[pos : pos+4])
+}
+
+// ReadAddressPair checks for a pattern match and reads two addresses if successful.
+func ReadAddressPair(data []byte, pos uint32) (uint32, uint32, bool) {
+	addrPat := []byte{0x20, 0x3C, 0x00}
+	addrMsk := []byte{0xf1, 0xbf, 0xff}
+
+	var addr1, addr2 uint32
+
+	if MatchPattern(data, pos, addrPat, addrMsk) &&
+		MatchPattern(data, pos+6, addrPat, addrMsk) &&
+		(pos+12) <= uint32(len(data)) {
+		addr1 = readU32(data, pos+2)
+		addr2 = readU32(data, pos+8)
+		return addr1, addr2, true
+	}
+
+	return 0, 0, false
+}
+
+// DecodeDataCpy decodes data copy operation based on address pairs.
+func DecodeDataCpy(data []byte, pos uint32) int {
+	pos += 8
+
+	addr1, addr2, ok := ReadAddressPair(data, pos)
+	if ok {
+		if addr1 >= 0x100000 && addr1 < 0x108000 && addr2 < 0x100000 {
+			return int(addr1 - addr2)
+		}
+		// Additional logic can be implemented here as needed.
+	}
+	return 0
+}
+
+// DetermineSecondaryOffset determines the secondary offset from the data.
+func DetermineSecondaryOffset(data []byte) int {
+	initFunc := readU32(data, 0x20004)
+
+	if initFunc >= 0x20008 &&
+		initFunc <= (0x100000-6) &&
+		(initFunc&1) == 0 {
+
+		if data[initFunc] == 0x4e &&
+			data[initFunc+1] == 0xb9 &&
+			data[initFunc+2] == 0x00 {
+
+			nextJump := readU32(data, initFunc+2)
+			if nextJump >= 0x20008 &&
+				nextJump <= (0x100000-6) &&
+				(nextJump&1) == 0 {
+
+				if data[nextJump] == 0x4e &&
+					data[nextJump+1] == 0xb9 &&
+					data[nextJump+2] == 0x00 {
+
+					nextJump = readU32(data, nextJump+2)
+
+					if nextJump >= 0x20008 && (nextJump&1) == 0 {
+						return DecodeDataCpy(data, nextJump)
+					}
+				}
+			}
+		}
+	}
+	return 0
+}
+
+// MatchPattern is a placeholder function for pattern matching logic.
+func MatchPattern(data []byte, pos uint32, pattern []byte, mask []byte) bool {
+	// Implement pattern matching logic here.
+	return false
 }
 
 /*

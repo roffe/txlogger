@@ -41,6 +41,9 @@ func (ic *Icon) render() {
 }
 
 func (ic *Icon) SetText(text string) {
+	if text == ic.cfg.Text {
+		return
+	}
 	ic.cfg.Text = text
 	ic.text.Text = text
 	ic.text.Refresh()

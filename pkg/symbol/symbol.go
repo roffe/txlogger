@@ -369,18 +369,25 @@ func (s *Symbol) Ints() []int {
 
 	switch {
 	case char && !signed:
+		//log.Println("uint8")
 		return s.Uint8s()
 	case char && signed:
+		//log.Println("int8")
 		return s.Int8s()
 	case !char && !long && !signed:
+		//log.Println("uint16")
 		return s.Uint16s()
 	case !char && !long && signed:
+		//log.Println("int16")
 		return s.Int16s()
 	case !char && long && !signed:
+		//log.Println("uint32")
 		return s.Uint32s()
 	case !char && long && signed:
+		//log.Println("int32")
 		return s.Int32s()
 	}
+	log.Println("xint16")
 	return s.Int16s()
 }
 

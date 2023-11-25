@@ -386,7 +386,7 @@ func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 	t.Ack(d[0], gocan.ResponseRequired)
 
 	s := int(d[5])<<8 | int(d[6])
-	k := calcen(s, method)
+	k := CalcSeed(s, method)
 
 	msgReply[5] = byte(int(k) >> 8 & int(0xFF))
 	msgReply[6] = byte(k) & 0xFF
@@ -414,7 +414,7 @@ func (t *Client) Ack(val byte, typ gocan.CANFrameType) error {
 	return t.c.Send(gocan.NewFrame(0x266, ack, typ))
 }
 
-func calcen(seed int, method int) int {
+func CalcSeed(seed int, method int) int {
 	key := seed << 2
 	key &= 0xFFFF
 	switch method {
@@ -437,6 +437,7 @@ func calcen(seed int, method int) int {
 	key &= 0xFFFF
 	return key
 }
+
 func (t *Client) splitRequest(payload []byte, responseRequired bool) []gocan.CANFrame {
 	chunkSize := 6
 	msgCount := (len(payload) + chunkSize - 1) / chunkSize

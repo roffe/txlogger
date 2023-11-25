@@ -203,7 +203,7 @@ func (c *T7Client) Start() error {
 			for {
 				select {
 				case <-c.quitChan:
-					c.OnMessage("Stop logging...")
+					c.OnMessage("Stopped logging..")
 					return nil
 				case <-gctx.Done():
 					return nil

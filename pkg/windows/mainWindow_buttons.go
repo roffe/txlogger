@@ -27,6 +27,23 @@ func (mw *MainWindow) createButtons() {
 	})
 
 	mw.loadSymbolsFileBtn = widget.NewButtonWithIcon("Load from binary", theme.FileIcon(), func() {
+		// d := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+		// 	if err != nil {
+		// 		// dialog.ShowError(err, mw)
+		// 		mw.Log(err.Error())
+		// 		return
+		// 	}
+		// 	if reader == nil {
+		// 		return
+		// 	}
+		// 	defer reader.Close()
+		// 	log.Println("lol")
+		// }, mw)
+		// d.SetFilter(storage.NewExtensionFileFilter([]string{".bin"}))
+		// d.Resize(mw.Window.Canvas().Size())
+		// d.Show()
+		// return
+
 		filename, err := sdialog.File().Filter("Binary file", "bin").Load()
 		if err != nil {
 			if err.Error() == "Cancelled" {
@@ -105,6 +122,7 @@ func (mw *MainWindow) createButtons() {
 	mw.dashboardBtn = widget.NewButtonWithIcon("Dashboard", theme.InfoIcon(), func() {
 		onClose := func() {
 			if mw.dlc != nil {
+				mw.dlc.Attach(mw.symbolList)
 				mw.dlc.Detach(mw.dashboard)
 			}
 			if mw.dashboard != nil {
@@ -119,6 +137,10 @@ func (mw *MainWindow) createButtons() {
 		mw.dashboard = widgets.NewDashboard(mw.app, mw, false, mw.logBtn, onClose)
 		if mw.dlc != nil {
 			mw.dlc.Attach(mw.dashboard)
+		}
+
+		if mw.dlc != nil {
+			mw.dlc.Detach(mw.symbolList)
 		}
 
 		mw.SetCloseIntercept(func() {
@@ -168,6 +190,7 @@ func (mw *MainWindow) createButtons() {
 			return
 		}
 		mw.startLogging()
+		mw.symbolList.UpdateBars(mw.settings.GetRealtimeBars())
 	})
 	mw.settingsBtn = mw.newSettingsBtn()
 }
