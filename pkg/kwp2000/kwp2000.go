@@ -72,6 +72,17 @@ func (t *Client) StopSession(ctx context.Context) error {
 	return t.c.Send(frame)
 }
 
+func (t *Client) TesterPresent(ctx context.Context) error {
+	payload := []byte{0x40, 0xA1, 0x01, TESTER_PRESENT}
+	frame := gocan.NewFrame(REQ_MSG_ID, payload, gocan.ResponseRequired)
+	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+	if err != nil {
+		return fmt.Errorf("TesterPresent: %w", err)
+	}
+	//	log.Println(resp)
+	return checkErr(resp)
+}
+
 func (t *Client) StartRoutineByIdentifier(ctx context.Context, id byte, extra ...byte) error {
 	payload := []byte{0x40, 0xA1, 0x03, START_ROUTINE_BY_IDENTIFIER, id}
 	payload = append(payload, extra...)

@@ -17,6 +17,7 @@ type Provider interface {
 	Start() error
 	SetRAM(address uint32, data []byte) error
 	GetRAM(address uint32, length uint32) ([]byte, error)
+	SetSymbols(symbols []*symbol.Symbol) error
 	Close()
 }
 
@@ -215,4 +216,11 @@ func (d *Client) GetRAM(address uint32, length uint32) ([]byte, error) {
 		return nil, fmt.Errorf("no provider")
 	}
 	return d.p.GetRAM(address, length)
+}
+
+func (d *Client) SetSymbols(symbols []*symbol.Symbol) error {
+	if d.p == nil {
+		return fmt.Errorf("no provider")
+	}
+	return d.p.SetSymbols(symbols)
 }

@@ -181,7 +181,6 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		loadFunc := func() {
 			if mw.dlc != nil {
 				start := time.Now()
-
 				data, err := mw.dlc.GetRAM(symZ.Address, uint32(symZ.Length))
 				if err != nil {
 					dialog.ShowError(err, w)

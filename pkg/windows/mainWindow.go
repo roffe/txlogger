@@ -3,6 +3,7 @@ package windows
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -98,11 +99,28 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		canSettings:    widgets.NewCanSettingsWidget(a),
 		captureCounter: binding.NewInt(),
 		errorCounter:   binding.NewInt(),
-		symbolList:     widgets.NewSymbolListWidget(),
-		openMaps:       make(map[string]mapviewerhandler.MapViewerWindowInterface),
-		mvh:            mapviewerhandler.New(),
-		settings:       widgets.NewSettingsWidget(),
+
+		openMaps: make(map[string]mapviewerhandler.MapViewerWindowInterface),
+		mvh:      mapviewerhandler.New(),
+		settings: widgets.NewSettingsWidget(),
 	}
+
+	updateSymbols := func(syms []*symbol.Symbol) {
+		log.Println("Updating symbols")
+		if mw.dlc != nil {
+			log.Println("Updating symbols in dlc")
+			if err := mw.dlc.SetSymbols(mw.symbolList.Symbols()); err != nil {
+				if err.Error() == "pending" {
+					log.Println("Pending")
+					return
+				}
+				mw.Log(err.Error())
+			}
+			log.Println("Updating symbols in dlc done")
+		}
+	}
+
+	mw.symbolList = widgets.NewSymbolListWidget(updateSymbols)
 
 	mw.settings.OnClose = func() {
 		mw.SetCloseIntercept(mw.closeIntercept)
@@ -304,7 +322,7 @@ func (mw *MainWindow) SyncSymbols() {
 
 func (mw *MainWindow) Disable() {
 	mw.buttonsDisabled = true
-	mw.addSymbolBtn.Disable()
+	//mw.addSymbolBtn.Disable()
 	mw.loadConfigBtn.Disable()
 	mw.saveConfigBtn.Disable()
 	mw.loadSymbolsFileBtn.Disable()
@@ -315,13 +333,13 @@ func (mw *MainWindow) Disable() {
 	}
 	mw.ecuSelect.Disable()
 	mw.canSettings.Disable()
-	mw.presetSelect.Disable()
-	mw.symbolList.Disable()
+	//mw.presetSelect.Disable()
+	//mw.symbolList.Disable()
 }
 
 func (mw *MainWindow) Enable() {
 	mw.buttonsDisabled = false
-	mw.addSymbolBtn.Enable()
+	//mw.addSymbolBtn.Enable()
 	mw.loadConfigBtn.Enable()
 	mw.saveConfigBtn.Enable()
 	mw.loadSymbolsFileBtn.Enable()
@@ -330,8 +348,8 @@ func (mw *MainWindow) Enable() {
 	mw.logBtn.Enable()
 	mw.ecuSelect.Enable()
 	mw.canSettings.Enable()
-	mw.presetSelect.Enable()
-	mw.symbolList.Enable()
+	//mw.presetSelect.Enable()
+	//mw.symbolList.Enable()
 }
 
 func (mw *MainWindow) LoadSymbolsFromECU() error {

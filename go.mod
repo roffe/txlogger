@@ -9,7 +9,7 @@ require (
 	github.com/avast/retry-go/v4 v4.5.1
 	github.com/fatih/color v1.16.0
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
-	github.com/roffe/gocan v0.0.0-20231114233324-abd50f80143b
+	github.com/roffe/gocan v0.0.0-20231126003022-e540a931408f
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/sqweek/dialog v0.0.0-20220809060634-e981b270ebbf
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9

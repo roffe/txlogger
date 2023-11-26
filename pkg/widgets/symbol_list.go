@@ -25,11 +25,13 @@ type SymbolListWidget struct {
 	mu         sync.Mutex
 	border     *fyne.Container
 	updateBars bool
+	onUpdate   func([]*symbol.Symbol)
 }
 
-func NewSymbolListWidget(symbols ...*symbol.Symbol) *SymbolListWidget {
+func NewSymbolListWidget(updateFunc func([]*symbol.Symbol), symbols ...*symbol.Symbol) *SymbolListWidget {
 	sl := &SymbolListWidget{
 		entryMap: make(map[string]*SymbolWidgetEntry),
+		onUpdate: updateFunc,
 	}
 	sl.ExtendBaseWidget(sl)
 	sl.render()
@@ -119,19 +121,23 @@ func (s *SymbolListWidget) SetValue(name string, value float64) {
 }
 
 func (s *SymbolListWidget) Disable() {
-	for _, e := range s.entrys {
-		e.symbolName.Disable()
-		e.symbolCorrectionfactor.Disable()
-		e.deleteBTN.Disable()
-	}
+	/*
+		for _, e := range s.entrys {
+			e.symbolName.Disable()
+			e.symbolCorrectionfactor.Disable()
+			e.deleteBTN.Disable()
+		}
+	*/
 }
 
 func (s *SymbolListWidget) Enable() {
-	for _, e := range s.entrys {
-		e.symbolName.Enable()
-		e.symbolCorrectionfactor.Enable()
-		e.deleteBTN.Enable()
-	}
+	/*
+		for _, e := range s.entrys {
+			e.symbolName.Enable()
+			e.symbolCorrectionfactor.Enable()
+			e.deleteBTN.Enable()
+		}
+	*/
 }
 
 func (s *SymbolListWidget) Add(symbols ...*symbol.Symbol) {
@@ -152,6 +158,7 @@ func (s *SymbolListWidget) Add(symbols ...*symbol.Symbol) {
 					delete(s.entryMap, sw.symbol.Name)
 					s.container.Remove(sw)
 					s.scroll.Refresh()
+					s.onUpdate(s.symbols)
 					break
 				}
 			}
@@ -163,6 +170,7 @@ func (s *SymbolListWidget) Add(symbols ...*symbol.Symbol) {
 		s.entryMap[sym.Name] = entry
 	}
 	s.border.Refresh()
+	s.onUpdate(s.symbols)
 }
 
 func (s *SymbolListWidget) LoadSymbols(symbols ...*symbol.Symbol) {
@@ -182,6 +190,7 @@ func (s *SymbolListWidget) LoadSymbols(symbols ...*symbol.Symbol) {
 					delete(s.entryMap, sw.symbol.Name)
 					s.container.Remove(sw)
 					s.scroll.Refresh()
+					s.onUpdate(s.symbols)
 					break
 				}
 			}
@@ -193,6 +202,7 @@ func (s *SymbolListWidget) LoadSymbols(symbols ...*symbol.Symbol) {
 		s.entryMap[sym.Name] = entry
 	}
 	s.border.Refresh()
+	s.onUpdate(s.symbols)
 }
 
 func (s *SymbolListWidget) SetSymbols(symbols ...*symbol.Symbol) {
@@ -204,8 +214,8 @@ func (s *SymbolListWidget) SetSymbols(symbols ...*symbol.Symbol) {
 }
 
 func (s *SymbolListWidget) Symbols() []*symbol.Symbol {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	//s.mu.Lock()
+	//defer s.mu.Unlock()
 	out := make([]*symbol.Symbol, len(s.symbols))
 	copy(out, s.symbols)
 	return s.symbols

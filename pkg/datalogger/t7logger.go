@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ import (
 type T7Client struct {
 	dl Logger
 
+	symbolChan chan []*symbol.Symbol
 	updateChan chan *RamUpdate
 	readChan   chan *ReadRequest
 
@@ -33,6 +35,7 @@ func NewT7(dl Logger, cfg Config) (Provider, error) {
 	return &T7Client{
 		Config:     cfg,
 		dl:         dl,
+		symbolChan: make(chan []*symbol.Symbol, 1),
 		updateChan: make(chan *RamUpdate, 1),
 		readChan:   make(chan *ReadRequest, 1),
 		quitChan:   make(chan struct{}, 2),
@@ -50,6 +53,16 @@ func NewT7(dl Logger, cfg Config) (Provider, error) {
 func (c *T7Client) Close() {
 	close(c.quitChan)
 	time.Sleep(200 * time.Millisecond)
+}
+
+func (c *T7Client) SetSymbols(symbols []*symbol.Symbol) error {
+	log.Println("SetSymbols")
+	select {
+	case c.symbolChan <- symbols:
+	default:
+		return fmt.Errorf("pending")
+	}
+	return nil
 }
 
 func (c *T7Client) SetRAM(address uint32, data []byte) error {
@@ -163,13 +176,15 @@ func (c *T7Client) Start() error {
 		if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
 			return err
 		}
+		c.OnMessage("Cleared dynamic register")
 
-		for i, v := range c.Symbols {
-			if err := kwp.DynamicallyDefineLocalIdRequest(ctx, i, v); err != nil {
+		for i, sym := range c.Symbols {
+			if err := kwp.DynamicallyDefineLocalIdRequest(ctx, i, sym); err != nil {
 				return err
 			}
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(2 * time.Millisecond)
 		}
+		c.OnMessage("Configured dynamic register")
 
 		secondTicker := time.NewTicker(time.Second)
 		defer secondTicker.Stop()
@@ -198,8 +213,8 @@ func (c *T7Client) Start() error {
 				}
 			}
 		})
-		var timeStamp time.Time
 		errg.Go(func() error {
+			var timeStamp time.Time
 			for {
 				select {
 				case <-c.quitChan:
@@ -207,6 +222,22 @@ func (c *T7Client) Start() error {
 					return nil
 				case <-gctx.Done():
 					return nil
+				case symbols := <-c.symbolChan:
+					c.Symbols = symbols
+					c.OnMessage("Reconfiguring symbols..")
+					if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
+						return err
+					}
+					c.OnMessage("Cleared dynamic register")
+					if len(c.Symbols) > 0 {
+						for i, sym := range c.Symbols {
+							if err := kwp.DynamicallyDefineLocalIdRequest(ctx, i, sym); err != nil {
+								return err
+							}
+							time.Sleep(2 * time.Millisecond)
+						}
+						c.OnMessage("Configured dynamic register")
+					}
 				case read := <-c.readChan:
 					data, err := kwp.ReadMemoryByAddress(ctx, int(read.Address), int(read.Length))
 					if err != nil {
@@ -217,6 +248,18 @@ func (c *T7Client) Start() error {
 				case upd := <-c.updateChan:
 					upd.Complete(kwp.WriteDataByAddress(ctx, upd.Address, upd.Data))
 				case <-t.C:
+					timeStamp = time.Now()
+
+					if len(c.Symbols) == 0 {
+						if err := kwp.TesterPresent(ctx); err != nil {
+							errCount++
+							errPerSecond++
+							c.ErrorCounter.Set(errCount)
+							c.OnMessage(err.Error())
+						}
+						continue
+					}
+
 					data, err := kwp.ReadDataByIdentifier(ctx, 0xF0)
 					if err != nil {
 						errCount++
@@ -225,7 +268,6 @@ func (c *T7Client) Start() error {
 						c.OnMessage(err.Error())
 						continue
 					}
-					timeStamp = time.Now()
 					r := bytes.NewReader(data)
 					for _, va := range c.Symbols {
 						if err := va.Read(r); err != nil {

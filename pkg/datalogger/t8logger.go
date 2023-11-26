@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 type T8Client struct {
 	dl Logger
 
+	symbolChan chan []*symbol.Symbol
 	updateChan chan *RamUpdate
 	readChan   chan *ReadRequest
 
@@ -32,6 +34,7 @@ func NewT8(dl Logger, cfg Config) (Provider, error) {
 	return &T8Client{
 		Config:     cfg,
 		dl:         dl,
+		symbolChan: make(chan []*symbol.Symbol, 1),
 		updateChan: make(chan *RamUpdate, 1),
 		readChan:   make(chan *ReadRequest, 1),
 		quitChan:   make(chan struct{}, 2),
@@ -43,7 +46,17 @@ func NewT8(dl Logger, cfg Config) (Provider, error) {
 
 func (c *T8Client) Close() {
 	close(c.quitChan)
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(150 * time.Millisecond)
+}
+
+func (c *T8Client) SetSymbols(symbols []*symbol.Symbol) error {
+	log.Println("SetSymbols")
+	select {
+	case c.symbolChan <- symbols:
+	default:
+		return fmt.Errorf("pending")
+	}
+	return nil
 }
 
 func (c *T8Client) SetRAM(address uint32, data []byte) error {
@@ -53,10 +66,13 @@ func (c *T8Client) SetRAM(address uint32, data []byte) error {
 	return nil
 }
 
-func (c *T8Client) GetRAM(address uint32, length uint32) ([]byte, error) {
-	req := NewReadRequest(address, length)
-	c.readChan <- req
-	return req.Data, req.Wait()
+func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
+	if address+length >= 0x100000 && address+length <= (0x100000+32768) {
+		req := NewReadRequest(address, length)
+		c.readChan <- req
+		return req.Data, req.Wait()
+	}
+	return nil, fmt.Errorf("GetRAM: address out of range: $%X", address)
 }
 
 func (c *T8Client) Start() error {
@@ -141,6 +157,7 @@ func (c *T8Client) Start() error {
 		})
 
 		errg.Go(func() error {
+			var timeStamp time.Time
 			for {
 				select {
 				case <-c.quitChan:
@@ -148,6 +165,21 @@ func (c *T8Client) Start() error {
 					return nil
 				case <-gctx.Done():
 					return nil
+				case symbols := <-c.symbolChan:
+					c.Symbols = symbols
+					c.OnMessage("Reconfiguring symbols..")
+					if err := ClearDynamicallyDefinedRegister(ctx, gm); err != nil {
+						return err
+					}
+					if len(c.Symbols) > 0 {
+						c.OnMessage("Cleared dynamic register")
+						for _, sym := range c.Symbols {
+							if err := SetUpDynamicallyDefinedRegisterBySymbol(ctx, gm, uint16(sym.Number)); err != nil {
+								return err
+							}
+						}
+						c.OnMessage("Configured dynamic register")
+					}
 				case read := <-c.readChan:
 					readAddr := read.Address
 					left := read.Length
@@ -172,7 +204,17 @@ func (c *T8Client) Start() error {
 					read.Complete(nil)
 
 				case <-t.C:
-					ts := time.Now()
+					timeStamp = time.Now()
+					if len(c.Symbols) == 0 {
+						if err := gm.TesterPresentNoResponseAllowed(); err != nil {
+							errCount++
+							errPerSecond++
+							c.ErrorCounter.Set(errCount)
+							c.OnMessage(fmt.Sprintf("Failed to send tester present: %v", err))
+						}
+						continue
+					}
+
 					data, err := gm.ReadDataByIdentifier(ctx, 0x18)
 					if err != nil {
 						errCount++
@@ -204,7 +246,7 @@ func (c *T8Client) Start() error {
 						}
 						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", left, leftovers[:n]))
 					}
-					c.produceLogLine(file, c.Symbols, ts)
+					c.produceLogLine(file, c.Symbols, timeStamp)
 					//cps++
 					count++
 					if count%10 == 0 {
@@ -225,6 +267,7 @@ func (c *T8Client) Start() error {
 		retry.DelayType(retry.FixedDelay),
 		retry.Delay(1500*time.Millisecond),
 		retry.Attempts(4),
+		retry.LastErrorOnly(true),
 		retry.OnRetry(func(n uint, err error) {
 			retries++
 			c.OnMessage(fmt.Sprintf("Retry %d: %v", n, err))
