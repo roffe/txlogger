@@ -145,23 +145,20 @@ func (s *Symbol) String() string {
 	return fmt.Sprintf("%s #%d @%X $%X type: %02X len: %d", s.Name, s.Number, s.Address, s.SramOffset, s.Type, s.Length)
 }
 
-func toValueString[N Number](number N, correctionfactor float64) string {
+func (s *Symbol) StringValue() string {
+	// return toValueString(s.Float64(), s.Correctionfactor)
 	var precission int
-	switch {
-	case correctionfactor == 0.1:
+	switch s.Correctionfactor {
+	case 0.1:
 		precission = 1
-	case correctionfactor == 0.01:
+	case 0.01, 0.0078125, 0.0009765625:
 		precission = 2
-	case correctionfactor == 0.001:
+	case 0.001:
 		precission = 3
 	default:
 		precission = 0
 	}
-	return strconv.FormatFloat(float64(number)*correctionfactor, 'f', precission, 64)
-}
-
-func (s *Symbol) StringValue() string {
-	return toValueString(s.Float64(), s.Correctionfactor)
+	return strconv.FormatFloat(s.Float64(), 'f', precission, 64)
 }
 
 func (s *Symbol) Bool() bool {
@@ -223,7 +220,6 @@ func (s *Symbol) Float64() float64 {
 			return -1
 		}
 		if s.Type&SIGNED != 0 {
-
 			return float64(s.Int16()) * s.Correctionfactor
 		}
 		return float64(s.Uint16()) * s.Correctionfactor
@@ -387,7 +383,7 @@ func (s *Symbol) Ints() []int {
 		//log.Println("int32")
 		return s.Int32s()
 	}
-	log.Println("xint16")
+	//log.Println("xint16")
 	return s.Int16s()
 }
 

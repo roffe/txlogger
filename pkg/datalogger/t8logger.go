@@ -11,12 +11,16 @@ import (
 	"github.com/avast/retry-go/v4"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/gmlan"
+	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/symbol"
 	"golang.org/x/sync/errgroup"
 )
 
 type T8Client struct {
 	dl Logger
+
+	updateChan chan *RamUpdate
+	readChan   chan *ReadRequest
 
 	quitChan chan struct{}
 	sysvars  *ThreadSafeMap
@@ -26,9 +30,11 @@ type T8Client struct {
 
 func NewT8(dl Logger, cfg Config) (Provider, error) {
 	return &T8Client{
-		dl:       dl,
-		quitChan: make(chan struct{}, 2),
-		Config:   cfg,
+		Config:     cfg,
+		dl:         dl,
+		updateChan: make(chan *RamUpdate, 1),
+		readChan:   make(chan *ReadRequest, 1),
+		quitChan:   make(chan struct{}, 2),
 		sysvars: &ThreadSafeMap{
 			values: make(map[string]string),
 		},
@@ -41,11 +47,16 @@ func (c *T8Client) Close() {
 }
 
 func (c *T8Client) SetRAM(address uint32, data []byte) error {
+	//upd := NewRamUpdate(address, data)
+	//c.updateChan <- upd
+	//return upd.Wait()
 	return nil
 }
 
 func (c *T8Client) GetRAM(address uint32, length uint32) ([]byte, error) {
-	return nil, nil
+	req := NewReadRequest(address, length)
+	c.readChan <- req
+	return req.Data, req.Wait()
 }
 
 func (c *T8Client) Start() error {
@@ -81,6 +92,10 @@ func (c *T8Client) Start() error {
 
 	err = retry.Do(func() error {
 		gm := gmlan.New(cl, 0x7e0, 0x7e8)
+
+		if err := gm.RequestSecurityAccess(ctx, 0xFD, 0, ecu.CalculateT8AccessKey); err != nil {
+			return err
+		}
 
 		if err := ClearDynamicallyDefinedRegister(ctx, gm); err != nil {
 			return err
@@ -133,6 +148,29 @@ func (c *T8Client) Start() error {
 					return nil
 				case <-gctx.Done():
 					return nil
+				case read := <-c.readChan:
+					readAddr := read.Address
+					left := read.Length
+					for left > 0 {
+						var chunk uint32
+						if left > 0xF0 {
+							chunk = 0xF0
+						} else {
+							chunk = left
+						}
+						data, err := gm.ReadMemoryByAddress(ctx, readAddr, chunk)
+						if err != nil {
+							errCount++
+							errPerSecond++
+							c.ErrorCounter.Set(errCount)
+							read.Complete(err)
+						}
+						read.Data = append(read.Data, data...)
+						left -= chunk
+						readAddr += chunk
+					}
+					read.Complete(nil)
+
 				case <-t.C:
 					ts := time.Now()
 					data, err := gm.ReadDataByIdentifier(ctx, 0x18)

@@ -285,6 +285,15 @@ func NewSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry
 	sw.symbolNumber = widget.NewLabel(strconv.Itoa(sw.symbol.Number))
 	sw.symbolType = widget.NewLabel(fmt.Sprintf("%02X", sw.symbol.Type))
 	sw.symbolCorrectionfactor = widget.NewEntry()
+
+	sw.symbolCorrectionfactor.OnChanged = func(s string) {
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return
+		}
+		sw.symbol.Correctionfactor = f
+	}
+
 	sw.SetCorrectionFactor(sym.Correctionfactor)
 	sw.deleteBTN = widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
 		if sw.deleteFunc != nil {

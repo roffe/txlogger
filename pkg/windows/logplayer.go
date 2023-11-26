@@ -346,11 +346,7 @@ func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, co
 			for k, v := range rec.Values {
 				lp.db.SetValue(k, v)
 				if len(lp.openMaps) > 0 {
-					fac := 1.0
-					if k == "ActualIn.p_AirInlet" {
-						fac = 1000
-					}
-					lp.mvh.SetValue(k, v*fac)
+					lp.mvh.SetValue(k, v)
 				}
 			}
 		}

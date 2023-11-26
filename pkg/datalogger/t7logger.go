@@ -31,11 +31,11 @@ type T7Client struct {
 
 func NewT7(dl Logger, cfg Config) (Provider, error) {
 	return &T7Client{
+		Config:     cfg,
 		dl:         dl,
 		updateChan: make(chan *RamUpdate, 1),
 		readChan:   make(chan *ReadRequest, 1),
 		quitChan:   make(chan struct{}, 2),
-		Config:     cfg,
 		sysvars: &ThreadSafeMap{
 			values: map[string]string{
 				"ActualIn.n_Engine": "0",   // comes from 0x1A0

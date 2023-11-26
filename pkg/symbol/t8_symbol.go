@@ -14,59 +14,41 @@ var T8SymbolsTuningOrder = []string{
 	"Boost",
 	"Ignition",
 	"Adaption",
-	//"Myrtilos",
 }
 
 var T8SymbolsTuning = map[string][]string{
-	"Calibration": {
-		//"AirCompCal.PressMap",
-		//"MAFCal.m_RedundantAirMap",
-		//"TCompCal.EnrFacE85Tab",
-		//"TCompCal.EnrFacTab",
-		//"VIOSMAFCal.FreqSP",
-		//"VIOSMAFCal.Q_AirInletTab2",
-	},
+	"Calibration": {},
 	"Injectors": {
-		//"InjCorrCal.BattCorrTab",
-		//"InjCorrCal.BattCorrSP",
-		//"InjCorrCal.InjectorConst",
+		"InjCorrCal.InjectorConst",
+		"InjCorrCal.BattCorrTab",
+		"InjCorrCal.BattCorrSP",
 	},
 	"Limiters": {
 		"BstKnkCal.MaxAirmass",
-		//"TorqueCal.M_ManGearLim",
+		"AirCtrlCal.AirmassLimiter",
 	},
 	"Fuel": {
-		//"BFuelCal.Map",
-		//"BFuelCal.StartMap",
-		//"StartCal.EnrFacE85Tab",
-		//"StartCal.EnrFacTab",
+		"BFuelCal.LambdaOneFacMap",
+		"BFuelCal.TempEnrichFacMap",
+		"FFFuelCal.TempEnrichFacMAP",
 	},
 	"Boost": {
-		"...|AirCtrlCal.RegMap|AirCtrlCal.Ppart_BoostMap|AirCtrlCal.Ipart_BoostMap|AirCtrlCal.Dpart_BoostMap",
+		//"...|AirCtrlCal.RegMap|AirCtrlCal.Ppart_BoostMap|AirCtrlCal.Ipart_BoostMap|AirCtrlCal.Dpart_BoostMap",
 		"AirCtrlCal.RegMap",
 		"AirCtrlCal.Ppart_BoostMap",
 		"AirCtrlCal.Ipart_BoostMap",
 		"AirCtrlCal.Dpart_BoostMap",
+		"AirCtrlCal.ST_BoostEnable",
+		"BoostAdapCal.ST_enable",
+		"FrompAdapCal.ST_enable",
+		"AreaAdapCal.ST_enable",
 	},
 	"Ignition": {
 		"IgnAbsCal.fi_NormalMAP",
-		//"IgnIdleCal.fi_IdleMap",
-		//"IgnNormCal.Map",
-		//"IgnStartCal.fi_StartMap",
+		"IgnAbsCal.fi_highOctanMAP",
+		"IgnAbsCal.ST_EnableOctanMaps",
 	},
-	"Adaption": {
-		//"AdpFuelCal.T_AdaptLim",
-		//"FCutCal.ST_Enable",
-		//"LambdaCal.ST_Enable",
-		//"PurgeCal.ST_PurgeEnable",
-	},
-	//"Myrtilos": {
-	//"MyrtilosCal.Launch_DisableSpeed",
-	//"MyrtilosCal.Launch_Ign_fi_Min",
-	//"MyrtilosCal.Launch_RPM",
-	//"MyrtilosCal.Launch_InjFac_at_rpm",
-	//"MyrtilosCal.Launch_PWM_max_at_stand",
-	//},
+	"Adaption": {},
 }
 
 type T8Binary struct {
@@ -132,32 +114,41 @@ func LoadT8Symbols(fileBytes []byte, cb func(string)) (SymbolCollection, error) 
 	openBin := false
 
 	for i, sym := range symbols {
+		origAddress := sym.Address
+		var actAddress uint32
 		if sym.Address >= 0x100000 {
 			if sym.Type != 0xFF && sym.Type&0x22 == 0x02 {
 				//				log.Println("asdXX")
-				var actAddress uint32
 				if !openBin {
 					if sym.Address+uint32(sym.Length) <= (0x100000+32768) && sym.Address >= uint32(priOffset) {
+						sym.SramOffset = uint32(priOffset)
 						actAddress = sym.Address - uint32(priOffset)
 					}
 				} else {
 					if sym.Address+uint32(sym.Length) <= (0x100000+32768) && sym.Address >= uint32(secOffset) {
+						sym.SramOffset = uint32(secOffset)
 						actAddress = sym.Address - uint32(secOffset)
 					} else if sym.Address >= (0x100000+32768) && sym.Address >= uint32(priOffset) {
+						sym.SramOffset = uint32(priOffset)
 						actAddress = sym.Address - uint32(priOffset)
 					}
 				}
 				if actAddress+uint32(sym.Length) <= 0x100000 && actAddress > 0 {
 					sym.Address = actAddress
+					//sym.data = extractT8SymbolData2(fileBytes, actAddress, sym.Length)
 				}
 			}
-
 		}
 
 		sym.Name = names[i+1]
 		sym.Unit = GetUnit(sym.Name)
 		sym.Correctionfactor = GetCorrectionfactor(sym.Name)
+
 		extractT8SymbolData(sym, fileBytes)
+		sym.Address = origAddress
+		//d := extractT8SymbolData2(fileBytes, actAddress, sym.Length)
+		//log.Printf("1> % X", d)
+		//log.Printf("2> % X", sym.data)
 	}
 
 	cb(fmt.Sprintf("End Of Symbol Table: 0x%X", addrtaboffset))
@@ -180,6 +171,14 @@ func extractT8SymbolData(sym *Symbol, data []byte) {
 		return
 	}
 	sym.data = data[sym.Address : sym.Address+uint32(sym.Length)]
+}
+
+func extractT8SymbolData2(data []byte, addr uint32, length uint16) []byte {
+	if addr < 0x020000 || addr+uint32(length) > uint32(len(data)) {
+		//log.Printf("Symbol out of range: 0x%X - 0x%X\n", addr, addr+uint32(length))
+		return nil
+	}
+	return data[addr : addr+uint32(length)]
 }
 
 func ReadAddressTable(data []byte, offset int) ([]*Symbol, error) {
