@@ -154,17 +154,22 @@ func (mv *MapViewer) finalizeSelection(eventPos fyne.Position) {
 
 func (mv *MapViewer) showPopupMenu(pos fyne.Position) {
 	if mv.popup == nil {
-		menu := fyne.NewMenu("",
+		menu := fyne.NewMenu("Opts",
 			fyne.NewMenuItem("Copy", func() {
 				mv.copy()
 			}),
-			fyne.NewMenuItem("Paste", func() {
-				mv.paste()
-			}),
-			fyne.NewMenuItem("Smooth", func() {
-				mv.smooth()
-			}),
 		)
+
+		if mv.editable {
+			menu.Items = append(menu.Items,
+				fyne.NewMenuItem("Paste", func() {
+					mv.paste()
+				}),
+				fyne.NewMenuItem("Smooth", func() {
+					mv.smooth()
+				}),
+			)
+		}
 		popupMenu := widget.NewPopUpMenu(menu,
 			fyne.CurrentApp().Driver().CanvasForObject(mv),
 		)

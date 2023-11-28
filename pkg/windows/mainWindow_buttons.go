@@ -15,7 +15,7 @@ import (
 
 func (mw *MainWindow) createButtons() {
 	mw.addSymbolBtn = widget.NewButtonWithIcon("Add", theme.ContentAddIcon(), func() {
-		sym := mw.symbols.GetByName(mw.symbolLookup.Text)
+		sym := mw.fw.GetByName(mw.symbolLookup.Text)
 		if sym == nil {
 			dialog.ShowError(fmt.Errorf("symbol not found"), mw)
 			return
@@ -169,7 +169,7 @@ func (mw *MainWindow) createButtons() {
 			mw.SetFullScreen(false)
 			mw.SetContent(mw.Content())
 		}
-		go NewLogPlayer(mw.app, filename, mw.symbols, onClose)
+		go NewLogPlayer(mw.app, filename, mw.fw, onClose)
 	})
 
 	mw.logBtn = widget.NewButtonWithIcon("Start logging", theme.MediaPlayIcon(), func() {

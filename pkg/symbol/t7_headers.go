@@ -46,6 +46,14 @@ func (h *T7HeaderField) Int32() int {
 	return int(binary.LittleEndian.Uint32(h.Data))
 }
 
+func (h *T7HeaderField) Uint32() int {
+	if len(h.Data) < 4 {
+		panic("data should have at least 4 bytes")
+	}
+
+	return int(binary.BigEndian.Uint32(h.Data))
+}
+
 func (t7 *T7File) loadHeaders() {
 	for _, h := range t7.GetHeaders() {
 		switch h.ID {
@@ -101,7 +109,7 @@ func (t7 *T7File) loadHeaders() {
 		case 0xFD:
 			t7.romChecksumType = h.Int32()
 		case 0xFE:
-			t7.fwLength = h.Int32()
+			t7.fwLength = h.Uint32()
 		}
 	}
 	if (t7.chassisIDCounter > 1 || !t7.immocodeDetected || !t7.chassisIDDetected) && t7.autoFixFooter {

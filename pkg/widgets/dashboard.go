@@ -523,6 +523,59 @@ func (db *Dashboard) NewDebugBar() *fyne.Container {
 	)
 }
 
+func lambdaToString(v float64) string {
+	switch v {
+	case 0:
+		return "Closed loop activated"
+	case 1:
+		return "Load to high during a specific time"
+	case 2:
+		return "Load to low"
+	case 3:
+		return "Load to high, no knocking"
+	case 4:
+		return "Load to high, knocking"
+	case 5:
+		return "Cooling water temp to low, closed throttle"
+	case 6:
+		return "Cooling water temp to low, open throttle"
+	case 7:
+		return "Engine speed to low"
+	case 8:
+		return "Throttle transient in progress"
+	case 9:
+		return "Throttle transient in progress and low temp"
+	case 10:
+		return "Fuel cut"
+	case 11:
+		return "Load to high and exhaust temperature algorithm decides it is time to enrich."
+	case 12:
+		return "Diagnostic failure that affects the lambda control"
+	case 13:
+		return "Cloosed loop not enabled"
+	case 14:
+		return "Waiting number of combustion before hardware check" //, ie U_lambda_probe < 300mV AND U_lambda_probe > 600mV"
+	case 15:
+		return "Waiting until engine probe is warm"
+	case 16:
+		return "Waiting until number of combustions have past after probe is warm"
+	case 17:
+		return "SAI request open loop"
+	case 18:
+		return "Number of combustion to start closed loop has not passed. Only active when SAI is activated"
+	case 19:
+		return "Lambda integrator is freezed to 0 by SAI Lean Clamp"
+	case 20:
+		return "Catalyst diagnose for V6 controls the fuel"
+	case 21:
+		return "Gas hybrid active, T7 lambdacontrol stopped"
+	case 22:
+		return "Lambda integrator may not decrease below 0 during start"
+	default:
+		return "Unknown"
+	}
+}
+
 func airDemToString(v float64) string {
 	switch v {
 	case 10:

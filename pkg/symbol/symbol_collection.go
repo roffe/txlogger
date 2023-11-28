@@ -20,12 +20,11 @@ type Collection struct {
 	symbols   []*Symbol
 	nameMap   map[string]*Symbol
 	numberMap map[int]*Symbol
-
-	count int
-	mu    sync.Mutex
+	count     int
+	mu        sync.Mutex
 }
 
-func NewCollection(symbols ...*Symbol) SymbolCollection {
+func NewCollection(symbols ...*Symbol) *Collection {
 	c := &Collection{
 		symbols:   symbols,
 		nameMap:   make(map[string]*Symbol),
@@ -63,11 +62,12 @@ func (c *Collection) Add(symbols ...*Symbol) {
 }
 
 func (c *Collection) Symbols() []*Symbol {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	out := make([]*Symbol, len(c.symbols))
-	copy(out, c.symbols)
-	return out
+	// c.mu.Lock()
+	// defer c.mu.Unlock()
+	// out := make([]*Symbol, len(c.symbols))
+	// copy(out, c.symbols)
+	// return out
+	return c.symbols
 }
 
 func (c *Collection) Count() int {

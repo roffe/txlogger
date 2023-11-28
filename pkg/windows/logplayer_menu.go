@@ -82,6 +82,7 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 			widgets.WithXFrom(axis.XFrom),
 			widgets.WithYFrom(axis.YFrom),
 			widgets.WithInterPolFunc(interpolate.Interpolate),
+			widgets.WithEditable(false),
 		)
 		if err != nil {
 

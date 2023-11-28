@@ -55,7 +55,7 @@ type T8Binary struct {
 }
 
 func LoadT8Symbols(fileBytes []byte, cb func(string)) (SymbolCollection, error) {
-	if err := ValidateTrionic8File(fileBytes); err != nil {
+	if err := IsTrionic8File(fileBytes); err != nil {
 		return nil, err
 	}
 
@@ -173,6 +173,7 @@ func extractT8SymbolData(sym *Symbol, data []byte) {
 	sym.data = data[sym.Address : sym.Address+uint32(sym.Length)]
 }
 
+/*
 func extractT8SymbolData2(data []byte, addr uint32, length uint16) []byte {
 	if addr < 0x020000 || addr+uint32(length) > uint32(len(data)) {
 		//log.Printf("Symbol out of range: 0x%X - 0x%X\n", addr, addr+uint32(length))
@@ -180,6 +181,7 @@ func extractT8SymbolData2(data []byte, addr uint32, length uint16) []byte {
 	}
 	return data[addr : addr+uint32(length)]
 }
+*/
 
 func ReadAddressTable(data []byte, offset int) ([]*Symbol, error) {
 	pos := offset - 17
@@ -211,7 +213,7 @@ func ReadAddressTable(data []byte, offset int) ([]*Symbol, error) {
 	return symbols, nil
 }
 
-func ValidateTrionic8File(data []byte) error {
+func IsTrionic8File(data []byte) error {
 	if len(data) != 0x100000 {
 		return ErrInvalidLength
 	}

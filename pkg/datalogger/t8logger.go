@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 	"time"
 
@@ -50,7 +49,6 @@ func (c *T8Client) Close() {
 }
 
 func (c *T8Client) SetSymbols(symbols []*symbol.Symbol) error {
-	log.Println("SetSymbols")
 	select {
 	case c.symbolChan <- symbols:
 	default:

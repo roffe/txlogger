@@ -11,8 +11,7 @@ const (
 
 type T7File struct {
 	autoFixFooter bool
-	data          []byte           // the raw data
-	Symbols       SymbolCollection // parsed symbols
+	data          []byte // the raw data
 
 	chassisIDDetected           bool
 	immocodeDetected            bool
@@ -49,13 +48,14 @@ type T7File struct {
 	lastModifiedBy  []byte
 
 	csumArea [16]T7ChecksumArea
+
+	*Collection // the symbol collection
 }
 
 func NewT7File(data []byte, autoFixFooter bool) (*T7File, error) {
 	t7 := &T7File{
-		autoFixFooter: autoFixFooter,
-		data:          data,
-		//Symbols:         symbols,
+		autoFixFooter:   autoFixFooter,
+		data:            data,
 		chassisID:       "00000000000000000",
 		immobilizerID:   "000000000000000",
 		engineType:      "0000000000000",
@@ -73,12 +73,29 @@ func NewT7File(data []byte, autoFixFooter bool) (*T7File, error) {
 
 func (t7 *T7File) init() (*T7File, error) {
 	t7.loadHeaders()
-	var err error
-	t7.Symbols, err = LoadT7Symbols(t7.data, func(s string) {
+	symbols, err := LoadT7Symbols(t7.data, func(s string) {
 		log.Println(s)
 	})
 	if err != nil {
 		return nil, err
 	}
-	return t7, nil
+	t7.Collection = symbols
+	return t7, t7.VerifyChecksum()
+}
+
+func (t7 *T7File) UpdateSymbol(sym *Symbol) error {
+	addr := sym.Address
+	if sym.Address > 0x7FFFFF {
+		if sym.Address-sym.SramOffset > uint32(len(t7.data)) {
+			return ErrAddressOutOfRange
+		}
+		addr = sym.Address - sym.SramOffset
+	}
+	log.Printf("Updating Symbol %s at %X, %X", sym.Name, addr, sym.data)
+	copy(t7.data[addr:addr+uint32(sym.Length)], sym.data[:sym.Length])
+	return nil
+}
+
+func (t7 *T7File) Bytes() []byte {
+	return t7.data
 }

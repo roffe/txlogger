@@ -116,3 +116,10 @@ func WithMeshView(meshView bool) MapViewerOption {
 		return nil
 	}
 }
+
+func WithEditable(editable bool) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.editable = editable
+		return nil
+	}
+}

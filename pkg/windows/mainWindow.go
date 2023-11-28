@@ -3,7 +3,6 @@ package windows
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -76,7 +75,8 @@ type MainWindow struct {
 	loggingRunning bool
 
 	symbolList *widgets.SymbolListWidget
-	symbols    symbol.SymbolCollection
+
+	fw symbol.Firmware
 
 	dlc       datalogger.Logger
 	dashboard *widgets.Dashboard
@@ -106,17 +106,17 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 	}
 
 	updateSymbols := func(syms []*symbol.Symbol) {
-		log.Println("Updating symbols")
+		//log.Println("Updating symbols")
 		if mw.dlc != nil {
-			log.Println("Updating symbols in dlc")
+			//log.Println("Updating symbols in dlc")
 			if err := mw.dlc.SetSymbols(mw.symbolList.Symbols()); err != nil {
 				if err.Error() == "pending" {
-					log.Println("Pending")
+					//log.Println("Pending")
 					return
 				}
 				mw.Log(err.Error())
 			}
-			log.Println("Updating symbols in dlc done")
+			//log.Println("Updating symbols in dlc done")
 		}
 	}
 
@@ -197,7 +197,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 	})
 
 	mw.loadPrefs(filename)
-	if mw.symbols == nil {
+	if mw.fw == nil {
 		mw.setTitle("No symbols loaded")
 	}
 
@@ -296,13 +296,13 @@ func (mw *MainWindow) Log(s string) {
 }
 
 func (mw *MainWindow) SyncSymbols() {
-	if mw.symbols == nil {
+	if mw.fw == nil {
 		mw.Log("Load bin to sync symbols")
 		return
 	}
 	cnt := 0
 	for _, v := range mw.symbolList.Symbols() {
-		sym := mw.symbols.GetByName(v.Name)
+		sym := mw.fw.GetByName(v.Name)
 		if sym != nil {
 			v.Name = sym.Name
 			v.Number = sym.Number
@@ -365,14 +365,14 @@ func (mw *MainWindow) LoadSymbolsFromECU() error {
 		if err != nil {
 			return err
 		}
-		mw.symbols = symbols
+		mw.fw = symbols
 		mw.SyncSymbols()
 	case "T8":
 		symbols, err := ecu.GetSymbolsT8(ctx, device, mw.Log)
 		if err != nil {
 			return err
 		}
-		mw.symbols = symbols
+		mw.fw = symbols
 		mw.SyncSymbols()
 	}
 
@@ -390,7 +390,7 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 
 	mw.ecuSelect.SetSelected(ecuType.String())
 
-	mw.symbols = symbols
+	mw.fw = symbols
 	mw.SyncSymbols()
 
 	//os.WriteFile("symbols.txt", []byte(symbols.Dump()), 0644)

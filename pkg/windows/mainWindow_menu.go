@@ -60,7 +60,7 @@ func (mw *MainWindow) setupMenu() {
 					mw.SetFullScreen(false)
 					mw.SetContent(mw.Content())
 				}
-				go NewLogPlayer(mw.app, filename, mw.symbols, onClose)
+				go NewLogPlayer(mw.app, filename, mw.fw, onClose)
 			}),
 			fyne.NewMenuItem("Open log folder", func() {
 				if _, err := os.Stat("logs"); os.IsNotExist(err) {
@@ -88,11 +88,11 @@ func (mw *MainWindow) openMapz(typ symbol.ECUType, mapNames ...string) {
 	mv, found := mw.openMaps[joinedNames]
 	if !found {
 		w := mw.app.NewWindow(strings.Join(mapNames, ", ") + " - Map Viewer")
-		if mw.symbols == nil {
+		if mw.fw == nil {
 			mw.Log("No binary loaded")
 			return
 		}
-		view, err := widgets.NewMapViewerMulti(typ, mw.symbols, mapNames...)
+		view, err := widgets.NewMapViewerMulti(typ, mw.fw, mapNames...)
 		if err != nil {
 			mw.Log(err.Error())
 			return
@@ -146,17 +146,17 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		//w := fyne.CurrentApp().Driver().CreateWindow("Map Viewer - " + axis.Z)
 		w := mw.app.NewWindow(axis.Z + " - Map Viewer")
 		//w.SetFixedSize(true)
-		if mw.symbols == nil {
+		if mw.fw == nil {
 			mw.Log("No binary loaded")
 			return
 		}
-		xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := mw.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
+		xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := mw.fw.GetXYZ(axis.X, axis.Y, axis.Z)
 		if err != nil {
 			mw.Log(err.Error())
 			return
 		}
 
-		symZ := mw.symbols.GetByName(axis.Z)
+		symZ := mw.fw.GetByName(axis.Z)
 
 		var mv *widgets.MapViewer
 

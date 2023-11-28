@@ -60,6 +60,9 @@ func (mv *MapViewer) copy() {
 }
 
 func (mv *MapViewer) paste() {
+	if !mv.editable {
+		return
+	}
 	cb := fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().Content()
 	split := strings.Split(cb, copyPasteSeparator)
 	for i, part := range split {
@@ -142,6 +145,9 @@ func (mv *MapViewer) smooth() {
 }
 
 func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
+	if !mv.editable {
+		return
+	}
 	//	log.Println("TypedKey", key.Name, shifted, key.Physical.ScanCode)
 	var refresh, updateCursor bool
 	switch key.Name {

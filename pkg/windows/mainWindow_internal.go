@@ -69,7 +69,7 @@ func (mw *MainWindow) newSymbolnameTypeahead() {
 	mw.symbolLookup = xwidget.NewCompletionEntry([]string{})
 	mw.symbolLookup.PlaceHolder = "Search for symbol"
 	mw.symbolLookup.OnChanged = func(s string) {
-		if mw.symbols == nil {
+		if mw.fw == nil {
 			return
 		}
 		// completion start for text length >= 3
@@ -79,7 +79,7 @@ func (mw *MainWindow) newSymbolnameTypeahead() {
 		}
 		// Get the list of possible completion
 		var results []string
-		for _, sym := range mw.symbols.Symbols() {
+		for _, sym := range mw.fw.Symbols() {
 			if strings.Contains(strings.ToLower(sym.Name), strings.ToLower(s)) {
 				results = append(results, sym.Name)
 			}

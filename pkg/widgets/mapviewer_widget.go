@@ -31,6 +31,7 @@ type MapViewerInfo struct {
 type MapViewer struct {
 	widget.BaseWidget
 
+	editable   bool
 	focused    bool
 	updateFunc UpdateFunc
 	loadFunc   LoadFunc
@@ -86,7 +87,8 @@ type MapViewer struct {
 
 func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 	mv := &MapViewer{
-		setChan: make(chan xyUpdate, 10),
+		setChan:  make(chan xyUpdate, 10),
+		editable: true,
 	}
 	mv.ExtendBaseWidget(mv)
 	for _, option := range options {

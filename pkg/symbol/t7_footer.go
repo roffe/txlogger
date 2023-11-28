@@ -35,13 +35,13 @@ func (t7 *T7File) createPiArea() {
 	}
 
 	if t7.f2ChecksumDetected {
-		pos = t7.writeFooterInt(pos, 0xF2, t7.checksumF2)
+		pos = t7.writeFooterIntx(pos, 0xF2, t7.checksumF2)
 	}
 
-	pos = t7.writeFooterInt(pos, 0xFB, t7.checksumFB)
+	pos = t7.writeFooterIntx(pos, 0xFB, t7.checksumFB)
 	pos = t7.writeFooterInt(pos, 0xFC, t7.bottomOfFlash)
 	pos = t7.writeFooterInt(pos, 0xFD, t7.romChecksumType)
-	pos = t7.writeFooterInt(pos, 0xFE, t7.fwLength)
+	pos = t7.writeFooterIntx(pos, 0xFE, t7.fwLength)
 	pos = t7.writeFooterBytes(pos, 0xFA, t7.lastModifiedBy)
 	pos = t7.writeFooterString(pos, 0x92, t7.immobilizerID)
 	pos = t7.writeFooterString(pos, 0x93, t7.ecuHardwareNr)
@@ -54,7 +54,7 @@ func (t7 *T7File) createPiArea() {
 	pos = t7.writeFooterString(pos, 0x98, t7.engineType)
 	t7.writeFooterBytes(pos, 0xF9, []byte{t7.romChecksumError})
 
-	log.Printf("pos: %d, %X", pos, t7.data[0x07FE00:])
+	//	log.Printf("pos: %d, %X", pos, t7.data[0x07FE00:])
 }
 
 func (t7 *T7File) writeFooter(pos int, h T7HeaderField) int {
@@ -93,7 +93,47 @@ func (t7 *T7File) writeFooterInt(pos int, id byte, value int) int {
 		Data:   make([]byte, 4),
 	}
 	binary.BigEndian.PutUint32(h.Data, uint32(value))
-	return t7.writeFooter(pos, h)
+
+	t7.data[pos] = h.Length
+	pos--
+	t7.data[pos] = h.ID
+	pos--
+
+	t7.data[pos] = h.Data[3]
+	pos--
+	t7.data[pos] = h.Data[2]
+	pos--
+	t7.data[pos] = h.Data[1]
+	pos--
+	t7.data[pos] = h.Data[0]
+	pos--
+
+	return pos
+}
+
+func (t7 *T7File) writeFooterIntx(pos int, id byte, value int) int {
+	h := T7HeaderField{
+		ID:     id,
+		Length: 4,
+		Data:   make([]byte, 4),
+	}
+	binary.BigEndian.PutUint32(h.Data, uint32(value))
+
+	t7.data[pos] = h.Length
+	pos--
+	t7.data[pos] = h.ID
+	pos--
+
+	t7.data[pos] = h.Data[0]
+	pos--
+	t7.data[pos] = h.Data[1]
+	pos--
+	t7.data[pos] = h.Data[2]
+	pos--
+	t7.data[pos] = h.Data[3]
+	pos--
+
+	return pos
 }
 
 func (t7 *T7File) writeFooterInt16(pos int, id byte, value int) int {
@@ -102,6 +142,6 @@ func (t7 *T7File) writeFooterInt16(pos int, id byte, value int) int {
 		Length: 2,
 		Data:   make([]byte, 2),
 	}
-	binary.BigEndian.PutUint16(h.Data, uint16(value))
+	binary.LittleEndian.PutUint16(h.Data, uint16(value))
 	return t7.writeFooter(pos, h)
 }

@@ -86,7 +86,7 @@ var T7SymbolsTuning = map[string][]string{
 	},
 }
 
-func ValidateTrionic7File(data []byte) error {
+func IsTrionic7File(data []byte) error {
 	if len(data) != 0x80000 {
 		return ErrInvalidLength
 	}
@@ -126,8 +126,8 @@ func NewFromT7Bytes(data []byte, symbol_number int) *Symbol {
 	}
 }
 
-func LoadT7Symbols(data []byte, cb func(string)) (SymbolCollection, error) {
-	if err := ValidateTrionic7File(data); err != nil {
+func LoadT7Symbols(data []byte, cb func(string)) (*Collection, error) {
+	if err := IsTrionic7File(data); err != nil {
 		return nil, err
 	}
 
@@ -153,7 +153,7 @@ func LoadT7Symbols(data []byte, cb func(string)) (SymbolCollection, error) {
 	//return nil, errors.New("not implemented")
 }
 
-func nonBinaryPacked(data []byte, cb func(string)) (SymbolCollection, error) {
+func nonBinaryPacked(data []byte, cb func(string)) (*Collection, error) {
 	symbolListOffset, err := getSymbolListOffSet(data) // 0x15FA in 5168646.BIN
 	if err != nil {
 		return nil, err
@@ -269,7 +269,7 @@ outer:
 	return symCol, nil
 }
 
-func binaryPacked(data []byte, cb func(string)) (SymbolCollection, error) {
+func binaryPacked(data []byte, cb func(string)) (*Collection, error) {
 	compressed, addressTableOffset, symbolNameTableOffset, symbolTableLength, err := getOffsets(data, cb)
 	if err != nil && !errors.Is(err, ErrSymbolTableNotFound) {
 		return nil, err

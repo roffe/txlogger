@@ -11,8 +11,8 @@ import (
 	"strconv"
 )
 
-type Number interface {
-	uint8 | int8 | uint16 | int16 | uint32 | int32 | uint64 | int64 | float64
+type Firmware interface {
+	SymbolCollection
 }
 
 type ECUType int
@@ -31,11 +31,6 @@ func (e ECUType) String() string {
 	default:
 		return "Unknown"
 	}
-}
-
-type ECUBinary interface {
-	Bytes() []byte
-	Symbols() []*Symbol
 }
 
 type Symbol struct {
@@ -70,12 +65,13 @@ func LoadSymbols(filename string, cb func(string)) (ECUType, SymbolCollection, e
 
 	cb(fmt.Sprintf("Loading %s", filepath.Base(filename)))
 
-	if err := ValidateTrionic7File(data); err == nil {
-		sym, err := LoadT7Symbols(data, cb)
+	if err := IsTrionic7File(data); err == nil {
+		sym, err := NewT7File(data, true)
+		//sym, err := LoadT7Symbols(data, cb)
 		return ECU_T7, sym, err
 	}
 
-	if err := ValidateTrionic8File(data); err == nil {
+	if err := IsTrionic8File(data); err == nil {
 		sym, err := LoadT8Symbols(data, cb)
 		return ECU_T8, sym, err
 	}
@@ -87,7 +83,7 @@ func (s *Symbol) SetData(data []byte) error {
 	if len(data) != int(s.Length) {
 		return fmt.Errorf("Symbol %s expected %d bytes, got %d", s.Name, s.Length, len(data))
 	}
-	s.data = data
+	copy(s.data, data)
 	return nil
 }
 

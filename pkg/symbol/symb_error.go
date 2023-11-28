@@ -13,4 +13,5 @@ var (
 	ErrOffsetOutOfRange           = errors.New("offset out of range")
 	ErrDataIsEmpty                = errors.New("data is empty")
 	ErrVersionNotFound            = errors.New("version not found")
+	ErrAddressOutOfRange          = errors.New("address out of range")
 )

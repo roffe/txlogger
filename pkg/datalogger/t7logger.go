@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -56,7 +55,6 @@ func (c *T7Client) Close() {
 }
 
 func (c *T7Client) SetSymbols(symbols []*symbol.Symbol) error {
-	log.Println("SetSymbols")
 	select {
 	case c.symbolChan <- symbols:
 	default:
@@ -182,7 +180,7 @@ func (c *T7Client) Start() error {
 			if err := kwp.DynamicallyDefineLocalIdRequest(ctx, i, sym); err != nil {
 				return err
 			}
-			time.Sleep(2 * time.Millisecond)
+			time.Sleep(5 * time.Millisecond)
 		}
 		c.OnMessage("Configured dynamic register")
 
@@ -234,7 +232,7 @@ func (c *T7Client) Start() error {
 							if err := kwp.DynamicallyDefineLocalIdRequest(ctx, i, sym); err != nil {
 								return err
 							}
-							time.Sleep(2 * time.Millisecond)
+							time.Sleep(5 * time.Millisecond)
 						}
 						c.OnMessage("Configured dynamic register")
 					}
