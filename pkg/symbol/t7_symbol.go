@@ -96,7 +96,7 @@ func IsTrionic7File(data []byte) error {
 	return nil
 }
 
-func NewFromT7Bytes(data []byte, symbol_number int) *Symbol {
+func newFromT7Bytes(data []byte, symbol_number int) *Symbol {
 	extractUint32 := func(data []byte, start int) uint32 {
 		return uint32(data[start])<<24 | uint32(data[start+1])<<16 | uint32(data[start+2])<<8 | uint32(data[start+3])
 	}
@@ -207,7 +207,7 @@ outer:
 		buff := data[pos : pos+14]
 		sram_address := binary.BigEndian.Uint32(buff[0:4])
 		symbol_length := binary.BigEndian.Uint16(buff[4:6])
-		internal_address := binary.BigEndian.Uint32(buff[10:14])
+		//internal_address := binary.BigEndian.Uint32(buff[10:14])
 		sym_type := buff[8]
 
 		var real_rom_address uint32
@@ -236,19 +236,19 @@ outer:
 			}
 		}
 
-		if sym.Name == "BFuelCal.E85Map" {
-			log.Println(sym.String())
-		}
+		// if sym.Name == "BFuelCal.E85Map" {
+		// 	log.Println(sym.String())
+		// }
 
-		if sym.Name == "BFuelCal.Map" {
-			log.Printf("all %X", buff)
-			log.Printf("sram address: %X", sram_address)
-			log.Printf("symbol length: %X", symbol_length)
-			log.Printf("internal address: %X", internal_address)
-			log.Printf("rest %X", buff[6:10])
-			log.Printf("real rom address: %X", real_rom_address)
-			log.Println(sym.String())
-		}
+		// if sym.Name == "BFuelCal.Map" {
+		// 	log.Printf("all %X", buff)
+		// 	log.Printf("sram address: %X", sram_address)
+		// 	log.Printf("symbol length: %X", symbol_length)
+		// 	log.Printf("internal address: %X", internal_address)
+		// 	log.Printf("rest %X", buff[6:10])
+		// 	log.Printf("real rom address: %X", real_rom_address)
+		// 	log.Println(sym.String())
+		// }
 
 		symCol.Add(sym)
 		symb_count++
@@ -290,7 +290,7 @@ func binaryPacked(data []byte, cb func(string)) (*Collection, error) {
 		if data[pos] == 0x53 && data[pos+1] == 0x43 { // SC
 			break
 		}
-		symbols = append(symbols, NewFromT7Bytes(data[pos:pos+10], symb_count))
+		symbols = append(symbols, newFromT7Bytes(data[pos:pos+10], symb_count))
 		symb_count++
 	}
 	//log.Println("Symbols found: ", symb_count)
@@ -417,8 +417,7 @@ func readSymbolData(file []byte, s *Symbol, offset uint32) ([]byte, error) {
 			debug.Log(fmt.Sprintf("%s, error reading symbol data: %v", s.String(), err))
 		}
 	}()
-	symData := make([]byte, s.Length)
-	copy(symData, file[s.Address-offset:(s.Address-offset)+uint32(s.Length)])
+	symData := file[s.Address-offset : (s.Address-offset)+uint32(s.Length)]
 	return symData, nil
 }
 

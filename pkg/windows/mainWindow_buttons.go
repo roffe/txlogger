@@ -58,6 +58,8 @@ func (mw *MainWindow) createButtons() {
 			mw.Log(err.Error())
 			return
 		}
+		mw.app.Preferences().SetString(prefsLastBinFile, filename)
+		mw.filename = filename
 	})
 
 	mw.loadSymbolsEcuBtn = widget.NewButtonWithIcon("Load from ECU", theme.DownloadIcon(), func() {

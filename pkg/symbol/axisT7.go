@@ -2539,7 +2539,7 @@ var axisT7 = AxisInformation{
 		"MAFCal.m_RedundantAirMap",
 		"rpm",
 		"map",
-		"mg/c",
+		"kPa",
 		"ActualIn.n_Engine",
 		"ActualIn.p_AirInlet",
 	},

@@ -11,10 +11,6 @@ import (
 	"strconv"
 )
 
-type Firmware interface {
-	SymbolCollection
-}
-
 type ECUType int
 
 const (
@@ -83,7 +79,7 @@ func (s *Symbol) SetData(data []byte) error {
 	if len(data) != int(s.Length) {
 		return fmt.Errorf("Symbol %s expected %d bytes, got %d", s.Name, s.Length, len(data))
 	}
-	copy(s.data, data)
+	s.data = data
 	return nil
 }
 
@@ -158,7 +154,7 @@ func (s *Symbol) StringValue() string {
 }
 
 func (s *Symbol) Bool() bool {
-	return s.data[0] == 1
+	return (s.data)[0] == 1
 }
 
 func (s *Symbol) Uint8() uint8 {
@@ -405,7 +401,7 @@ func (s *Symbol) Uint16s() []int {
 	}
 	values := make([]int, 0, len(s.data)/2)
 	for i := 0; i < len(s.data); i += 2 {
-		value := binary.BigEndian.Uint16(s.data[i : i+2])
+		value := binary.BigEndian.Uint16((s.data)[i : i+2])
 		values = append(values, int(value))
 	}
 	return values
@@ -417,7 +413,7 @@ func (s *Symbol) Int16s() []int {
 	}
 	values := make([]int, 0, len(s.data)/2)
 	for i := 0; i < len(s.data); i += 2 {
-		value := int16(binary.BigEndian.Uint16(s.data[i : i+2]))
+		value := int16(binary.BigEndian.Uint16((s.data)[i : i+2]))
 		values = append(values, int(value))
 	}
 	return values
@@ -441,7 +437,7 @@ func (s *Symbol) Int32s() []int {
 	}
 	values := make([]int, 0, len(s.data)/4)
 	for i := 0; i < len(s.data); i += 4 {
-		value := int32(binary.BigEndian.Uint32(s.data[i : i+4]))
+		value := int32(binary.BigEndian.Uint32((s.data)[i : i+4]))
 		values = append(values, int(value))
 	}
 	return values

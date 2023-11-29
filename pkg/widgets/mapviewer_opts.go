@@ -7,6 +7,10 @@ import (
 
 type MapViewerOption func(*MapViewer) error
 
+type LoadFunc func()
+type SaveFunc func([]int)
+type UpdateFunc func(idx int, value []int)
+
 func WithXFrom(xFrom string) MapViewerOption {
 	return func(mv *MapViewer) error {
 		mv.xFrom = xFrom
@@ -76,29 +80,30 @@ func WithInterPolFunc(ipf interpolate.InterPolFunc) MapViewerOption {
 	}
 }
 
-type UpdateFunc func(idx int, value []int)
-
-func WithUpdateFunc(updateFunc UpdateFunc) MapViewerOption {
+func WithSaveFileFunc(saveFileFunc SaveFunc) MapViewerOption {
 	return func(mv *MapViewer) error {
-		mv.updateFunc = updateFunc
+		mv.saveFileFunc = saveFileFunc
 		return nil
 	}
 }
 
-type LoadFunc func()
-
-func WithLoadFunc(loadFunc LoadFunc) MapViewerOption {
+func WithLoadECUFunc(loadFunc LoadFunc) MapViewerOption {
 	return func(mv *MapViewer) error {
-		mv.loadFunc = loadFunc
+		mv.loadECUFunc = loadFunc
 		return nil
 	}
 }
 
-type SaveFunc func([]int)
-
-func WithSaveFunc(saveFunc SaveFunc) MapViewerOption {
+func WithSaveECUFunc(saveECUFunc SaveFunc) MapViewerOption {
 	return func(mv *MapViewer) error {
-		mv.saveFunc = saveFunc
+		mv.saveECUFunc = saveECUFunc
+		return nil
+	}
+}
+
+func WithUpdateECUFunc(updateFunc UpdateFunc) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.updateECUFunc = updateFunc
 		return nil
 	}
 }

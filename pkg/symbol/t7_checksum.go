@@ -80,7 +80,6 @@ func (t7 *T7File) UpdateChecksum() error {
 
 	t7.clearPiArea()
 	t7.createPiArea()
-
 	return nil
 }
 
@@ -294,7 +293,7 @@ func (t7 *T7File) calculateF2Checksum() (uint32, error) {
 	var xorCount uint8 = 1
 
 	for count := 0; count < t7.fwLength && count < len(t7.data)-3; count += 4 {
-		temp := binary.BigEndian.Uint32(t7.data[count : count+4])
+		temp := binary.BigEndian.Uint32((t7.data)[count : count+4])
 		checksum += temp ^ xorTable[xorCount]
 		xorCount++
 		if xorCount > 7 {

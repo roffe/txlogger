@@ -29,12 +29,16 @@ func (mw *MainWindow) loadPrefs(filename string) {
 			if err := mw.LoadSymbolsFromFile(filename); err != nil {
 				mw.Log(err.Error())
 			}
+			mw.filename = filename
+			return
 		}
 	} else {
 		if err := mw.LoadSymbolsFromFile(filename); err != nil {
 			mw.Log(err.Error())
 		}
+		mw.filename = filename
 	}
+
 }
 
 func (mw *MainWindow) newOutputList() {

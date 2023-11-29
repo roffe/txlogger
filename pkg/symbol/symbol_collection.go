@@ -14,6 +14,7 @@ type SymbolCollection interface {
 	Dump() string
 	Count() int
 	Add(symbols ...*Symbol)
+	Save(filename string) error
 }
 
 type Collection struct {
@@ -36,6 +37,10 @@ func NewCollection(symbols ...*Symbol) *Collection {
 		c.count++
 	}
 	return c
+}
+
+func (c *Collection) Save(filename string) error {
+	return nil
 }
 
 func (c *Collection) GetByName(name string) *Symbol {
@@ -62,11 +67,11 @@ func (c *Collection) Add(symbols ...*Symbol) {
 }
 
 func (c *Collection) Symbols() []*Symbol {
-	// c.mu.Lock()
-	// defer c.mu.Unlock()
-	// out := make([]*Symbol, len(c.symbols))
-	// copy(out, c.symbols)
-	// return out
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	//out := make([]*Symbol, len(c.symbols))
+	//copy(out, c.symbols)
+	//return out
 	return c.symbols
 }
 

@@ -1,7 +1,9 @@
 package symbol
 
 import (
+	"fmt"
 	"log"
+	"os"
 )
 
 const (
@@ -91,11 +93,42 @@ func (t7 *T7File) UpdateSymbol(sym *Symbol) error {
 		}
 		addr = sym.Address - sym.SramOffset
 	}
-	log.Printf("Updating Symbol %s at %X, %X", sym.Name, addr, sym.data)
-	copy(t7.data[addr:addr+uint32(sym.Length)], sym.data[:sym.Length])
+
+	for i, b := range sym.data {
+		(t7.data)[addr+uint32(i)] = b
+	}
+
 	return nil
 }
 
 func (t7 *T7File) Bytes() []byte {
 	return t7.data
+}
+
+func (t7 *T7File) Save(filename string) error {
+	for _, sym := range t7.Symbols() {
+		addr := sym.Address
+		if sym.Address > 0x7FFFFF {
+			if sym.Address-sym.SramOffset > uint32(len(t7.data)) {
+				return ErrAddressOutOfRange
+			}
+			addr = sym.Address - sym.SramOffset
+		}
+		for idx, b := range sym.data {
+			(t7.data)[addr+uint32(idx)] = b
+		}
+	}
+
+	if err := t7.UpdateChecksum(); err != nil {
+		return err
+	}
+
+	if err := t7.VerifyChecksum(); err != nil {
+		return err
+	}
+	err := os.WriteFile(filename, t7.data, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write %s : %w", filename, err)
+	}
+	return nil
 }

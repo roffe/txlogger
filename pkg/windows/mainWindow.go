@@ -74,9 +74,9 @@ type MainWindow struct {
 
 	loggingRunning bool
 
+	filename   string
 	symbolList *widgets.SymbolListWidget
-
-	fw symbol.Firmware
+	fw         symbol.SymbolCollection
 
 	dlc       datalogger.Logger
 	dashboard *widgets.Dashboard

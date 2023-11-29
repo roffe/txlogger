@@ -31,11 +31,13 @@ type MapViewerInfo struct {
 type MapViewer struct {
 	widget.BaseWidget
 
-	editable   bool
-	focused    bool
-	updateFunc UpdateFunc
-	loadFunc   LoadFunc
-	saveFunc   SaveFunc
+	editable bool
+	focused  bool
+
+	saveFileFunc  SaveFunc
+	updateECUFunc UpdateFunc
+	loadECUFunc   LoadFunc
+	saveECUFunc   SaveFunc
 
 	tik uint8
 
@@ -87,8 +89,11 @@ type MapViewer struct {
 
 func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 	mv := &MapViewer{
-		setChan:  make(chan xyUpdate, 10),
-		editable: true,
+		setChan:       make(chan xyUpdate, 10),
+		editable:      true,
+		loadECUFunc:   func() {},
+		saveECUFunc:   func(data []int) {},
+		updateECUFunc: func(idx int, value []int) {},
 	}
 	mv.ExtendBaseWidget(mv)
 	for _, option := range options {
@@ -164,7 +169,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 
 	fixed := container.NewBorder(
 		mv.xAxisLabels,
-		container.NewGridWithColumns(3,
+		container.NewGridWithColumns(4,
 			widget.NewButtonWithIcon("Load from File", theme.DocumentIcon(), func() {
 				if mv.symbol != nil {
 					mv.zData = mv.symbol.Ints()
@@ -172,16 +177,13 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 				}
 			}),
 			widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
-				if mv.loadFunc != nil {
-					mv.loadFunc()
-				}
+				mv.loadECUFunc()
 			}),
-			//widget.NewButtonWithIcon("Save to File", theme.DocumentSaveIcon(), func() {
-			//}),
+			widget.NewButtonWithIcon("Save to File", theme.DocumentSaveIcon(), func() {
+				mv.saveFileFunc(mv.zData)
+			}),
 			widget.NewButtonWithIcon("Save to ECU", theme.DocumentSaveIcon(), func() {
-				if mv.saveFunc != nil {
-					mv.saveFunc(mv.zData)
-				}
+				mv.saveECUFunc(mv.zData)
 			}),
 		),
 		mv.yAxisLabels,
@@ -228,6 +230,11 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 		mv.tik++
 	}
 	if name == mv.yFrom || (mv.yFrom == "" && name == "ActualIn.n_Engine") {
+		if name == "ActualIn.p_AirInlet" {
+			mv.yValue = int(value * 1000)
+			mv.tik++
+			return
+		}
 		mv.yValue = int(value)
 		mv.tik++
 	}

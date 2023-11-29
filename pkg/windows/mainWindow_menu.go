@@ -3,6 +3,7 @@ package windows
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -74,9 +75,6 @@ func (mw *MainWindow) setupMenu() {
 				if err := open.Run(datalogger.LOGPATH); err != nil {
 					fyne.LogError("Failed to open logs folder", err)
 				}
-			}),
-			fyne.NewMenuItem("Settings", func() {
-				mw.Window.SetContent(mw.settings)
 			}),
 		),
 	}
@@ -217,6 +215,25 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			mw.Log(fmt.Sprintf("save %s took %s", axis.Z, time.Since(start)))
 		}
 
+		saveFileFunc := func(data []int) {
+			ss := mw.fw.GetByName(axis.Z)
+			if ss == nil {
+				mw.Log(fmt.Sprintf("failed to find symbol %s", axis.Z))
+				return
+			}
+
+			log.Println("Save", mw.filename)
+			if err := ss.SetData(ss.EncodeInts(data)); err != nil {
+				mw.Log(err.Error())
+				return
+			}
+			if err := mw.fw.Save(mw.filename); err != nil {
+				mw.Log(err.Error())
+				return
+			}
+			mw.Log(fmt.Sprintf("Saved %s", axis.Z))
+		}
+
 		mv, err = widgets.NewMapViewer(
 			widgets.WithSymbol(symZ),
 			widgets.WithXData(xData),
@@ -228,9 +245,10 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			widgets.WithXFrom(axis.XFrom),
 			widgets.WithYFrom(axis.YFrom),
 			widgets.WithInterPolFunc(interpolate.Interpolate),
-			widgets.WithUpdateFunc(updateFunc),
-			widgets.WithLoadFunc(loadFunc),
-			widgets.WithSaveFunc(saveFunc),
+			widgets.WithUpdateECUFunc(updateFunc),
+			widgets.WithLoadECUFunc(loadFunc),
+			widgets.WithSaveECUFunc(saveFunc),
+			widgets.WithSaveFileFunc(saveFileFunc),
 			widgets.WithMeshView(mw.settings.GetMeshView()),
 		)
 		if err != nil {

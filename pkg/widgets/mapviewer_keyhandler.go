@@ -106,11 +106,11 @@ func (mv *MapViewer) paste() {
 		}
 		mv.zData[index] = value
 		if len(split) < 30 {
-			mv.updateFunc(index, []int{mv.zData[index]})
+			mv.updateECUFunc(index, []int{mv.zData[index]})
 		}
 	}
 	if len(split) >= 30 {
-		mv.saveFunc(mv.zData)
+		mv.saveECUFunc(mv.zData)
 	}
 	mv.Refresh()
 }
@@ -324,15 +324,11 @@ func (mv *MapViewer) shouldFullSync(updates []updateBlock) bool {
 }
 
 func (mv *MapViewer) fullSync() {
-	if mv.saveFunc != nil {
-		mv.saveFunc(mv.zData)
-	}
+	mv.saveECUFunc(mv.zData)
 }
 
 func (mv *MapViewer) partialSync(updates []updateBlock) {
 	for _, update := range updates {
-		if mv.updateFunc != nil {
-			mv.updateFunc(update.idx, update.data)
-		}
+		mv.updateECUFunc(update.idx, update.data)
 	}
 }

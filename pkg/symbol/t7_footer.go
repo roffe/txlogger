@@ -11,7 +11,7 @@ func (t7 *T7File) clearPiArea() {
 		return
 	}
 	for i := startPosition; i < len(t7.data); i++ {
-		t7.data[i] = 0xFF
+		(t7.data)[i] = 0xFF
 	}
 	log.Println("Footer cleared")
 }

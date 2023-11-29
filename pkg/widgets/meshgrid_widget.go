@@ -49,7 +49,7 @@ type Meshgrid struct {
 func NewMeshgrid(values []float64, cols, rows int) (*Meshgrid, error) {
 	// Check if the provided values slice has the correct number of elements
 	if len(values) != cols*rows {
-		return nil, fmt.Errorf("The number of Z values does not match the meshgrid dimensions.")
+		return nil, fmt.Errorf("the number of Z values does not match the meshgrid dimensions")
 	}
 	// Find min and max Z values for normalization
 	minZ, maxZ, rangeZ := findMinMaxRange(values)

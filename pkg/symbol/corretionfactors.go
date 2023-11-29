@@ -20,7 +20,7 @@ var correctionFactors = map[string]float64{
 
 	"ActualIn.p_AirBefThrottle": 0.001,
 	"ActualIn.p_AirInlet":       0.001,
-	"AirCompCal.PressMap":       1,
+	"AirCompCal.PressMap":       0.1,
 	"BFuelCal.Map":              0.01,
 	"BFuelCal.StartMap":         0.01,
 	"BoostCal.RegMap":           0.1,
@@ -46,6 +46,7 @@ var correctionFactors = map[string]float64{
 	"Out.X_AccPos":              0.1,
 	"BstKnkCal.OffsetXSP":       0.1,
 	"InjCorrCal.BattCorrSP":     0.1,
+	"MAFCal.LoadYSP":            0.001,
 }
 
 func GetCorrectionfactor(name string) float64 {
