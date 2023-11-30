@@ -58,7 +58,7 @@ var T7SymbolsTuning = map[string][]string{
 		"StartCal.EnrFacTab",
 	},
 	"Boost": {
-		"...|BoostCal.RegMap|BoostCal.PMap|BoostCal.IMap|BoostCal.DMap",
+		//"...|BoostCal.RegMap|BoostCal.PMap|BoostCal.IMap|BoostCal.DMap",
 		"BoostCal.RegMap",
 		"BoostCal.PMap",
 		"BoostCal.IMap",
@@ -75,6 +75,7 @@ var T7SymbolsTuning = map[string][]string{
 		"FCutCal.ST_Enable",
 		"LambdaCal.ST_Enable",
 		"PurgeCal.ST_PurgeEnable",
+		"E85Cal.ST_Enable",
 	},
 	"Myrtilos": {
 		"MyrtilosCal.Launch_DisableSpeed",
@@ -85,7 +86,7 @@ var T7SymbolsTuning = map[string][]string{
 	},
 }
 
-func ValidateTrionic7File(data []byte) error {
+func IsTrionic7File(data []byte) error {
 	if len(data) != 0x80000 {
 		return ErrInvalidLength
 	}
@@ -95,7 +96,7 @@ func ValidateTrionic7File(data []byte) error {
 	return nil
 }
 
-func NewFromT7Bytes(data []byte, symb_count int) *Symbol {
+func newFromT7Bytes(data []byte, symbol_number int) *Symbol {
 	extractUint32 := func(data []byte, start int) uint32 {
 		return uint32(data[start])<<24 | uint32(data[start+1])<<16 | uint32(data[start+2])<<8 | uint32(data[start+3])
 	}
@@ -107,7 +108,7 @@ func NewFromT7Bytes(data []byte, symb_count int) *Symbol {
 	internall_address := extractUint32(data, 0)
 
 	symbol_length := uint16(0x08)
-	if symb_count != 0 {
+	if symbol_number != 0 {
 		symbol_length = extractUint16(data, 4)
 	}
 
@@ -116,8 +117,8 @@ func NewFromT7Bytes(data []byte, symb_count int) *Symbol {
 	symbol_type := data[8]
 
 	return &Symbol{
-		Name:    "Symbol-" + strconv.Itoa(symb_count),
-		Number:  symb_count,
+		Name:    "Symbol-" + strconv.Itoa(symbol_number),
+		Number:  symbol_number,
 		Address: internall_address,
 		Length:  symbol_length,
 		Mask:    symbol_mask,
@@ -125,15 +126,15 @@ func NewFromT7Bytes(data []byte, symb_count int) *Symbol {
 	}
 }
 
-func LoadT7Symbols(data []byte, cb func(string)) (SymbolCollection, error) {
-	if err := ValidateTrionic7File(data); err != nil {
+func LoadT7Symbols(data []byte, cb func(string)) (*Collection, error) {
+	if err := IsTrionic7File(data); err != nil {
 		return nil, err
 	}
 
 	for _, h := range GetAllT7HeaderFields(data) {
 		switch h.ID {
 		case 0x91, 0x94, 0x95, 0x97:
-			cb(h.String())
+			cb(h.PrettyString())
 		}
 	}
 
@@ -152,7 +153,7 @@ func LoadT7Symbols(data []byte, cb func(string)) (SymbolCollection, error) {
 	//return nil, errors.New("not implemented")
 }
 
-func nonBinaryPacked(data []byte, cb func(string)) (SymbolCollection, error) {
+func nonBinaryPacked(data []byte, cb func(string)) (*Collection, error) {
 	symbolListOffset, err := getSymbolListOffSet(data) // 0x15FA in 5168646.BIN
 	if err != nil {
 		return nil, err
@@ -188,7 +189,7 @@ outer:
 
 	// log.Printf("Search pattern: %X", searchPattern)
 
-	addressTableOffset := bytePatternSearch(data, searchPattern, 0)
+	addressTableOffset := BytePatternSearch(data, searchPattern, 0)
 	cb(fmt.Sprintf("Address table offset: %X", addressTableOffset))
 
 	if addressTableOffset == -1 {
@@ -206,7 +207,7 @@ outer:
 		buff := data[pos : pos+14]
 		sram_address := binary.BigEndian.Uint32(buff[0:4])
 		symbol_length := binary.BigEndian.Uint16(buff[4:6])
-		internal_address := binary.BigEndian.Uint32(buff[10:14])
+		//internal_address := binary.BigEndian.Uint32(buff[10:14])
 		sym_type := buff[8]
 
 		var real_rom_address uint32
@@ -235,19 +236,19 @@ outer:
 			}
 		}
 
-		if sym.Name == "BFuelCal.E85Map" {
-			log.Println(sym.String())
-		}
+		// if sym.Name == "BFuelCal.E85Map" {
+		// 	log.Println(sym.String())
+		// }
 
-		if sym.Name == "BFuelCal.Map" {
-			log.Printf("all %X", buff)
-			log.Printf("sram address: %X", sram_address)
-			log.Printf("symbol length: %X", symbol_length)
-			log.Printf("internal address: %X", internal_address)
-			log.Printf("rest %X", buff[6:10])
-			log.Printf("real rom address: %X", real_rom_address)
-			log.Println(sym.String())
-		}
+		// if sym.Name == "BFuelCal.Map" {
+		// 	log.Printf("all %X", buff)
+		// 	log.Printf("sram address: %X", sram_address)
+		// 	log.Printf("symbol length: %X", symbol_length)
+		// 	log.Printf("internal address: %X", internal_address)
+		// 	log.Printf("rest %X", buff[6:10])
+		// 	log.Printf("real rom address: %X", real_rom_address)
+		// 	log.Println(sym.String())
+		// }
 
 		symCol.Add(sym)
 		symb_count++
@@ -268,7 +269,7 @@ outer:
 	return symCol, nil
 }
 
-func binaryPacked(data []byte, cb func(string)) (SymbolCollection, error) {
+func binaryPacked(data []byte, cb func(string)) (*Collection, error) {
 	compressed, addressTableOffset, symbolNameTableOffset, symbolTableLength, err := getOffsets(data, cb)
 	if err != nil && !errors.Is(err, ErrSymbolTableNotFound) {
 		return nil, err
@@ -282,12 +283,14 @@ func binaryPacked(data []byte, cb func(string)) (SymbolCollection, error) {
 	var symb_count int
 	var symbols []*Symbol
 
+	//os.WriteFile("adresstable.bin", data[addressTableOffset:], 0644)
+
 	// parse addresstable and create symbols with generic names
 	for pos := addressTableOffset; pos < len(data)+10; pos += 10 {
 		if data[pos] == 0x53 && data[pos+1] == 0x43 { // SC
 			break
 		}
-		symbols = append(symbols, NewFromT7Bytes(data[pos:pos+10], symb_count))
+		symbols = append(symbols, newFromT7Bytes(data[pos:pos+10], symb_count))
 		symb_count++
 	}
 	//log.Println("Symbols found: ", symb_count)
@@ -345,7 +348,7 @@ func binaryPacked(data []byte, cb func(string)) (SymbolCollection, error) {
 }
 
 func readAllT7SymbolsData(fileBytes []byte, symbols []*Symbol) error {
-	dataLocationOffset := bytePatternSearch(fileBytes, searchPattern, 0x30000) - 10
+	dataLocationOffset := BytePatternSearch(fileBytes, searchPattern, 0x30000) - 10
 	dataOffsetValue := binary.BigEndian.Uint32(fileBytes[dataLocationOffset : dataLocationOffset+4])
 
 	//sram_offset, err := GetAddressFromOffset(fileBytes, dataLocationOffset+4)
@@ -368,6 +371,7 @@ func readAllT7SymbolsData(fileBytes []byte, symbols []*Symbol) error {
 	//	log.Printf("sramOffset: %X", sramOffset)
 
 	for _, sym := range symbols {
+		sym.SramOffset = sramOffset
 		if sym.Address < 0x0F00000 {
 			sym.data, err = readSymbolData(fileBytes, sym, 0)
 			if err != nil {
@@ -413,8 +417,7 @@ func readSymbolData(file []byte, s *Symbol, offset uint32) ([]byte, error) {
 			debug.Log(fmt.Sprintf("%s, error reading symbol data: %v", s.String(), err))
 		}
 	}()
-	symData := make([]byte, s.Length)
-	copy(symData, file[s.Address-offset:(s.Address-offset)+uint32(s.Length)])
+	symData := file[s.Address-offset : (s.Address-offset)+uint32(s.Length)]
 	return symData, nil
 }
 
@@ -422,7 +425,7 @@ func determineVersion(data []byte) (string, error) {
 	switch {
 	case bytes.Contains(data, []byte("EU0CF01O")):
 		return "EU0CF01O", nil
-	case bytes.Contains(data, []byte("EU0AF01C")), bytes.Contains(data, []byte("EU0BF01C")), bytes.Contains(data, []byte("EU0CF01C")):
+	case bytes.Contains(data, []byte("C10FA0UE")), bytes.Contains(data, []byte("EU0AF01C")), bytes.Contains(data, []byte("EU0BF01C")), bytes.Contains(data, []byte("EU0CF01C")):
 		return "EU0AF01C", nil
 	}
 	return "", ErrVersionNotFound
@@ -434,13 +437,11 @@ var searchPattern = []byte{0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 //var searchPattern3 = []byte{0x73, 0x59, 0x4D, 0x42, 0x4F, 0x4C, 0x74, 0x41, 0x42, 0x4C, 0x45, 0x00} // 12
 
 func getOffsets(data []byte, cb func(string)) (bool, int, int, int, error) {
-	addressTableOffset := bytePatternSearch(data, searchPattern, 0x30000) - 0x06
-	//	log.Printf("Address table offset: %08X", addressTableOffset)
+	addressTableOffset := BytePatternSearch(data, searchPattern, 0x30000) - 0x06
 	cb(fmt.Sprintf("Address table offset: %08X", addressTableOffset))
 
-	//sramTableOffset := getAddressFromOffset(file, addressTableOffset-0x04)
-	//log.Printf("SRAM table offset: %08X", sramTableOffset)
-	//cb(fmt.Sprintf("SRAM table offset: %08X", sramTableOffset))
+	sramTableOffset := getAddressFromOffset(data, addressTableOffset-0x04)
+	cb(fmt.Sprintf("SRAM table offset: %08X", sramTableOffset))
 
 	symbolNameTableOffset := getAddressFromOffset(data, addressTableOffset)
 	//	log.Printf("Symbol table offset: %08X", symbolNameTableOffset)
@@ -564,22 +565,6 @@ func GetT7HeaderField(bin []byte, id byte) ([]byte, error) {
 	return nil, fmt.Errorf("did not find header for id 0x%02x", id)
 }
 
-type T7HeaderField struct {
-	ID     byte
-	Length byte
-	Data   []byte
-}
-
-func (h *T7HeaderField) String() string {
-	if h.Length == 4 {
-		return fmt.Sprintf("0x%02x %d> 0x%08X  %q", h.ID, len(h.Data), binary.BigEndian.Uint32(h.Data), h.Data)
-	} else if h.Length == 2 {
-		return fmt.Sprintf("0x%02x %d> 0x%04X  %q", h.ID, len(h.Data), binary.BigEndian.Uint16(h.Data), h.Data)
-	} else {
-		return fmt.Sprintf("0x%02x> %s", h.ID, string(h.Data))
-	}
-}
-
 func GetAllT7HeaderFields(bin []byte) []*T7HeaderField {
 	binLength := len(bin)
 	addr := binLength - 1
@@ -614,6 +599,5 @@ func GetAllT7HeaderFields(bin []byte) []*T7HeaderField {
 		})
 		//		log.Printf("0x%02x %d> %q len: %d", fieldID, len(fieldData), string(fieldData), fieldLength)
 	}
-
 	return fields
 }

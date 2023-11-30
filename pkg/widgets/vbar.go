@@ -7,9 +7,11 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
 )
 
 type VBar struct {
+	widget.BaseWidget
 	face        *canvas.Rectangle
 	bar         *canvas.Rectangle
 	titleText   *canvas.Text
@@ -38,6 +40,7 @@ func NewVBar(cfg *VBarConfig) *VBar {
 		s.cfg.Steps = 10
 	}
 	s.canvas = s.render()
+	s.ExtendBaseWidget(s)
 	return s
 }
 
@@ -60,11 +63,15 @@ func (s *VBar) render() *fyne.Container {
 		bar.Add(line)
 	}
 	bar.Objects = append(bar.Objects, s.bar, s.titleText, s.displayText)
-	bar.Layout = s
 	return bar
 }
 
-func (s *VBar) Layout(_ []fyne.CanvasObject, space fyne.Size) {
+func (s *VBar) Size() fyne.Size {
+	return s.canvas.Size()
+}
+
+func (s *VBar) Resize(space fyne.Size) {
+	s.canvas.Resize(space)
 	diameter := space.Width
 	middle := diameter / 2
 	heightFactor := float32(space.Height) / float32(s.cfg.Steps)
@@ -72,7 +79,6 @@ func (s *VBar) Layout(_ []fyne.CanvasObject, space fyne.Size) {
 	s.face.Resize(space)
 
 	s.titleText.Move(fyne.NewPos(middle-s.titleText.Size().Width/2, space.Height+2))
-
 	s.displayText.Move(fyne.NewPos(space.Width/2-s.displayText.Size().Width/2, space.Height-(float32(s.value)*heightFactor)-12.5))
 
 	s.bar.Move(fyne.NewPos(0, space.Height-float32(s.value)))
@@ -89,18 +95,10 @@ func (s *VBar) Layout(_ []fyne.CanvasObject, space fyne.Size) {
 	s.SetValue(s.value)
 }
 
-func (s *VBar) MinSize(_ []fyne.CanvasObject) fyne.Size {
-	return s.cfg.Minsize
-}
-
-func (s *VBar) Content() fyne.CanvasObject {
-	return s.canvas
-}
-
 func (s *VBar) SetValue(value float64) {
-	//if value == s.value {
-	//	return
-	//}
+	// if value == s.value {
+	// return
+	// }
 	if value > s.cfg.Max {
 		value = s.cfg.Max
 	}
@@ -123,7 +121,6 @@ func (s *VBar) SetValue(value float64) {
 
 	s.bar.Move(fyne.NewPos(diameter/8, size.Height-(float32(value)*heightFactor)))
 	s.bar.Resize(fyne.NewSize(size.Width-(diameter/8*2), (float32(value) * heightFactor)))
-	//s.bar.Refresh()
 
 	s.displayText.Text = strconv.FormatFloat(value, 'f', 0, 64)
 	s.displayText.Move(fyne.NewPos(size.Width/2-s.displayText.Size().Width/2, size.Height-(float32(value)*heightFactor)-12.5))
@@ -132,4 +129,31 @@ func (s *VBar) SetValue(value float64) {
 
 func (s *VBar) Value() float64 {
 	return s.value
+}
+
+func (s *VBar) CreateRenderer() fyne.WidgetRenderer {
+	return &vbarRenderer{s}
+}
+
+type vbarRenderer struct {
+	vbar *VBar
+}
+
+func (vr *vbarRenderer) Destroy() {
+}
+
+func (vr *vbarRenderer) Layout(size fyne.Size) {
+	vr.vbar.canvas.Resize(size)
+}
+
+func (vr *vbarRenderer) MinSize() fyne.Size {
+	return vr.vbar.cfg.Minsize
+}
+
+func (vr *vbarRenderer) Refresh() {
+	vr.vbar.canvas.Refresh()
+}
+
+func (vr *vbarRenderer) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{vr.vbar.canvas}
 }

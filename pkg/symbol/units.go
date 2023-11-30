@@ -17,6 +17,6 @@ func GetUnit(name string) string {
 	case "m_Request", "MAF.m_AirInlet":
 		return "Mg/c"
 	default:
-		return "Value"
+		return ""
 	}
 }

@@ -11,27 +11,32 @@ import (
 	"github.com/avast/retry-go/v4"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/gmlan"
-	"github.com/roffe/txlogger/pkg/kwp2000"
-	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/ecu"
+	"github.com/roffe/txlogger/pkg/symbol"
 	"golang.org/x/sync/errgroup"
 )
 
 type T8Client struct {
 	dl Logger
 
+	symbolChan chan []*symbol.Symbol
+	updateChan chan *RamUpdate
+	readChan   chan *ReadRequest
+
 	quitChan chan struct{}
 	sysvars  *ThreadSafeMap
-
-	cc int
 
 	Config
 }
 
 func NewT8(dl Logger, cfg Config) (Provider, error) {
 	return &T8Client{
-		dl:       dl,
-		quitChan: make(chan struct{}, 2),
-		Config:   cfg,
+		Config:     cfg,
+		dl:         dl,
+		symbolChan: make(chan []*symbol.Symbol, 1),
+		updateChan: make(chan *RamUpdate, 1),
+		readChan:   make(chan *ReadRequest, 1),
+		quitChan:   make(chan struct{}, 2),
 		sysvars: &ThreadSafeMap{
 			values: make(map[string]string),
 		},
@@ -40,7 +45,32 @@ func NewT8(dl Logger, cfg Config) (Provider, error) {
 
 func (c *T8Client) Close() {
 	close(c.quitChan)
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(150 * time.Millisecond)
+}
+
+func (c *T8Client) SetSymbols(symbols []*symbol.Symbol) error {
+	select {
+	case c.symbolChan <- symbols:
+	default:
+		return fmt.Errorf("pending")
+	}
+	return nil
+}
+
+func (c *T8Client) SetRAM(address uint32, data []byte) error {
+	//upd := NewRamUpdate(address, data)
+	//c.updateChan <- upd
+	//return upd.Wait()
+	return nil
+}
+
+func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
+	if address+length >= 0x100000 && address+length <= (0x100000+32768) {
+		req := NewReadRequest(address, length)
+		c.readChan <- req
+		return req.Data, req.Wait()
+	}
+	return nil, fmt.Errorf("GetRAM: address out of range: $%X", address)
 }
 
 func (c *T8Client) Start() error {
@@ -57,7 +87,7 @@ func (c *T8Client) Start() error {
 
 	cl, err := gocan.NewWithOpts(
 		ctx,
-		c.Dev,
+		c.Device,
 	)
 	if err != nil {
 		return err
@@ -69,7 +99,7 @@ func (c *T8Client) Start() error {
 	c.ErrorCounter.Set(errCount)
 
 	errPerSecond := 0
-	c.ErrorPerSecondCounter.Set(errPerSecond)
+	//c.ErrorPerSecondCounter.Set(errPerSecond)
 
 	// cps := 0
 	retries := 0
@@ -77,13 +107,17 @@ func (c *T8Client) Start() error {
 	err = retry.Do(func() error {
 		gm := gmlan.New(cl, 0x7e0, 0x7e8)
 
+		if err := gm.RequestSecurityAccess(ctx, 0xFD, 0, ecu.CalculateT8AccessKey); err != nil {
+			return err
+		}
+
 		if err := ClearDynamicallyDefinedRegister(ctx, gm); err != nil {
 			return err
 		}
 		c.OnMessage("Cleared dynamic register")
 
-		for _, sym := range c.Config.Variables {
-			if err := SetUpDynamicallyDefinedRegisterBySymbol(ctx, gm, uint16(sym.Value)); err != nil {
+		for _, sym := range c.Symbols {
+			if err := SetUpDynamicallyDefinedRegisterBySymbol(ctx, gm, uint16(sym.Number)); err != nil {
 				return err
 			}
 			//c.OnMessage(fmt.Sprintf("Configured dynamic register %d: %s %d", i, sym.Name, sym.Value))
@@ -93,7 +127,7 @@ func (c *T8Client) Start() error {
 		secondTicker := time.NewTicker(time.Second)
 		defer secondTicker.Stop()
 
-		t := time.NewTicker(time.Second / time.Duration(c.Freq))
+		t := time.NewTicker(time.Second / time.Duration(c.Rate))
 		defer t.Stop()
 
 		//first := true
@@ -110,7 +144,7 @@ func (c *T8Client) Start() error {
 				case <-secondTicker.C:
 					//log.Println("cps:", cps)
 					//cps = 0
-					c.ErrorPerSecondCounter.Set(errPerSecond)
+					//c.ErrorPerSecondCounter.Set(errPerSecond)
 					if errPerSecond > 10 {
 						errPerSecond = 0
 						return fmt.Errorf("too many errors")
@@ -121,15 +155,64 @@ func (c *T8Client) Start() error {
 		})
 
 		errg.Go(func() error {
+			var timeStamp time.Time
 			for {
 				select {
 				case <-c.quitChan:
-					c.OnMessage("Stop logging...")
+					c.OnMessage("Stopped logging..")
 					return nil
 				case <-gctx.Done():
 					return nil
+				case symbols := <-c.symbolChan:
+					c.Symbols = symbols
+					c.OnMessage("Reconfiguring symbols..")
+					if err := ClearDynamicallyDefinedRegister(ctx, gm); err != nil {
+						return err
+					}
+					if len(c.Symbols) > 0 {
+						c.OnMessage("Cleared dynamic register")
+						for _, sym := range c.Symbols {
+							if err := SetUpDynamicallyDefinedRegisterBySymbol(ctx, gm, uint16(sym.Number)); err != nil {
+								return err
+							}
+						}
+						c.OnMessage("Configured dynamic register")
+					}
+				case read := <-c.readChan:
+					readAddr := read.Address
+					left := read.Length
+					for left > 0 {
+						var chunk uint32
+						if left > 0xF0 {
+							chunk = 0xF0
+						} else {
+							chunk = left
+						}
+						data, err := gm.ReadMemoryByAddress(ctx, readAddr, chunk)
+						if err != nil {
+							errCount++
+							errPerSecond++
+							c.ErrorCounter.Set(errCount)
+							read.Complete(err)
+						}
+						read.Data = append(read.Data, data...)
+						left -= chunk
+						readAddr += chunk
+					}
+					read.Complete(nil)
+
 				case <-t.C:
-					ts := time.Now()
+					timeStamp = time.Now()
+					if len(c.Symbols) == 0 {
+						if err := gm.TesterPresentNoResponseAllowed(); err != nil {
+							errCount++
+							errPerSecond++
+							c.ErrorCounter.Set(errCount)
+							c.OnMessage(fmt.Sprintf("Failed to send tester present: %v", err))
+						}
+						continue
+					}
+
 					data, err := gm.ReadDataByIdentifier(ctx, 0x18)
 					if err != nil {
 						errCount++
@@ -142,12 +225,15 @@ func (c *T8Client) Start() error {
 					if err != nil {
 						return err
 					}
-					for _, va := range c.Variables {
+					for _, va := range c.Symbols {
 						if err := va.Read(r); err != nil {
+							errCount++
+							errPerSecond++
+							c.ErrorCounter.Set(errCount)
 							c.OnMessage(fmt.Sprintf("Failed to read %s: %v", va.Name, err))
 							break
 						}
-						c.dl.SetValue(va.Name, va.GetFloat64())
+						c.dl.SetValue(va.Name, va.Float64())
 					}
 					if r.Len() > 0 {
 						left := r.Len()
@@ -158,7 +244,7 @@ func (c *T8Client) Start() error {
 						}
 						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", left, leftovers[:n]))
 					}
-					c.produceLogLine(file, c.Variables, ts)
+					c.produceLogLine(file, c.Symbols, timeStamp)
 					//cps++
 					count++
 					if count%10 == 0 {
@@ -171,7 +257,7 @@ func (c *T8Client) Start() error {
 			}
 		})
 
-		c.OnMessage(fmt.Sprintf("Live logging at %d fps", c.Freq))
+		c.OnMessage(fmt.Sprintf("Live logging at %d fps", c.Rate))
 
 		return errg.Wait()
 
@@ -179,6 +265,7 @@ func (c *T8Client) Start() error {
 		retry.DelayType(retry.FixedDelay),
 		retry.Delay(1500*time.Millisecond),
 		retry.Attempts(4),
+		retry.LastErrorOnly(true),
 		retry.OnRetry(func(n uint, err error) {
 			retries++
 			c.OnMessage(fmt.Sprintf("Retry %d: %v", n, err))
@@ -211,7 +298,7 @@ func SetUpDynamicallyDefinedRegisterBySymbol(ctx context.Context, gm *gmlan.Clie
 	return nil
 }
 
-func (c *T8Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition, ts time.Time) {
+func (c *T8Client) produceLogLine(file io.Writer, vars []*symbol.Symbol, ts time.Time) {
 	file.Write([]byte(ts.Format("02-01-2006 15:04:05.999") + "|"))
 	c.sysvars.Lock()
 	for k, v := range c.sysvars.values {
@@ -221,14 +308,6 @@ func (c *T8Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition,
 	for _, va := range vars {
 		val := va.StringValue()
 		file.Write([]byte(va.Name + "=" + strings.Replace(val, ".", ",", 1) + "|"))
-		if va.Widget != nil && c.cc == 5 {
-			va.Widget.(*widgets.VarDefinitionWidgetEntry).SetValue(val)
-
-		}
-	}
-	c.cc++
-	if c.cc > 6 {
-		c.cc = 0
 	}
 	file.Write([]byte("IMPORTANTLINE=0|\n"))
 }

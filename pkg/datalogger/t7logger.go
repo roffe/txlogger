@@ -13,26 +13,31 @@ import (
 	"github.com/avast/retry-go/v4"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/kwp2000"
-	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/symbol"
 	"golang.org/x/sync/errgroup"
 )
 
 type T7Client struct {
 	dl Logger
 
+	symbolChan chan []*symbol.Symbol
+	updateChan chan *RamUpdate
+	readChan   chan *ReadRequest
+
 	quitChan chan struct{}
 	sysvars  *ThreadSafeMap
-
-	cc int
 
 	Config
 }
 
 func NewT7(dl Logger, cfg Config) (Provider, error) {
 	return &T7Client{
-		dl:       dl,
-		quitChan: make(chan struct{}, 2),
-		Config:   cfg,
+		Config:     cfg,
+		dl:         dl,
+		symbolChan: make(chan []*symbol.Symbol, 1),
+		updateChan: make(chan *RamUpdate, 1),
+		readChan:   make(chan *ReadRequest, 1),
+		quitChan:   make(chan struct{}, 2),
 		sysvars: &ThreadSafeMap{
 			values: map[string]string{
 				"ActualIn.n_Engine": "0",   // comes from 0x1A0
@@ -49,6 +54,27 @@ func (c *T7Client) Close() {
 	time.Sleep(200 * time.Millisecond)
 }
 
+func (c *T7Client) SetSymbols(symbols []*symbol.Symbol) error {
+	select {
+	case c.symbolChan <- symbols:
+	default:
+		return fmt.Errorf("pending")
+	}
+	return nil
+}
+
+func (c *T7Client) SetRAM(address uint32, data []byte) error {
+	upd := NewRamUpdate(address, data)
+	c.updateChan <- upd
+	return upd.Wait()
+}
+
+func (c *T7Client) GetRAM(address uint32, length uint32) ([]byte, error) {
+	req := NewReadRequest(address, length)
+	c.readChan <- req
+	return req.Data, req.Wait()
+}
+
 func (c *T7Client) Start() error {
 	file, filename, err := createLog("t7l")
 	if err != nil {
@@ -63,7 +89,7 @@ func (c *T7Client) Start() error {
 
 	cl, err := gocan.NewWithOpts(
 		ctx,
-		c.Dev,
+		c.Device,
 	)
 	if err != nil {
 		return err
@@ -115,7 +141,7 @@ func (c *T7Client) Start() error {
 	c.ErrorCounter.Set(errCount)
 
 	errPerSecond := 0
-	c.ErrorPerSecondCounter.Set(errPerSecond)
+	//c.ErrorPerSecondCounter.Set(errPerSecond)
 
 	//cps := 0
 	retries := 0
@@ -134,22 +160,34 @@ func (c *T7Client) Start() error {
 
 		c.OnMessage("Connected to ECU")
 
-		if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
-			return fmt.Errorf("ClearDynamicallyDefineLocalId: %w", err)
+		granted, err := kwp.RequestSecurityAccess(ctx, false)
+		if err != nil {
+			return err
 		}
 
-		for i, v := range c.Variables {
-			//c.onMessage(fmt.Sprintf("%d %s %s %d %X", i, v.Name, v.Method, v.Value, v.Type))
-			if err := kwp.DynamicallyDefineLocalIdRequest(ctx, i, v); err != nil {
-				return fmt.Errorf("DynamicallyDefineLocalIdRequest: %w", err)
+		if !granted {
+			c.OnMessage("Security access not granted!")
+		} else {
+			c.OnMessage("Security access granted")
+		}
+
+		if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
+			return err
+		}
+		c.OnMessage("Cleared dynamic register")
+
+		for i, sym := range c.Symbols {
+			if err := kwp.DynamicallyDefineLocalIdRequest(ctx, i, sym); err != nil {
+				return err
 			}
 			time.Sleep(5 * time.Millisecond)
 		}
+		c.OnMessage("Configured dynamic register")
 
 		secondTicker := time.NewTicker(time.Second)
 		defer secondTicker.Stop()
 
-		t := time.NewTicker(time.Second / time.Duration(c.Freq))
+		t := time.NewTicker(time.Second / time.Duration(c.Rate))
 		defer t.Stop()
 
 		errg, gctx := errgroup.WithContext(ctx)
@@ -164,8 +202,8 @@ func (c *T7Client) Start() error {
 				case <-secondTicker.C:
 					//log.Println("cps:", cps)
 					//cps = 0
-					c.ErrorPerSecondCounter.Set(errPerSecond)
-					if errPerSecond > 10 {
+					//c.ErrorPerSecondCounter.Set(errPerSecond)
+					if errPerSecond > 5 {
 						errPerSecond = 0
 						return fmt.Errorf("too many errors")
 					}
@@ -173,33 +211,75 @@ func (c *T7Client) Start() error {
 				}
 			}
 		})
-		var timeStamp time.Time
 		errg.Go(func() error {
+			var timeStamp time.Time
 			for {
 				select {
 				case <-c.quitChan:
-					c.OnMessage("Stop logging...")
+					c.OnMessage("Stopped logging..")
 					return nil
 				case <-gctx.Done():
 					return nil
+				case symbols := <-c.symbolChan:
+					c.Symbols = symbols
+					c.OnMessage("Reconfiguring symbols..")
+					if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
+						return err
+					}
+					c.OnMessage("Cleared dynamic register")
+					if len(c.Symbols) > 0 {
+						for i, sym := range c.Symbols {
+							if err := kwp.DynamicallyDefineLocalIdRequest(ctx, i, sym); err != nil {
+								return err
+							}
+							time.Sleep(5 * time.Millisecond)
+						}
+						c.OnMessage("Configured dynamic register")
+					}
+				case read := <-c.readChan:
+					data, err := kwp.ReadMemoryByAddress(ctx, int(read.Address), int(read.Length))
+					if err != nil {
+						read.Complete(err)
+					}
+					read.Data = data
+					read.Complete(nil)
+				case upd := <-c.updateChan:
+					upd.Complete(kwp.WriteDataByAddress(ctx, upd.Address, upd.Data))
 				case <-t.C:
 					timeStamp = time.Now()
-					data, err := kwp.ReadDataByLocalIdentifier(ctx, 0xF0)
+
+					if len(c.Symbols) == 0 {
+						if err := kwp.TesterPresent(ctx); err != nil {
+							errCount++
+							errPerSecond++
+							c.ErrorCounter.Set(errCount)
+							c.OnMessage(err.Error())
+						}
+						continue
+					}
+
+					data, err := kwp.ReadDataByIdentifier(ctx, 0xF0)
 					if err != nil {
 						errCount++
 						errPerSecond++
 						c.ErrorCounter.Set(errCount)
-						c.OnMessage(fmt.Sprintf("Failed to read data: %v", err))
+						c.OnMessage(err.Error())
 						continue
 					}
 					r := bytes.NewReader(data)
-					for _, va := range c.Variables {
+					for _, va := range c.Symbols {
 						if err := va.Read(r); err != nil {
-							c.OnMessage(fmt.Sprintf("Failed to read %s: %v", va.Name, err))
+							errCount++
+							errPerSecond++
+							c.ErrorCounter.Set(errCount)
+							if err == io.EOF {
+								return fmt.Errorf("EOF reading symbol %s", va.Name)
+							}
+							c.OnMessage(err.Error())
 							break
 						}
 						// Set value on dashboards
-						c.dl.SetValue(va.Name, va.GetFloat64())
+						c.dl.SetValue(va.Name, va.Float64())
 					}
 					if r.Len() > 0 {
 						left := r.Len()
@@ -210,17 +290,17 @@ func (c *T7Client) Start() error {
 						}
 						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", left, leftovers[:n]))
 					}
-					//c.produceCSVLine(csv, c.Variables)
-					c.produceLogLine(file, c.Variables, timeStamp)
+					c.produceLogLine(file, c.Symbols, timeStamp)
 					count++
 					//cps++
 					if count%10 == 0 {
 						c.CaptureCounter.Set(count)
 					}
+
 				}
 			}
 		})
-		c.OnMessage(fmt.Sprintf("Live logging at %d fps", c.Freq))
+		c.OnMessage(fmt.Sprintf("Live logging at %d fps", c.Rate))
 		return errg.Wait()
 	},
 		retry.DelayType(retry.FixedDelay),
@@ -230,11 +310,12 @@ func (c *T7Client) Start() error {
 			retries++
 			c.OnMessage(fmt.Sprintf("Retry %d: %v", n, err))
 		}),
+		retry.LastErrorOnly(true),
 	)
 	return err
 }
 
-func (c *T7Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition, ts time.Time) {
+func (c *T7Client) produceLogLine(file io.Writer, vars []*symbol.Symbol, ts time.Time) {
 	file.Write([]byte(ts.Format("02-01-2006 15:04:05.999") + "|"))
 	c.sysvars.Lock()
 	for k, v := range c.sysvars.values {
@@ -244,13 +325,6 @@ func (c *T7Client) produceLogLine(file io.Writer, vars []*kwp2000.VarDefinition,
 	for _, va := range vars {
 		val := va.StringValue()
 		file.Write([]byte(va.Name + "=" + strings.Replace(val, ".", ",", 1) + "|"))
-		if va.Widget != nil && c.cc == 5 {
-			va.Widget.(*widgets.VarDefinitionWidgetEntry).SetValue(val)
-		}
-	}
-	c.cc++
-	if c.cc > 6 {
-		c.cc = 0
 	}
 	file.Write([]byte("IMPORTANTLINE=0|\n"))
 }

@@ -38,13 +38,13 @@ func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (symb
 		return nil, errors.New("security access not granted")
 	}
 
-	if err := k.StartRoutineByIdentifier(ctx, 0x50); err != nil {
+	if err := k.StartRoutineByIdentifier(ctx, 0x50, 0x10); err != nil {
 		return nil, err
 	}
 
 	cb("Downloading symbol table")
 	start := time.Now()
-	symTable, err := k.TransferData(ctx)
+	symTable, err := k.TransferData(ctx, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (symb
 	// log.Println("time to read symbol name table", time.Since(start))
 	// log.Println("size symbolnames", len(compressedSymbolNameTable))
 	if bytes.HasPrefix(compressedSymbolNameTable, []byte{0xFF, 0xFF, 0xFF, 0xFF}) {
-		return nil, errors.New("compressed symbol table is not present")
+		return nil, errors.New("no compressed symbol table found")
 	}
 
 	symbolNames, err := symbol.ExpandCompressedSymbolNames(compressedSymbolNameTable)

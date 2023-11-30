@@ -17,7 +17,7 @@ func (lp *LogPlayer) openMapz(typ symbol.ECUType, mapNames ...string) {
 	joinedNames := strings.Join(mapNames, "|")
 	mv, found := lp.openMaps[joinedNames]
 	if !found {
-		w := lp.app.NewWindow("Map Viewer - " + strings.Join(mapNames, ", "))
+		w := lp.app.NewWindow(strings.Join(mapNames, ", ") + " - Map Viewer")
 		//w.SetFixedSize(true)
 		if lp.symbols == nil {
 			dialog.ShowError(errors.New("no symbols loaded"), lp.Window)
@@ -65,7 +65,7 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 	axis := symbol.GetInfo(typ, symbolName)
 	mw, found := lp.openMaps[axis.Z]
 	if !found {
-		w := lp.app.NewWindow(fmt.Sprintf("Map Viewer - %s", axis.Z))
+		w := lp.app.NewWindow(fmt.Sprintf("%s - Map Viewer", axis.Z))
 
 		xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := lp.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
 		if err != nil {
@@ -82,6 +82,7 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 			widgets.WithXFrom(axis.XFrom),
 			widgets.WithYFrom(axis.YFrom),
 			widgets.WithInterPolFunc(interpolate.Interpolate),
+			widgets.WithEditable(false),
 		)
 		if err != nil {
 

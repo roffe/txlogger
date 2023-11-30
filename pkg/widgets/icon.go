@@ -26,10 +26,8 @@ func NewIcon(cfg *IconConfig) *Icon {
 	ic := &Icon{
 		cfg: cfg,
 	}
-
 	cfg.Image.FillMode = canvas.ImageFillContain
 	cfg.Image.SetMinSize(cfg.Minsize)
-
 	ic.render()
 	return ic
 }
@@ -39,18 +37,22 @@ func (ic *Icon) render() {
 	ic.text.TextSize = 25
 	ic.text.TextStyle.Monospace = true
 	ic.text.Alignment = fyne.TextAlignLeading
-	c := container.NewWithoutLayout(ic.cfg.Image, ic.text)
-	ic.container = c
+	ic.container = container.NewWithoutLayout(ic.cfg.Image, ic.text)
 }
 
 func (ic *Icon) SetText(text string) {
+	if text == ic.cfg.Text {
+		return
+	}
 	ic.cfg.Text = text
 	ic.text.Text = text
 	ic.text.Refresh()
 }
 
 func (ic *Icon) CreateRenderer() fyne.WidgetRenderer {
-	return &CanSettingsWidgetRenderer{}
+	return &IconRenderer{
+		ic: ic,
+	}
 }
 
 type IconRenderer struct {

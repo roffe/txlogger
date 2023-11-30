@@ -2,7 +2,8 @@
 #define _LZHUF_H
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #include <stdio.h>
@@ -10,7 +11,7 @@ extern "C" {
 
 #if defined(LZHUF)
 
-unsigned int Decode(unsigned char *in, unsigned char *out);
+    unsigned int Decode(unsigned char *in, unsigned char *out);
 
 #ifdef __cplusplus
 }

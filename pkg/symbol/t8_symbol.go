@@ -1,7 +1,9 @@
 package symbol
 
 import (
+	"encoding/binary"
 	"fmt"
+	"log"
 )
 
 var T8SymbolsTuningOrder = []string{
@@ -12,66 +14,48 @@ var T8SymbolsTuningOrder = []string{
 	"Boost",
 	"Ignition",
 	"Adaption",
-	//"Myrtilos",
 }
 
 var T8SymbolsTuning = map[string][]string{
-	"Calibration": {
-		//"AirCompCal.PressMap",
-		//"MAFCal.m_RedundantAirMap",
-		//"TCompCal.EnrFacE85Tab",
-		//"TCompCal.EnrFacTab",
-		//"VIOSMAFCal.FreqSP",
-		//"VIOSMAFCal.Q_AirInletTab2",
-	},
+	"Calibration": {},
 	"Injectors": {
-		//"InjCorrCal.BattCorrTab",
-		//"InjCorrCal.BattCorrSP",
-		//"InjCorrCal.InjectorConst",
+		"InjCorrCal.InjectorConst",
+		"InjCorrCal.BattCorrTab",
+		"InjCorrCal.BattCorrSP",
 	},
 	"Limiters": {
 		"BstKnkCal.MaxAirmass",
-		//"TorqueCal.M_ManGearLim",
+		"AirCtrlCal.AirmassLimiter",
 	},
 	"Fuel": {
-		//"BFuelCal.Map",
-		//"BFuelCal.StartMap",
-		//"StartCal.EnrFacE85Tab",
-		//"StartCal.EnrFacTab",
+		"BFuelCal.LambdaOneFacMap",
+		"BFuelCal.TempEnrichFacMap",
+		"FFFuelCal.TempEnrichFacMAP",
 	},
 	"Boost": {
-		"...|AirCtrlCal.RegMap|AirCtrlCal.Ppart_BoostMap|AirCtrlCal.Ipart_BoostMap|AirCtrlCal.Dpart_BoostMap",
+		//"...|AirCtrlCal.RegMap|AirCtrlCal.Ppart_BoostMap|AirCtrlCal.Ipart_BoostMap|AirCtrlCal.Dpart_BoostMap",
 		"AirCtrlCal.RegMap",
 		"AirCtrlCal.Ppart_BoostMap",
 		"AirCtrlCal.Ipart_BoostMap",
 		"AirCtrlCal.Dpart_BoostMap",
+		"AirCtrlCal.ST_BoostEnable",
+		"BoostAdapCal.ST_enable",
+		"FrompAdapCal.ST_enable",
+		"AreaAdapCal.ST_enable",
 	},
 	"Ignition": {
 		"IgnAbsCal.fi_NormalMAP",
-		//"IgnIdleCal.fi_IdleMap",
-		//"IgnNormCal.Map",
-		//"IgnStartCal.fi_StartMap",
+		"IgnAbsCal.fi_highOctanMAP",
+		"IgnAbsCal.ST_EnableOctanMaps",
 	},
-	"Adaption": {
-		//"AdpFuelCal.T_AdaptLim",
-		//"FCutCal.ST_Enable",
-		//"LambdaCal.ST_Enable",
-		//"PurgeCal.ST_PurgeEnable",
-	},
-	"Myrtilos": {
-		//"MyrtilosCal.Launch_DisableSpeed",
-		//"MyrtilosCal.Launch_Ign_fi_Min",
-		//"MyrtilosCal.Launch_RPM",
-		//"MyrtilosCal.Launch_InjFac_at_rpm",
-		//"MyrtilosCal.Launch_PWM_max_at_stand",
-	},
+	"Adaption": {},
 }
 
 type T8Binary struct {
 }
 
 func LoadT8Symbols(fileBytes []byte, cb func(string)) (SymbolCollection, error) {
-	if err := ValidateTrionic8File(fileBytes); err != nil {
+	if err := IsTrionic8File(fileBytes); err != nil {
 		return nil, err
 	}
 
@@ -116,11 +100,55 @@ func LoadT8Symbols(fileBytes []byte, cb func(string)) (SymbolCollection, error) 
 		return nil, err
 	}
 
+	nqCount := CountNq(fileBytes, NqNqNqOffset-2)
+
+	priOffset, err := GetAddressFromOffset(fileBytes, NqNqNqOffset-((nqCount*2)+6))
+	if err != nil {
+		return nil, err
+	}
+
+	secOffset := DetermineSecondaryOffset(fileBytes)
+	log.Printf("priOffset: 0x%X\n", priOffset)
+	log.Printf("secOffset: 0x%X\n", secOffset)
+
+	openBin := false
+
 	for i, sym := range symbols {
+		origAddress := sym.Address
+		var actAddress uint32
+		if sym.Address >= 0x100000 {
+			if sym.Type != 0xFF && sym.Type&0x22 == 0x02 {
+				//				log.Println("asdXX")
+				if !openBin {
+					if sym.Address+uint32(sym.Length) <= (0x100000+32768) && sym.Address >= uint32(priOffset) {
+						sym.SramOffset = uint32(priOffset)
+						actAddress = sym.Address - uint32(priOffset)
+					}
+				} else {
+					if sym.Address+uint32(sym.Length) <= (0x100000+32768) && sym.Address >= uint32(secOffset) {
+						sym.SramOffset = uint32(secOffset)
+						actAddress = sym.Address - uint32(secOffset)
+					} else if sym.Address >= (0x100000+32768) && sym.Address >= uint32(priOffset) {
+						sym.SramOffset = uint32(priOffset)
+						actAddress = sym.Address - uint32(priOffset)
+					}
+				}
+				if actAddress+uint32(sym.Length) <= 0x100000 && actAddress > 0 {
+					sym.Address = actAddress
+					//sym.data = extractT8SymbolData2(fileBytes, actAddress, sym.Length)
+				}
+			}
+		}
+
 		sym.Name = names[i+1]
 		sym.Unit = GetUnit(sym.Name)
 		sym.Correctionfactor = GetCorrectionfactor(sym.Name)
+
 		extractT8SymbolData(sym, fileBytes)
+		sym.Address = origAddress
+		//d := extractT8SymbolData2(fileBytes, actAddress, sym.Length)
+		//log.Printf("1> % X", d)
+		//log.Printf("2> % X", sym.data)
 	}
 
 	cb(fmt.Sprintf("End Of Symbol Table: 0x%X", addrtaboffset))
@@ -139,11 +167,21 @@ func LoadT8Symbols(fileBytes []byte, cb func(string)) (SymbolCollection, error) 
 
 func extractT8SymbolData(sym *Symbol, data []byte) {
 	if sym.Address < 0x020000 || sym.Address+uint32(sym.Length) > uint32(len(data)) {
-		//log.Println("out of fisring")
+		//	log.Printf("Symbol %s out of range: 0x%X - 0x%X\n", sym.Name, sym.Address, sym.Address+uint32(sym.Length))
 		return
 	}
 	sym.data = data[sym.Address : sym.Address+uint32(sym.Length)]
 }
+
+/*
+func extractT8SymbolData2(data []byte, addr uint32, length uint16) []byte {
+	if addr < 0x020000 || addr+uint32(length) > uint32(len(data)) {
+		//log.Printf("Symbol out of range: 0x%X - 0x%X\n", addr, addr+uint32(length))
+		return nil
+	}
+	return data[addr : addr+uint32(length)]
+}
+*/
 
 func ReadAddressTable(data []byte, offset int) ([]*Symbol, error) {
 	pos := offset - 17
@@ -175,7 +213,7 @@ func ReadAddressTable(data []byte, offset int) ([]*Symbol, error) {
 	return symbols, nil
 }
 
-func ValidateTrionic8File(data []byte) error {
+func IsTrionic8File(data []byte) error {
 	if len(data) != 0x100000 {
 		return ErrInvalidLength
 	}
@@ -229,7 +267,7 @@ func CountNq(data []byte, offset int) int {
 
 func GetEndOfSymbolTable(data []byte) (int, error) {
 	pattern := []byte{0x73, 0x59, 0x4D, 0x42, 0x4F, 0x4C, 0x74, 0x41, 0x42, 0x4C, 0x45}
-	pos := bytePatternSearch(data, pattern, 0)
+	pos := BytePatternSearch(data, pattern, 0)
 	if pos == -1 {
 		return -1, ErrEndOfSymbolTableNotFound
 	}
@@ -297,11 +335,87 @@ outer:
 }
 
 func FindAddressTableOffset(data []byte) error {
-	pos := bytePatternSearch(data, []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20}, 0x3000)
+	pos := BytePatternSearch(data, []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20}, 0x3000)
 	if pos == -1 {
 		return ErrAddressTableOffsetNotFound
 	}
 	return nil
+}
+
+// readU32 reads a 32-bit unsigned integer from a byte slice at a specified position.
+func readU32(data []byte, pos uint32) uint32 {
+	return binary.BigEndian.Uint32(data[pos : pos+4])
+}
+
+// ReadAddressPair checks for a pattern match and reads two addresses if successful.
+func ReadAddressPair(data []byte, pos uint32) (uint32, uint32, bool) {
+	addrPat := []byte{0x20, 0x3C, 0x00}
+	addrMsk := []byte{0xf1, 0xbf, 0xff}
+
+	var addr1, addr2 uint32
+
+	if MatchPattern(data, pos, addrPat, addrMsk) &&
+		MatchPattern(data, pos+6, addrPat, addrMsk) &&
+		(pos+12) <= uint32(len(data)) {
+		addr1 = readU32(data, pos+2)
+		addr2 = readU32(data, pos+8)
+		return addr1, addr2, true
+	}
+
+	return 0, 0, false
+}
+
+// DecodeDataCpy decodes data copy operation based on address pairs.
+func DecodeDataCpy(data []byte, pos uint32) int {
+	pos += 8
+
+	addr1, addr2, ok := ReadAddressPair(data, pos)
+	if ok {
+		if addr1 >= 0x100000 && addr1 < 0x108000 && addr2 < 0x100000 {
+			return int(addr1 - addr2)
+		}
+		// Additional logic can be implemented here as needed.
+	}
+	return 0
+}
+
+// DetermineSecondaryOffset determines the secondary offset from the data.
+func DetermineSecondaryOffset(data []byte) int {
+	initFunc := readU32(data, 0x20004)
+
+	if initFunc >= 0x20008 &&
+		initFunc <= (0x100000-6) &&
+		(initFunc&1) == 0 {
+
+		if data[initFunc] == 0x4e &&
+			data[initFunc+1] == 0xb9 &&
+			data[initFunc+2] == 0x00 {
+
+			nextJump := readU32(data, initFunc+2)
+			if nextJump >= 0x20008 &&
+				nextJump <= (0x100000-6) &&
+				(nextJump&1) == 0 {
+
+				if data[nextJump] == 0x4e &&
+					data[nextJump+1] == 0xb9 &&
+					data[nextJump+2] == 0x00 {
+
+					nextJump = readU32(data, nextJump+2)
+
+					if nextJump >= 0x20008 && (nextJump&1) == 0 {
+						return DecodeDataCpy(data, nextJump)
+					}
+				}
+			}
+		}
+	}
+	return 0
+}
+
+// MatchPattern is a placeholder function for pattern matching logic.
+func MatchPattern(data []byte, pos uint32, pattern []byte, mask []byte) bool {
+	// Implement pattern matching logic here.
+	return false
 }
 
 /*

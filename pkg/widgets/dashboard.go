@@ -55,7 +55,6 @@ type Dashboard struct {
 
 	onClose func()
 
-	//metricsChan chan *model.ashboardMetric
 	metrics map[string]func(float64)
 
 	logplayer bool
@@ -97,14 +96,14 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 			Min:     0,
 			Max:     100,
 			Steps:   20,
-			Minsize: fyne.NewSize(75, 100),
+			Minsize: fyne.NewSize(50, 100),
 		}),
 		pwm: NewVBar(&VBarConfig{
 			Title:   "PWM",
 			Min:     0,
 			Max:     100,
 			Steps:   20,
-			Minsize: fyne.NewSize(75, 100),
+			Minsize: fyne.NewSize(50, 100),
 		}),
 		engineTemp: NewDial(DialConfig{
 			Title: "tEng",
@@ -204,10 +203,7 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 	db.limpMode.FillMode = canvas.ImageFillContain
 	db.limpMode.SetMinSize(fyne.NewSize(110, 85))
 	db.limpMode.Resize(fyne.NewSize(110, 85))
-
 	db.container = db.render()
-
-	//db.knockIcon.Hide()
 
 	return db
 }
@@ -232,8 +228,8 @@ func (db *Dashboard) render() *fyne.Container {
 
 		db.nblambda,
 		db.wblambda,
-		db.throttle.Content(),
-		db.pwm.Content(),
+		db.throttle,
+		db.pwm,
 		db.checkEngine,
 		db.cruise,
 		db.knockIcon,
@@ -261,7 +257,7 @@ func (db *Dashboard) Focused() bool {
 }
 
 func (db *Dashboard) Close() {
-	// close(db.metricsChan)
+
 }
 
 func (db *Dashboard) SetTime(t time.Time) {
@@ -284,8 +280,12 @@ func (db *Dashboard) SetValue(key string, value float64) {
 		}
 	}()
 
-	if fun, ok := db.metrics[key]; ok {
-		fun(value)
+	if db != nil {
+		if fun, ok := db.metrics[key]; ok {
+			if fun != nil {
+				fun(value)
+			}
+		}
 	}
 
 	/*
@@ -523,6 +523,59 @@ func (db *Dashboard) NewDebugBar() *fyne.Container {
 	)
 }
 
+func lambdaToString(v float64) string {
+	switch v {
+	case 0:
+		return "Closed loop activated"
+	case 1:
+		return "Load to high during a specific time"
+	case 2:
+		return "Load to low"
+	case 3:
+		return "Load to high, no knocking"
+	case 4:
+		return "Load to high, knocking"
+	case 5:
+		return "Cooling water temp to low, closed throttle"
+	case 6:
+		return "Cooling water temp to low, open throttle"
+	case 7:
+		return "Engine speed to low"
+	case 8:
+		return "Throttle transient in progress"
+	case 9:
+		return "Throttle transient in progress and low temp"
+	case 10:
+		return "Fuel cut"
+	case 11:
+		return "Load to high and exhaust temperature algorithm decides it is time to enrich."
+	case 12:
+		return "Diagnostic failure that affects the lambda control"
+	case 13:
+		return "Cloosed loop not enabled"
+	case 14:
+		return "Waiting number of combustion before hardware check" //, ie U_lambda_probe < 300mV AND U_lambda_probe > 600mV"
+	case 15:
+		return "Waiting until engine probe is warm"
+	case 16:
+		return "Waiting until number of combustions have past after probe is warm"
+	case 17:
+		return "SAI request open loop"
+	case 18:
+		return "Number of combustion to start closed loop has not passed. Only active when SAI is activated"
+	case 19:
+		return "Lambda integrator is freezed to 0 by SAI Lean Clamp"
+	case 20:
+		return "Catalyst diagnose for V6 controls the fuel"
+	case 21:
+		return "Gas hybrid active, T7 lambdacontrol stopped"
+	case 22:
+		return "Lambda integrator may not decrease below 0 during start"
+	default:
+		return "Unknown"
+	}
+}
+
 func airDemToString(v float64) string {
 	switch v {
 	case 10:
@@ -624,11 +677,11 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	db.speed.Move(fyne.NewPos(space.Width/2-db.speed.Size().Width/2, space.Height/2-db.speed.Size().Height/2+25))
 
 	// Vbar
-	pwm := db.pwm.Content()
+	pwm := db.pwm
 	pwm.Resize(fyne.NewSize(sixthWidth/3, space.Height-125))
 	pwm.Move(fyne.NewPos(sixthWidth+8, 25))
 
-	tps := db.throttle.Content()
+	tps := db.throttle
 	tps.Resize(fyne.NewSize(sixthWidth/3, space.Height-125))
 	tps.Move(fyne.NewPos(space.Width-sixthWidth-tps.Size().Width-8, 25))
 
@@ -644,7 +697,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	db.limpMode.Move(fyne.NewPos(space.Width/2-db.limpMode.Size().Width/2, space.Height/2-db.limpMode.Size().Height/2-(thirdHeight/2)))
 
 	db.checkEngine.Resize(fyne.NewSize(sixthWidth/2, thirdHeight/2))
-	db.checkEngine.Move(fyne.NewPos(space.Width-db.engineTemp.Size().Width-db.throttle.Content().Size().Width-db.checkEngine.Size().Width-15, space.Height-db.checkEngine.Size().Height-db.wblambda.Size().Height))
+	db.checkEngine.Move(fyne.NewPos(space.Width-db.engineTemp.Size().Width-db.throttle.Size().Width-db.checkEngine.Size().Width-15, space.Height-db.checkEngine.Size().Height-db.wblambda.Size().Height))
 
 	db.knockIcon.Move(fyne.NewPos((space.Width/2)-(db.checkEngine.Size().Width/2)-(sixthWidth*.7), space.Height/2-60))
 
