@@ -151,7 +151,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 	mw.createButtons()
 
 	mw.presetSelect = &widget.Select{
-		Alignment:   fyne.TextAlignCenter,
+		Alignment:   fyne.TextAlignLeading,
 		PlaceHolder: "Select preset",
 		Options:     append([]string{"Select preset"}, presets.Names()...),
 
@@ -232,10 +232,9 @@ func (mw *MainWindow) createLeading() *fyne.Container {
 			),
 		),
 		container.NewVBox(
-			container.NewGridWithColumns(3,
+			container.NewGridWithColumns(2,
 				mw.loadConfigBtn,
 				mw.saveConfigBtn,
-				mw.presetSelect,
 			),
 		),
 		nil,
@@ -261,6 +260,13 @@ func (mw *MainWindow) render() fyne.CanvasObject {
 					layout.NewFixedWidth(75, widget.NewLabel("ECU")),
 					nil,
 					mw.ecuSelect,
+				),
+				container.NewBorder(
+					nil,
+					nil,
+					layout.NewFixedWidth(75, widget.NewLabel("Preset")),
+					nil,
+					mw.presetSelect,
 				),
 				mw.canSettings,
 				mw.logBtn,
