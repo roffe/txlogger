@@ -192,6 +192,7 @@ func (c *T7Client) Start() error {
 
 		errg, gctx := errgroup.WithContext(ctx)
 
+		//cps := 0
 		errg.Go(func() error {
 			for {
 				select {

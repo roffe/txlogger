@@ -27,26 +27,26 @@ func (t7 *T7File) VerifyChecksum() error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Checksum address: %X", uint32(c.Address))
-	log.Printf("Checksum value: %X", uint32(c.Value))
+	t7.printFunc("Checksum address: %X", uint32(c.Address))
+	t7.printFunc("Checksum value: %X", uint32(c.Value))
 
 	calculatedFWChecksum, err := t7.calculateFWChecksum()
 	if err != nil {
 		return err
 	}
-	log.Printf("Calculated FW checksum: %X", calculatedFWChecksum)
+	t7.printFunc("Calculated FW checksum: %X", calculatedFWChecksum)
 
 	calculatedF2Checksum, err := t7.calculateF2Checksum()
 	if err != nil {
 		return err
 	}
-	log.Printf("Calculated F2 checksum: %X", calculatedF2Checksum)
+	t7.printFunc("Calculated F2 checksum: %X", calculatedF2Checksum)
 
 	calculatedFBChecksum, err := t7.calculateFBChecksum(0, t7.fwLength)
 	if err != nil {
 		return err
 	}
-	log.Printf("Calculated FB checksum: %X", calculatedFBChecksum)
+	t7.printFunc("Calculated FB checksum: %X", calculatedFBChecksum)
 
 	if c.Value != int(calculatedFWChecksum) {
 		return errors.New("checksum mismatch")
@@ -59,19 +59,19 @@ func (t7 *T7File) UpdateChecksum() error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Calculated FW checksum: %X", calculatedFWChecksum)
+	t7.printFunc("Calculated FW checksum: %X", calculatedFWChecksum)
 
 	calculatedF2Checksum, err := t7.calculateF2Checksum()
 	if err != nil {
 		return err
 	}
-	log.Printf("Calculated F2 checksum: %X", calculatedF2Checksum)
+	t7.printFunc("Calculated F2 checksum: %X", calculatedF2Checksum)
 
 	calculatedFBChecksum, err := t7.calculateFBChecksum(0, t7.fwLength)
 	if err != nil {
 		return err
 	}
-	log.Printf("Calculated FB checksum: %X", calculatedFBChecksum)
+	t7.printFunc("Calculated FB checksum: %X", calculatedFBChecksum)
 
 	t7.setFWChecksum(calculatedFWChecksum)
 
@@ -115,9 +115,9 @@ func (t7 *T7File) getFWChecksum() (T7Checksum, error) {
 		return T7Checksum{}, errors.New("checksum area not found")
 	}
 
-	log.Printf("Checksum area: %X", checksumArea)
+	t7.printFunc("Checksum area: %X", checksumArea)
 	if checksumArea > T7Length {
-		log.Printf("Checksum area sram: %X", checksumArea)
+		t7.printFunc("Checksum area sram: %X", checksumArea)
 		checksumArea = checksumArea - t7.sramOffset
 	}
 
@@ -138,7 +138,7 @@ func (t7 *T7File) calculateFWChecksum() (uint32, error) {
 		checksum := t7.calculateChecksum(addr, t7.csumArea[i].Length)
 		checksum32 += uint32(checksum)
 		//		log.Println("Checksum area:", i, t7.csumArea[i].String())
-		//		log.Printf("Checksum: %d %X", i, uint32(checksum))
+		//		t7.printFunc("Checksum: %d %X", i, uint32(checksum))
 	}
 
 	return checksum32, nil
@@ -202,7 +202,7 @@ func (t7 *T7File) findFWChecksum(areaStart int) T7Checksum {
 		}
 	}
 	if rCheckSum.Address > 0x7FFFF {
-		log.Printf("Checksum address in ram: %X", rCheckSum.Address)
+		//t7.printFunc("Checksum address in ram: %X", rCheckSum.Address)
 		rCheckSum.Address = rCheckSum.Address - t7.sramOffset
 	}
 

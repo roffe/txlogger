@@ -62,7 +62,10 @@ func LoadSymbols(filename string, cb func(string)) (ECUType, SymbolCollection, e
 	cb(fmt.Sprintf("Loading %s", filepath.Base(filename)))
 
 	if err := IsTrionic7File(data); err == nil {
-		sym, err := NewT7File(data, true)
+		sym, err := NewT7File(data,
+			WithAutoFixFooter(),
+			WithPrintFunc(func(str string, v ...any) { cb(fmt.Sprintf(str, v...)) }),
+		)
 		//sym, err := LoadT7Symbols(data, cb)
 		return ECU_T7, sym, err
 	}

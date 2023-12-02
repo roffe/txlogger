@@ -279,22 +279,11 @@ func (db *Dashboard) SetValue(key string, value float64) {
 			log.Println(err)
 		}
 	}()
-
 	if db != nil {
 		if fun, ok := db.metrics[key]; ok {
-			if fun != nil {
-				fun(value)
-			}
+			fun(value)
 		}
 	}
-
-	/*
-		select {
-		case db.metricsChan <- &model.DashboardMetric{Name: key, Value: value}:
-		default:
-			//		log.Println("failed to set value")
-		}
-	*/
 }
 
 func (db *Dashboard) createRouter() map[string]func(float64) {

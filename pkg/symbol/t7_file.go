@@ -51,12 +51,28 @@ type T7File struct {
 
 	csumArea [16]T7ChecksumArea
 
+	printFunc   func(string, ...any)
 	*Collection // the symbol collection
 }
 
-func NewT7File(data []byte, autoFixFooter bool) (*T7File, error) {
+type T7FileOpt func(*T7File) error
+
+func WithAutoFixFooter() T7FileOpt {
+	return func(t7 *T7File) error {
+		t7.autoFixFooter = true
+		return nil
+	}
+}
+
+func WithPrintFunc(f func(string, ...any)) T7FileOpt {
+	return func(t7 *T7File) error {
+		t7.printFunc = f
+		return nil
+	}
+}
+
+func NewT7File(data []byte, opts ...T7FileOpt) (*T7File, error) {
 	t7 := &T7File{
-		autoFixFooter:   autoFixFooter,
 		data:            data,
 		chassisID:       "00000000000000000",
 		immobilizerID:   "000000000000000",
@@ -69,14 +85,24 @@ func NewT7File(data []byte, autoFixFooter bool) (*T7File, error) {
 		ecuHardwareNr:   "0000000",
 		lastModifiedBy:  []byte{0x42, 0xFB, 0xFA, 0xFF, 0xFF},
 		testserialnr:    "050225",
+		printFunc: func(format string, v ...any) {
+			log.Printf(format, v...)
+		},
 	}
+
+	for _, opt := range opts {
+		if err := opt(t7); err != nil {
+			return nil, err
+		}
+	}
+
 	return t7.init()
 }
 
 func (t7 *T7File) init() (*T7File, error) {
 	t7.loadHeaders()
 	symbols, err := LoadT7Symbols(t7.data, func(s string) {
-		log.Println(s)
+		t7.printFunc(s)
 	})
 	if err != nil {
 		return nil, err
