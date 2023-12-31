@@ -6,8 +6,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -76,13 +76,13 @@ func (c *T7Client) GetRAM(address uint32, length uint32) ([]byte, error) {
 }
 
 func (c *T7Client) Start() error {
-	file, filename, err := createLog("t7l")
+	file, filename, err := createLog(c.LogPath, "t7l")
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 	defer file.Sync()
-	c.OnMessage(fmt.Sprintf("Logging to %s", filename))
+	c.OnMessage(fmt.Sprintf("Logging to %s%s", c.LogPath, filename))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -214,6 +214,14 @@ func (c *T7Client) Start() error {
 		})
 		errg.Go(func() error {
 			var timeStamp time.Time
+
+			var order []string
+			for k := range c.sysvars.values {
+				order = append(order, k)
+			}
+			// sort order
+			sort.StringSlice(order).Sort()
+
 			for {
 				select {
 				case <-c.quitChan:
@@ -291,7 +299,7 @@ func (c *T7Client) Start() error {
 						}
 						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", left, leftovers[:n]))
 					}
-					c.produceLogLine(file, c.Symbols, timeStamp)
+					produceLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
 					count++
 					//cps++
 					if count%10 == 0 {
@@ -314,18 +322,4 @@ func (c *T7Client) Start() error {
 		retry.LastErrorOnly(true),
 	)
 	return err
-}
-
-func (c *T7Client) produceLogLine(file io.Writer, vars []*symbol.Symbol, ts time.Time) {
-	file.Write([]byte(ts.Format("02-01-2006 15:04:05.999") + "|"))
-	c.sysvars.Lock()
-	for k, v := range c.sysvars.values {
-		file.Write([]byte(k + "=" + strings.Replace(v, ".", ",", 1) + "|"))
-	}
-	c.sysvars.Unlock()
-	for _, va := range vars {
-		val := va.StringValue()
-		file.Write([]byte(va.Name + "=" + strings.Replace(val, ".", ",", 1) + "|"))
-	}
-	file.Write([]byte("IMPORTANTLINE=0|\n"))
 }

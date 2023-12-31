@@ -20,6 +20,7 @@ const (
 	prefsLivePreview       = "livePreview"
 	prefsMeshView          = "liveMeshView"
 	prefsRealtimeBars      = "realtimeBars"
+	prefsLogPath           = "logPath"
 )
 
 type SettingsWidget struct {
@@ -32,6 +33,7 @@ type SettingsWidget struct {
 	livePreview  *widget.Check
 	meshView     *widget.Check
 	realtimeBars *widget.Check
+	logPath      *widget.Label
 
 	container *fyne.Container
 
@@ -62,6 +64,10 @@ func (sw *SettingsWidget) GetMeshView() bool {
 	return sw.meshView.Checked
 }
 
+func (sw *SettingsWidget) GetLogPath() string {
+	return sw.logPath.Text
+}
+
 func NewSettingsWidget() *SettingsWidget {
 	sw := &SettingsWidget{}
 	sw.ExtendBaseWidget(sw)
@@ -75,8 +81,7 @@ func NewSettingsWidget() *SettingsWidget {
 	sw.meshView = sw.newMeshView()
 	sw.realtimeBars = sw.newRealtimeBars()
 
-	logPath := widget.NewEntry()
-	logPath.SetText(datalogger.LOGPATH)
+	sw.logPath = widget.NewLabel("")
 
 	sw.container =
 		container.NewVBox(
@@ -92,18 +97,25 @@ func NewSettingsWidget() *SettingsWidget {
 				nil,
 				nil,
 				widget.NewLabel("Log folder"),
-				widget.NewButtonWithIcon("Browse", theme.FileIcon(), func() {
-					dir, err := sdialog.Directory().Title("Select log folder").Browse()
-					if err != nil {
-						if errors.Is(err, sdialog.ErrCancelled) {
+				container.NewGridWithColumns(2,
+					widget.NewButtonWithIcon("Reset", theme.ContentClearIcon(), func() {
+						sw.logPath.SetText(datalogger.LOGPATH)
+						fyne.CurrentApp().Preferences().SetString(prefsLogPath, datalogger.LOGPATH)
+					}),
+					widget.NewButtonWithIcon("Browse", theme.FileIcon(), func() {
+						dir, err := sdialog.Directory().Title("Select log folder").Browse()
+						if err != nil {
+							if errors.Is(err, sdialog.ErrCancelled) {
+								return
+							}
+							log.Println(err)
 							return
 						}
-						log.Println(err)
-						return
-					}
-					logPath.SetText(dir)
-				}),
-				logPath,
+						sw.logPath.SetText(dir)
+						fyne.CurrentApp().Preferences().SetString(prefsLogPath, dir)
+					}),
+				),
+				sw.logPath,
 			),
 			widget.NewSeparator(),
 			container.NewBorder(
@@ -195,6 +207,7 @@ func (sw *SettingsWidget) loadPrefs() {
 	sw.livePreview.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsLivePreview, true))
 	sw.meshView.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsMeshView, true))
 	sw.realtimeBars.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsRealtimeBars, true))
+	sw.logPath.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogPath, datalogger.LOGPATH))
 }
 
 func (sw *SettingsWidget) CreateRenderer() fyne.WidgetRenderer {

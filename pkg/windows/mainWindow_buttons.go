@@ -252,6 +252,7 @@ func (mw *MainWindow) newDataLogger(device gocan.Adapter) (datalogger.Logger, er
 		OnMessage:      mw.Log,
 		CaptureCounter: mw.captureCounter,
 		ErrorCounter:   mw.errorCounter,
+		LogPath:        mw.settings.GetLogPath(),
 	})
 }
 

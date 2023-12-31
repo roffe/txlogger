@@ -4,8 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
-	"strings"
+	"sort"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -74,7 +73,7 @@ func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
 }
 
 func (c *T8Client) Start() error {
-	file, filename, err := createLog("t8l")
+	file, filename, err := createLog(c.LogPath, "t8l")
 	if err != nil {
 		return err
 	}
@@ -156,6 +155,14 @@ func (c *T8Client) Start() error {
 
 		errg.Go(func() error {
 			var timeStamp time.Time
+
+			order := make([]string, len(c.sysvars.values))
+			for k := range c.sysvars.values {
+				order = append(order, k)
+			}
+			// sort order
+			sort.StringSlice(order).Sort()
+
 			for {
 				select {
 				case <-c.quitChan:
@@ -244,7 +251,7 @@ func (c *T8Client) Start() error {
 						}
 						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", left, leftovers[:n]))
 					}
-					c.produceLogLine(file, c.Symbols, timeStamp)
+					produceLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
 					//cps++
 					count++
 					if count%10 == 0 {
@@ -296,18 +303,4 @@ func SetUpDynamicallyDefinedRegisterBySymbol(ctx context.Context, gm *gmlan.Clie
 		return fmt.Errorf("SetUpDynamicallyDefinedRegisterBySymbol: %w", err)
 	}
 	return nil
-}
-
-func (c *T8Client) produceLogLine(file io.Writer, vars []*symbol.Symbol, ts time.Time) {
-	file.Write([]byte(ts.Format("02-01-2006 15:04:05.999") + "|"))
-	c.sysvars.Lock()
-	for k, v := range c.sysvars.values {
-		file.Write([]byte(k + "=" + strings.Replace(v, ".", ",", 1) + "|"))
-	}
-	c.sysvars.Unlock()
-	for _, va := range vars {
-		val := va.StringValue()
-		file.Write([]byte(va.Name + "=" + strings.Replace(val, ".", ",", 1) + "|"))
-	}
-	file.Write([]byte("IMPORTANTLINE=0|\n"))
 }

@@ -40,6 +40,7 @@ type Config struct {
 	OnMessage      func(string)
 	CaptureCounter binding.Int
 	ErrorCounter   binding.Int
+	LogPath        string
 }
 
 type Client struct {
