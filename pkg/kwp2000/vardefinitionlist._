@@ -3,7 +3,7 @@ package kwp2000
 import (
 	"sync"
 
-	"github.com/roffe/txlogger/pkg/symbol"
+	symbol "github.com/roffe/ecusymbol"
 )
 
 type VarDefinitionList struct {

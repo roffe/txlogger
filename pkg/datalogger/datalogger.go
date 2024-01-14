@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2/data/binding"
+	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
-	"github.com/roffe/txlogger/pkg/symbol"
 )
 
 const ISO8601 = "2006-01-02T15:04:05.999-0700"

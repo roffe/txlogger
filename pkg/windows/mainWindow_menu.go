@@ -4,17 +4,15 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
-	"github.com/roffe/txlogger/pkg/datalogger"
+	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/mainmenu"
 	"github.com/roffe/txlogger/pkg/mapviewerhandler"
-	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/skratchdot/open-golang/open"
 	sdialog "github.com/sqweek/dialog"
@@ -64,15 +62,7 @@ func (mw *MainWindow) setupMenu() {
 				go NewLogPlayer(mw.app, filename, mw.fw, onClose)
 			}),
 			fyne.NewMenuItem("Open log folder", func() {
-				if _, err := os.Stat("logs"); os.IsNotExist(err) {
-					if err := os.Mkdir("logs", 0755); err != nil {
-						if err != os.ErrExist {
-							mw.Log(fmt.Sprintf("failed to create logs dir: %s", err))
-							return
-						}
-					}
-				}
-				if err := open.Run(datalogger.LOGPATH); err != nil {
+				if err := open.Run(mw.settings.GetLogPath()); err != nil {
 					fyne.LogError("Failed to open logs folder", err)
 				}
 			}),

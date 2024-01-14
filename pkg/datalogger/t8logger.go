@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
+	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/gmlan"
 	"github.com/roffe/txlogger/pkg/ecu"
-	"github.com/roffe/txlogger/pkg/symbol"
 	"golang.org/x/sync/errgroup"
 )
 

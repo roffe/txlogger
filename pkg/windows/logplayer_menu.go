@@ -8,8 +8,8 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
+	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/interpolate"
-	"github.com/roffe/txlogger/pkg/symbol"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 

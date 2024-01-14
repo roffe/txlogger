@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
-	"github.com/roffe/txlogger/pkg/symbol"
+	symbol "github.com/roffe/ecusymbol"
 )
 
 type MainMenu struct {

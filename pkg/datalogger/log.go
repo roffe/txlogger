@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/roffe/txlogger/pkg/symbol"
+	symbol "github.com/roffe/ecusymbol"
 )
 
 func createLog(path, extension string) (*os.File, string, error) {

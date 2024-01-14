@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
+	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/kwp2000"
-	"github.com/roffe/txlogger/pkg/symbol"
 	"golang.org/x/sync/errgroup"
 )
 

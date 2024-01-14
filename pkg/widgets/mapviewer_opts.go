@@ -1,8 +1,8 @@
 package widgets
 
 import (
+	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/interpolate"
-	"github.com/roffe/txlogger/pkg/symbol"
 )
 
 type MapViewerOption func(*MapViewer) error

@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
+	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
-	"github.com/roffe/txlogger/pkg/symbol"
 )
 
 var (

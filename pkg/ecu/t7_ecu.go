@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/kwp2000"
-	"github.com/roffe/txlogger/pkg/symbol"
 )
 
 func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (symbol.SymbolCollection, error) {

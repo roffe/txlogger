@@ -14,10 +14,10 @@ import (
 )
 
 func (mw *MainWindow) createButtons() {
-	mw.addSymbolBtn = widget.NewButtonWithIcon("Add", theme.ContentAddIcon(), func() {
+	mw.addSymbolBtn = widget.NewButtonWithIcon("", theme.ContentAddIcon(), func() {
 		sym := mw.fw.GetByName(mw.symbolLookup.Text)
 		if sym == nil {
-			dialog.ShowError(fmt.Errorf("symbol not found"), mw)
+			dialog.ShowError(fmt.Errorf("%q not found", mw.symbolLookup.Text), mw)
 			return
 		}
 
@@ -26,7 +26,7 @@ func (mw *MainWindow) createButtons() {
 		//log.Printf("Name: %s, Method: %d, Value: %d, Type: %X", s.Name, s.Method, s.Value, s.Type)
 	})
 
-	mw.loadSymbolsFileBtn = widget.NewButtonWithIcon("Load from binary", theme.FileIcon(), func() {
+	mw.loadSymbolsFileBtn = widget.NewButtonWithIcon("Load binary", theme.FileIcon(), func() {
 		// d := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 		// 	if err != nil {
 		// 		// dialog.ShowError(err, mw)
@@ -44,7 +44,7 @@ func (mw *MainWindow) createButtons() {
 		// d.Show()
 		// return
 
-		filename, err := sdialog.File().Filter("Binary file", "bin").Load()
+		filename, err := sdialog.File().Filter("Binary file", "bin").SetStartDir(mw.settings.GetLogPath()).Load()
 		if err != nil {
 			if err.Error() == "Cancelled" {
 				return
@@ -76,7 +76,7 @@ func (mw *MainWindow) createButtons() {
 		}()
 	})
 
-	mw.loadConfigBtn = widget.NewButtonWithIcon("Load config", theme.FileIcon(), func() {
+	mw.loadConfigBtn = widget.NewButtonWithIcon("Load symbols", theme.FileIcon(), func() {
 		filename, err := sdialog.File().Filter("*.json", "json").Load()
 		if err != nil {
 			if err.Error() == "Cancelled" {
@@ -94,7 +94,7 @@ func (mw *MainWindow) createButtons() {
 		mw.SyncSymbols()
 	})
 
-	mw.saveConfigBtn = widget.NewButtonWithIcon("Save config", theme.DocumentSaveIcon(), func() {
+	mw.saveConfigBtn = widget.NewButtonWithIcon("Save symbols", theme.DocumentSaveIcon(), func() {
 		filename, err := sdialog.File().Filter("json", "json").Save()
 		if err != nil {
 			if err.Error() == "Cancelled" {

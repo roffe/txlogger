@@ -4,8 +4,8 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/interpolate"
-	"github.com/roffe/txlogger/pkg/symbol"
 )
 
 type MapViewerMulti struct {

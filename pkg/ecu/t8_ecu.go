@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/gmlan"
-	"github.com/roffe/txlogger/pkg/symbol"
 )
 
 func CalculateT8AccessKey(seed []byte, level byte) (byte, byte) {
