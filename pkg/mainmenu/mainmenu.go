@@ -7,6 +7,115 @@ import (
 	symbol "github.com/roffe/ecusymbol"
 )
 
+var T7SymbolsTuningOrder = []string{
+	"Calibration",
+	"Injectors",
+	"Limiters",
+	"Fuel",
+	"Boost",
+	"Ignition",
+	"Adaption",
+	"Myrtilos",
+}
+
+var T7SymbolsTuning = map[string][]string{
+	"Calibration": {
+		"AirCompCal.PressMap",
+		"MAFCal.m_RedundantAirMap",
+		"TCompCal.EnrFacE85Tab",
+		"TCompCal.EnrFacTab",
+		"VIOSMAFCal.FreqSP",
+		"VIOSMAFCal.Q_AirInletTab2",
+	},
+	"Injectors": {
+		"InjCorrCal.BattCorrTab",
+		"InjCorrCal.BattCorrSP",
+		"InjCorrCal.InjectorConst",
+	},
+	"Limiters": {
+		"BstKnkCal.MaxAirmass",
+		"TorqueCal.M_ManGearLim",
+	},
+	"Fuel": {
+		"BFuelCal.Map",
+		"BFuelCal.StartMap",
+		"StartCal.EnrFacE85Tab",
+		"StartCal.EnrFacTab",
+	},
+	"Boost": {
+		//"...|BoostCal.RegMap|BoostCal.PMap|BoostCal.IMap|BoostCal.DMap",
+		"BoostCal.RegMap",
+		"BoostCal.PMap",
+		"BoostCal.IMap",
+		"BoostCal.DMap",
+	},
+	"Ignition": {
+		"IgnE85Cal.fi_AbsMap",
+		"IgnIdleCal.fi_IdleMap",
+		"IgnNormCal.Map",
+		"IgnStartCal.fi_StartMap",
+	},
+	"Adaption": {
+		"AdpFuelCal.T_AdaptLim",
+		"FCutCal.ST_Enable",
+		"LambdaCal.ST_Enable",
+		"PurgeCal.ST_PurgeEnable",
+		"E85Cal.ST_Enable",
+	},
+	"Myrtilos": {
+		"MyrtilosCal.Launch_DisableSpeed",
+		"MyrtilosCal.Launch_Ign_fi_Min",
+		"MyrtilosCal.Launch_RPM",
+		"MyrtilosCal.Launch_InjFac_at_rpm",
+		"MyrtilosCal.Launch_PWM_max_at_stand",
+	},
+}
+
+var T8SymbolsTuningOrder = []string{
+	"Calibration",
+	"Injectors",
+	"Limiters",
+	"Fuel",
+	"Boost",
+	"Ignition",
+	"Adaption",
+}
+
+var T8SymbolsTuning = map[string][]string{
+	"Calibration": {},
+	"Injectors": {
+		"InjCorrCal.InjectorConst",
+		"InjCorrCal.BattCorrTab",
+		"InjCorrCal.BattCorrSP",
+	},
+	"Limiters": {
+		"BstKnkCal.MaxAirmass",
+		"AirCtrlCal.AirmassLimiter",
+	},
+	"Fuel": {
+		"BFuelCal.LambdaOneFacMap",
+		"BFuelCal.TempEnrichFacMap",
+		"FFFuelCal.TempEnrichFacMAP",
+	},
+	"Boost": {
+		//"...|AirCtrlCal.RegMap|AirCtrlCal.Ppart_BoostMap|AirCtrlCal.Ipart_BoostMap|AirCtrlCal.Dpart_BoostMap",
+		"AirCtrlCal.RegMap",
+		"AirCtrlCal.Ppart_BoostMap",
+		"AirCtrlCal.Ipart_BoostMap",
+		"AirCtrlCal.Dpart_BoostMap",
+		"AirCtrlCal.ST_BoostEnable",
+		"BoostAdapCal.ST_enable",
+		"FrompAdapCal.ST_enable",
+		"AreaAdapCal.ST_enable",
+	},
+	"Ignition": {
+		"IgnAbsCal.fi_NormalMAP",
+		"IgnAbsCal.fi_highOctanMAP",
+		"IgnAbsCal.ST_EnableOctanMaps",
+	},
+	"Adaption": {},
+}
+
 type MainMenu struct {
 	w         fyne.Window
 	menus     []*fyne.Menu
@@ -30,12 +139,12 @@ func (mw *MainMenu) GetMenu(name string) *fyne.MainMenu {
 
 	switch name {
 	case "T7":
-		order = symbol.T7SymbolsTuningOrder
-		ecuM = symbol.T7SymbolsTuning
+		order = T7SymbolsTuningOrder
+		ecuM = T7SymbolsTuning
 		typ = symbol.ECU_T7
 	case "T8":
-		order = symbol.T8SymbolsTuningOrder
-		ecuM = symbol.T8SymbolsTuning
+		order = T8SymbolsTuningOrder
+		ecuM = T8SymbolsTuning
 		typ = symbol.ECU_T8
 	}
 

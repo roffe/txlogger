@@ -254,6 +254,10 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 func (mv *MapViewer) SetCellText(idx int, value int) {
 	precission := 0
 	switch mv.zCorrFac {
+	case 1.0 / 1024:
+		precission = 4
+	case 1.0 / 128:
+		precission = 3
 	case 0.1:
 		precission = 1
 	case 0.01:
