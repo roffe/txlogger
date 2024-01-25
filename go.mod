@@ -7,8 +7,7 @@ require (
 	github.com/avast/retry-go/v4 v4.5.1
 	github.com/fatih/color v1.16.0
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
-	github.com/roffe/ecusymbol v0.0.0-00010101000000-000000000000
-	github.com/roffe/gocan v0.0.0-20231126003022-e540a931408f
+	github.com/roffe/gocan v0.0.0-20231231164343-755e5ac84c98
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/sqweek/dialog v0.0.0-20220809060634-e981b270ebbf
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9
@@ -67,6 +66,7 @@ require (
 	honnef.co/go/js/dom v0.0.0-20231030024858-cb489e859d05 // indirect
 )
 
-replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
+require github.com/roffe/ecusymbol v0.0.0-20240125155554-632470c71287 // indirect
 
-replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
+// replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
+// replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
