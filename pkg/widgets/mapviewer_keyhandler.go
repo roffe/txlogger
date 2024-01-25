@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
+	"github.com/roffe/txlogger/pkg/debug"
 )
 
 func (mv *MapViewer) TypedRune(r rune) {
@@ -197,8 +198,13 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 					mv.zData[cell] = int(num * 100)
 				case 0.001:
 					mv.zData[cell] = int(num * 1000)
+				case 1.0 / 128:
+					mv.zData[cell] = int(num * 128)
+				case 1.0 / 1024:
+					mv.zData[cell] = int(num * 1024)
 				default:
-					fyne.LogError("Unknown zCorrFac", fmt.Errorf("%f", mv.zCorrFac))
+					fyne.LogError("unknown zCorrFac", fmt.Errorf("%f", mv.zCorrFac))
+					debug.Log(fmt.Sprintf("%s unknown zCorrFac: %f", mv.symbol.Name, mv.zCorrFac))
 				}
 			} else {
 				num, err := strconv.Atoi(mv.inputBuffer.String())
