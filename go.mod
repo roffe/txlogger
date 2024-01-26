@@ -3,7 +3,6 @@ module github.com/roffe/txlogger
 go 1.21.5
 
 require (
-	fyne.io/x/fyne v0.0.0-20231020065621-89b4a4aea27d
 	github.com/avast/retry-go/v4 v4.5.1
 	github.com/fatih/color v1.16.0
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
@@ -12,15 +11,15 @@ require (
 	github.com/sqweek/dialog v0.0.0-20220809060634-e981b270ebbf
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9
 	go.bug.st/serial v1.6.1
-	golang.org/x/crypto v0.15.0
-	golang.org/x/image v0.14.0
+	golang.org/x/crypto v0.18.0
+	golang.org/x/image v0.15.0
 	golang.org/x/mod v0.14.0
-	golang.org/x/net v0.18.0
-	golang.org/x/sync v0.5.0
+	golang.org/x/net v0.20.0
+	golang.org/x/sync v0.6.0
 )
 
 require (
-	fyne.io/fyne/v2 v2.4.2
+	fyne.io/fyne/v2 v2.4.3
 	fyne.io/systray v1.10.1-0.20231115130155-104f5ef7839e // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
@@ -57,16 +56,20 @@ require (
 	github.com/tevino/abool v1.2.0 // indirect
 	github.com/yuin/goldmark v1.6.0 // indirect
 	go.einride.tech/can v0.7.0 // indirect
-	golang.org/x/mobile v0.0.0-20231108233038-35478a0c49da // indirect
-	golang.org/x/sys v0.14.0 // indirect
+	golang.org/x/mobile v0.0.0-20240112133503-c713f31d574b // indirect
+	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/tools v0.15.0 // indirect
+	golang.org/x/tools v0.17.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	honnef.co/go/js/dom v0.0.0-20231030024858-cb489e859d05 // indirect
+	honnef.co/go/js/dom v0.0.0-20231112215516-51f43a291193 // indirect
 )
 
-require github.com/roffe/ecusymbol v0.0.0-20240125155554-632470c71287 // indirect
+require github.com/roffe/ecusymbol v0.0.0-20240125161701-957aa42b58bd
+
+require (
+	fyne.io/x/fyne v0.0.0-20231231230942-0b5901d0781a
+)
 
 // replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
-// replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
+replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol

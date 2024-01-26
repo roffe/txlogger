@@ -15,6 +15,47 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+func AirDemToStringT8(v float64) string {
+	switch v {
+	case 10:
+		return "PedalMap"
+	case 11:
+		return "Cruise Control"
+	case 12:
+		return "Idle Control"
+	case 20:
+		return "Max Engine Torque"
+	case 21:
+		return "Traction Control"
+	case 22:
+		return "Manual Gearbox Limit"
+	case 23:
+		return "Automatic Gearbox Lim"
+	case 24:
+		return "Stall Limit (Automatic)"
+	case 25:
+		return "Special Mode"
+	case 26:
+		return "Reverse Limit (Automatic)"
+	case 27:
+		return "Max Vehicle speed"
+	case 28:
+		return "Brake Management"
+	case 29:
+		return "System Action"
+	case 30:
+		return "Max Engine Speed"
+	case 40:
+		return "Min Load"
+	case 50:
+		return "Knock Airmass Limit"
+	case 52:
+		return "Max Turbo Speed"
+	default:
+		return "Unknown"
+	}
+}
+
 type T8Client struct {
 	dl Logger
 

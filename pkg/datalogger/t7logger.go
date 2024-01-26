@@ -17,6 +17,65 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+func AirDemToStringT7(v float64) string {
+	switch v {
+	case 10:
+		return "PedalMap"
+	case 11:
+		return "Cruise Control"
+	case 12:
+		return "Idle Control"
+	case 20:
+		return "Max Engine Torque"
+	case 21:
+		return "Traction Control"
+	case 22:
+		return "Manual Gearbox Limit"
+	case 23:
+		return "Automatic Gearbox Lim"
+	case 24:
+		return "Stall Limit"
+	case 25:
+		return "Special Mode"
+	case 26:
+		return "Reverse Limit (Auto)"
+	case 27:
+		return "Misfire diagnose"
+	case 28:
+		return "Brake Management"
+	case 29:
+		return "Diff Prot (Automatic)"
+	case 30:
+		return "Not used"
+	case 31:
+		return "Max Vehicle Speed"
+	case 40:
+		return "LDA Request"
+	case 41:
+		return "Min Load"
+	case 42:
+		return "Dash Pot"
+	case 50:
+		return "Knock Airmass Limit"
+	case 51:
+		return "Max Engine Speed"
+	case 52:
+		return "Max Air for Lambda 1"
+	case 53:
+		return "Max Turbo Speed"
+	case 54:
+		return "N.A"
+	case 55:
+		return "Faulty APC valve"
+	case 60:
+		return "Emission Limitation"
+	case 70:
+		return "Safety Switch Limit"
+	default:
+		return "Unknown"
+	}
+}
+
 type T7Client struct {
 	dl Logger
 

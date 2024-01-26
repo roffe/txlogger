@@ -33,6 +33,8 @@ type Gauge interface {
 */
 
 type Dashboard struct {
+	cfg *DashboardConfig
+
 	widget.BaseWidget
 	rpm, speed, iat                 *Dial
 	throttle, pwm                   *VBar
@@ -61,10 +63,28 @@ type Dashboard struct {
 	focused   bool
 }
 
-func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.Button, onClose func()) *Dashboard {
+type DashboardConfig struct {
+	App            fyne.App
+	Mw             fyne.Window
+	Logplayer      bool
+	LogBtn         *widget.Button
+	OnClose        func()
+	AirDemToString func(float64) string
+}
+
+// func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.Button, onClose func()) *Dashboard {
+func NewDashboard(cfg *DashboardConfig) *Dashboard {
+
+	if cfg.AirDemToString == nil {
+		cfg.AirDemToString = func(f float64) string {
+			return fmt.Sprintf("%.0f", f)
+		}
+	}
+
 	db := &Dashboard{
-		logBtn:    logBtn,
-		logplayer: logplayer,
+		cfg:       cfg,
+		logBtn:    cfg.LogBtn,
+		logplayer: cfg.Logplayer,
 		speed: NewDial(DialConfig{
 			Title:         "km/h",
 			Min:           0,
@@ -160,14 +180,14 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 		}),
 		checkEngine: canvas.NewImageFromResource(fyne.NewStaticResource("checkengine.png", checkengineBytes)),
 		fullscreenBtn: widget.NewButtonWithIcon("Fullscreen", theme.ZoomFitIcon(), func() {
-			mw.SetFullScreen(!mw.FullScreen())
+			cfg.Mw.SetFullScreen(!cfg.Mw.FullScreen())
 		}),
 		knockIcon: NewIcon(&IconConfig{
 			Image:   canvas.NewImageFromResource(fyne.NewStaticResource("knock.png", knockBytes)),
 			Minsize: fyne.NewSize(90, 90),
 		}),
 		limpMode: canvas.NewImageFromResource(fyne.NewStaticResource("limp.png", limpBytes)),
-		onClose:  onClose,
+		onClose:  cfg.OnClose,
 		//metricsChan: make(chan *model.DashboardMetric, 60),
 	}
 	db.ExtendBaseWidget(db)
@@ -180,7 +200,7 @@ func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.But
 		}
 	})
 
-	if logplayer {
+	if cfg.Logplayer {
 		db.time = &canvas.Text{
 			Text:     "00:00:00.00",
 			Color:    color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF},
@@ -309,7 +329,7 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 	}
 
 	ecmstat := func(value float64) {
-		db.activeAirDem.Text = airDemToString(value) + " (" + strconv.FormatFloat(value, 'f', 0, 64) + ")"
+		db.activeAirDem.Text = db.cfg.AirDemToString(value) + " (" + strconv.FormatFloat(value, 'f', 0, 64) + ")"
 		db.activeAirDem.Refresh()
 	}
 
@@ -560,65 +580,6 @@ func lambdaToString(v float64) string {
 		return "Gas hybrid active, T7 lambdacontrol stopped"
 	case 22:
 		return "Lambda integrator may not decrease below 0 during start"
-	default:
-		return "Unknown"
-	}
-}
-
-func airDemToString(v float64) string {
-	switch v {
-	case 10:
-		return "PedalMap"
-	case 11:
-		return "Cruise Control"
-	case 12:
-		return "Idle Control"
-	case 20:
-		return "Max Engine Torque"
-	case 21:
-		return "Traction Control"
-	case 22:
-		return "Manual Gearbox Limit"
-	case 23:
-		return "Automatic Gearbox Lim"
-	case 24:
-		return "Stall Limit"
-	case 25:
-		return "Special Mode"
-	case 26:
-		return "Reverse Limit (Auto)"
-	case 27:
-		return "Misfire diagnose"
-	case 28:
-		return "Brake Management"
-	case 29:
-		return "Diff Prot (Automatic)"
-	case 30:
-		return "Not used"
-	case 31:
-		return "Max Vehicle Speed"
-	case 40:
-		return "LDA Request"
-	case 41:
-		return "Min Load"
-	case 42:
-		return "Dash Pot"
-	case 50:
-		return "Knock Airmass Limit"
-	case 51:
-		return "Max Engine Speed"
-	case 52:
-		return "Max Air for Lambda 1"
-	case 53:
-		return "Max Turbo Speed"
-	case 54:
-		return "N.A"
-	case 55:
-		return "Faulty APC valve"
-	case 60:
-		return "Emission Limitation"
-	case 70:
-		return "Safety Switch Limit"
 	default:
 		return "Unknown"
 	}

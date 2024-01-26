@@ -14,6 +14,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/capture"
+	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/mainmenu"
@@ -88,9 +89,17 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 	w := a.NewWindow("LogPlayer " + filename)
 	w.Resize(fyne.NewSize(1024, 530))
 
+	dbCfg := &widgets.DashboardConfig{
+		App:       a,
+		Mw:        w,
+		Logplayer: true,
+		LogBtn:    nil,
+		OnClose:   onClose,
+	}
+
 	lp := &LogPlayer{
 		app: a,
-		db:  widgets.NewDashboard(a, w, true, nil, onClose),
+		db:  widgets.NewDashboard(dbCfg),
 
 		controlChan: make(chan *controlMsg, 10),
 
@@ -106,8 +115,10 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 	switch strings.ToLower(filepath.Ext(filename)) {
 	case ".t7l":
 		lp.logType = "T7"
+		dbCfg.AirDemToString = datalogger.AirDemToStringT7
 	case ".t8l":
 		lp.logType = "T8"
+		dbCfg.AirDemToString = datalogger.AirDemToStringT8
 	}
 
 	lp.menu = mainmenu.New(lp, []*fyne.Menu{

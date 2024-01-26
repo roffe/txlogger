@@ -136,7 +136,22 @@ func (mw *MainWindow) createButtons() {
 			mw.SetCloseIntercept(mw.closeIntercept)
 		}
 
-		mw.dashboard = widgets.NewDashboard(mw.app, mw, false, mw.logBtn, onClose)
+		dbcfg := &widgets.DashboardConfig{
+			App:       mw.app,
+			Mw:        mw,
+			Logplayer: false,
+			LogBtn:    mw.logBtn,
+			OnClose:   onClose,
+		}
+
+		switch mw.ecuSelect.Selected {
+		case "T7":
+			dbcfg.AirDemToString = datalogger.AirDemToStringT7
+		case "T8":
+			dbcfg.AirDemToString = datalogger.AirDemToStringT8
+		}
+
+		mw.dashboard = widgets.NewDashboard(dbcfg)
 		if mw.dlc != nil {
 			mw.dlc.Attach(mw.dashboard)
 		}
