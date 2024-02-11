@@ -71,5 +71,6 @@ require (
 	fyne.io/x/fyne v0.0.0-20231231230942-0b5901d0781a
 )
 
-// replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
+replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
+
 replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol

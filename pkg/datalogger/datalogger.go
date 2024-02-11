@@ -1,6 +1,7 @@
 package datalogger
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"sync"
@@ -32,8 +33,16 @@ type Logger interface {
 	Consumer
 }
 
+type LambdaProvider interface {
+	GetLambda() float64
+	Start(context.Context)
+	Stop()
+	PrettyPrint() string
+}
+
 type Config struct {
 	ECU            string
+	Lambda         string
 	Device         gocan.Adapter
 	Symbols        []*symbol.Symbol
 	Rate           int

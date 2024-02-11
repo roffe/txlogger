@@ -11,17 +11,30 @@ import (
 )
 
 func Help(app fyne.App) {
-	u, err := url.Parse("https://txlogger.com")
-	if err != nil {
-		panic(err)
-	}
-	link := widget.NewHyperlink(u.Host, u)
-	link.Alignment = fyne.TextAlignLeading
-	link.TextStyle = fyne.TextStyle{Bold: true}
-
 	w := app.NewWindow("Help")
 	w.Resize(fyne.NewSize(400, 600))
+
+	tx, _ := url.Parse("https://txlogger.com")
+	kv, _ := url.Parse("https://www.kvaser.com")
+	mt, _ := url.Parse("https://www.maptun.com/en/")
+	tt, _ := url.Parse("https://www.trionictuning.com")
+
 	tabs := container.NewAppTabs(
+		container.NewTabItemWithIcon("About", theme.InfoIcon(), container.NewVBox(
+			widget.NewHyperlink("txlogger.com", tx),
+			widget.NewLabel("Version: "+app.Metadata().Version+" Build: "+strconv.Itoa(app.Metadata().Build)),
+			widget.NewLabel("Author: Roffe"),
+			widget.NewSeparator(),
+			widget.NewLabel("Special thanks to:"),
+			widget.NewLabel("SAAB for making the cars we ❤️!"),
+			widget.NewLabel("MattiasC, Dilemma, J.K Nilsson, Manick"),
+			widget.NewLabel("Artursson, Schottis, Chriva, Myrtilos"),
+			widget.NewLabel("Kalej, Bojer"),
+			widget.NewHyperlink("TrionicTuning", tt),
+			widget.NewHyperlink("Kvaser AB", kv),
+			widget.NewHyperlink("Maptun Performance AB", mt),
+			widget.NewLabel("o2o Crew"),
+		)),
 		container.NewTabItemWithIcon("Keyboard Shortcuts", theme.VisibilityIcon(), container.NewVBox(
 			widget.NewLabel("Keyboard Shortcuts"),
 			widget.NewLabel("F12: Capture screenshot"),
@@ -38,21 +51,6 @@ func Help(app fyne.App) {
 			widget.NewLabel("Plus: Increase playback speed"),
 			widget.NewLabel("Minus: Decrease playback speed"),
 			widget.NewLabel("Num Enter Reset playback speed"),
-		)),
-		container.NewTabItemWithIcon("About", theme.InfoIcon(), container.NewVBox(
-			widget.NewLabel("TxLogger"),
-			widget.NewLabel("Version: "+app.Metadata().Version+" Build: "+strconv.Itoa(app.Metadata().Build)),
-			widget.NewLabel("Author: Roffe"),
-			link,
-			widget.NewSeparator(),
-			widget.NewLabel("tHANKS tO:"),
-			widget.NewLabel("SAAB for making the cars we love"),
-			widget.NewLabel("The guys who made TrionicCANFlasher and TxSuite"),
-			widget.NewLabel("Kalej"),
-			widget.NewLabel("Artursson"),
-			widget.NewLabel("Schottis"),
-			widget.NewLabel("o2o Crew"),
-			widget.NewLabel("All supporters"),
 		)),
 	)
 	w.SetContent(tabs)

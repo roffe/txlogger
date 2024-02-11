@@ -387,7 +387,7 @@ func (mw *MainWindow) LoadSymbolsFromECU() error {
 }
 
 func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
-	ecuType, symbols, err := symbol.LoadSymbols(filename, mw.Log)
+	ecuType, symbols, err := symbol.Load(filename, mw.Log)
 	if err != nil {
 		return fmt.Errorf("error loading symbols: %w", err)
 	}

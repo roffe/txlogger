@@ -386,7 +386,9 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		"Out.PWM_BoostCntrl": db.pwm.SetValue,
 
 		"DisplProt.LambdaScanner": db.wblambda.SetValue,
-		"Lambda.LambdaInt":        db.nblambda.SetValue,
+		"Lambda.External":         db.wblambda.SetValue,
+
+		"Lambda.LambdaInt": db.nblambda.SetValue,
 
 		"MAF.m_AirInlet":        db.air.SetValue,
 		"m_Request":             db.air.SetValue2,

@@ -258,12 +258,13 @@ outer:
 		}
 
 		sub := t.c.Subscribe(ctx, 0x258)
+		defer sub.Close()
 		if err := t.Ack(b[0], gocan.ResponseRequired); err != nil {
 			return nil, err
 		}
 		for toRead > 0 {
 			select {
-			case f := <-sub:
+			case f := <-sub.C():
 				d := f.Data()
 				// log.Printf("toRead %d, %X", toRead, d)
 				readThis := int(min(6, toRead))
@@ -560,7 +561,7 @@ outer:
 			return nil, ctx.Err()
 		case <-time.After(t.defaultTimeout * 4):
 			return nil, fmt.Errorf("timeout")
-		case f := <-sub:
+		case f := <-sub.C():
 			d := f.Data()
 			if d[0]&0x40 == 0x40 {
 				payloadLeft = int(d[2]) - 2 // subtract two non-payload bytes

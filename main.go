@@ -3,20 +3,14 @@ package main
 import (
 	"image/color"
 	"log"
-	"net/url"
 	"os"
 	"strings"
-	"time"
 
 	//	_ "net/http/pprof"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
-	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/windows"
 )
 
@@ -54,10 +48,11 @@ func mainz(args []string) {
 		mw = windows.NewMainWindow(a, "")
 	}
 
-	go updateCheck(a, mw)
+	//go updateCheck(a, mw)
 	mw.ShowAndRun()
 }
 
+/*
 func updateCheck(a fyne.App, mw fyne.Window) {
 	doUpdateCheck := false
 	nextUpdateCheck := a.Preferences().String("nextUpdateCheck")
@@ -101,6 +96,7 @@ func updateCheck(a fyne.App, mw fyne.Window) {
 		}
 	}
 }
+*/
 
 type txTheme struct{}
 

@@ -261,6 +261,7 @@ func (mw *MainWindow) startLogging() {
 func (mw *MainWindow) newDataLogger(device gocan.Adapter) (datalogger.Logger, error) {
 	return datalogger.New(datalogger.Config{
 		ECU:            mw.ecuSelect.Selected,
+		Lambda:         mw.settings.GetLambdaSource(),
 		Device:         device,
 		Symbols:        mw.symbolList.Symbols(),
 		Rate:           mw.settings.GetFreq(),

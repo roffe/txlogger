@@ -13,6 +13,7 @@ import (
 	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
+	"github.com/roffe/txlogger/pkg/ecumaster"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 	"golang.org/x/sync/errgroup"
 )
@@ -86,6 +87,8 @@ type T7Client struct {
 	quitChan chan struct{}
 	sysvars  *ThreadSafeMap
 
+	lamb LambdaProvider
+
 	Config
 }
 
@@ -155,9 +158,26 @@ func (c *T7Client) Start() error {
 	}
 	defer cl.Close()
 
+	order := make([]string, len(c.sysvars.values))
+	for k := range c.sysvars.values {
+		order = append(order, k)
+	}
+	// sort order
+	sort.StringSlice(order).Sort()
+
+	switch c.Config.Lambda {
+	case "ECU":
+	case ecumaster.ProductString:
+		c.lamb = ecumaster.NewLambdaToCAN(cl)
+		c.lamb.Start(ctx)
+		defer c.lamb.Stop()
+		order = append(order, "Lambda.External")
+	}
+
+	sub := cl.Subscribe(ctx, 0x1A0, 0x280, 0x3A0)
 	go func() {
-		sub := cl.Subscribe(ctx, 0x1A0, 0x280, 0x3A0)
-		for msg := range sub {
+		defer sub.Close()
+		for msg := range sub.C() {
 			switch msg.Identifier() {
 			case 0x1A0:
 				rpm := binary.BigEndian.Uint16(msg.Data()[1:3])
@@ -273,14 +293,6 @@ func (c *T7Client) Start() error {
 		})
 		errg.Go(func() error {
 			var timeStamp time.Time
-
-			var order []string
-			for k := range c.sysvars.values {
-				order = append(order, k)
-			}
-			// sort order
-			sort.StringSlice(order).Sort()
-
 			for {
 				select {
 				case <-c.quitChan:
@@ -358,6 +370,13 @@ func (c *T7Client) Start() error {
 						}
 						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", left, leftovers[:n]))
 					}
+
+					if c.lamb != nil {
+						value := fmt.Sprintf("%.2f", c.lamb.GetLambda())
+						c.dl.SetValue("Lambda.External", c.lamb.GetLambda())
+						c.sysvars.Set("Lambda.External", value)
+					}
+
 					produceLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
 					count++
 					//cps++

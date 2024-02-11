@@ -10,6 +10,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/datalogger"
+	"github.com/roffe/txlogger/pkg/ecumaster"
 	sdialog "github.com/sqweek/dialog"
 )
 
@@ -21,6 +22,7 @@ const (
 	prefsMeshView          = "liveMeshView"
 	prefsRealtimeBars      = "realtimeBars"
 	prefsLogPath           = "logPath"
+	prefsLambdaSource      = "lambdaSource"
 )
 
 type SettingsWidget struct {
@@ -34,10 +36,15 @@ type SettingsWidget struct {
 	meshView     *widget.Check
 	realtimeBars *widget.Check
 	logPath      *widget.Label
+	lambdaSource *widget.Select
 
 	container *fyne.Container
 
 	OnClose func()
+}
+
+func (sw *SettingsWidget) GetLambdaSource() string {
+	return sw.lambdaSource.Selected
 }
 
 func (sw *SettingsWidget) GetFreq() int {
@@ -80,8 +87,9 @@ func NewSettingsWidget() *SettingsWidget {
 	sw.livePreview = sw.newLivePreview()
 	sw.meshView = sw.newMeshView()
 	sw.realtimeBars = sw.newRealtimeBars()
-
 	sw.logPath = widget.NewLabel("")
+
+	lambdaSel := sw.newLambdaSelector()
 
 	sw.container =
 		container.NewVBox(
@@ -141,6 +149,7 @@ func NewSettingsWidget() *SettingsWidget {
 				container.NewVBox(
 					sw.livePreview,
 					sw.realtimeBars,
+					lambdaSel,
 				),
 			),
 
@@ -155,6 +164,19 @@ func NewSettingsWidget() *SettingsWidget {
 		)
 	sw.loadPrefs()
 	return sw
+}
+
+func (sw *SettingsWidget) newLambdaSelector() *fyne.Container {
+	sw.lambdaSource = widget.NewSelect([]string{"ECU", ecumaster.ProductString}, func(s string) {
+		fyne.CurrentApp().Preferences().SetString(prefsLambdaSource, s)
+	})
+	return container.NewBorder(
+		nil,
+		nil,
+		widget.NewLabel("Lambda source"),
+		nil,
+		sw.lambdaSource,
+	)
 }
 
 func (sw *SettingsWidget) newFreqSlider() *widget.Slider {
@@ -208,6 +230,7 @@ func (sw *SettingsWidget) loadPrefs() {
 	sw.meshView.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsMeshView, true))
 	sw.realtimeBars.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsRealtimeBars, true))
 	sw.logPath.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogPath, datalogger.LOGPATH))
+	sw.lambdaSource.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLambdaSource, "ECU"))
 }
 
 func (sw *SettingsWidget) CreateRenderer() fyne.WidgetRenderer {

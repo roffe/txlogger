@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/gmlan"
 	"github.com/roffe/txlogger/pkg/ecu"
+	"github.com/roffe/txlogger/pkg/ecumaster"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -66,6 +68,8 @@ type T8Client struct {
 	quitChan chan struct{}
 	sysvars  *ThreadSafeMap
 
+	lamb LambdaProvider
+
 	Config
 }
 
@@ -98,19 +102,21 @@ func (c *T8Client) SetSymbols(symbols []*symbol.Symbol) error {
 }
 
 func (c *T8Client) SetRAM(address uint32, data []byte) error {
-	//upd := NewRamUpdate(address, data)
-	//c.updateChan <- upd
-	//return upd.Wait()
-	return nil
+	upd := NewRamUpdate(address, data)
+	c.updateChan <- upd
+	return upd.Wait()
 }
 
+// REMOVE OFFSET FIX WARNING
 func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
-	if address+length >= 0x100000 && address+length <= (0x100000+32768) {
-		req := NewReadRequest(address, length)
-		c.readChan <- req
-		return req.Data, req.Wait()
+	var of uint32 = 0x82FDC
+	if address+length+of <= 0x100000 {
+		return nil, fmt.Errorf("GetRAM: address out of range: $%X", address)
 	}
-	return nil, fmt.Errorf("GetRAM: address out of range: $%X", address)
+	req := NewReadRequest(address+of, length)
+	c.readChan <- req
+	return req.Data, req.Wait()
+
 }
 
 func (c *T8Client) Start() error {
@@ -134,6 +140,22 @@ func (c *T8Client) Start() error {
 	}
 	defer cl.Close()
 
+	order := make([]string, len(c.sysvars.values))
+	for k := range c.sysvars.values {
+		order = append(order, k)
+	}
+	// sort order
+	sort.StringSlice(order).Sort()
+
+	switch c.Config.Lambda {
+	case "ECU":
+	case ecumaster.ProductString:
+		c.lamb = ecumaster.NewLambdaToCAN(cl)
+		c.lamb.Start(ctx)
+		defer c.lamb.Stop()
+		order = append(order, "Lambda.External")
+	}
+
 	count := 0
 	errCount := 0
 	c.ErrorCounter.Set(errCount)
@@ -141,7 +163,7 @@ func (c *T8Client) Start() error {
 	errPerSecond := 0
 	//c.ErrorPerSecondCounter.Set(errPerSecond)
 
-	// cps := 0
+	cps := 0
 	retries := 0
 
 	err = retry.Do(func() error {
@@ -182,9 +204,9 @@ func (c *T8Client) Start() error {
 				case <-gctx.Done():
 					return nil
 				case <-secondTicker.C:
-					//log.Println("cps:", cps)
-					//cps = 0
-					//c.ErrorPerSecondCounter.Set(errPerSecond)
+					log.Println("cps:", cps)
+					cps = 0
+
 					if errPerSecond > 10 {
 						errPerSecond = 0
 						return fmt.Errorf("too many errors")
@@ -196,13 +218,6 @@ func (c *T8Client) Start() error {
 
 		errg.Go(func() error {
 			var timeStamp time.Time
-
-			order := make([]string, len(c.sysvars.values))
-			for k := range c.sysvars.values {
-				order = append(order, k)
-			}
-			// sort order
-			sort.StringSlice(order).Sort()
 
 			for {
 				select {
@@ -248,7 +263,8 @@ func (c *T8Client) Start() error {
 						readAddr += chunk
 					}
 					read.Complete(nil)
-
+				case upd := <-c.updateChan:
+					upd.Complete(gm.WriteDataByAddress(ctx, upd.Address, upd.Data))
 				case <-t.C:
 					timeStamp = time.Now()
 					if len(c.Symbols) == 0 {
@@ -260,7 +276,6 @@ func (c *T8Client) Start() error {
 						}
 						continue
 					}
-
 					data, err := gm.ReadDataByIdentifier(ctx, 0x18)
 					if err != nil {
 						errCount++
@@ -292,8 +307,15 @@ func (c *T8Client) Start() error {
 						}
 						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", left, leftovers[:n]))
 					}
+
+					if c.lamb != nil {
+						value := fmt.Sprintf("%.2f", c.lamb.GetLambda())
+						c.dl.SetValue("Lambda.External", c.lamb.GetLambda())
+						c.sysvars.Set("Lambda.External", value)
+					}
+
 					produceLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
-					//cps++
+					cps++
 					count++
 					if count%10 == 0 {
 						c.CaptureCounter.Set(count)
