@@ -13,7 +13,7 @@ import (
 
 func (mv *MapViewer) TypedRune(r rune) {
 	// print out the rune
-	log.Println("TypedRune", string(r))
+	//	log.Println("TypedRune", string(r))
 }
 
 func (mv *MapViewer) restoreSelectedValues() {
@@ -34,7 +34,6 @@ func (mv *MapViewer) TypedShortcut(shortcut fyne.Shortcut) {
 	case "Paste":
 		mv.paste()
 	}
-
 }
 
 const (

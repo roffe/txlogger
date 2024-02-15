@@ -268,6 +268,8 @@ func (mw *MainWindow) newDataLogger(device gocan.Adapter) (datalogger.Logger, er
 		OnMessage:      mw.Log,
 		CaptureCounter: mw.captureCounter,
 		ErrorCounter:   mw.errorCounter,
+		FpsCounter:     mw.fpsCounter,
+		LogFormat:      mw.settings.GetLogFormat(),
 		LogPath:        mw.settings.GetLogPath(),
 	})
 }

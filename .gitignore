@@ -4,6 +4,7 @@ tmp2
 *.afr
 *.t7l
 *.t8l
+*.csv
 *.dif
 /*.json
 *.dat

@@ -1,8 +1,10 @@
 package windows
 
 import (
+	"bufio"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -113,6 +115,19 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 	}
 
 	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".csv":
+		l, err := readFirstLine(filename)
+		if err != nil {
+			log.Println(err)
+		}
+		if strings.Contains(l, "AirMassMast.m_Request") {
+			lp.logType = "T8"
+			dbCfg.AirDemToString = datalogger.AirDemToStringT8
+		} else {
+			lp.logType = "T7"
+			dbCfg.AirDemToString = datalogger.AirDemToStringT7
+		}
+
 	case ".t7l":
 		lp.logType = "T7"
 		dbCfg.AirDemToString = datalogger.AirDemToStringT7
@@ -231,12 +246,13 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 
 	var err error
 	start := time.Now()
-	logz, err = logfile.NewFromTxLogfile(filename)
+	logz, err = logfile.Open(filename)
 	if err != nil {
 		log.Println(err)
-
+		return lp
 	}
 	log.Printf("Parsed %d records in %s", logz.Len(), time.Since(start))
+
 	lp.slider.Max = float64(logz.Len())
 	lp.posLabel.SetText("0.0%")
 	lp.slider.Refresh()
@@ -246,16 +262,6 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 }
 
 func (lp *LogPlayer) render() fyne.CanvasObject {
-
-	/*
-		if lp.logType == ".T8L" {
-			bottom = container.NewGridWithColumns(2,
-				lp.newMapBtn("Fuel", "IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "BFuelCal.TempEnrichFacMap"),
-				lp.newMapBtn("Ignition", "IgnAbsCal.m_AirNormXSP", "IgnAbsCal.n_EngNormYSP", "IgnAbsCal.fi_NormalMAP"),
-			)
-		}
-	*/
-
 	main := container.NewBorder(
 		nil,
 		container.NewBorder(
@@ -421,4 +427,27 @@ func keyHandler(w fyne.Window, controlChan chan *controlMsg, slider *slider, tb 
 			})
 		}
 	}
+}
+
+func readFirstLine(filename string) (string, error) {
+	// Open the file for reading.
+	file, err := os.Open(filename)
+	if err != nil {
+		return "", err // Return an empty string and the error.
+	}
+	defer file.Close() // Ensure the file is closed after finishing reading.
+
+	// Create a new scanner to read the file.
+	scanner := bufio.NewScanner(file)
+	if scanner.Scan() { // Read the first line.
+		return scanner.Text(), nil // Return the first line and no error.
+	}
+
+	// If there is an error scanning the file, return it.
+	if err := scanner.Err(); err != nil {
+		return "", err
+	}
+
+	// If the file is empty, return an empty string with no error.
+	return "", nil
 }

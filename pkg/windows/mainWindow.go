@@ -68,9 +68,11 @@ type MainWindow struct {
 
 	captureCounter binding.Int
 	errorCounter   binding.Int
+	fpsCounter     binding.Int
 
 	capturedCounterLabel *widget.Label
 	errorCounterLabel    *widget.Label
+	fpsLabel             *widget.Label
 
 	loggingRunning bool
 
@@ -99,6 +101,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		canSettings:    widgets.NewCanSettingsWidget(a),
 		captureCounter: binding.NewInt(),
 		errorCounter:   binding.NewInt(),
+		fpsCounter:     binding.NewInt(),
 
 		openMaps: make(map[string]mapviewerhandler.MapViewerWindowInterface),
 		mvh:      mapviewerhandler.New(),
@@ -191,6 +194,15 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		}
 	}))
 
+	mw.fpsLabel = &widget.Label{
+		Alignment: fyne.TextAlignLeading,
+	}
+	mw.fpsCounter.AddListener(binding.NewDataListener(func() {
+		if val, err := mw.fpsCounter.Get(); err == nil {
+			mw.fpsLabel.SetText(fmt.Sprintf("Fps: %d", val))
+		}
+	}))
+
 	mw.ecuSelect = widget.NewSelect([]string{"T7", "T8"}, func(s string) {
 		mw.app.Preferences().SetString(prefsSelectedECU, s)
 		mw.SetMainMenu(mw.menu.GetMenu(s))
@@ -280,9 +292,10 @@ func (mw *MainWindow) render() fyne.CanvasObject {
 					mw.logplayerBtn,
 					mw.helpBtn,
 					//mw.settingsBtn,
-					container.NewGridWithColumns(2,
+					container.NewGridWithColumns(3,
 						mw.capturedCounterLabel,
 						mw.errorCounterLabel,
+						mw.fpsLabel,
 					),
 				),
 			},

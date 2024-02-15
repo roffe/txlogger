@@ -150,7 +150,7 @@ func parseLine(line, timeFormat string) (*Record, error) {
 		if strings.HasPrefix(kv, "IMPORTANTLINE") {
 			continue
 		}
-		key, value, err := parseValue(kv)
+		key, value, err := parseCommaValue(kv)
 		if err != nil {
 			return nil, err
 		}
@@ -173,7 +173,7 @@ func getDelayTillNext(line, timeFormat string, currentDelay time.Time) int64 {
 	return 0
 }
 
-func parseValue(valueString string) (string, float64, error) {
+func parseCommaValue(valueString string) (string, float64, error) {
 	parts := strings.Split(valueString, "=")
 	val, err := strconv.ParseFloat(strings.Replace(parts[1], ",", ".", 1), 64)
 	if err != nil {

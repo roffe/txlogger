@@ -98,7 +98,7 @@ var T8SymbolsTuning = map[string][]string{
 		"FFFuelCal.TempEnrichFacMAP",
 	},
 	"Boost": {
-		//"...|AirCtrlCal.RegMap|AirCtrlCal.Ppart_BoostMap|AirCtrlCal.Ipart_BoostMap|AirCtrlCal.Dpart_BoostMap",
+		"...|AirCtrlCal.RegMap|AirCtrlCal.Ppart_BoostMap|AirCtrlCal.Ipart_BoostMap|AirCtrlCal.Dpart_BoostMap",
 		"AirCtrlCal.RegMap",
 		"AirCtrlCal.Ppart_BoostMap",
 		"AirCtrlCal.Ipart_BoostMap",
@@ -110,6 +110,7 @@ var T8SymbolsTuning = map[string][]string{
 	},
 	"Ignition": {
 		"IgnAbsCal.fi_NormalMAP",
+		"IgnAbsCal.fi_lowOctanMAP",
 		"IgnAbsCal.fi_highOctanMAP",
 		"IgnAbsCal.ST_EnableOctanMaps",
 	},

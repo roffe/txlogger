@@ -1,7 +1,8 @@
 package logfile
 
 import (
-	"sync"
+	"path"
+	"strings"
 	"time"
 )
 
@@ -26,16 +27,27 @@ type Record struct {
 	Time          time.Time
 	DelayTillNext int64
 	Values        map[string]float64
-	mu            sync.Mutex
+	//mu            sync.Mutex
 }
 
 func (r *Record) SetValue(key string, value float64) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	//r.mu.Lock()
+	//defer r.mu.Unlock()
 	r.Values[key] = value
 }
 
 type RecordValue struct {
 	Key   string
 	Value float64
+}
+
+func Open(filename string) (Logfile, error) {
+	switch strings.ToLower(path.Ext(filename)) {
+	case ".csv":
+		return NewFromCSVLogfile(filename)
+	case ".t7l", ".t8l":
+		fallthrough
+	default:
+		return NewFromTxLogfile(filename)
+	}
 }

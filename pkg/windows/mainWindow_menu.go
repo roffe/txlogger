@@ -41,7 +41,7 @@ func (mw *MainWindow) setupMenu() {
 				mw.SyncSymbols()
 			}),
 			fyne.NewMenuItem("Play log", func() {
-				filename, err := sdialog.File().Filter("trionic logfile", "t7l", "t8l").SetStartDir("logs").Load()
+				filename, err := sdialog.File().Filter("Logfile", "t7l", "t8l", "csv").SetStartDir(mw.settings.GetLogPath()).Load()
 				if err != nil {
 					if err.Error() == "Cancelled" {
 						return
@@ -158,8 +158,18 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 						dataLen = buff.Len()
 					}
 				}
+
+				var addr uint32
+
+				switch mw.ecuSelect.Selected {
+				case "T7":
+					addr = symZ.Address
+				case "T8":
+					addr = symZ.Address + symZ.SramOffset
+				}
+
 				start := time.Now()
-				if err := mw.dlc.SetRAM(symZ.Address+uint32(idx*dataLen), buff.Bytes()); err != nil {
+				if err := mw.dlc.SetRAM(addr+uint32(idx*dataLen), buff.Bytes()); err != nil {
 					mw.Log(err.Error())
 				}
 				mw.Log(fmt.Sprintf("set %s idx: %d took %s", axis.Z, idx, time.Since(start)))
@@ -169,7 +179,16 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		loadFunc := func() {
 			if mw.dlc != nil {
 				start := time.Now()
-				data, err := mw.dlc.GetRAM(symZ.Address, uint32(symZ.Length))
+				var addr uint32
+
+				switch mw.ecuSelect.Selected {
+				case "T7":
+					addr = symZ.Address
+				case "T8":
+					addr = symZ.Address + symZ.SramOffset
+				}
+
+				data, err := mw.dlc.GetRAM(addr, uint32(symZ.Length))
 				if err != nil {
 					dialog.ShowError(err, w)
 					return
@@ -186,7 +205,14 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			}
 			start := time.Now()
 			buff := bytes.NewBuffer(symZ.EncodeInts(data))
-			startPos := symZ.Address
+			var startPos uint32
+			switch mw.ecuSelect.Selected {
+			case "T7":
+				startPos = symZ.Address
+			case "T8":
+				startPos = symZ.Address + symZ.SramOffset
+			}
+
 			for buff.Len() > 0 {
 				if buff.Len() > chunkSize {
 					if err := mw.dlc.SetRAM(startPos, buff.Next(chunkSize)); err != nil {
@@ -240,6 +266,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			widgets.WithSaveECUFunc(saveFunc),
 			widgets.WithSaveFileFunc(saveFileFunc),
 			widgets.WithMeshView(mw.settings.GetMeshView()),
+			widgets.WithAutload(mw.settings.GetAutoLoad()),
 		)
 		if err != nil {
 			mw.Log(err.Error())
@@ -257,13 +284,9 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			w.Close()
 		})
 
-		// if we are online, try to load the map from ECU
-		if mw.dlc != nil && mw.settings.GetAutoLoad() {
-			go func() { loadFunc() }()
-		}
-
 		w.SetContent(mv)
 		w.Show()
+
 		return
 	}
 	mv.RequestFocus()

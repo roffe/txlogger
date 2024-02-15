@@ -13,6 +13,13 @@ import (
 )
 
 const ISO8601 = "2006-01-02T15:04:05.999-0700"
+const ISONICO = "2006-01-02 15:04:05,999"
+const EXTERNALWBLSYM = "Lambda.External"
+
+type LogWriter interface {
+	Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time.Time, sysvarOrder []string) error
+	Close() error
+}
 
 type Provider interface {
 	Start() error
@@ -49,6 +56,8 @@ type Config struct {
 	OnMessage      func(string)
 	CaptureCounter binding.Int
 	ErrorCounter   binding.Int
+	FpsCounter     binding.Int
+	LogFormat      string
 	LogPath        string
 }
 
@@ -64,12 +73,14 @@ type ReadRequest struct {
 	Length   uint32
 	respChan chan error
 	Data     []byte
+	left     uint32
 }
 
 func NewReadRequest(address uint32, length uint32) *ReadRequest {
 	return &ReadRequest{
 		Address:  address,
 		Length:   length,
+		left:     length,
 		respChan: make(chan error, 1),
 	}
 }
@@ -99,7 +110,7 @@ func (r *ReadRequest) Wait() error {
 	select {
 	case err := <-r.respChan:
 		return err
-	case <-time.After(5 * time.Second):
+	case <-time.After(10 * time.Second):
 		return fmt.Errorf("timeout")
 	}
 }
@@ -107,6 +118,7 @@ func (r *ReadRequest) Wait() error {
 type RamUpdate struct {
 	Address  uint32
 	Data     []byte
+	left     uint32
 	respChan chan error
 }
 
@@ -114,6 +126,7 @@ func NewRamUpdate(address uint32, data []byte) *RamUpdate {
 	return &RamUpdate{
 		Address:  address,
 		Data:     data,
+		left:     uint32(len(data)),
 		respChan: make(chan error, 1),
 	}
 }
@@ -152,20 +165,29 @@ func New(cfg Config) (Logger, error) {
 		cfg: cfg,
 	}
 	var err error
+
+	filename, lw, err := NewWriter(cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	switch cfg.ECU {
 	case "T7":
-		datalogger.p, err = NewT7(datalogger, cfg)
+		datalogger.p, err = NewT7(datalogger, cfg, lw)
 		if err != nil {
 			return nil, err
 		}
 	case "T8":
-		datalogger.p, err = NewT8(datalogger, cfg)
+		datalogger.p, err = NewT8(datalogger, cfg, lw)
 		if err != nil {
 			return nil, err
 		}
 	default:
 		return nil, fmt.Errorf("%s not supported yet", cfg.ECU)
 	}
+
+	cfg.OnMessage(fmt.Sprintf("Logging to %s", filename))
+
 	return datalogger, nil
 }
 

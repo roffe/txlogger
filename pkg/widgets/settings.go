@@ -21,6 +21,7 @@ const (
 	prefsLivePreview       = "livePreview"
 	prefsMeshView          = "liveMeshView"
 	prefsRealtimeBars      = "realtimeBars"
+	prefsLogFormat         = "logFormat"
 	prefsLogPath           = "logPath"
 	prefsLambdaSource      = "lambdaSource"
 )
@@ -35,6 +36,7 @@ type SettingsWidget struct {
 	livePreview  *widget.Check
 	meshView     *widget.Check
 	realtimeBars *widget.Check
+	logFormat    *widget.Select
 	logPath      *widget.Label
 	lambdaSource *widget.Select
 
@@ -71,6 +73,10 @@ func (sw *SettingsWidget) GetMeshView() bool {
 	return sw.meshView.Checked
 }
 
+func (sw *SettingsWidget) GetLogFormat() string {
+	return sw.logFormat.Selected
+}
+
 func (sw *SettingsWidget) GetLogPath() string {
 	return sw.logPath.Text
 }
@@ -87,6 +93,8 @@ func NewSettingsWidget() *SettingsWidget {
 	sw.livePreview = sw.newLivePreview()
 	sw.meshView = sw.newMeshView()
 	sw.realtimeBars = sw.newRealtimeBars()
+
+	sw.logFormat = sw.newLogFormat()
 	sw.logPath = widget.NewLabel("")
 
 	lambdaSel := sw.newLambdaSelector()
@@ -101,6 +109,13 @@ func NewSettingsWidget() *SettingsWidget {
 				sw.freqSlider,
 			),
 			widget.NewSeparator(),
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewLabel("Log format"),
+				nil,
+				sw.logFormat,
+			),
 			container.NewBorder(
 				nil,
 				nil,
@@ -166,6 +181,12 @@ func NewSettingsWidget() *SettingsWidget {
 	return sw
 }
 
+func (sw *SettingsWidget) newLogFormat() *widget.Select {
+	return widget.NewSelect([]string{"CSV", "TXL"}, func(s string) {
+		fyne.CurrentApp().Preferences().SetString(prefsLogFormat, s)
+	})
+}
+
 func (sw *SettingsWidget) newLambdaSelector() *fyne.Container {
 	sw.lambdaSource = widget.NewSelect([]string{"ECU", ecumaster.ProductString}, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsLambdaSource, s)
@@ -229,6 +250,7 @@ func (sw *SettingsWidget) loadPrefs() {
 	sw.livePreview.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsLivePreview, true))
 	sw.meshView.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsMeshView, true))
 	sw.realtimeBars.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsRealtimeBars, true))
+	sw.logFormat.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogFormat, "TXL"))
 	sw.logPath.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogPath, datalogger.LOGPATH))
 	sw.lambdaSource.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLambdaSource, "ECU"))
 }

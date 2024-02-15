@@ -74,10 +74,9 @@ type DashboardConfig struct {
 
 // func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.Button, onClose func()) *Dashboard {
 func NewDashboard(cfg *DashboardConfig) *Dashboard {
-
 	if cfg.AirDemToString == nil {
 		cfg.AirDemToString = func(f float64) string {
-			return fmt.Sprintf("%.0f", f)
+			return "Undefined"
 		}
 	}
 

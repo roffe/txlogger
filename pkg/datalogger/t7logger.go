@@ -89,10 +89,12 @@ type T7Client struct {
 
 	lamb LambdaProvider
 
+	lw LogWriter
+
 	Config
 }
 
-func NewT7(dl Logger, cfg Config) (Provider, error) {
+func NewT7(dl Logger, cfg Config, lw LogWriter) (Provider, error) {
 	return &T7Client{
 		Config:     cfg,
 		dl:         dl,
@@ -108,6 +110,7 @@ func NewT7(dl Logger, cfg Config) (Provider, error) {
 				"Out.ST_LimpHome":   "0",   // comes from 0x280
 			},
 		},
+		lw: lw,
 	}, nil
 }
 
@@ -138,13 +141,14 @@ func (c *T7Client) GetRAM(address uint32, length uint32) ([]byte, error) {
 }
 
 func (c *T7Client) Start() error {
-	file, filename, err := createLog(c.LogPath, "t7l")
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	defer file.Sync()
-	c.OnMessage(fmt.Sprintf("Logging to %s%s", c.LogPath, filename))
+	/* 	file, filename, err := createLog(c.LogPath, "t7l")
+	   	if err != nil {
+	   		return err
+	   	}
+	   	defer file.Close()
+	   	defer file.Sync()
+	   	c.OnMessage(fmt.Sprintf("Logging to %s%s", c.LogPath, filename)) */
+	defer c.lw.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -171,7 +175,7 @@ func (c *T7Client) Start() error {
 		c.lamb = ecumaster.NewLambdaToCAN(cl)
 		c.lamb.Start(ctx)
 		defer c.lamb.Stop()
-		order = append(order, "Lambda.External")
+		order = append(order, EXTERNALWBLSYM)
 	}
 
 	sub := cl.Subscribe(ctx, 0x1A0, 0x280, 0x3A0)
@@ -271,7 +275,7 @@ func (c *T7Client) Start() error {
 
 		errg, gctx := errgroup.WithContext(ctx)
 
-		//cps := 0
+		cps := 0
 		errg.Go(func() error {
 			for {
 				select {
@@ -280,9 +284,8 @@ func (c *T7Client) Start() error {
 				case <-gctx.Done():
 					return nil
 				case <-secondTicker.C:
-					//log.Println("cps:", cps)
-					//cps = 0
-					//c.ErrorPerSecondCounter.Set(errPerSecond)
+					c.FpsCounter.Set(cps)
+					cps = 0
 					if errPerSecond > 5 {
 						errPerSecond = 0
 						return fmt.Errorf("too many errors")
@@ -373,13 +376,19 @@ func (c *T7Client) Start() error {
 
 					if c.lamb != nil {
 						value := fmt.Sprintf("%.2f", c.lamb.GetLambda())
-						c.dl.SetValue("Lambda.External", c.lamb.GetLambda())
-						c.sysvars.Set("Lambda.External", value)
+						c.dl.SetValue(EXTERNALWBLSYM, c.lamb.GetLambda())
+						c.sysvars.Set(EXTERNALWBLSYM, value)
 					}
 
-					produceLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
+					//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
+					if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
+						errCount++
+						errPerSecond++
+						c.ErrorCounter.Set(errCount)
+						c.OnMessage(fmt.Sprintf("Failed to write log: %v", err))
+					}
 					count++
-					//cps++
+					cps++
 					if count%10 == 0 {
 						c.CaptureCounter.Set(count)
 					}
@@ -387,7 +396,7 @@ func (c *T7Client) Start() error {
 				}
 			}
 		})
-		c.OnMessage(fmt.Sprintf("Live logging at %d fps", c.Rate))
+		//c.OnMessage(fmt.Sprintf("Live logging at %d fps", c.Rate))
 		return errg.Wait()
 	},
 		retry.DelayType(retry.FixedDelay),

@@ -3,8 +3,9 @@ package datalogger
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"log"
+	"math"
 	"sort"
 	"time"
 
@@ -70,10 +71,12 @@ type T8Client struct {
 
 	lamb LambdaProvider
 
+	lw LogWriter
+
 	Config
 }
 
-func NewT8(dl Logger, cfg Config) (Provider, error) {
+func NewT8(dl Logger, cfg Config, lw LogWriter) (Provider, error) {
 	return &T8Client{
 		Config:     cfg,
 		dl:         dl,
@@ -84,6 +87,7 @@ func NewT8(dl Logger, cfg Config) (Provider, error) {
 		sysvars: &ThreadSafeMap{
 			values: make(map[string]string),
 		},
+		lw: lw,
 	}, nil
 }
 
@@ -109,24 +113,27 @@ func (c *T8Client) SetRAM(address uint32, data []byte) error {
 
 // REMOVE OFFSET FIX WARNING
 func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
-	var of uint32 = 0x82FDC
-	if address+length+of <= 0x100000 {
+	if address+length <= 0x100000 {
 		return nil, fmt.Errorf("GetRAM: address out of range: $%X", address)
 	}
-	req := NewReadRequest(address+of, length)
+	req := NewReadRequest(address, length)
 	c.readChan <- req
 	return req.Data, req.Wait()
 
 }
 
+const T8ChunkSize = 0x10
+
 func (c *T8Client) Start() error {
-	file, filename, err := createLog(c.LogPath, "t8l")
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	defer file.Sync()
-	c.OnMessage(fmt.Sprintf("Logging to %s", filename))
+	/* 	file, filename, err := createLog(c.LogPath, "t8l")
+	   	if err != nil {
+	   		return err
+	   	}
+	   	defer file.Close()
+	   	defer file.Sync()
+	   	c.OnMessage(fmt.Sprintf("Logging to %s", filename)) */
+
+	defer c.lw.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -153,7 +160,7 @@ func (c *T8Client) Start() error {
 		c.lamb = ecumaster.NewLambdaToCAN(cl)
 		c.lamb.Start(ctx)
 		defer c.lamb.Stop()
-		order = append(order, "Lambda.External")
+		order = append(order, EXTERNALWBLSYM)
 	}
 
 	count := 0
@@ -165,6 +172,8 @@ func (c *T8Client) Start() error {
 
 	cps := 0
 	retries := 0
+
+	lastPresentInterval := 3500 * time.Millisecond
 
 	err = retry.Do(func() error {
 		gm := gmlan.New(cl, 0x7e0, 0x7e8)
@@ -192,8 +201,6 @@ func (c *T8Client) Start() error {
 		t := time.NewTicker(time.Second / time.Duration(c.Rate))
 		defer t.Stop()
 
-		//first := true
-
 		errg, gctx := errgroup.WithContext(ctx)
 
 		errg.Go(func() error {
@@ -204,12 +211,10 @@ func (c *T8Client) Start() error {
 				case <-gctx.Done():
 					return nil
 				case <-secondTicker.C:
-					log.Println("cps:", cps)
+					c.FpsCounter.Set(cps)
 					cps = 0
-
 					if errPerSecond > 10 {
-						errPerSecond = 0
-						return fmt.Errorf("too many errors")
+						return errors.New("too many errors, reconnecting")
 					}
 					errPerSecond = 0
 				}
@@ -218,7 +223,22 @@ func (c *T8Client) Start() error {
 
 		errg.Go(func() error {
 			var timeStamp time.Time
+			var chunkSize uint32
+			lastPresent := time.Now()
 
+			testerPresent := func() {
+				if time.Since(lastPresent) > lastPresentInterval {
+					if err := gm.TesterPresentNoResponseAllowed(); err != nil {
+						errCount++
+						errPerSecond++
+						c.ErrorCounter.Set(errCount)
+						c.OnMessage(fmt.Sprintf("Failed to send tester present: %v", err))
+					}
+					lastPresent = time.Now()
+				}
+			}
+
+		outer:
 			for {
 				select {
 				case <-c.quitChan:
@@ -242,38 +262,53 @@ func (c *T8Client) Start() error {
 						c.OnMessage("Configured dynamic register")
 					}
 				case read := <-c.readChan:
-					readAddr := read.Address
-					left := read.Length
-					for left > 0 {
-						var chunk uint32
-						if left > 0xF0 {
-							chunk = 0xF0
-						} else {
-							chunk = left
-						}
-						data, err := gm.ReadMemoryByAddress(ctx, readAddr, chunk)
-						if err != nil {
-							errCount++
-							errPerSecond++
-							c.ErrorCounter.Set(errCount)
-							read.Complete(err)
-						}
-						read.Data = append(read.Data, data...)
-						left -= chunk
-						readAddr += chunk
+					chunkSize = uint32(math.Min(float64(read.left), T8ChunkSize))
+					data, err := gm.ReadMemoryByAddress(ctx, read.Address, chunkSize)
+					if err != nil {
+						errCount++
+						errPerSecond++
+						c.ErrorCounter.Set(errCount)
+						read.Complete(err)
+						continue outer
 					}
-					read.Complete(nil)
+					read.Data = append(read.Data, data...)
+					read.left -= chunkSize
+					read.Address += chunkSize
+					if time.Since(lastPresent) > lastPresentInterval {
+						gm.TesterPresentNoResponseAllowed()
+						lastPresent = time.Now()
+					}
+					if read.left > 0 {
+						go func() {
+							time.Sleep(4 * time.Millisecond)
+							c.readChan <- read
+						}()
+					} else {
+						read.Complete(nil)
+					}
 				case upd := <-c.updateChan:
-					upd.Complete(gm.WriteDataByAddress(ctx, upd.Address, upd.Data))
+					//					log.Printf("Updating RAM 0x%X", upd.Address)
+					chunkSize = uint32(math.Min(float64(upd.left), 0x06))
+					if err := gm.WriteDataByAddress(ctx, upd.Address, upd.Data[:chunkSize]); err != nil {
+						errCount++
+						errPerSecond++
+						c.ErrorCounter.Set(errCount)
+						upd.Complete(err)
+						continue outer
+					}
+					upd.left -= chunkSize
+					upd.Address += chunkSize
+					upd.Data = upd.Data[chunkSize:]
+					testerPresent()
+					if upd.left > 0 {
+						c.updateChan <- upd
+						continue outer
+					}
+					upd.Complete(nil)
 				case <-t.C:
 					timeStamp = time.Now()
 					if len(c.Symbols) == 0 {
-						if err := gm.TesterPresentNoResponseAllowed(); err != nil {
-							errCount++
-							errPerSecond++
-							c.ErrorCounter.Set(errCount)
-							c.OnMessage(fmt.Sprintf("Failed to send tester present: %v", err))
-						}
+						testerPresent()
 						continue
 					}
 					data, err := gm.ReadDataByIdentifier(ctx, 0x18)
@@ -285,9 +320,6 @@ func (c *T8Client) Start() error {
 						continue
 					}
 					r := bytes.NewReader(data)
-					if err != nil {
-						return err
-					}
 					for _, va := range c.Symbols {
 						if err := va.Read(r); err != nil {
 							errCount++
@@ -304,30 +336,35 @@ func (c *T8Client) Start() error {
 						n, err := r.Read(leftovers)
 						if err != nil {
 							c.OnMessage(fmt.Sprintf("Failed to read leftovers: %v", err))
+							continue
 						}
 						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", left, leftovers[:n]))
 					}
 
 					if c.lamb != nil {
 						value := fmt.Sprintf("%.2f", c.lamb.GetLambda())
-						c.dl.SetValue("Lambda.External", c.lamb.GetLambda())
-						c.sysvars.Set("Lambda.External", value)
+						c.dl.SetValue(EXTERNALWBLSYM, c.lamb.GetLambda())
+						c.sysvars.Set(EXTERNALWBLSYM, value)
 					}
 
-					produceLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
+					//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
+					if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
+						errCount++
+						errPerSecond++
+						c.ErrorCounter.Set(errCount)
+						c.OnMessage(fmt.Sprintf("Failed to write log: %v", err))
+					}
 					cps++
 					count++
 					if count%10 == 0 {
 						c.CaptureCounter.Set(count)
 					}
-					//if count%30 == 0 {
-					//	gm.TesterPresentNoResponseAllowed()
-					//}
+					testerPresent()
 				}
 			}
 		})
 
-		c.OnMessage(fmt.Sprintf("Live logging at %d fps", c.Rate))
+		//c.OnMessage(fmt.Sprintf("Live logging at %d fps", c.Rate))
 
 		return errg.Wait()
 

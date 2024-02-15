@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	_ "embed"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
@@ -33,6 +35,8 @@ type MapViewer struct {
 
 	editable bool
 	focused  bool
+
+	autoload bool
 
 	saveFileFunc  SaveFunc
 	updateECUFunc UpdateFunc
@@ -117,6 +121,10 @@ func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 		}
 	}()
 
+	if mv.autoload {
+		go mv.lx()
+	}
+
 	return mv, nil
 }
 
@@ -177,13 +185,21 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 				}
 			}),
 			widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
+				p := mv.newProgressModal("Loading map from ECU")
+				p.p.Show()
 				mv.loadECUFunc()
+				p.pb.Stop()
+				p.p.Hide()
 			}),
 			widget.NewButtonWithIcon("Save to File", theme.DocumentSaveIcon(), func() {
 				mv.saveFileFunc(mv.zData)
 			}),
 			widget.NewButtonWithIcon("Save to ECU", theme.DocumentSaveIcon(), func() {
+				p := mv.newProgressModal("Saving map to ECU")
+				p.p.Show()
 				mv.saveECUFunc(mv.zData)
+				p.pb.Stop()
+				p.p.Hide()
 			}),
 		),
 		mv.yAxisLabels,
@@ -206,6 +222,44 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 	}
 
 	return fixed
+}
+
+//go:embed bobr.jpg
+var bobr []byte
+
+// lx is a helper function to load from ECU
+func (mv *MapViewer) lx() {
+	done := make(chan struct{})
+	go func() {
+		mv.loadECUFunc()
+		close(done)
+	}()
+	time.Sleep(300 * time.Millisecond)
+	p := mv.newProgressModal("Loading map from ECU")
+	p.p.Show()
+	<-done
+	p.pb.Stop()
+	p.p.Hide()
+}
+
+type progressModal struct {
+	p  *widget.PopUp
+	pb *widget.ProgressBarInfinite
+}
+
+func (mv *MapViewer) newProgressModal(message string) *progressModal {
+	bobrK := canvas.NewImageFromResource(fyne.NewStaticResource("bobr.jpg", bobr))
+	bobrK.SetMinSize(fyne.NewSize(150, 150))
+	bobrK.FillMode = canvas.ImageFillOriginal
+	bobrK.ScaleMode = canvas.ImageScaleSmooth
+
+	pb := widget.NewProgressBarInfinite()
+	pb.Start()
+	msg := container.NewBorder(bobrK, pb, nil, nil, widget.NewLabel(message))
+	return &progressModal{
+		p:  widget.NewModalPopUp(msg, fyne.CurrentApp().Driver().CanvasForObject(mv)),
+		pb: pb,
+	}
 }
 
 func (mv *MapViewer) Info() MapViewerInfo {
@@ -510,15 +564,21 @@ func (mv *MapViewer) setXY(xValue, yValue int) error {
 	mv.yIdx = yIdx
 	sz := mv.innerView.Size()
 
-	fyne.NewAnimation(10*time.Millisecond, func(p float32) {
-		//mv.cursor.Resize(fyne.NewSize(1, 1))
-		mv.crosshair.Move(
-			fyne.NewPos(
-				p*float32(min(xIdx, float64(mv.numColumns)))*sz.Width/float32(mv.numColumns),
-				p*float32(float64(mv.numRows-1)-yIdx)*sz.Height/float32(mv.numRows),
-			),
-		)
-	}).Start()
+	//fyne.NewAnimation(10*time.Millisecond, func(p float32) {
+	//	//mv.cursor.Resize(fyne.NewSize(1, 1))
+	//	mv.crosshair.Move(
+	//		fyne.NewPos(
+	//			p*float32(min(xIdx, float64(mv.numColumns)))*sz.Width/float32(mv.numColumns),
+	//			p*float32(float64(mv.numRows-1)-yIdx)*sz.Height/float32(mv.numRows),
+	//		),
+	//	)
+	//}).Start()
+	mv.crosshair.Move(
+		fyne.NewPos(
+			float32(xIdx)*sz.Width/float32(mv.numColumns),
+			float32(float64(mv.numRows-1)-yIdx)*sz.Height/float32(mv.numRows),
+		),
+	)
 	return nil
 }
 
