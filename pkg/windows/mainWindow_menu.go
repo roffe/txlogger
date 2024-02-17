@@ -38,10 +38,9 @@ func (mw *MainWindow) setupMenu() {
 					mw.Log(err.Error())
 					return
 				}
-				mw.SyncSymbols()
 			}),
 			fyne.NewMenuItem("Play log", func() {
-				filename, err := sdialog.File().Filter("Logfile", "t7l", "t8l", "csv").SetStartDir(mw.settings.GetLogPath()).Load()
+				filename, err := sdialog.File().Filter("logfile", "t7l", "t8l", "csv").SetStartDir(mw.settings.GetLogPath()).Load()
 				if err != nil {
 					if err.Error() == "Cancelled" {
 						return
@@ -113,15 +112,14 @@ func (mw *MainWindow) newMapViewerWindow(w fyne.Window, mv mapviewerhandler.MapV
 	mww := mapviewerhandler.NewWindow(w, mv)
 
 	mw.openMaps[axis.Z] = mww
-
 	if axis.XFrom == "" {
 		axis.XFrom = "MAF.m_AirInlet"
 	}
-
 	if axis.YFrom == "" {
 		axis.YFrom = "ActualIn.n_Engine"
 	}
 
+	mw.mvh.Subscribe("Lambda.External", mv)
 	mw.mvh.Subscribe(axis.XFrom, mv)
 	mw.mvh.Subscribe(axis.YFrom, mv)
 	return mww
@@ -267,6 +265,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			widgets.WithSaveFileFunc(saveFileFunc),
 			widgets.WithMeshView(mw.settings.GetMeshView()),
 			widgets.WithAutload(mw.settings.GetAutoLoad()),
+			widgets.WithLambdaSymbolName(mw.settings.GetLambdaSymbolName()),
 		)
 		if err != nil {
 			mw.Log(err.Error())
@@ -279,6 +278,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 		w.SetCloseIntercept(func() {
 			delete(mw.openMaps, axis.Z)
+			mw.mvh.Unsubscribe("Lambda.External", mv)
 			mw.mvh.Unsubscribe(axis.XFrom, mv)
 			mw.mvh.Unsubscribe(axis.YFrom, mv)
 			w.Close()
@@ -286,7 +286,6 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 		w.SetContent(mv)
 		w.Show()
-
 		return
 	}
 	mv.RequestFocus()

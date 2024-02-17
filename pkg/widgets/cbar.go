@@ -25,13 +25,22 @@ type CBar struct {
 	container *fyne.Container
 }
 
+type TextPosition int
+
+const (
+	TextAtTop TextPosition = iota
+	TextAtBottom
+	TextAtCenter
+)
+
 type CBarConfig struct {
 	Title            string
 	DisplayString    string // default "%.0f"
+	DisplayTextSize  int
 	Min, Max, Center float64
 	Steps            int
 	Minsize          fyne.Size
-	TextAtBottom     bool
+	TextPosition     TextPosition
 }
 
 func NewCBar(cfg *CBarConfig) *CBar {
@@ -45,6 +54,9 @@ func NewCBar(cfg *CBarConfig) *CBar {
 	}
 	if s.cfg.DisplayString == "" {
 		s.cfg.DisplayString = "%.0f"
+	}
+	if s.cfg.DisplayTextSize == 0 {
+		s.cfg.DisplayTextSize = 25
 	}
 	return s
 }
@@ -110,7 +122,7 @@ func (s *CBar) CreateRenderer() fyne.WidgetRenderer {
 	s.titleText.TextStyle.Monospace = true
 	s.titleText.Alignment = fyne.TextAlignCenter
 
-	s.displayText = &canvas.Text{Text: fmt.Sprintf(s.cfg.DisplayString, 0.00), Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 40}
+	s.displayText = &canvas.Text{Text: fmt.Sprintf(s.cfg.DisplayString, 0.00), Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: float32(s.cfg.DisplayTextSize)}
 	s.displayText.TextStyle.Monospace = true
 	s.displayText.Alignment = fyne.TextAlignLeading
 
@@ -143,13 +155,20 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 
 	s.face.Resize(space)
 
-	y := float32(-s.bar.Size().Height * .47)
-	if s.cfg.TextAtBottom {
+	var y float32
+
+	switch s.cfg.TextPosition {
+	case TextAtTop:
+		y = float32(-s.bar.Size().Height * .47)
+	case TextAtBottom:
 		y = float32(s.bar.Size().Height * 0.85)
+	case TextAtCenter:
+		//y = (s.bar.Size().Height - s.displayText.MinSize().Height) / 2
+
 	}
 
 	s.titleText.Move(fyne.NewPos(diameter/2-s.titleText.Size().Width/2, height-30))
-	s.displayText.TextSize = min((diameter/2)/6, 40)
+	//s.displayText.TextSize = min((diameter/2)/6, 40)
 	s.displayText.Move(fyne.NewPos(diameter/2-s.displayText.MinSize().Width/2, y))
 
 	for i, line := range s.bars {

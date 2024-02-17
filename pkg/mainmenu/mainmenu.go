@@ -72,17 +72,15 @@ var T7SymbolsTuning = map[string][]string{
 }
 
 var T8SymbolsTuningOrder = []string{
-	"Calibration",
 	"Injectors",
 	"Limiters",
 	"Fuel",
 	"Boost",
 	"Ignition",
-	"Adaption",
+	"Torque",
 }
 
 var T8SymbolsTuning = map[string][]string{
-	"Calibration": {},
 	"Injectors": {
 		"InjCorrCal.InjectorConst",
 		"InjCorrCal.BattCorrTab",
@@ -96,9 +94,15 @@ var T8SymbolsTuning = map[string][]string{
 		"BFuelCal.LambdaOneFacMap",
 		"BFuelCal.TempEnrichFacMap",
 		"FFFuelCal.TempEnrichFacMAP",
+		"PurgeCal.ST_PurgeEnable",
+		"LambdaCal.ST_Enable",
+		"FCutCal.ST_Enable",
+		"FFFuelCal.ST_Enable",
+		"FuelDynCal.ST_Enable",
+		"TCompCal.ST_Enable",
 	},
 	"Boost": {
-		"...|AirCtrlCal.RegMap|AirCtrlCal.Ppart_BoostMap|AirCtrlCal.Ipart_BoostMap|AirCtrlCal.Dpart_BoostMap",
+		//"...|AirCtrlCal.RegMap|AirCtrlCal.Ppart_BoostMap|AirCtrlCal.Ipart_BoostMap|AirCtrlCal.Dpart_BoostMap",
 		"AirCtrlCal.RegMap",
 		"AirCtrlCal.Ppart_BoostMap",
 		"AirCtrlCal.Ipart_BoostMap",
@@ -114,7 +118,13 @@ var T8SymbolsTuning = map[string][]string{
 		"IgnAbsCal.fi_highOctanMAP",
 		"IgnAbsCal.ST_EnableOctanMaps",
 	},
-	"Adaption": {},
+	"Torque": {
+		"TrqLimCal.Trq_ManGear",
+		"TrqLimCal.Trq_MaxEngineTab1",
+		"TrqLimCal.Trq_MaxEngineTab2",
+		"FFTrqCal.FFTrq_MaxEngineTab1",
+		"FFTrqCal.FFTrq_MaxEngineTab2",
+	},
 }
 
 type MainMenu struct {
@@ -157,6 +167,13 @@ func (mw *MainMenu) GetMenu(name string) *fyne.MainMenu {
 			if strings.Contains(mapName, "|") {
 				parts := strings.Split(mapName, "|")
 				names := parts[1:]
+				if len(parts) == 2 {
+					itm := fyne.NewMenuItem(parts[0], func() {
+						mw.oneFunc(typ, names[0])
+					})
+					items = append(items, itm)
+					continue
+				}
 				itm := fyne.NewMenuItem(parts[0], func() {
 					mw.multiFunc(typ, names...)
 				})

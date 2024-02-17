@@ -49,6 +49,17 @@ func (sw *SettingsWidget) GetLambdaSource() string {
 	return sw.lambdaSource.Selected
 }
 
+func (sw *SettingsWidget) GetLambdaSymbolName() string {
+	switch sw.lambdaSource.Selected {
+	case "ECU":
+		return "DisplProt.LambdaScanner"
+	case ecumaster.ProductString:
+		return datalogger.EXTERNALWBLSYM
+	default:
+		return "DisplProt.LambdaScanner"
+	}
+}
+
 func (sw *SettingsWidget) GetFreq() int {
 	return int(sw.freqSlider.Value)
 }

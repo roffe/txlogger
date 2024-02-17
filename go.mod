@@ -6,7 +6,7 @@ require (
 	github.com/avast/retry-go/v4 v4.5.1
 	github.com/fatih/color v1.16.0
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
-	github.com/roffe/gocan v0.0.0-20231231164343-755e5ac84c98
+	github.com/roffe/gocan v0.0.0-20240217174805-832204afc5ef
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/sqweek/dialog v0.0.0-20220809060634-e981b270ebbf
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9
@@ -19,7 +19,7 @@ require (
 )
 
 require (
-	fyne.io/fyne/v2 v2.4.4-rc2
+	fyne.io/fyne/v2 v2.4.4
 	fyne.io/systray v1.10.1-0.20231115130155-104f5ef7839e // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
@@ -65,10 +65,9 @@ require (
 	honnef.co/go/js/dom v0.0.0-20231112215516-51f43a291193 // indirect
 )
 
-require github.com/roffe/ecusymbol v0.0.0-20240125161701-957aa42b58bd
+require github.com/roffe/ecusymbol v0.0.0-20240215000600-19cd704a3d6c
 
 require fyne.io/x/fyne v0.0.0-20231231230942-0b5901d0781a
 
-replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
-
-replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
+// replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
+// replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol

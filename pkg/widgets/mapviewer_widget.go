@@ -89,6 +89,9 @@ type MapViewer struct {
 
 	mousePos fyne.Position
 	popup    *widget.PopUpMenu
+
+	lamb       *CBar
+	lambdaName string
 }
 
 func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
@@ -107,12 +110,11 @@ func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 	}
 
 	mv.min, mv.max = findMinMax(mv.zData)
-
-	log.Printf("NewMapViewer: mv.numColumns: %d mv.numRows: %d mv.numData: %d xf: %s  yf: %s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom)
+	log.Printf("NewMapViewer: cols: %d rows: %d datalen: %d xfrom: %s yfrom: %s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom)
 	mv.content = mv.render()
 
 	if mv.numColumns*mv.numRows != mv.numData && mv.numColumns > 1 && mv.numRows > 1 {
-		return nil, fmt.Errorf("NewMapViewer mv.numColumns * mv.numRows != mv.numData")
+		return nil, fmt.Errorf("NewMapViewer columns * rows != datalen")
 	}
 
 	go func() {
@@ -165,42 +167,75 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		mv.valueTexts,
 	)
 
+	mv.lamb = NewCBar(&CBarConfig{
+		Title:           "",
+		Min:             0.50,
+		Center:          1,
+		Max:             1.52,
+		Steps:           20,
+		Minsize:         fyne.NewSize(100, 25),
+		TextPosition:    TextAtCenter,
+		DisplayString:   "λ %.2f",
+		DisplayTextSize: 25,
+	})
+
+	buttons := container.NewGridWithColumns(4,
+		widget.NewButtonWithIcon("Load from File", theme.DocumentIcon(), func() {
+			if mv.symbol != nil {
+				mv.zData = mv.symbol.Ints()
+				mv.Refresh()
+			}
+		}),
+		widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
+			p := mv.newProgressModal("Loading map from ECU")
+			p.p.Show()
+			mv.loadECUFunc()
+			p.pb.Stop()
+			p.p.Hide()
+		}),
+		widget.NewButtonWithIcon("Save to File", theme.DocumentSaveIcon(), func() {
+			mv.saveFileFunc(mv.zData)
+		}),
+		widget.NewButtonWithIcon("Save to ECU", theme.DocumentSaveIcon(), func() {
+			p := mv.newProgressModal("Saving map to ECU")
+			p.p.Show()
+			mv.saveECUFunc(mv.zData)
+			p.pb.Stop()
+			p.p.Hide()
+		}),
+	)
+
 	if mv.symbol == nil || mv.numColumns == 1 && mv.numRows == 1 {
 		return container.NewBorder(
-			mv.xAxisLabels,
 			nil,
-			mv.yAxisLabels,
+			container.NewBorder(
+				mv.lamb,
+				nil,
+				nil,
+				nil,
+				buttons,
+			),
 			nil,
-			mv.innerView,
+			nil,
+			container.NewBorder(
+				mv.xAxisLabels,
+				nil,
+				mv.yAxisLabels,
+				nil,
+				mv.innerView,
+			),
 		)
+
 	}
 
-	fixed := container.NewBorder(
+	mapview := container.NewBorder(
 		mv.xAxisLabels,
-		container.NewGridWithColumns(4,
-			widget.NewButtonWithIcon("Load from File", theme.DocumentIcon(), func() {
-				if mv.symbol != nil {
-					mv.zData = mv.symbol.Ints()
-					mv.Refresh()
-				}
-			}),
-			widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
-				p := mv.newProgressModal("Loading map from ECU")
-				p.p.Show()
-				mv.loadECUFunc()
-				p.pb.Stop()
-				p.p.Hide()
-			}),
-			widget.NewButtonWithIcon("Save to File", theme.DocumentSaveIcon(), func() {
-				mv.saveFileFunc(mv.zData)
-			}),
-			widget.NewButtonWithIcon("Save to ECU", theme.DocumentSaveIcon(), func() {
-				p := mv.newProgressModal("Saving map to ECU")
-				p.p.Show()
-				mv.saveECUFunc(mv.zData)
-				p.pb.Stop()
-				p.p.Hide()
-			}),
+		container.NewBorder(
+			mv.lamb,
+			nil,
+			nil,
+			nil,
+			buttons,
 		),
 		mv.yAxisLabels,
 		nil,
@@ -212,7 +247,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		mv.mesh, err = NewMeshgrid(mv.symbol.Float64s(), mv.numColumns, mv.numRows)
 		if err == nil {
 			return container.NewBorder(
-				fixed,
+				mapview,
 				nil,
 				nil,
 				nil,
@@ -221,7 +256,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		}
 	}
 
-	return fixed
+	return mapview
 }
 
 //go:embed bobr.jpg
@@ -278,6 +313,12 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 			log.Println(r)
 		}
 	}()
+
+	if name == mv.lambdaName {
+		mv.lamb.SetValue(value)
+		return
+	}
+
 	//log.Printf("MapViewer: SetValue: %s: %f", name, value)
 	if name == mv.xFrom || (mv.xFrom == "" && name == "MAF.m_AirInlet") {
 		mv.xValue = int(value)

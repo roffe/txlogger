@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -84,6 +85,10 @@ type LogPlayer struct {
 
 	closed bool
 
+	lambSymbolName string
+
+	speedLock sync.RWMutex
+
 	fyne.Window
 }
 
@@ -111,15 +116,22 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 
 		closed: false,
 
+		lambSymbolName: "DisplProt.LambdaScanner",
+
 		Window: w,
+	}
+
+	l, err := readFirstLine(filename)
+	if err != nil {
+		log.Println(err)
+	}
+
+	if strings.Contains(l, datalogger.EXTERNALWBLSYM) {
+		lp.lambSymbolName = datalogger.EXTERNALWBLSYM
 	}
 
 	switch strings.ToLower(filepath.Ext(filename)) {
 	case ".csv":
-		l, err := readFirstLine(filename)
-		if err != nil {
-			log.Println(err)
-		}
 		if strings.Contains(l, "AirMassMast.m_Request") {
 			lp.logType = "T8"
 			dbCfg.AirDemToString = datalogger.AirDemToStringT8
@@ -244,7 +256,6 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 	w.SetContent(lp.render())
 	w.Show()
 
-	var err error
 	start := time.Now()
 	logz, err = logfile.Open(filename)
 	if err != nil {
@@ -256,7 +267,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 	lp.slider.Max = float64(logz.Len())
 	lp.posLabel.SetText("0.0%")
 	lp.slider.Refresh()
-	go lp.PlayLog(lp.currLine, logz, lp.controlChan, w)
+	go lp.PlayLog(logz)
 
 	return lp
 }
@@ -297,13 +308,14 @@ func (lp *LogPlayer) newMapViewerWindow(w fyne.Window, mv mapviewerhandler.MapVi
 		axis.YFrom = "ActualIn.n_Engine"
 	}
 
+	lp.mvh.Subscribe(datalogger.EXTERNALWBLSYM, mv)
 	lp.mvh.Subscribe(axis.XFrom, mv)
 	lp.mvh.Subscribe(axis.YFrom, mv)
 
 	return mw
 }
 
-func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, control <-chan *controlMsg, ww fyne.Window) {
+func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 	play := true
 	if play {
 		lp.toggleBtn.SetIcon(theme.MediaPauseIcon())
@@ -313,7 +325,7 @@ func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, co
 	speedMultiplier := 1.0
 
 	go func() {
-		for op := range control {
+		for op := range lp.controlChan {
 			currentMillis := time.Now().UnixMilli()
 			switch op.Op {
 			case OpPlaybackSpeed:
@@ -345,21 +357,21 @@ func (lp *LogPlayer) PlayLog(currentLine binding.Float, logz logfile.Logfile, co
 			time.Sleep(10 * time.Millisecond)
 			continue
 		}
-		if nextFrame-currentMillis > 4 {
-			time.Sleep(time.Duration(nextFrame-currentMillis-2) * time.Millisecond)
+		if nextFrame-currentMillis > 15 {
+			time.Sleep(10 * time.Millisecond)
 			continue
 		}
 		if currentMillis < nextFrame {
 			continue
 		}
-		currentLine.Set(float64(logz.Pos()))
+		lp.currLine.Set(float64(logz.Pos()))
 		if rec := logz.Next(); rec != nil {
 			lp.db.SetTimeText(currentTimeFormatted(rec.Time))
 			delayTilNext := int64(float64(rec.DelayTillNext) * speedMultiplier)
 			if delayTilNext > 1000 {
 				delayTilNext = 100
 			}
-			nextFrame = currentMillis + delayTilNext
+			nextFrame = (currentMillis + delayTilNext) - 3
 			for k, v := range rec.Values {
 				lp.db.SetValue(k, v)
 				if len(lp.openMaps) > 0 {

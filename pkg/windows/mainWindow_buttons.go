@@ -168,7 +168,7 @@ func (mw *MainWindow) createButtons() {
 	})
 
 	mw.logplayerBtn = widget.NewButtonWithIcon("Log Player", theme.MediaFastForwardIcon(), func() {
-		filename, err := sdialog.File().Filter("trionic logfile", "t7l", "t8l").SetStartDir("logs").Load()
+		filename, err := sdialog.File().Filter("logfile", "t7l", "t8l", "csv").SetStartDir("logs").Load()
 		if err != nil {
 			if err.Error() == "Cancelled" {
 				return

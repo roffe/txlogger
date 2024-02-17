@@ -135,3 +135,10 @@ func WithEditable(editable bool) MapViewerOption {
 		return nil
 	}
 }
+
+func WithLambdaSymbolName(lambdaName string) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.lambdaName = lambdaName
+		return nil
+	}
+}

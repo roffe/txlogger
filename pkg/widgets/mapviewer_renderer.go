@@ -19,7 +19,9 @@ func (vr *MapViewerRenderer) Layout(size fyne.Size) {
 }
 
 func (vr *MapViewerRenderer) MinSize() fyne.Size {
-	min := fyne.NewSize(float32(vr.mv.numColumns)*40, float32(vr.mv.numRows)*23)
+	wm := maxf32(80, float32(vr.mv.numColumns)*40)
+	hm := maxf32(50, float32(vr.mv.numRows)*25)
+	min := fyne.NewSize(wm, hm)
 	return min.Max(vr.mv.content.MinSize())
 }
 
@@ -31,4 +33,11 @@ func (vr *MapViewerRenderer) Destroy() {
 
 func (vr *MapViewerRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{vr.mv.content}
+}
+
+func maxf32(a, b float32) float32 {
+	if a > b {
+		return a
+	}
+	return b
 }

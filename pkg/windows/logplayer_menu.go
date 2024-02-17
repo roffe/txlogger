@@ -83,6 +83,7 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 			widgets.WithYFrom(axis.YFrom),
 			widgets.WithInterPolFunc(interpolate.Interpolate),
 			widgets.WithEditable(false),
+			widgets.WithLambdaSymbolName(lp.lambSymbolName),
 		)
 		if err != nil {
 
@@ -98,8 +99,9 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 		})
 
 		w.SetCloseIntercept(func() {
-			log.Println("closing", axis.Z)
+			//log.Println("closing", axis.Z)
 			delete(lp.openMaps, axis.Z)
+			lp.mvh.Unsubscribe(lp.lambSymbolName, mv)
 			lp.mvh.Unsubscribe(axis.XFrom, mv)
 			lp.mvh.Unsubscribe(axis.YFrom, mv)
 			mv.Close()
