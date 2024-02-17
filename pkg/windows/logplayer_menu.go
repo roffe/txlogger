@@ -70,6 +70,7 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 		xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := lp.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
 		if err != nil {
 			dialog.ShowError(err, lp.Window)
+			return
 		}
 
 		mv, err := widgets.NewMapViewer(

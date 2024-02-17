@@ -70,6 +70,7 @@ type DashboardConfig struct {
 	LogBtn         *widget.Button
 	OnClose        func()
 	AirDemToString func(float64) string
+	UseMPH         bool
 }
 
 // func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.Button, onClose func()) *Dashboard {
@@ -80,12 +81,17 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 		}
 	}
 
+	speedometerText := "km/h"
+	if cfg.UseMPH {
+		speedometerText = "mph"
+	}
+
 	db := &Dashboard{
 		cfg:       cfg,
 		logBtn:    cfg.LogBtn,
 		logplayer: cfg.Logplayer,
 		speed: NewDial(DialConfig{
-			Title:         "km/h",
+			Title:         speedometerText,
 			Min:           0,
 			Max:           300,
 			Steps:         30,
@@ -366,8 +372,18 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		}
 	}
 
-	return map[string]func(float64){
-		"In.v_Vehicle": db.speed.SetValue,
+	var setVehicleSpeed func(float64)
+
+	if db.cfg.UseMPH {
+		setVehicleSpeed = func(value float64) {
+			db.speed.SetValue(value * 0.621371)
+		}
+	} else {
+		setVehicleSpeed = db.speed.SetValue
+	}
+
+	router := map[string]func(float64){
+		"In.v_Vehicle": setVehicleSpeed,
 
 		"ActualIn.n_Engine":   db.rpm.SetValue,
 		"ActualIn.T_AirInlet": db.iat.SetValue,
@@ -406,6 +422,8 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 
 		"KnkDet.KnockCyl": knkDet,
 	}
+
+	return router
 }
 
 /*

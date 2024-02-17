@@ -102,6 +102,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 		Logplayer: true,
 		LogBtn:    nil,
 		OnClose:   onClose,
+		UseMPH:    a.Preferences().BoolWithFallback("useMPH", false),
 	}
 
 	lp := &LogPlayer{

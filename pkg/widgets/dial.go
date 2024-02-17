@@ -236,7 +236,7 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 	middle := fyne.NewPos(space.Width/2, space.Height/2)
 	topleft := fyne.NewPos(middle.X-radius, middle.Y-radius)
 
-	c.titleText.TextSize = radius / 3
+	c.titleText.TextSize = radius / 3.5
 	c.titleText.Move(middle.Add(fyne.NewPos(0, diameter/4)))
 	c.titleText.Refresh()
 

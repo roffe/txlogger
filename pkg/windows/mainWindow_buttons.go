@@ -142,6 +142,7 @@ func (mw *MainWindow) createButtons() {
 			Logplayer: false,
 			LogBtn:    mw.logBtn,
 			OnClose:   onClose,
+			UseMPH:    mw.settings.GetUseMPH(),
 		}
 
 		switch mw.ecuSelect.Selected {

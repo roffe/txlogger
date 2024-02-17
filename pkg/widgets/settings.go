@@ -24,6 +24,7 @@ const (
 	prefsLogFormat         = "logFormat"
 	prefsLogPath           = "logPath"
 	prefsLambdaSource      = "lambdaSource"
+	prefsUseMPH            = "useMPH"
 )
 
 type SettingsWidget struct {
@@ -39,6 +40,7 @@ type SettingsWidget struct {
 	logFormat    *widget.Select
 	logPath      *widget.Label
 	lambdaSource *widget.Select
+	useMPH       *widget.Check
 
 	container *fyne.Container
 
@@ -92,6 +94,10 @@ func (sw *SettingsWidget) GetLogPath() string {
 	return sw.logPath.Text
 }
 
+func (sw *SettingsWidget) GetUseMPH() bool {
+	return sw.useMPH.Checked
+}
+
 func NewSettingsWidget() *SettingsWidget {
 	sw := &SettingsWidget{}
 	sw.ExtendBaseWidget(sw)
@@ -109,6 +115,7 @@ func NewSettingsWidget() *SettingsWidget {
 	sw.logPath = widget.NewLabel("")
 
 	lambdaSel := sw.newLambdaSelector()
+	sw.useMPH = sw.newUserMPH()
 
 	sw.container =
 		container.NewVBox(
@@ -151,7 +158,6 @@ func NewSettingsWidget() *SettingsWidget {
 				),
 				sw.logPath,
 			),
-			widget.NewSeparator(),
 			container.NewBorder(
 				nil,
 				nil,
@@ -166,7 +172,6 @@ func NewSettingsWidget() *SettingsWidget {
 				nil,
 				sw.autoSave,
 			),
-			widget.NewSeparator(),
 			container.NewBorder(
 				nil,
 				nil,
@@ -178,14 +183,19 @@ func NewSettingsWidget() *SettingsWidget {
 					lambdaSel,
 				),
 			),
-
-			widget.NewSeparator(),
 			container.NewBorder(
 				nil,
 				nil,
 				widget.NewIcon(theme.ViewFullScreenIcon()),
 				nil,
 				sw.meshView,
+			),
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewIcon(theme.InfoIcon()),
+				nil,
+				sw.useMPH,
 			),
 		)
 	sw.loadPrefs()
@@ -253,6 +263,12 @@ func (sw *SettingsWidget) newRealtimeBars() *widget.Check {
 	})
 }
 
+func (sw *SettingsWidget) newUserMPH() *widget.Check {
+	return widget.NewCheck("Use mph instead of km/h", func(b bool) {
+		fyne.CurrentApp().Preferences().SetBool(prefsUseMPH, b)
+	})
+}
+
 func (sw *SettingsWidget) loadPrefs() {
 	freq := fyne.CurrentApp().Preferences().IntWithFallback(prefsFreq, 25)
 	sw.freqSlider.SetValue(float64(freq))
@@ -264,6 +280,7 @@ func (sw *SettingsWidget) loadPrefs() {
 	sw.logFormat.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogFormat, "TXL"))
 	sw.logPath.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogPath, datalogger.LOGPATH))
 	sw.lambdaSource.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLambdaSource, "ECU"))
+	sw.useMPH.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsUseMPH, false))
 }
 
 func (sw *SettingsWidget) CreateRenderer() fyne.WidgetRenderer {

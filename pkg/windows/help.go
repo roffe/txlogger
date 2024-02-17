@@ -67,7 +67,9 @@ func Help(app fyne.App) {
 				),
 				container.NewVBox(
 					lb2,
-					layout.NewSpacer(),
+					widget.NewLabel("catavares"),
+					widget.NewLabel("mackan"),
+					widget.NewLabel("kalej"),
 					container.NewBorder(
 						nil,
 						mtLink,
