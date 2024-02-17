@@ -37,8 +37,6 @@ cloud.google.com/go/storage v1.6.0/go.mod h1:N7U0C8pVQ/+NIKOBQyamJIeKQKkZ+mxpohl
 cloud.google.com/go/storage v1.8.0/go.mod h1:Wv1Oy7z6Yz3DshWRJFhqM/UCfaWIRTdp0RXyy7KQOVs=
 cloud.google.com/go/storage v1.10.0/go.mod h1:FLPqc6j+Ki4BU591ie1oL6qBQGu2Bl/tZ9ullr3+Kg0=
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
-fyne.io/fyne/v2 v2.4.4-rc2 h1:zi0ypgSgHmGMab6Af18q43RjYiz6SZ2C7wDC/dck40Y=
-fyne.io/fyne/v2 v2.4.4-rc2/go.mod h1:VyrxAOZ3NRZRWBvNIJbfqoKOG4DdbewoPk7ozqJKNPY=
 fyne.io/fyne/v2 v2.4.4 h1:4efSRpoikcGbqQN83yzC9WmF8UNq9olsaJQ/Ejme6Z8=
 fyne.io/fyne/v2 v2.4.4/go.mod h1:VyrxAOZ3NRZRWBvNIJbfqoKOG4DdbewoPk7ozqJKNPY=
 fyne.io/systray v1.10.1-0.20231115130155-104f5ef7839e h1:Hvs+kW2VwCzNToF3FmnIAzmivNgrclwPgoUdVSrjkP8=
@@ -284,8 +282,8 @@ github.com/posener/complete v1.1.1/go.mod h1:em0nMJCgc9GFtwrmVmEMR/ZL6WyhyjMBndr
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/roffe/ecusymbol v0.0.0-20240215000600-19cd704a3d6c h1:jc3tMnJVNZzirNAlF5aJfSEE6cO7xGQMCMdJf9qKdY8=
 github.com/roffe/ecusymbol v0.0.0-20240215000600-19cd704a3d6c/go.mod h1:b5Wz7voC7PlRahgmFGo3NRPua6Lk3++r34Hn5DOVsT8=
-github.com/roffe/gocan v0.0.0-20240217174805-832204afc5ef h1:pqdkSfnx+UhXJ+zHEroxWYiPJDWOoySPllvtibF2/dY=
-github.com/roffe/gocan v0.0.0-20240217174805-832204afc5ef/go.mod h1:uRCE45DgfzrLSBoIVokLLu6ZdkgCiam+E/wFdIDrqWA=
+github.com/roffe/gocan v0.0.0-20240217180240-a1aeb25b4418 h1:gglZS9+EREfcVv7AqjVePWhuTQQl1lyAAjxU/c7T6ME=
+github.com/roffe/gocan v0.0.0-20240217180240-a1aeb25b4418/go.mod h1:uRCE45DgfzrLSBoIVokLLu6ZdkgCiam+E/wFdIDrqWA=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/rogpeppe/go-internal v1.6.1/go.mod h1:xXDCJY+GAPziupqXw64V24skbSoqbTEfhy4qGm1nDQc=
