@@ -45,7 +45,7 @@ func Help(app fyne.App) {
 	kvLink := widget.NewHyperlink("Kvaser AB", kv)
 	kvLink.Alignment = fyne.TextAlignCenter
 
-	lb2 := widget.NewLabel("With support from")
+	lb2 := widget.NewLabel("Made with support from")
 	lb2.Alignment = fyne.TextAlignCenter
 
 	tabs := container.NewAppTabs(
@@ -56,20 +56,18 @@ func Help(app fyne.App) {
 				container.NewVBox(
 					widget.NewHyperlink("txlogger.com", tx),
 					widget.NewLabel("Version: "+app.Metadata().Version+" Build: "+strconv.Itoa(app.Metadata().Build)),
-					widget.NewLabel("Author: Roffe"),
+					widget.NewLabel("Author: Joakim \"Roffe\" Karlsson"),
 					widget.NewLabel("Special thanks to:"),
-					widget.NewLabel("SAAB for making the cars we ❤️"),
+					widget.NewLabel("SAAB for making the cars we ❤️❤️❤️"),
 					widget.NewLabel("MattiasC, Dilemma, J.K Nilsson, Manick"),
 					widget.NewLabel("Artursson, Schottis, Chriva, Myrtilos"),
 					widget.NewLabel("Mackan, Kalej, Bojer"),
+					widget.NewLabel("catavares, Richardc9052, rk3"),
 					widget.NewHyperlink("TrionicTuning", tt),
 					widget.NewLabel("o2o Crew"),
 				),
 				container.NewVBox(
 					lb2,
-					widget.NewLabel("catavares"),
-					widget.NewLabel("mackan"),
-					widget.NewLabel("kalej"),
 					container.NewBorder(
 						nil,
 						mtLink,
