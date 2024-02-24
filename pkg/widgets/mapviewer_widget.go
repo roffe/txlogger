@@ -109,6 +109,10 @@ func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 		}
 	}
 
+	if len(mv.zData) == 0 {
+		return nil, fmt.Errorf("NewMapViewer: zData is empty")
+	}
+
 	mv.min, mv.max = findMinMax(mv.zData)
 	log.Printf("NewMapViewer: cols: %d rows: %d datalen: %d xfrom: %s yfrom: %s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom)
 	mv.content = mv.render()

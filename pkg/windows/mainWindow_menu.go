@@ -119,7 +119,7 @@ func (mw *MainWindow) newMapViewerWindow(w fyne.Window, mv mapviewerhandler.MapV
 		axis.YFrom = "ActualIn.n_Engine"
 	}
 
-	mw.mvh.Subscribe("Lambda.External", mv)
+	mw.mvh.Subscribe(mw.settings.GetLambdaSymbolName(), mv)
 	mw.mvh.Subscribe(axis.XFrom, mv)
 	mw.mvh.Subscribe(axis.YFrom, mv)
 	return mww
@@ -278,7 +278,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 		w.SetCloseIntercept(func() {
 			delete(mw.openMaps, axis.Z)
-			mw.mvh.Unsubscribe("Lambda.External", mv)
+			mw.mvh.Unsubscribe(mw.settings.GetLambdaSymbolName(), mv)
 			mw.mvh.Unsubscribe(axis.XFrom, mv)
 			mw.mvh.Unsubscribe(axis.YFrom, mv)
 			w.Close()

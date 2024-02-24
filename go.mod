@@ -1,6 +1,6 @@
 module github.com/roffe/txlogger
 
-go 1.21.5
+go 1.22
 
 require (
 	github.com/avast/retry-go/v4 v4.5.1
@@ -10,11 +10,11 @@ require (
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/sqweek/dialog v0.0.0-20220809060634-e981b270ebbf
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9
-	go.bug.st/serial v1.6.1
-	golang.org/x/crypto v0.18.0
+	go.bug.st/serial v1.6.2
+	golang.org/x/crypto v0.19.0
 	golang.org/x/image v0.15.0
-	golang.org/x/mod v0.14.0
-	golang.org/x/net v0.20.0
+	golang.org/x/mod v0.15.0
+	golang.org/x/net v0.21.0
 	golang.org/x/sync v0.6.0
 )
 
@@ -29,11 +29,11 @@ require (
 	github.com/fredbi/uri v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/fyne-io/gl-js v0.0.0-20230506162202-1fdaa286a934 // indirect
-	github.com/fyne-io/glfw-js v0.0.0-20231117203605-bc7c6f97d52f // indirect
-	github.com/fyne-io/image v0.0.0-20230811065323-ed435dc8bca6 // indirect
+	github.com/fyne-io/glfw-js v0.0.0-20240101223322-6e1efdc71b7a // indirect
+	github.com/fyne-io/image v0.0.0-20240121103648-c3c798e60e6b // indirect
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71 // indirect
-	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20231124074035-2de0cf0c80af // indirect
-	github.com/go-text/render v0.0.0-20230619120952-35bccb6164b8 // indirect
+	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20240118000515-a250818d05e3 // indirect
+	github.com/go-text/render v0.0.0-20240129162809-b6410f7d78ad // indirect
 	github.com/go-text/typesetting v0.1.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/mock v1.6.0 // indirect
@@ -54,20 +54,20 @@ require (
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
 	github.com/tevino/abool v1.2.0 // indirect
-	github.com/yuin/goldmark v1.6.0 // indirect
+	github.com/yuin/goldmark v1.7.0 // indirect
 	go.einride.tech/can v0.7.0 // indirect
-	golang.org/x/mobile v0.0.0-20240112133503-c713f31d574b // indirect
-	golang.org/x/sys v0.16.0 // indirect
+	golang.org/x/mobile v0.0.0-20240213143359-d1f7d3436075 // indirect
+	golang.org/x/sys v0.17.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/tools v0.17.0 // indirect
+	golang.org/x/tools v0.18.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/js/dom v0.0.0-20231112215516-51f43a291193 // indirect
 )
 
-require github.com/roffe/ecusymbol v0.0.0-20240217200753-28b66f932123
+require github.com/roffe/ecusymbol v0.0.0-20240224135343-0e29a48308aa
 
-require fyne.io/x/fyne v0.0.0-20231231230942-0b5901d0781a
+require fyne.io/x/fyne v0.0.0-20240216160529-61d0ff41acd7
 
 // replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
 

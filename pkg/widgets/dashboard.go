@@ -383,44 +383,31 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 	}
 
 	router := map[string]func(float64){
-		"In.v_Vehicle": setVehicleSpeed,
-
-		"ActualIn.n_Engine":   db.rpm.SetValue,
-		"ActualIn.T_AirInlet": db.iat.SetValue,
-
-		"ActualIn.T_Engine": db.engineTemp.SetValue,
-
-		"In.p_AirInlet":       db.boost.SetValue,
-		"ActualIn.p_AirInlet": db.boost.SetValue,
-
+		"In.v_Vehicle":              setVehicleSpeed,
+		"ActualIn.n_Engine":         db.rpm.SetValue,
+		"ActualIn.T_AirInlet":       db.iat.SetValue,
+		"ActualIn.T_Engine":         db.engineTemp.SetValue,
+		"In.p_AirInlet":             db.boost.SetValue,
+		"ActualIn.p_AirInlet":       db.boost.SetValue,
 		"In.p_AirBefThrottle":       db.boost.SetValue2,
 		"ActualIn.p_AirBefThrottle": db.boost.SetValue2,
-
-		"Out.X_AccPedal": db.throttle.SetValue, // t7
-		"Out.X_AccPos":   db.throttle.SetValue, // t8
-
-		"Out.PWM_BoostCntrl": db.pwm.SetValue,
-
-		"DisplProt.LambdaScanner": db.wblambda.SetValue,
-		"Lambda.External":         db.wblambda.SetValue,
-
-		"Lambda.LambdaInt": db.nblambda.SetValue,
-
-		"MAF.m_AirInlet":        db.air.SetValue,
-		"m_Request":             db.air.SetValue2,
-		"AirMassMast.m_Request": db.air.SetValue2,
-
-		"Out.fi_Ignition":         textSetter(db.ign, "Ign", 1),
-		"ECMStat.ST_ActiveAirDem": ecmstat,
-
-		"IgnProt.fi_Offset":     ioff,
-		"IgnMastProt.fi_Offset": ioff,
-
-		"CRUISE": showHider(db.cruise),
-		"CEL":    showHider(db.checkEngine),
-		"LIMP":   showHider(db.limpMode),
-
-		"KnkDet.KnockCyl": knkDet,
+		"Out.X_AccPedal":            db.throttle.SetValue, // t7
+		"Out.X_AccPos":              db.throttle.SetValue, // t8
+		"Out.PWM_BoostCntrl":        db.pwm.SetValue,
+		"DisplProt.LambdaScanner":   db.wblambda.SetValue,
+		"Lambda.External":           db.wblambda.SetValue,
+		"Lambda.LambdaInt":          db.nblambda.SetValue,
+		"MAF.m_AirInlet":            db.air.SetValue,
+		"m_Request":                 db.air.SetValue2,
+		"AirMassMast.m_Request":     db.air.SetValue2,
+		"Out.fi_Ignition":           textSetter(db.ign, "Ign", 1),
+		"ECMStat.ST_ActiveAirDem":   ecmstat,
+		"IgnProt.fi_Offset":         ioff,
+		"IgnMastProt.fi_Offset":     ioff,
+		"CRUISE":                    showHider(db.cruise),
+		"CEL":                       showHider(db.checkEngine),
+		"LIMP":                      showHider(db.limpMode),
+		"KnkDet.KnockCyl":           knkDet,
 	}
 
 	return router
