@@ -296,6 +296,8 @@ github.com/roffe/ecusymbol v0.0.0-20240217200753-28b66f932123 h1:eL1slBq5P0HI7hv
 github.com/roffe/ecusymbol v0.0.0-20240217200753-28b66f932123/go.mod h1:b5Wz7voC7PlRahgmFGo3NRPua6Lk3++r34Hn5DOVsT8=
 github.com/roffe/ecusymbol v0.0.0-20240224135343-0e29a48308aa h1:dXgqwiB+E/KAYLEA40uol4CwrZdpX8suxUx82UOPPbY=
 github.com/roffe/ecusymbol v0.0.0-20240224135343-0e29a48308aa/go.mod h1:b5Wz7voC7PlRahgmFGo3NRPua6Lk3++r34Hn5DOVsT8=
+github.com/roffe/ecusymbol v0.0.0-20240226195317-8191b57ea5c8 h1:Rzws/teLH7ODrbwmJsrRAdWRzwe0B18q9r5UJTwecmY=
+github.com/roffe/ecusymbol v0.0.0-20240226195317-8191b57ea5c8/go.mod h1:b5Wz7voC7PlRahgmFGo3NRPua6Lk3++r34Hn5DOVsT8=
 github.com/roffe/gocan v0.0.0-20240217180240-a1aeb25b4418 h1:gglZS9+EREfcVv7AqjVePWhuTQQl1lyAAjxU/c7T6ME=
 github.com/roffe/gocan v0.0.0-20240217180240-a1aeb25b4418/go.mod h1:uRCE45DgfzrLSBoIVokLLu6ZdkgCiam+E/wFdIDrqWA=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
