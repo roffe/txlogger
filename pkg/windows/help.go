@@ -12,21 +12,16 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/assets"
 )
 
-//go:embed kvaser_logo.png
-var kvaserLogoBytes []byte
-
-//go:embed maptun_logo.png
-var maptunLogoBytes []byte
-
 func Help(app fyne.App) {
-	kvaserLogo := canvas.NewImageFromResource(fyne.NewStaticResource("kvaser_logo.png", kvaserLogoBytes))
+	kvaserLogo := canvas.NewImageFromResource(fyne.NewStaticResource("kvaser_logo.png", assets.KvaserLogoBytes))
 	kvaserLogo.SetMinSize(fyne.NewSize(190, 117))
 	kvaserLogo.FillMode = canvas.ImageFillContain
 	kvaserLogo.ScaleMode = canvas.ImageScaleSmooth
 
-	maptunLogo := canvas.NewImageFromResource(fyne.NewStaticResource("maptun_logo.png", maptunLogoBytes))
+	maptunLogo := canvas.NewImageFromResource(fyne.NewStaticResource("maptun_logo.png", assets.MaptunLogoBytes))
 	maptunLogo.SetMinSize(fyne.NewSize(390, 67))
 	maptunLogo.FillMode = canvas.ImageFillContain
 	maptunLogo.ScaleMode = canvas.ImageScaleSmooth
