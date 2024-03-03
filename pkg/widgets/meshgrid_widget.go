@@ -470,6 +470,7 @@ func drawCircle(img *image.RGBA, p image.Point, radius int, c color.RGBA) {
 	}
 }
 
+/*
 func (m *Meshgrid) drawLine33(img *image.RGBA, p1, p2 image.Point, startWidth, endWidth int, startColor, endColor color.RGBA) {
 	if startWidth <= 0 {
 		startWidth = 1
@@ -612,13 +613,14 @@ func (m *Meshgrid) drawLine333(img *image.RGBA, p1, p2 image.Point, width int, s
 		}
 	}
 }
+*/
 
-func abs(x int) int {
+/* func abs(x int) int {
 	if x < 0 {
 		return -x
 	}
 	return x
-}
+} */
 
 func lerp(a, b, t float64) float64 {
 	return a + (b-a)*t

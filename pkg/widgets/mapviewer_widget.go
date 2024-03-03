@@ -32,8 +32,9 @@ type MapViewerInfo struct {
 type MapViewer struct {
 	widget.BaseWidget
 
-	editable bool
-	focused  bool
+	editable       bool
+	focused        bool
+	buttonsEnabled bool
 
 	saveFileFunc  SaveFunc
 	updateECUFunc UpdateFunc
@@ -177,31 +178,36 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		DisplayTextSize: 25,
 	})
 
-	buttons := container.NewGridWithColumns(4,
-		widget.NewButtonWithIcon("Load from File", theme.DocumentIcon(), func() {
-			if mv.symbol != nil {
-				mv.zData = mv.symbol.Ints()
-				mv.Refresh()
-			}
-		}),
-		widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
-			p := NewProgressModal(mv, "Loading map from ECU")
-			p.Show()
-			mv.loadECUFunc()
-			p.pb.Stop()
-			p.Hide()
-		}),
-		widget.NewButtonWithIcon("Save to File", theme.DocumentSaveIcon(), func() {
-			mv.saveFileFunc(mv.zData)
-		}),
-		widget.NewButtonWithIcon("Save to ECU", theme.DocumentSaveIcon(), func() {
-			p := NewProgressModal(mv, "Saving map to ECU")
-			p.Show()
-			mv.saveECUFunc(mv.zData)
-			p.pb.Stop()
-			p.Hide()
-		}),
-	)
+	var buttons *fyne.Container
+	if mv.buttonsEnabled {
+		buttons = container.NewGridWithColumns(4,
+			widget.NewButtonWithIcon("Load from File", theme.DocumentIcon(), func() {
+				if mv.symbol != nil {
+					mv.zData = mv.symbol.Ints()
+					mv.Refresh()
+				}
+			}),
+			widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
+				p := NewProgressModal(mv, "Loading map from ECU")
+				p.Show()
+				mv.loadECUFunc()
+				p.pb.Stop()
+				p.Hide()
+			}),
+			widget.NewButtonWithIcon("Save to File", theme.DocumentSaveIcon(), func() {
+				mv.saveFileFunc(mv.zData)
+			}),
+			widget.NewButtonWithIcon("Save to ECU", theme.DocumentSaveIcon(), func() {
+				p := NewProgressModal(mv, "Saving map to ECU")
+				p.Show()
+				mv.saveECUFunc(mv.zData)
+				p.pb.Stop()
+				p.Hide()
+			}),
+		)
+	} else {
+		buttons = container.NewWithoutLayout()
+	}
 
 	if mv.symbol == nil || mv.numColumns == 1 && mv.numRows == 1 {
 		return container.NewBorder(

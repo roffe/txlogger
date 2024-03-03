@@ -18,6 +18,7 @@ import (
 	"github.com/roffe/txlogger/pkg/capture"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
+	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/mainmenu"
@@ -107,6 +108,8 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		mvh:      mapviewerhandler.New(),
 		settings: widgets.NewSettingsWidget(),
 	}
+
+	ebus.SubscribeAllFunc(mw.mvh.SetValue)
 
 	updateSymbols := func(syms []*symbol.Symbol) {
 		//log.Println("Updating symbols")
@@ -219,6 +222,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 	return mw
 }
 func (mw *MainWindow) closeIntercept() {
+	mw.mvh.Close()
 	mw.SaveSymbolList()
 	debug.Close()
 	if mw.dlc != nil {

@@ -107,16 +107,16 @@ func (c *Dial) rotateNeedle(hand *canvas.Line, middle fyne.Position, facePositio
 		facePosition = 0
 	}
 	rotation := math.Pi*1.5/(c.steps*c.factor)*facePosition - math.Pi/4*3
-	c.rotate(hand, middle, facePosition, rotation, offset, length)
+	c.rotate(hand, middle, rotation, offset, length)
 	hand.Refresh()
 }
 
 func (c *Dial) rotatePips(hand *canvas.Line, middle fyne.Position, facePosition float64, offset, length float32) {
 	rotation := math.Pi*1.5/c.steps*facePosition - math.Pi/4*3
-	c.rotate(hand, middle, facePosition, rotation, offset, length)
+	c.rotate(hand, middle, rotation, offset, length)
 }
 
-func (c *Dial) rotate(hand *canvas.Line, middle fyne.Position, facePosition, rotation float64, offset, length float32) {
+func (c *Dial) rotate(hand *canvas.Line, middle fyne.Position, rotation float64, offset, length float32) {
 	x2 := length * float32(math.Sin(rotation))
 	y2 := -length * float32(math.Cos(rotation))
 

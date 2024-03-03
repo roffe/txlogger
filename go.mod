@@ -20,7 +20,7 @@ require (
 
 require (
 	fyne.io/fyne/v2 v2.4.4
-	fyne.io/systray v1.10.1-0.20231115130155-104f5ef7839e // indirect
+	fyne.io/systray v1.10.1-0.20231230205326-d160fd363db9 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
 	github.com/bendikro/dl v0.0.0-20190410215913-e41fdb9069d4 // indirect
@@ -53,7 +53,6 @@ require (
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
-	github.com/tevino/abool v1.2.0 // indirect
 	github.com/yuin/goldmark v1.7.0 // indirect
 	go.einride.tech/can v0.7.0 // indirect
 	golang.org/x/mobile v0.0.0-20240213143359-d1f7d3436075 // indirect

@@ -39,7 +39,7 @@ func mainz(args []string) {
 			mw = windows.NewMainWindow(a, filename)
 		}
 		if strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") {
-			windows.NewLogPlayer(a, filename, nil, nil).ShowAndRun()
+			windows.NewLogPlayer(a, filename, nil).ShowAndRun()
 			return
 		}
 	}
