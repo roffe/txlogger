@@ -11,6 +11,13 @@ type LoadFunc func()
 type SaveFunc func([]int)
 type UpdateFunc func(idx int, value []int)
 
+func WithButtons(buttons bool) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.buttonsEnabled = buttons
+		return nil
+	}
+}
+
 func WithXFrom(xFrom string) MapViewerOption {
 	return func(mv *MapViewer) error {
 		mv.xFrom = xFrom

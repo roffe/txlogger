@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"fyne.io/fyne/v2/data/binding"
@@ -35,9 +34,6 @@ type Consumer interface {
 
 type Logger interface {
 	Provider
-	Attach(Consumer)
-	Detach(Consumer)
-	Consumer
 }
 
 type LambdaProvider interface {
@@ -63,8 +59,6 @@ type Config struct {
 
 type Client struct {
 	cfg Config
-	dbs []Consumer
-	mu  sync.Mutex
 	p   Provider
 }
 
@@ -192,47 +186,12 @@ func New(cfg Config) (Logger, error) {
 }
 
 func (d *Client) Start() error {
-	//fyne.CurrentApp().SendNotification(&fyne.Notification{
-	//	Title:   "txlogger",
-	//	Content: fmt.Sprintf("Connecting to %s", d.cfg.Device.Name()),
-	//})
-
 	return d.p.Start()
 }
 
 func (d *Client) Close() {
 	if d.p != nil {
 		d.p.Close()
-	}
-}
-
-func (d *Client) Attach(db Consumer) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	for _, dbz := range d.dbs {
-		if db == dbz {
-			return
-		}
-	}
-	d.dbs = append(d.dbs, db)
-}
-
-func (d *Client) Detach(db Consumer) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	for i, dbz := range d.dbs {
-		if db == dbz {
-			d.dbs = append(d.dbs[:i], d.dbs[i+1:]...)
-			return
-		}
-	}
-}
-
-func (d *Client) SetValue(name string, value float64) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	for _, db := range d.dbs {
-		db.SetValue(name, value)
 	}
 }
 

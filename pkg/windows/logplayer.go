@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -87,12 +86,10 @@ type LogPlayer struct {
 
 	lambSymbolName string
 
-	speedLock sync.RWMutex
-
 	fyne.Window
 }
 
-func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, onClose func()) *LogPlayer {
+func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) *LogPlayer {
 	w := a.NewWindow("LogPlayer " + filename)
 	w.Resize(fyne.NewSize(1024, 530))
 
@@ -101,7 +98,6 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 		Mw:        w,
 		Logplayer: true,
 		LogBtn:    nil,
-		OnClose:   onClose,
 		UseMPH:    a.Preferences().BoolWithFallback("useMPH", false),
 	}
 
@@ -162,6 +158,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection, 
 		for _, ma := range lp.openMaps {
 			ma.Close()
 		}
+		lp.mvh.Close()
 		w.Close()
 	})
 

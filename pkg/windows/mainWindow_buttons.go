@@ -9,6 +9,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/datalogger"
+	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/widgets"
 	sdialog "github.com/sqweek/dialog"
 )
@@ -122,10 +123,11 @@ func (mw *MainWindow) createButtons() {
 	mw.syncSymbolsBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), mw.SyncSymbols)
 
 	mw.dashboardBtn = widget.NewButtonWithIcon("Dashboard", theme.InfoIcon(), func() {
+		var unsubDB func()
+
 		onClose := func() {
-			if mw.dlc != nil {
-				mw.dlc.Attach(mw.symbolList)
-				mw.dlc.Detach(mw.dashboard)
+			if unsubDB != nil {
+				unsubDB()
 			}
 			if mw.dashboard != nil {
 				mw.dashboard.Close()
@@ -153,13 +155,8 @@ func (mw *MainWindow) createButtons() {
 		}
 
 		mw.dashboard = widgets.NewDashboard(dbcfg)
-		if mw.dlc != nil {
-			mw.dlc.Attach(mw.dashboard)
-		}
 
-		if mw.dlc != nil {
-			mw.dlc.Detach(mw.symbolList)
-		}
+		unsubDB = ebus.SubscribeAllFunc(mw.dashboard.SetValue)
 
 		mw.SetCloseIntercept(func() {
 			onClose()
@@ -179,15 +176,7 @@ func (mw *MainWindow) createButtons() {
 			return
 		}
 
-		onClose := func() {
-			if mw.dlc != nil {
-				mw.dlc.Detach(mw.dashboard)
-			}
-			mw.dashboard = nil
-			mw.SetFullScreen(false)
-			mw.SetContent(mw.Content())
-		}
-		go NewLogPlayer(mw.app, filename, mw.fw, onClose)
+		go NewLogPlayer(mw.app, filename, mw.fw)
 	})
 
 	mw.logBtn = widget.NewButtonWithIcon("Start logging", theme.MediaPlayIcon(), func() {
@@ -243,20 +232,25 @@ func (mw *MainWindow) startLogging() {
 	mw.logBtn.SetText("Stop logging")
 	mw.Disable()
 
+	var cancel func()
+
 	if mw.settings.GetLivePreview() {
-		// Attach our symbol list message handler
-		mw.dlc.Attach(mw.symbolList)
+		cancel = ebus.SubscribeAllFunc(mw.symbolList.SetValue)
 	}
 
-	if mw.dashboard != nil {
-		// Attach our dashboard message handler
-		mw.dlc.Attach(mw.dashboard)
-	}
-
-	// Attach our mapview message handler
-	mw.dlc.Attach(mw.mvh)
-
-	go mw.logDaemon()
+	go func() {
+		defer mw.Enable()
+		if err := mw.dlc.Start(); err != nil {
+			mw.Log(err.Error())
+		}
+		if cancel != nil {
+			cancel()
+		}
+		mw.dlc = nil
+		mw.loggingRunning = false
+		mw.logBtn.SetIcon(theme.MediaPlayIcon())
+		mw.logBtn.SetText("Start logging")
+	}()
 }
 
 func (mw *MainWindow) newDataLogger(device gocan.Adapter) (datalogger.Logger, error) {
@@ -273,20 +267,4 @@ func (mw *MainWindow) newDataLogger(device gocan.Adapter) (datalogger.Logger, er
 		LogFormat:      mw.settings.GetLogFormat(),
 		LogPath:        mw.settings.GetLogPath(),
 	})
-}
-
-func (mw *MainWindow) logDaemon() {
-	defer mw.Enable()
-	if err := mw.dlc.Start(); err != nil {
-		mw.Log(err.Error())
-	}
-	if mw.dashboard != nil {
-		mw.dlc.Detach(mw.dashboard)
-	}
-	mw.dlc.Detach(mw.mvh)
-	mw.dlc.Detach(mw.symbolList)
-	mw.dlc = nil
-	mw.loggingRunning = false
-	mw.logBtn.SetIcon(theme.MediaPlayIcon())
-	mw.logBtn.SetText("Start logging")
 }

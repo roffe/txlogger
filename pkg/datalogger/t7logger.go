@@ -13,6 +13,7 @@ import (
 	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
+	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecumaster"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 	"golang.org/x/sync/errgroup"
@@ -78,8 +79,6 @@ func AirDemToStringT7(v float64) string {
 }
 
 type T7Client struct {
-	dl Logger
-
 	symbolChan chan []*symbol.Symbol
 	updateChan chan *RamUpdate
 	readChan   chan *ReadRequest
@@ -97,7 +96,6 @@ type T7Client struct {
 func NewT7(dl Logger, cfg Config, lw LogWriter) (Provider, error) {
 	return &T7Client{
 		Config:     cfg,
-		dl:         dl,
 		symbolChan: make(chan []*symbol.Symbol, 1),
 		updateChan: make(chan *RamUpdate, 1),
 		readChan:   make(chan *ReadRequest, 1),
@@ -188,31 +186,31 @@ func (c *T7Client) Start() error {
 				throttle := int(msg.Data()[5])
 				c.sysvars.Set("ActualIn.n_Engine", strconv.Itoa(int(rpm)))
 				c.sysvars.Set("Out.X_AccPedal", strconv.Itoa(throttle)+",0")
-				c.dl.SetValue("ActualIn.n_Engine", float64(rpm))
-				c.dl.SetValue("Out.X_AccPedal", float64(throttle))
+				ebus.Publish("ActualIn.n_Engine", float64(rpm))
+				ebus.Publish("Out.X_AccPedal", float64(throttle))
 			case 0x280:
 				data := msg.Data()[4]
 				if data&0x20 == 0x20 {
-					c.dl.SetValue("CRUISE", 1)
+					ebus.Publish("CRUISE", 1)
 				} else {
-					c.dl.SetValue("CRUISE", 0)
+					ebus.Publish("CRUISE", 0)
 				}
 				if data&0x80 == 0x80 {
-					c.dl.SetValue("CEL", 1)
+					ebus.Publish("CEL", 1)
 				} else {
-					c.dl.SetValue("CEL", 0)
+					ebus.Publish("CEL", 0)
 				}
 				data2 := msg.Data()[3]
 				if data2&0x01 == 0x01 {
-					c.dl.SetValue("LIMP", 1)
+					ebus.Publish("LIMP", 1)
 				} else {
-					c.dl.SetValue("LIMP", 0)
+					ebus.Publish("LIMP", 0)
 				}
 			case 0x3A0:
 				speed := uint16(msg.Data()[4]) | uint16(msg.Data()[3])<<8
 				realSpeed := float64(speed) / 10
 				c.sysvars.Set("In.v_Vehicle", strconv.FormatFloat(realSpeed, 'f', 1, 64))
-				c.dl.SetValue("In.v_Vehicle", realSpeed)
+				ebus.Publish("In.v_Vehicle", realSpeed)
 			}
 		}
 	}()
@@ -362,7 +360,7 @@ func (c *T7Client) Start() error {
 							break
 						}
 						// Set value on dashboards
-						c.dl.SetValue(va.Name, va.Float64())
+						ebus.Publish(va.Name, va.Float64())
 					}
 					if r.Len() > 0 {
 						left := r.Len()
@@ -376,7 +374,7 @@ func (c *T7Client) Start() error {
 
 					if c.lamb != nil {
 						value := fmt.Sprintf("%.2f", c.lamb.GetLambda())
-						c.dl.SetValue(EXTERNALWBLSYM, c.lamb.GetLambda())
+						ebus.Publish(EXTERNALWBLSYM, c.lamb.GetLambda())
 						c.sysvars.Set(EXTERNALWBLSYM, value)
 					}
 

@@ -47,8 +47,6 @@ type Dashboard struct {
 
 	//dbgBar *fyne.Container
 
-	onClose func()
-
 	metrics map[string]func(float64)
 
 	logplayer bool
@@ -185,7 +183,6 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 			Minsize: fyne.NewSize(90, 90),
 		}),
 		limpMode: canvas.NewImageFromResource(fyne.NewStaticResource("limp.png", assets.LimpBytes)),
-		onClose:  cfg.OnClose,
 		//metricsChan: make(chan *model.DashboardMetric, 60),
 	}
 	db.ExtendBaseWidget(db)
@@ -193,8 +190,8 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 	db.metrics = db.createRouter()
 
 	db.closeBtn = widget.NewButtonWithIcon("Back", theme.NavigateBackIcon(), func() {
-		if db.onClose != nil {
-			db.onClose()
+		if db.cfg.OnClose != nil {
+			db.cfg.OnClose()
 		}
 	})
 

@@ -82,6 +82,9 @@ func (mvh *MapViewerHandler) Unsubscribe(symbolName string, mv MapViewerWindowWi
 }
 
 func (mvh *MapViewerHandler) SetValue(symbolName string, value float64) {
+	if len(mvh.subs) == 0 {
+		return
+	}
 	select {
 	case mvh.incoming <- MapViewerEvent{SymbolName: symbolName, Value: value}:
 		return
@@ -102,6 +105,9 @@ func (mvh *MapViewerHandler) run() {
 			for i, m := range mvh.subs[unsub.SymbolName] {
 				if m == unsub.Widget {
 					mvh.subs[unsub.SymbolName] = append(mvh.subs[unsub.SymbolName][:i], mvh.subs[unsub.SymbolName][i+1:]...)
+					if len(mvh.subs[unsub.SymbolName]) == 0 {
+						delete(mvh.subs, unsub.SymbolName)
+					}
 					break
 				}
 			}

@@ -49,16 +49,7 @@ func (mw *MainWindow) setupMenu() {
 					mw.Log(err.Error())
 					return
 				}
-
-				onClose := func() {
-					if mw.dlc != nil {
-						mw.dlc.Detach(mw.dashboard)
-					}
-					mw.dashboard = nil
-					mw.SetFullScreen(false)
-					mw.SetContent(mw.Content())
-				}
-				go NewLogPlayer(mw.app, filename, mw.fw, onClose)
+				go NewLogPlayer(mw.app, filename, mw.fw)
 			}),
 			fyne.NewMenuItem("Open log folder", func() {
 				if err := open.Run(mw.settings.GetLogPath()); err != nil {
@@ -269,6 +260,8 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		widgets.WithSaveFileFunc(saveFileFunc),
 		widgets.WithMeshView(mw.settings.GetMeshView()),
 		widgets.WithLambdaSymbolName(mw.settings.GetLambdaSymbolName()),
+		widgets.WithEditable(true),
+		widgets.WithButtons(true),
 	)
 	if err != nil {
 		mw.Log(err.Error())

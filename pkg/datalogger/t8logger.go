@@ -14,6 +14,7 @@ import (
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/gmlan"
+	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ecumaster"
 	"golang.org/x/sync/errgroup"
@@ -61,8 +62,6 @@ func AirDemToStringT8(v float64) string {
 }
 
 type T8Client struct {
-	dl Logger
-
 	symbolChan chan []*symbol.Symbol
 	updateChan chan *RamUpdate
 	readChan   chan *ReadRequest
@@ -80,7 +79,6 @@ type T8Client struct {
 func NewT8(dl Logger, cfg Config, lw LogWriter) (Provider, error) {
 	return &T8Client{
 		Config:     cfg,
-		dl:         dl,
 		symbolChan: make(chan []*symbol.Symbol, 1),
 		updateChan: make(chan *RamUpdate, 1),
 		readChan:   make(chan *ReadRequest, 1),
@@ -321,7 +319,7 @@ func (c *T8Client) Start() error {
 							c.OnMessage(fmt.Sprintf("Failed to read %s: %v", va.Name, err))
 							break
 						}
-						c.dl.SetValue(va.Name, va.Float64())
+						ebus.Publish(va.Name, va.Float64())
 					}
 					if r.Len() > 0 {
 						left := r.Len()
@@ -336,7 +334,7 @@ func (c *T8Client) Start() error {
 
 					if c.lamb != nil {
 						value := fmt.Sprintf("%.2f", c.lamb.GetLambda())
-						c.dl.SetValue(EXTERNALWBLSYM, c.lamb.GetLambda())
+						ebus.Publish(EXTERNALWBLSYM, c.lamb.GetLambda())
 						c.sysvars.Set(EXTERNALWBLSYM, value)
 					}
 
