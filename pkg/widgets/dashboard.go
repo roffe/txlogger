@@ -13,16 +13,8 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/assets"
 )
-
-//go:embed checkengine.png
-var checkengineBytes []byte
-
-//go:embed limp.png
-var limpBytes []byte
-
-//go:embed knock.png
-var knockBytes []byte
 
 /*
 type Gauge interface {
@@ -184,15 +176,15 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 			Max:   2200,
 			Steps: 22,
 		}),
-		checkEngine: canvas.NewImageFromResource(fyne.NewStaticResource("checkengine.png", checkengineBytes)),
+		checkEngine: canvas.NewImageFromResource(fyne.NewStaticResource("checkengine.png", assets.CheckengineBytes)),
 		fullscreenBtn: widget.NewButtonWithIcon("Fullscreen", theme.ZoomFitIcon(), func() {
 			cfg.Mw.SetFullScreen(!cfg.Mw.FullScreen())
 		}),
 		knockIcon: NewIcon(&IconConfig{
-			Image:   canvas.NewImageFromResource(fyne.NewStaticResource("knock.png", knockBytes)),
+			Image:   canvas.NewImageFromResource(fyne.NewStaticResource("knock.png", assets.KnockBytes)),
 			Minsize: fyne.NewSize(90, 90),
 		}),
-		limpMode: canvas.NewImageFromResource(fyne.NewStaticResource("limp.png", limpBytes)),
+		limpMode: canvas.NewImageFromResource(fyne.NewStaticResource("limp.png", assets.LimpBytes)),
 		onClose:  cfg.OnClose,
 		//metricsChan: make(chan *model.DashboardMetric, 60),
 	}

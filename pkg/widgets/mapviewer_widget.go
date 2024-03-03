@@ -6,7 +6,6 @@ import (
 	"log"
 	"strconv"
 	"strings"
-	"time"
 
 	_ "embed"
 
@@ -35,8 +34,6 @@ type MapViewer struct {
 
 	editable bool
 	focused  bool
-
-	autoload bool
 
 	saveFileFunc  SaveFunc
 	updateECUFunc UpdateFunc
@@ -114,6 +111,7 @@ func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 	}
 
 	mv.min, mv.max = findMinMax(mv.zData)
+
 	log.Printf("NewMapViewer: cols: %d rows: %d datalen: %d xfrom: %s yfrom: %s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom)
 	mv.content = mv.render()
 
@@ -126,10 +124,6 @@ func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 			mv.setXY(xy.x, xy.y)
 		}
 	}()
-
-	if mv.autoload {
-		go mv.lx()
-	}
 
 	return mv, nil
 }
@@ -191,21 +185,21 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 			}
 		}),
 		widget.NewButtonWithIcon("Load from ECU", theme.DocumentIcon(), func() {
-			p := mv.newProgressModal("Loading map from ECU")
-			p.p.Show()
+			p := NewProgressModal(mv, "Loading map from ECU")
+			p.Show()
 			mv.loadECUFunc()
 			p.pb.Stop()
-			p.p.Hide()
+			p.Hide()
 		}),
 		widget.NewButtonWithIcon("Save to File", theme.DocumentSaveIcon(), func() {
 			mv.saveFileFunc(mv.zData)
 		}),
 		widget.NewButtonWithIcon("Save to ECU", theme.DocumentSaveIcon(), func() {
-			p := mv.newProgressModal("Saving map to ECU")
-			p.p.Show()
+			p := NewProgressModal(mv, "Saving map to ECU")
+			p.Show()
 			mv.saveECUFunc(mv.zData)
 			p.pb.Stop()
-			p.p.Hide()
+			p.Hide()
 		}),
 	)
 
@@ -261,44 +255,6 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 	}
 
 	return mapview
-}
-
-//go:embed bobr.jpg
-var bobr []byte
-
-// lx is a helper function to load from ECU
-func (mv *MapViewer) lx() {
-	done := make(chan struct{})
-	go func() {
-		mv.loadECUFunc()
-		close(done)
-	}()
-	time.Sleep(300 * time.Millisecond)
-	p := mv.newProgressModal("Loading map from ECU")
-	p.p.Show()
-	<-done
-	p.pb.Stop()
-	p.p.Hide()
-}
-
-type progressModal struct {
-	p  *widget.PopUp
-	pb *widget.ProgressBarInfinite
-}
-
-func (mv *MapViewer) newProgressModal(message string) *progressModal {
-	bobrK := canvas.NewImageFromResource(fyne.NewStaticResource("bobr.jpg", bobr))
-	bobrK.SetMinSize(fyne.NewSize(150, 150))
-	bobrK.FillMode = canvas.ImageFillOriginal
-	bobrK.ScaleMode = canvas.ImageScaleSmooth
-
-	pb := widget.NewProgressBarInfinite()
-	pb.Start()
-	msg := container.NewBorder(bobrK, pb, nil, nil, widget.NewLabel(message))
-	return &progressModal{
-		p:  widget.NewModalPopUp(msg, fyne.CurrentApp().Driver().CanvasForObject(mv)),
-		pb: pb,
-	}
 }
 
 func (mv *MapViewer) Info() MapViewerInfo {

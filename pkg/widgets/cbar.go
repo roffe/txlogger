@@ -58,6 +58,28 @@ func NewCBar(cfg *CBarConfig) *CBar {
 	if s.cfg.DisplayTextSize == 0 {
 		s.cfg.DisplayTextSize = 25
 	}
+
+	s.face = &canvas.Rectangle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0x80}, FillColor: color.RGBA{0x00, 0x00, 0x00, 0x00}, StrokeWidth: 3}
+	s.bar = &canvas.Rectangle{FillColor: color.RGBA{0x2C, 0xA5, 0x00, 0x80}}
+
+	s.titleText = &canvas.Text{Text: s.cfg.Title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
+	s.titleText.TextStyle.Monospace = true
+	s.titleText.Alignment = fyne.TextAlignCenter
+
+	s.displayText = &canvas.Text{Text: fmt.Sprintf(s.cfg.DisplayString, 0.00), Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: float32(s.cfg.DisplayTextSize)}
+	s.displayText.TextStyle.Monospace = true
+	s.displayText.Alignment = fyne.TextAlignLeading
+
+	bar := container.NewWithoutLayout(s.face)
+	for i := 0; i < int(s.cfg.Steps+1); i++ {
+		line := &canvas.Line{StrokeColor: color.RGBA{0x00, 0xE5, 0x00, 0xFF}, StrokeWidth: 2}
+		s.bars = append(s.bars, line)
+		bar.Add(line)
+	}
+	bar.Objects = append(bar.Objects, s.bar, s.titleText, s.displayText)
+
+	s.container = bar
+
 	return s
 }
 
@@ -115,27 +137,6 @@ func (s *CBar) Value() float64 {
 }
 
 func (s *CBar) CreateRenderer() fyne.WidgetRenderer {
-	s.face = &canvas.Rectangle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0x80}, FillColor: color.RGBA{0x00, 0x00, 0x00, 0x00}, StrokeWidth: 3}
-	s.bar = &canvas.Rectangle{FillColor: color.RGBA{0x2C, 0xA5, 0x00, 0x80}}
-
-	s.titleText = &canvas.Text{Text: s.cfg.Title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
-	s.titleText.TextStyle.Monospace = true
-	s.titleText.Alignment = fyne.TextAlignCenter
-
-	s.displayText = &canvas.Text{Text: fmt.Sprintf(s.cfg.DisplayString, 0.00), Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: float32(s.cfg.DisplayTextSize)}
-	s.displayText.TextStyle.Monospace = true
-	s.displayText.Alignment = fyne.TextAlignLeading
-
-	bar := container.NewWithoutLayout(s.face)
-	for i := 0; i < int(s.cfg.Steps+1); i++ {
-		line := &canvas.Line{StrokeColor: color.RGBA{0x00, 0xE5, 0x00, 0xFF}, StrokeWidth: 2}
-		s.bars = append(s.bars, line)
-		bar.Add(line)
-	}
-	bar.Objects = append(bar.Objects, s.bar, s.titleText, s.displayText)
-
-	s.container = bar
-
 	return &CBarRenderer{
 		d: s,
 	}

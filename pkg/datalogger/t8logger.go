@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"sort"
 	"time"
@@ -111,28 +112,19 @@ func (c *T8Client) SetRAM(address uint32, data []byte) error {
 	return upd.Wait()
 }
 
-// REMOVE OFFSET FIX WARNING
 func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
+	//c.OnMessage(fmt.Sprintf("GetRAM %X %d", address, length))
 	if address+length <= 0x100000 {
-		return nil, fmt.Errorf("GetRAM: address out of range: $%X", address)
+		return nil, fmt.Errorf("GetRAM: address not in SRAM: $%X", address)
 	}
 	req := NewReadRequest(address, length)
 	c.readChan <- req
 	return req.Data, req.Wait()
-
 }
 
 const T8ChunkSize = 0x10
 
 func (c *T8Client) Start() error {
-	/* 	file, filename, err := createLog(c.LogPath, "t8l")
-	   	if err != nil {
-	   		return err
-	   	}
-	   	defer file.Close()
-	   	defer file.Sync()
-	   	c.OnMessage(fmt.Sprintf("Logging to %s", filename)) */
-
 	defer c.lw.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -182,13 +174,13 @@ func (c *T8Client) Start() error {
 			return err
 		}
 
-		if err := ClearDynamicallyDefinedRegister(ctx, gm); err != nil {
+		if err := clearDynamicallyDefinedRegister(ctx, gm); err != nil {
 			return err
 		}
 		c.OnMessage("Cleared dynamic register")
 
 		for _, sym := range c.Symbols {
-			if err := SetUpDynamicallyDefinedRegisterBySymbol(ctx, gm, uint16(sym.Number)); err != nil {
+			if err := setUpDynamicallyDefinedRegisterBySymbol(ctx, gm, uint16(sym.Number)); err != nil {
 				return err
 			}
 			//c.OnMessage(fmt.Sprintf("Configured dynamic register %d: %s %d", i, sym.Name, sym.Value))
@@ -249,13 +241,13 @@ func (c *T8Client) Start() error {
 				case symbols := <-c.symbolChan:
 					c.Symbols = symbols
 					c.OnMessage("Reconfiguring symbols..")
-					if err := ClearDynamicallyDefinedRegister(ctx, gm); err != nil {
+					if err := clearDynamicallyDefinedRegister(ctx, gm); err != nil {
 						return err
 					}
 					if len(c.Symbols) > 0 {
 						c.OnMessage("Cleared dynamic register")
 						for _, sym := range c.Symbols {
-							if err := SetUpDynamicallyDefinedRegisterBySymbol(ctx, gm, uint16(sym.Number)); err != nil {
+							if err := setUpDynamicallyDefinedRegisterBySymbol(ctx, gm, uint16(sym.Number)); err != nil {
 								return err
 							}
 						}
@@ -263,6 +255,7 @@ func (c *T8Client) Start() error {
 					}
 				case read := <-c.readChan:
 					chunkSize = uint32(math.Min(float64(read.left), T8ChunkSize))
+					log.Printf("Reading RAM 0x%X %d", read.Address, chunkSize)
 					data, err := gm.ReadMemoryByAddress(ctx, read.Address, chunkSize)
 					if err != nil {
 						errCount++
@@ -381,14 +374,14 @@ func (c *T8Client) Start() error {
 	return err
 }
 
-func ClearDynamicallyDefinedRegister(ctx context.Context, gm *gmlan.Client) error {
+func clearDynamicallyDefinedRegister(ctx context.Context, gm *gmlan.Client) error {
 	if err := gm.WriteDataByIdentifier(ctx, 0x17, []byte{0xF0, 0x04}); err != nil {
 		return fmt.Errorf("ClearDynamicallyDefinedRegister: %w", err)
 	}
 	return nil
 }
 
-func SetUpDynamicallyDefinedRegisterBySymbol(ctx context.Context, gm *gmlan.Client, symbol uint16) error {
+func setUpDynamicallyDefinedRegisterBySymbol(ctx context.Context, gm *gmlan.Client, symbol uint16) error {
 	/* payload
 	byte[0] = register id
 	byte[1] type
@@ -398,8 +391,7 @@ func SetUpDynamicallyDefinedRegisterBySymbol(ctx context.Context, gm *gmlan.Clie
 	byte[5] symbol id high byte
 	byte[6]	symbol id low byte
 	*/
-	payload := []byte{0xF0, 0x80, 0x00, 0x00, 0x00, byte(symbol >> 8), byte(symbol)}
-	if err := gm.WriteDataByIdentifier(ctx, 0x17, payload); err != nil {
+	if err := gm.WriteDataByIdentifier(ctx, 0x17, []byte{0xF0, 0x80, 0x00, 0x00, 0x00, byte(symbol >> 8), byte(symbol)}); err != nil {
 		return fmt.Errorf("SetUpDynamicallyDefinedRegisterBySymbol: %w", err)
 	}
 	return nil

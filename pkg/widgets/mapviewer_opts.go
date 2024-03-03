@@ -11,13 +11,6 @@ type LoadFunc func()
 type SaveFunc func([]int)
 type UpdateFunc func(idx int, value []int)
 
-func WithAutload(autoload bool) MapViewerOption {
-	return func(mv *MapViewer) error {
-		mv.autoload = autoload
-		return nil
-	}
-}
-
 func WithXFrom(xFrom string) MapViewerOption {
 	return func(mv *MapViewer) error {
 		mv.xFrom = xFrom

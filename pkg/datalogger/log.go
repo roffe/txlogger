@@ -62,7 +62,7 @@ type CSVWriter struct {
 
 func (c *CSVWriter) Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time.Time, sysvarOrder []string) error {
 	if !c.headerWritten {
-		if err := c.writeHeader(sysvars, vars, sysvarOrder); err != nil {
+		if err := c.writeHeader(vars, sysvarOrder); err != nil {
 			return err
 		}
 	}
@@ -79,7 +79,7 @@ func (c *CSVWriter) Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time
 	return c.cw.Write(record)
 }
 
-func (c *CSVWriter) writeHeader(sysvars *ThreadSafeMap, vars []*symbol.Symbol, sysvarOrder []string) error {
+func (c *CSVWriter) writeHeader(vars []*symbol.Symbol, sysvarOrder []string) error {
 	var header []string
 	header = append(header, "Time")
 	header = append(header, sysvarOrder...)

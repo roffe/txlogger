@@ -127,166 +127,174 @@ func (mw *MainWindow) newMapViewerWindow(w fyne.Window, mv mapviewerhandler.MapV
 
 func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	axis := symbol.GetInfo(typ, mapName)
-	mv, found := mw.openMaps[axis.Z]
-	if !found {
-		//w := fyne.CurrentApp().Driver().CreateWindow("Map Viewer - " + axis.Z)
-		w := mw.app.NewWindow(axis.Z + " - Map Viewer")
-		//w.SetFixedSize(true)
-		if mw.fw == nil {
-			mw.Log("No binary loaded")
-			return
-		}
-		xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := mw.fw.GetXYZ(axis.X, axis.Y, axis.Z)
-		if err != nil {
-			mw.Log(err.Error())
-			return
-		}
-
-		symZ := mw.fw.GetByName(axis.Z)
-
-		var mv *widgets.MapViewer
-
-		updateFunc := func(idx int, value []int) {
-			if mw.dlc != nil && mw.settings.GetAutoSave() {
-				buff := bytes.NewBuffer([]byte{})
-				var dataLen int
-				for i, val := range value {
-					buff.Write(symZ.EncodeInt(val))
-					if i == 0 {
-						dataLen = buff.Len()
-					}
-				}
-
-				var addr uint32
-
-				switch mw.ecuSelect.Selected {
-				case "T7":
-					addr = symZ.Address
-				case "T8":
-					addr = symZ.Address + symZ.SramOffset
-				}
-
-				start := time.Now()
-				if err := mw.dlc.SetRAM(addr+uint32(idx*dataLen), buff.Bytes()); err != nil {
-					mw.Log(err.Error())
-				}
-				mw.Log(fmt.Sprintf("set %s idx: %d took %s", axis.Z, idx, time.Since(start)))
-			}
-		}
-
-		loadFunc := func() {
-			if mw.dlc != nil {
-				start := time.Now()
-				var addr uint32
-
-				switch mw.ecuSelect.Selected {
-				case "T7":
-					addr = symZ.Address
-				case "T8":
-					addr = symZ.Address + symZ.SramOffset
-				}
-
-				data, err := mw.dlc.GetRAM(addr, uint32(symZ.Length))
-				if err != nil {
-					dialog.ShowError(err, w)
-					return
-				}
-				ints := symZ.BytesToInts(data)
-				mv.SetZ(ints)
-				mw.Log(fmt.Sprintf("load %s took %s", axis.Z, time.Since(start)))
-			}
-		}
-
-		saveFunc := func(data []int) {
-			if mw.dlc == nil {
-				return
-			}
-			start := time.Now()
-			buff := bytes.NewBuffer(symZ.EncodeInts(data))
-			var startPos uint32
-			switch mw.ecuSelect.Selected {
-			case "T7":
-				startPos = symZ.Address
-			case "T8":
-				startPos = symZ.Address + symZ.SramOffset
-			}
-
-			for buff.Len() > 0 {
-				if buff.Len() > chunkSize {
-					if err := mw.dlc.SetRAM(startPos, buff.Next(chunkSize)); err != nil {
-						mw.Log(err.Error())
-						return
-					}
-				} else {
-					if err := mw.dlc.SetRAM(startPos, buff.Bytes()); err != nil {
-						mw.Log(err.Error())
-						return
-					}
-					buff.Reset()
-				}
-				startPos += chunkSize
-			}
-			mw.Log(fmt.Sprintf("save %s took %s", axis.Z, time.Since(start)))
-		}
-
-		saveFileFunc := func(data []int) {
-			ss := mw.fw.GetByName(axis.Z)
-			if ss == nil {
-				mw.Log(fmt.Sprintf("failed to find symbol %s", axis.Z))
-				return
-			}
-
-			log.Println("Save", mw.filename)
-			if err := ss.SetData(ss.EncodeInts(data)); err != nil {
-				mw.Log(err.Error())
-				return
-			}
-			if err := mw.fw.Save(mw.filename); err != nil {
-				mw.Log(err.Error())
-				return
-			}
-			mw.Log(fmt.Sprintf("Saved %s", axis.Z))
-		}
-
-		mv, err = widgets.NewMapViewer(
-			widgets.WithSymbol(symZ),
-			widgets.WithXData(xData),
-			widgets.WithYData(yData),
-			widgets.WithZData(zData),
-			widgets.WithXCorrFac(xCorrFac),
-			widgets.WithYCorrFac(yCorrFac),
-			widgets.WithZCorrFac(zCorrFac),
-			widgets.WithXFrom(axis.XFrom),
-			widgets.WithYFrom(axis.YFrom),
-			widgets.WithInterPolFunc(interpolate.Interpolate),
-			widgets.WithUpdateECUFunc(updateFunc),
-			widgets.WithLoadECUFunc(loadFunc),
-			widgets.WithSaveECUFunc(saveFunc),
-			widgets.WithSaveFileFunc(saveFileFunc),
-			widgets.WithMeshView(mw.settings.GetMeshView()),
-			widgets.WithAutload(mw.settings.GetAutoLoad()),
-			widgets.WithLambdaSymbolName(mw.settings.GetLambdaSymbolName()),
-		)
-		if err != nil {
-			mw.Log(err.Error())
-			return
-		}
-
-		w.Canvas().SetOnTypedKey(mv.TypedKey)
-
-		mw.openMaps[axis.Z] = mw.newMapViewerWindow(w, mv, axis)
-
-		w.SetCloseIntercept(func() {
-			delete(mw.openMaps, axis.Z)
-			mw.mvh.Unsubscribe(mw.settings.GetLambdaSymbolName(), mv)
-			mw.mvh.Unsubscribe(axis.XFrom, mv)
-			mw.mvh.Unsubscribe(axis.YFrom, mv)
-			w.Close()
-		})
-
-		w.SetContent(mv)
-		w.Show()
+	mww, found := mw.openMaps[axis.Z]
+	if found {
+		mww.RequestFocus()
 		return
 	}
-	mv.RequestFocus()
+
+	//w := fyne.CurrentApp().Driver().CreateWindow("Map Viewer - " + axis.Z)
+	w := mw.app.NewWindow(axis.Z + " - Map Viewer")
+	//w.SetFixedSize(true)
+	if mw.fw == nil {
+		mw.Log("No binary loaded")
+		return
+	}
+	xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := mw.fw.GetXYZ(axis.X, axis.Y, axis.Z)
+	if err != nil {
+		mw.Log(err.Error())
+		return
+	}
+
+	symZ := mw.fw.GetByName(axis.Z)
+
+	var mv *widgets.MapViewer
+
+	updateFunc := func(idx int, value []int) {
+		if mw.dlc != nil && mw.settings.GetAutoSave() {
+			buff := bytes.NewBuffer([]byte{})
+			var dataLen int
+			for i, val := range value {
+				buff.Write(symZ.EncodeInt(val))
+				if i == 0 {
+					dataLen = buff.Len()
+				}
+			}
+
+			var addr uint32
+
+			switch mw.ecuSelect.Selected {
+			case "T7":
+				addr = symZ.Address
+			case "T8":
+				addr = symZ.Address + symZ.SramOffset
+			}
+
+			start := time.Now()
+			if err := mw.dlc.SetRAM(addr+uint32(idx*dataLen), buff.Bytes()); err != nil {
+				mw.Log(err.Error())
+			}
+			mw.Log(fmt.Sprintf("set %s idx: %d took %s", axis.Z, idx, time.Since(start)))
+		}
+	}
+
+	loadFunc := func() {
+		if mw.dlc != nil {
+			start := time.Now()
+			var addr uint32
+
+			switch mw.ecuSelect.Selected {
+			case "T7":
+				addr = symZ.Address
+			case "T8":
+				addr = symZ.Address + symZ.SramOffset
+			}
+
+			data, err := mw.dlc.GetRAM(addr, uint32(symZ.Length))
+			if err != nil {
+				dialog.ShowError(err, w)
+				return
+			}
+			ints := symZ.BytesToInts(data)
+			mv.SetZ(ints)
+			mw.Log(fmt.Sprintf("load %s took %s", axis.Z, time.Since(start)))
+		}
+	}
+
+	saveFunc := func(data []int) {
+		if mw.dlc == nil {
+			return
+		}
+		start := time.Now()
+		buff := bytes.NewBuffer(symZ.EncodeInts(data))
+		var startPos uint32
+		switch mw.ecuSelect.Selected {
+		case "T7":
+			startPos = symZ.Address
+		case "T8":
+			startPos = symZ.Address + symZ.SramOffset
+		}
+
+		for buff.Len() > 0 {
+			if buff.Len() > chunkSize {
+				if err := mw.dlc.SetRAM(startPos, buff.Next(chunkSize)); err != nil {
+					mw.Log(err.Error())
+					return
+				}
+			} else {
+				if err := mw.dlc.SetRAM(startPos, buff.Bytes()); err != nil {
+					mw.Log(err.Error())
+					return
+				}
+				buff.Reset()
+			}
+			startPos += chunkSize
+		}
+		mw.Log(fmt.Sprintf("save %s took %s", axis.Z, time.Since(start)))
+	}
+
+	saveFileFunc := func(data []int) {
+		ss := mw.fw.GetByName(axis.Z)
+		if ss == nil {
+			mw.Log(fmt.Sprintf("failed to find symbol %s", axis.Z))
+			return
+		}
+
+		log.Println("Save", mw.filename)
+		if err := ss.SetData(ss.EncodeInts(data)); err != nil {
+			mw.Log(err.Error())
+			return
+		}
+		if err := mw.fw.Save(mw.filename); err != nil {
+			mw.Log(err.Error())
+			return
+		}
+		mw.Log(fmt.Sprintf("Saved %s", axis.Z))
+	}
+
+	mv, err = widgets.NewMapViewer(
+		widgets.WithSymbol(symZ),
+		widgets.WithXData(xData),
+		widgets.WithYData(yData),
+		widgets.WithZData(zData),
+		widgets.WithXCorrFac(xCorrFac),
+		widgets.WithYCorrFac(yCorrFac),
+		widgets.WithZCorrFac(zCorrFac),
+		widgets.WithXFrom(axis.XFrom),
+		widgets.WithYFrom(axis.YFrom),
+		widgets.WithInterPolFunc(interpolate.Interpolate),
+		widgets.WithUpdateECUFunc(updateFunc),
+		widgets.WithLoadECUFunc(loadFunc),
+		widgets.WithSaveECUFunc(saveFunc),
+		widgets.WithSaveFileFunc(saveFileFunc),
+		widgets.WithMeshView(mw.settings.GetMeshView()),
+		widgets.WithLambdaSymbolName(mw.settings.GetLambdaSymbolName()),
+	)
+	if err != nil {
+		mw.Log(err.Error())
+		return
+	}
+
+	w.Canvas().SetOnTypedKey(mv.TypedKey)
+
+	mw.openMaps[axis.Z] = mw.newMapViewerWindow(w, mv, axis)
+
+	w.SetCloseIntercept(func() {
+		delete(mw.openMaps, axis.Z)
+		mw.mvh.Unsubscribe(mw.settings.GetLambdaSymbolName(), mv)
+		mw.mvh.Unsubscribe(axis.XFrom, mv)
+		mw.mvh.Unsubscribe(axis.YFrom, mv)
+		w.Close()
+	})
+
+	if mw.settings.GetAutoLoad() {
+		p := widgets.NewProgressModal(mw.Window.Content(), "Loading "+axis.Z)
+		p.Show()
+		loadFunc()
+		p.Hide()
+	}
+
+	w.SetContent(mv)
+	w.Show()
+
 }

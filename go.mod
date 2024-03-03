@@ -65,7 +65,7 @@ require (
 	honnef.co/go/js/dom v0.0.0-20231112215516-51f43a291193 // indirect
 )
 
-require github.com/roffe/ecusymbol v0.0.0-20240226195317-8191b57ea5c8
+require github.com/roffe/ecusymbol v0.0.0-20240303000037-5c28465106b7
 
 require fyne.io/x/fyne v0.0.0-20240216160529-61d0ff41acd7
 
