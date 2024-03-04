@@ -128,10 +128,10 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 		}),
 		wblambda: NewCBar(&CBarConfig{
 			Title:         "",
-			Min:           0.30,
+			Min:           0.50,
 			Center:        1,
-			Max:           1.70,
-			Steps:         40,
+			Max:           1.50,
+			Steps:         20,
 			Minsize:       fyne.NewSize(100, 35),
 			DisplayString: "λ %.2f",
 		}),

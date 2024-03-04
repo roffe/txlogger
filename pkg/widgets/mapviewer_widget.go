@@ -170,7 +170,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		Title:           "",
 		Min:             0.50,
 		Center:          1,
-		Max:             1.52,
+		Max:             1.50,
 		Steps:           20,
 		Minsize:         fyne.NewSize(100, 25),
 		TextPosition:    TextAtCenter,
