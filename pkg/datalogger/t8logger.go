@@ -81,7 +81,7 @@ func NewT8(dl Logger, cfg Config, lw LogWriter) (Provider, error) {
 		Config:     cfg,
 		symbolChan: make(chan []*symbol.Symbol, 1),
 		updateChan: make(chan *RamUpdate, 1),
-		readChan:   make(chan *ReadRequest, 0),
+		readChan:   make(chan *ReadRequest),
 		quitChan:   make(chan struct{}, 2),
 		sysvars: &ThreadSafeMap{
 			values: make(map[string]string),
