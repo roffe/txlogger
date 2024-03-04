@@ -42,7 +42,7 @@ func New(c *gocan.Client /*canID uint32, recvID ...uint32*/) *Client {
 		c: c,
 		//canID:          canID,
 		//recvID:         recvID,
-		defaultTimeout: 60 * time.Millisecond,
+		defaultTimeout: 200 * time.Millisecond,
 	}
 }
 
@@ -405,7 +405,7 @@ func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 
 	time.Sleep(10 * time.Millisecond)
 
-	f2, err := t.c.SendAndPoll(ctx, gocan.NewFrame(REQ_MSG_ID, msgReply, gocan.ResponseRequired), t.defaultTimeout*2, t.responseID)
+	f2, err := t.c.SendAndPoll(ctx, gocan.NewFrame(REQ_MSG_ID, msgReply, gocan.ResponseRequired), 200*time.Millisecond, t.responseID)
 	if err != nil {
 		return false, fmt.Errorf("send seed: %v", err)
 
@@ -559,7 +559,7 @@ outer:
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		case <-time.After(t.defaultTimeout * 4):
+		case <-time.After(t.defaultTimeout):
 			return nil, fmt.Errorf("timeout")
 		case f := <-sub.C():
 			d := f.Data()
@@ -647,7 +647,7 @@ func (t *Client) ReadMemoryByAddressF0(ctx context.Context, address, length int)
 	// Jump to read adress
 	t.c.SendFrame(REQ_MSG_ID, []byte{0x41, 0xA1, 0x08, DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER, 0xF0, 0x03, 0x00, byte(length)}, gocan.Outgoing)
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x00, 0xA1, byte((address >> 16) & 0xFF), byte((address >> 8) & 0xFF), byte(address & 0xFF), 0x00, 0x00, 0x00}, gocan.ResponseRequired)
-	f, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout*3, t.responseID)
+	f, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
 	if err != nil {
 		return nil, err
 	}
