@@ -137,7 +137,7 @@ func (c *T8Client) Start() error {
 	}
 	defer cl.Close()
 
-	order := make([]string, len(c.sysvars.values))
+	var order []string
 	for k := range c.sysvars.values {
 		order = append(order, k)
 	}
@@ -214,6 +214,12 @@ func (c *T8Client) Start() error {
 		errg.Go(func() error {
 			var timeStamp time.Time
 			var chunkSize uint32
+
+			var expectedPayloadSize uint16
+			for _, sym := range c.Symbols {
+				expectedPayloadSize += sym.Length
+			}
+
 			lastPresent := time.Now()
 
 			testerPresent := func() {
@@ -228,6 +234,7 @@ func (c *T8Client) Start() error {
 				}
 			}
 			buf := bytes.NewBuffer(nil)
+			var databuff []byte
 		outer:
 			for {
 				select {
@@ -238,12 +245,16 @@ func (c *T8Client) Start() error {
 					return nil
 				case symbols := <-c.symbolChan:
 					c.Symbols = symbols
+					expectedPayloadSize = 0
+					for _, sym := range c.Symbols {
+						expectedPayloadSize += sym.Length
+					}
 					c.OnMessage("Reconfiguring symbols..")
 					if err := clearDynamicallyDefinedRegister(ctx, gm); err != nil {
 						return err
 					}
+					c.OnMessage("Cleared dynamic register")
 					if len(c.Symbols) > 0 {
-						c.OnMessage("Cleared dynamic register")
 						for _, sym := range c.Symbols {
 							if err := setUpDynamicallyDefinedRegisterBySymbol(ctx, gm, uint16(sym.Number)); err != nil {
 								return err
@@ -302,7 +313,7 @@ func (c *T8Client) Start() error {
 						testerPresent()
 						continue
 					}
-					data, err := gm.ReadDataByIdentifier(ctx, 0x18)
+					databuff, err = gm.ReadDataByIdentifier(ctx, 0x18)
 					if err != nil {
 						errCount++
 						errPerSecond++
@@ -310,30 +321,28 @@ func (c *T8Client) Start() error {
 						c.OnMessage(fmt.Sprintf("Failed to read data: %v", err))
 						continue
 					}
-					r := bytes.NewReader(data)
+					if len(databuff) != int(expectedPayloadSize) {
+						return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
+					}
+
 					for _, va := range c.Symbols {
 						buf.Reset()
 						buf.Write(va.Bytes())
-						if err := va.Read(r); err != nil {
+						if err := va.SetData(databuff[:va.Length]); err != nil {
 							errCount++
 							errPerSecond++
 							c.ErrorCounter.Set(errCount)
-							c.OnMessage(fmt.Sprintf("Failed to read %s: %v", va.Name, err))
+							c.OnMessage(fmt.Sprintf("Failed to set data: %v", err))
 							break
 						}
+						databuff = databuff[va.Length:]
 						if !bytes.Equal(va.Bytes(), buf.Bytes()) {
 							ebus.Publish(va.Name, va.Float64())
 						}
 					}
-					if r.Len() > 0 {
-						left := r.Len()
-						leftovers := make([]byte, r.Len())
-						n, err := r.Read(leftovers)
-						if err != nil {
-							c.OnMessage(fmt.Sprintf("Failed to read leftovers: %v", err))
-							continue
-						}
-						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", left, leftovers[:n]))
+
+					if len(databuff) > 0 {
+						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", len(databuff), databuff))
 					}
 
 					if c.lamb != nil {

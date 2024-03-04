@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"sort"
 	"strconv"
 	"time"
@@ -160,10 +159,18 @@ func (c *T7Client) Start() error {
 	}
 	defer cl.Close()
 
-	order := make([]string, len(c.sysvars.values))
+	for _, sym := range c.Symbols {
+		if _, found := c.sysvars.values[sym.Name]; found {
+			delete(c.sysvars.values, sym.Name)
+			continue
+		}
+	}
+
+	var order []string
 	for k := range c.sysvars.values {
 		order = append(order, k)
 	}
+
 	// sort order
 	sort.StringSlice(order).Sort()
 
@@ -178,16 +185,25 @@ func (c *T7Client) Start() error {
 
 	sub := cl.Subscribe(ctx, 0x1A0, 0x280, 0x3A0)
 	go func() {
+		var oldSpeed, speed uint16
+		var oldRpm, rpm uint16
+		var oldThrottle, throttle int
 		defer sub.Close()
 		for msg := range sub.C() {
 			switch msg.Identifier() {
 			case 0x1A0:
-				rpm := binary.BigEndian.Uint16(msg.Data()[1:3])
-				throttle := int(msg.Data()[5])
-				c.sysvars.Set("ActualIn.n_Engine", strconv.Itoa(int(rpm)))
-				c.sysvars.Set("Out.X_AccPedal", strconv.Itoa(throttle)+",0")
-				ebus.Publish("ActualIn.n_Engine", float64(rpm))
-				ebus.Publish("Out.X_AccPedal", float64(throttle))
+				rpm = binary.BigEndian.Uint16(msg.Data()[1:3])
+				if oldRpm != rpm {
+					oldRpm = rpm
+					c.sysvars.Set("ActualIn.n_Engine", strconv.Itoa(int(rpm)))
+					ebus.Publish("ActualIn.n_Engine", float64(rpm))
+				}
+				throttle = int(msg.Data()[5])
+				if oldThrottle != throttle {
+					oldThrottle = throttle
+					c.sysvars.Set("Out.X_AccPedal", strconv.Itoa(throttle)+",0")
+					ebus.Publish("Out.X_AccPedal", float64(throttle))
+				}
 			case 0x280:
 				data := msg.Data()[4]
 				if data&0x20 == 0x20 {
@@ -207,10 +223,13 @@ func (c *T7Client) Start() error {
 					ebus.Publish("LIMP", 0)
 				}
 			case 0x3A0:
-				speed := uint16(msg.Data()[4]) | uint16(msg.Data()[3])<<8
-				realSpeed := float64(speed) / 10
-				c.sysvars.Set("In.v_Vehicle", strconv.FormatFloat(realSpeed, 'f', 1, 64))
-				ebus.Publish("In.v_Vehicle", realSpeed)
+				speed = uint16(msg.Data()[4]) | uint16(msg.Data()[3])<<8
+				if oldSpeed != speed {
+					oldSpeed = speed
+					realSpeed := float64(speed) / 10
+					c.sysvars.Set("In.v_Vehicle", strconv.FormatFloat(realSpeed, 'f', 1, 64))
+					ebus.Publish("In.v_Vehicle", realSpeed)
+				}
 			}
 		}
 	}()
@@ -294,7 +313,15 @@ func (c *T7Client) Start() error {
 		})
 		errg.Go(func() error {
 			var timeStamp time.Time
+
+			var expectedPayloadSize uint16
+			for _, sym := range c.Symbols {
+				expectedPayloadSize += sym.Length
+			}
+
 			buf := bytes.NewBuffer(nil)
+			var databuff []byte
+
 			for {
 				select {
 				case <-c.quitChan:
@@ -329,7 +356,6 @@ func (c *T7Client) Start() error {
 					upd.Complete(kwp.WriteDataByAddress(ctx, upd.Address, upd.Data))
 				case <-t.C:
 					timeStamp = time.Now()
-
 					if len(c.Symbols) == 0 {
 						if err := kwp.TesterPresent(ctx); err != nil {
 							errCount++
@@ -340,7 +366,7 @@ func (c *T7Client) Start() error {
 						continue
 					}
 
-					data, err := kwp.ReadDataByIdentifier(ctx, 0xF0)
+					databuff, err = kwp.ReadDataByIdentifier(ctx, 0xF0)
 					if err != nil {
 						errCount++
 						errPerSecond++
@@ -348,33 +374,30 @@ func (c *T7Client) Start() error {
 						c.OnMessage(err.Error())
 						continue
 					}
-					r := bytes.NewReader(data)
+
+					if len(databuff) != int(expectedPayloadSize) {
+						return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
+					}
+
 					for _, va := range c.Symbols {
 						buf.Reset()
 						buf.Write(va.Bytes())
-						if err := va.Read(r); err != nil {
+						if err := va.SetData(databuff[:va.Length]); err != nil {
 							errCount++
 							errPerSecond++
 							c.ErrorCounter.Set(errCount)
-							if err == io.EOF {
-								return fmt.Errorf("EOF reading symbol %s", va.Name)
-							}
-							c.OnMessage(err.Error())
+							c.OnMessage(fmt.Sprintf("Failed to set data: %v", err))
 							break
 						}
-						// Set value on dashboards
+
+						databuff = databuff[va.Length:]
+
 						if !bytes.Equal(va.Bytes(), buf.Bytes()) {
 							ebus.Publish(va.Name, va.Float64())
 						}
 					}
-					if r.Len() > 0 {
-						left := r.Len()
-						leftovers := make([]byte, r.Len())
-						n, err := r.Read(leftovers)
-						if err != nil {
-							c.OnMessage(fmt.Sprintf("Failed to read leftovers: %v", err))
-						}
-						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", left, leftovers[:n]))
+					if len(databuff) > 0 {
+						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", len(databuff), databuff))
 					}
 
 					if c.lamb != nil {
