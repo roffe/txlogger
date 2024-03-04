@@ -6,34 +6,17 @@ import (
 	"os"
 	"strings"
 
-	//	_ "net/http/pprof"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/theme"
 	"github.com/roffe/txlogger/pkg/windows"
-
-	"net/http"
-	_ "net/http/pprof"
-
-	"github.com/pkg/profile"
 )
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
-	//go func() {
-	//	if err := http.ListenAndServe(":8080", nil); err != nil {
-	//		log.Println(err)
-	//	}
-	//}()
 }
 
 func main() {
-	defer profile.Start(profile.MemProfile).Stop()
-
-	go func() {
-		http.ListenAndServe(":8080", nil)
-	}()
 	mainz(os.Args)
 }
 
