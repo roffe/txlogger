@@ -66,8 +66,16 @@ require (
 
 require github.com/roffe/ecusymbol v0.0.0-20240303000037-5c28465106b7
 
-require fyne.io/x/fyne v0.0.0-20240216160529-61d0ff41acd7
+require (
+	fyne.io/x/fyne v0.0.0-20240216160529-61d0ff41acd7
+	github.com/pkg/profile v1.7.0
+)
+
+require (
+	github.com/felixge/fgprof v0.9.3 // indirect
+	github.com/google/pprof v0.0.0-20211214055906-6f57359322fd // indirect
+)
 
 // replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
 
-// replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
+replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol

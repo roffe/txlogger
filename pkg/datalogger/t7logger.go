@@ -294,6 +294,7 @@ func (c *T7Client) Start() error {
 		})
 		errg.Go(func() error {
 			var timeStamp time.Time
+			buf := bytes.NewBuffer(nil)
 			for {
 				select {
 				case <-c.quitChan:
@@ -349,6 +350,8 @@ func (c *T7Client) Start() error {
 					}
 					r := bytes.NewReader(data)
 					for _, va := range c.Symbols {
+						buf.Reset()
+						buf.Write(va.Bytes())
 						if err := va.Read(r); err != nil {
 							errCount++
 							errPerSecond++
@@ -360,7 +363,9 @@ func (c *T7Client) Start() error {
 							break
 						}
 						// Set value on dashboards
-						ebus.Publish(va.Name, va.Float64())
+						if !bytes.Equal(va.Bytes(), buf.Bytes()) {
+							ebus.Publish(va.Name, va.Float64())
+						}
 					}
 					if r.Len() > 0 {
 						left := r.Len()

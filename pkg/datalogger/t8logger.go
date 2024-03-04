@@ -81,7 +81,7 @@ func NewT8(dl Logger, cfg Config, lw LogWriter) (Provider, error) {
 		Config:     cfg,
 		symbolChan: make(chan []*symbol.Symbol, 1),
 		updateChan: make(chan *RamUpdate, 1),
-		readChan:   make(chan *ReadRequest, 1),
+		readChan:   make(chan *ReadRequest, 0),
 		quitChan:   make(chan struct{}, 2),
 		sysvars: &ThreadSafeMap{
 			values: make(map[string]string),
@@ -227,7 +227,7 @@ func (c *T8Client) Start() error {
 					lastPresent = time.Now()
 				}
 			}
-
+			buf := bytes.NewBuffer(nil)
 		outer:
 			for {
 				select {
@@ -271,7 +271,7 @@ func (c *T8Client) Start() error {
 					}
 					if read.left > 0 {
 						go func() {
-							time.Sleep(4 * time.Millisecond)
+							//time.Sleep(2 * time.Millisecond)
 							c.readChan <- read
 						}()
 					} else {
@@ -312,6 +312,8 @@ func (c *T8Client) Start() error {
 					}
 					r := bytes.NewReader(data)
 					for _, va := range c.Symbols {
+						buf.Reset()
+						buf.Write(va.Bytes())
 						if err := va.Read(r); err != nil {
 							errCount++
 							errPerSecond++
@@ -319,7 +321,9 @@ func (c *T8Client) Start() error {
 							c.OnMessage(fmt.Sprintf("Failed to read %s: %v", va.Name, err))
 							break
 						}
-						ebus.Publish(va.Name, va.Float64())
+						if !bytes.Equal(va.Bytes(), buf.Bytes()) {
+							ebus.Publish(va.Name, va.Float64())
+						}
 					}
 					if r.Len() > 0 {
 						left := r.Len()

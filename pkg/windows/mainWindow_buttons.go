@@ -158,6 +158,10 @@ func (mw *MainWindow) createButtons() {
 
 		unsubDB = ebus.SubscribeAllFunc(mw.dashboard.SetValue)
 
+		for _, s := range mw.symbolList.Symbols() {
+			mw.dashboard.SetValue(s.Name, s.Float64())
+		}
+
 		mw.SetCloseIntercept(func() {
 			onClose()
 		})

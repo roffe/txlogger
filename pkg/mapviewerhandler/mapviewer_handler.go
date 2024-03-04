@@ -27,8 +27,8 @@ func NewWindow(w fyne.Window, mv MapViewerWindowWidget) *MapViewerWindow {
 }
 
 type MapViewerEvent struct {
-	SymbolName string
-	Value      float64
+	SymbolName *string
+	Value      *float64
 }
 
 type MapViewerSubscriber struct {
@@ -42,7 +42,7 @@ type MapViewerHandler struct {
 	subChan   chan MapViewerSubscriber
 	unsubChan chan MapViewerSubscriber
 
-	incoming chan MapViewerEvent
+	incoming chan *MapViewerEvent
 
 	quit chan struct{}
 
@@ -55,7 +55,7 @@ func New() *MapViewerHandler {
 		subChan:     make(chan MapViewerSubscriber, 10),
 		unsubChan:   make(chan MapViewerSubscriber, 10),
 		subs:        make(map[string][]MapViewerWindowWidget),
-		incoming:    make(chan MapViewerEvent, 100),
+		incoming:    make(chan *MapViewerEvent, 100),
 		quit:        make(chan struct{}),
 		aggregators: make([]*MapAggregator, 0),
 	}
@@ -86,7 +86,7 @@ func (mvh *MapViewerHandler) SetValue(symbolName string, value float64) {
 		return
 	}
 	select {
-	case mvh.incoming <- MapViewerEvent{SymbolName: symbolName, Value: value}:
+	case mvh.incoming <- &MapViewerEvent{SymbolName: &symbolName, Value: &value}:
 		return
 	default:
 		log.Println("dropped update")
@@ -112,11 +112,11 @@ func (mvh *MapViewerHandler) run() {
 				}
 			}
 		case event := <-mvh.incoming:
-			for _, mv := range mvh.subs[event.SymbolName] {
-				mv.SetValue(event.SymbolName, event.Value)
+			for _, mv := range mvh.subs[*event.SymbolName] {
+				mv.SetValue(*event.SymbolName, *event.Value)
 			}
 			for _, agg := range mvh.aggregators {
-				agg.Func(mvh, event.SymbolName, event.Value)
+				agg.Func(mvh, *event.SymbolName, *event.Value)
 			}
 		}
 	}

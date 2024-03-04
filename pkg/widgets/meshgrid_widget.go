@@ -65,8 +65,8 @@ func NewMeshgrid(values []float64, cols, rows int) (*Meshgrid, error) {
 		cols: cols,
 
 		// Set up the cell size based on the space available and desired spacing
-		cellWidth:  30,
-		cellHeight: 30,
+		cellWidth:  32,
+		cellHeight: 32,
 		depth:      400,
 
 		cx: 0, // Center of the meshgrid X
@@ -322,29 +322,52 @@ func (m *Meshgrid) generateImage() image.Image {
 	return img
 }
 
-const (
-	dimmfactor = .35
-)
-
-func dimmedColor(col color.RGBA) color.RGBA {
-	return color.RGBA{
-		R: uint8(float64(col.R) * dimmfactor),
-		G: uint8(float64(col.G) * dimmfactor),
-		B: uint8(float64(col.B) * dimmfactor),
-		A: 127, // Use a fully opaque alpha
-	}
-}
-
-func dimmedColor2(col color.RGBA) color.RGBA {
-	return color.RGBA{
-		R: uint8(float64(col.R) * .10),
-		G: uint8(float64(col.G) * .10),
-		B: uint8(float64(col.B) * .10),
-		A: 127, // Use a fully opaque alpha
-	}
-}
-
 func (m *Meshgrid) drawMeshgridLines(img *image.RGBA) {
+	for i := m.rows - 1; i >= 0; i-- {
+		for j := m.cols - 1; j >= 0; j-- {
+			vertice := m.vertices[i][j]
+			value := m.values[i*m.cols+j]
+			x1, y1 := m.project(vertice)
+			lineColor := m.getColorInterpolation(value)
+
+			// Enhance line color based on value (assuming higher values are closer or more significant)
+			enhancedLineColor := enhanceLineColor(lineColor, value)
+
+			// Neighboring vertices to connect
+			//			neighbors := []struct{ di, dj int }{{1, 0}, {0, 1}, {1, 1}, {1, -1}}
+			neighbors := []struct{ di, dj int }{{1, 0}, {0, 1}, {1, -1}}
+			for _, n := range neighbors {
+				ni, nj := i+n.di, j+n.dj
+				if ni < m.rows && nj >= 0 && nj < m.cols {
+					neighborVertice := m.vertices[ni][nj]
+					neighborValue := m.values[ni*m.cols+nj]
+					x2, y2 := m.project(neighborVertice)
+					neighborColor := m.getColorInterpolation(neighborValue)
+					enhancedNeighborColor := enhanceLineColor(neighborColor, neighborValue)
+					// Draw line with interpolated color between current and neighbor
+					m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, enhancedLineColor, enhancedNeighborColor)
+				}
+			}
+		}
+	}
+}
+
+func enhanceLineColor(baseColor color.RGBA, value float64) color.RGBA {
+	// Adjust the base color based on value to simulate depth; higher values are "closer"
+	// This is a simple approach where we map the value to a brightness factor
+	factor := 0.5 + (value / 2.0) // Assuming value is normalized between 0 and 1
+	if factor > 1 {
+		factor = 1
+	}
+	return color.RGBA{
+		R: uint8(float64(baseColor.R) * factor),
+		G: uint8(float64(baseColor.G) * factor),
+		B: uint8(float64(baseColor.B) * factor),
+		A: baseColor.A,
+	}
+}
+
+func (m *Meshgrid) drawMeshgridLines2(img *image.RGBA) {
 	ti := 0
 	for i := m.rows - 1; i >= 0; i-- {
 		for j := m.cols - 1; j >= 0; j-- {
@@ -400,7 +423,7 @@ func (m *Meshgrid) drawMeshgridLines(img *image.RGBA) {
 				if value > valueDown {
 					m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, dimmedColor(endColor))
 				} else if value == valueDown {
-					m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 1, 0, lineColor, endColor)
+					m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 2, 0, lineColor, endColor)
 				} else {
 					m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, dimmedLineColor, endColor)
 				}
@@ -430,6 +453,28 @@ func (m *Meshgrid) drawMeshgridLines(img *image.RGBA) {
 			}
 			//drawCircle(img, image.Point{X: x1, Y: y1}, 3, lineColor)
 		}
+	}
+}
+
+const (
+	dimmfactor = .35
+)
+
+func dimmedColor(col color.RGBA) color.RGBA {
+	return color.RGBA{
+		R: uint8(float64(col.R) * dimmfactor),
+		G: uint8(float64(col.G) * dimmfactor),
+		B: uint8(float64(col.B) * dimmfactor),
+		A: 127, // Use a fully opaque alpha
+	}
+}
+
+func dimmedColor2(col color.RGBA) color.RGBA {
+	return color.RGBA{
+		R: uint8(float64(col.R) * .10),
+		G: uint8(float64(col.G) * .10),
+		B: uint8(float64(col.B) * .10),
+		A: 127, // Use a fully opaque alpha
 	}
 }
 

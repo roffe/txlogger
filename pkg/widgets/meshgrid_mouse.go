@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	rotationSensitivity = .5 // Adjust as necessary
+	rotationSensitivity = .4 // Adjust as necessary
 )
 
 func (m *Meshgrid) MouseIn(_ *desktop.MouseEvent) {
@@ -15,8 +15,76 @@ func (m *Meshgrid) MouseIn(_ *desktop.MouseEvent) {
 func (m *Meshgrid) MouseOut() {
 }
 
-// MouseMoved is called when the mouse is moved over the map viewer.
 func (m *Meshgrid) MouseMoved(event *desktop.MouseEvent) {
+	dx := float64(event.Position.X - m.lastMouseX) // Change in X position
+	dy := float64(event.Position.Y - m.lastMouseY) // Change in Y position
+
+	if m.isDragging {
+		if event.Button&desktop.MouseButtonPrimary == desktop.MouseButtonPrimary {
+			// Adjust rotation direction based on current orientation
+			rotationFactorX := 1.0
+			rotationFactorY := 1.0
+			if m.ay > 90 && m.ay <= 270 {
+				rotationFactorX = -1.0
+				rotationFactorY = -1.0
+			}
+			m.ax += -dy * rotationSensitivity * rotationFactorX // Rotate around X-axis
+			m.ay += dx * rotationSensitivity * rotationFactorY  // Rotate around Y-axis
+		}
+		if event.Button&desktop.MouseButtonSecondary == desktop.MouseButtonSecondary {
+			m.az += dx * rotationSensitivity // Rotate around Z-axis
+		}
+		if event.Button&desktop.MouseButtonTertiary == desktop.MouseButtonTertiary {
+			m.px += -dx // Move along X-axis
+			m.py += -dy // Move along Y-axis
+		}
+
+		// Clamping angles to prevent flipping
+		// Note: Consider removing these clamps or adjusting them based on your requirements
+
+		m.Refresh()
+	}
+	// Update the last mouse position
+	m.lastMouseX = event.Position.X
+	m.lastMouseY = event.Position.Y
+}
+
+func (m *Meshgrid) MouseMovedxx(event *desktop.MouseEvent) {
+	dx := float64(event.Position.X - m.lastMouseX) // Change in X position
+	dy := float64(event.Position.Y - m.lastMouseY) // Change in Y position
+
+	if m.isDragging {
+		if event.Button&desktop.MouseButtonPrimary == desktop.MouseButtonPrimary {
+			// Adjust rotation direction based on current orientation
+			rotationFactorX := 1.0
+			rotationFactorY := 1.0
+			if m.ay > 90 && m.ay <= 270 {
+				rotationFactorX = -1.0
+				rotationFactorY = -1.0
+			}
+			m.ax += -dy * rotationSensitivity * rotationFactorX // Rotate around X-axis
+			m.ay += dx * rotationSensitivity * rotationFactorY  // Rotate around Y-axis
+		}
+		if event.Button&desktop.MouseButtonSecondary == desktop.MouseButtonSecondary {
+			m.az += dx * rotationSensitivity // Rotate around Z-axis
+		}
+		if event.Button&desktop.MouseButtonTertiary == desktop.MouseButtonTertiary {
+			m.px += -dx // Move along X-axis
+			m.py += -dy // Move along Y-axis
+		}
+
+		// Clamping angles to prevent flipping
+		// Note: Consider removing these clamps or adjusting them based on your requirements
+
+		m.Refresh()
+	}
+	// Update the last mouse position
+	m.lastMouseX = event.Position.X
+	m.lastMouseY = event.Position.Y
+}
+
+// MouseMoved is called when the mouse is moved over the map viewer.
+func (m *Meshgrid) MouseMoved2(event *desktop.MouseEvent) {
 	dx := float64(event.Position.X - m.lastMouseX) // Change in X position
 	dy := float64(event.Position.Y - m.lastMouseY) // Change in Y position
 

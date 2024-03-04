@@ -12,6 +12,11 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/theme"
 	"github.com/roffe/txlogger/pkg/windows"
+
+	"net/http"
+	_ "net/http/pprof"
+
+	"github.com/pkg/profile"
 )
 
 func init() {
@@ -24,6 +29,11 @@ func init() {
 }
 
 func main() {
+	defer profile.Start(profile.MemProfile).Stop()
+
+	go func() {
+		http.ListenAndServe(":8080", nil)
+	}()
 	mainz(os.Args)
 }
 
