@@ -8,6 +8,7 @@ import (
 )
 
 var T7SymbolsTuningOrder = []string{
+	"Diagnostics",
 	"Calibration",
 	"Injectors",
 	"Limiters",
@@ -19,6 +20,12 @@ var T7SymbolsTuningOrder = []string{
 }
 
 var T7SymbolsTuning = map[string][]string{
+	"Diagnostics": {
+		"KnkDetAdap.KnkCntMap",
+		"F_KnkDetAdap.FKnkCntMap",
+		"F_KnkDetAdap.RKnkCntMap",
+		"MissfAdap.MissfCntMap",
+	},
 	"Calibration": {
 		"AirCompCal.PressMap",
 		"MAFCal.m_RedundantAirMap",

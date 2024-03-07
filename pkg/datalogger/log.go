@@ -39,7 +39,7 @@ func createLog(path, extension string) (*os.File, string, error) {
 			}
 		}
 	}
-	filename := fmt.Sprintf("log-%s.%s", time.Now().Format("2006-01-02_1504"), extension)
+	filename := fmt.Sprintf("log-%s.%s", time.Now().Format("2006-01-02_150405"), extension)
 	file, err := os.OpenFile(fullPath(path, filename), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to open file: %w", err)
@@ -70,9 +70,12 @@ func (c *CSVWriter) Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time
 	var record []string
 	record = append(record, ts.Format(ISONICO))
 	for _, k := range sysvarOrder {
-		record = append(record, sysvars.values[k])
+		record = append(record, sysvars.Get(k))
 	}
 	for _, va := range vars {
+		if va.Skip {
+			continue
+		}
 		record = append(record, va.StringValue())
 	}
 
@@ -84,6 +87,9 @@ func (c *CSVWriter) writeHeader(vars []*symbol.Symbol, sysvarOrder []string) err
 	header = append(header, "Time")
 	header = append(header, sysvarOrder...)
 	for _, va := range vars {
+		if va.Skip {
+			continue
+		}
 		header = append(header, va.Name)
 	}
 	c.headerWritten = true
@@ -107,12 +113,13 @@ func (t *TXWriter) Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time.
 	if err != nil {
 		return err
 	}
-	sysvars.Lock()
 	for _, k := range sysvarOrder {
-		t.file.Write([]byte(k + "=" + replaceDot(sysvars.values[k]) + "|"))
+		t.file.Write([]byte(k + "=" + replaceDot(sysvars.Get(k)) + "|"))
 	}
-	sysvars.Unlock()
 	for _, va := range vars {
+		if va.Skip {
+			continue
+		}
 		t.file.Write([]byte(va.Name + "=" + replaceDot(va.StringValue()) + "|"))
 	}
 	_, err = t.file.Write([]byte("IMPORTANTLINE=0|\n"))

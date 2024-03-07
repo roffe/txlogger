@@ -92,6 +92,9 @@ type MainWindow struct {
 	settings *widgets.SettingsWidget
 
 	openMaps map[string]mapviewerhandler.MapViewerWindowInterface
+
+	tab *container.AppTabs
+	//doctab *container.DocTabs
 }
 
 func NewMainWindow(a fyne.App, filename string) *MainWindow {
@@ -146,9 +149,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 	signal.Notify(quitChan, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-quitChan
-		if mw.dlc != nil {
-			mw.dlc.Close()
-		}
+		mw.closeIntercept()
 		mw.app.Quit()
 	}()
 
@@ -222,16 +223,18 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 	return mw
 }
 func (mw *MainWindow) closeIntercept() {
+	if mw.dlc != nil {
+		mw.dlc.Close()
+		time.Sleep(500 * time.Millisecond)
+	}
 	mw.mvh.Close()
 	mw.SaveSymbolList()
 	debug.Close()
-	if mw.dlc != nil {
-		mw.dlc.Close()
-	}
 	mw.Close()
 }
 
 func (mw *MainWindow) createLeading() *fyne.Container {
+	//mw.doctab = container.NewDocTabs()
 	return container.NewBorder(
 		container.NewVBox(
 			container.NewBorder(
@@ -261,8 +264,8 @@ func (mw *MainWindow) createLeading() *fyne.Container {
 
 func (mw *MainWindow) render() fyne.CanvasObject {
 	mw.leading = mw.createLeading()
-	tab := container.NewAppTabs()
-	tab.Append(container.NewTabItem("Realtime", &container.Split{
+	mw.tab = container.NewAppTabs()
+	mw.tab.Append(container.NewTabItem("Realtime", &container.Split{
 		Offset:     0.7,
 		Horizontal: true,
 		Leading:    mw.leading,
@@ -307,8 +310,8 @@ func (mw *MainWindow) render() fyne.CanvasObject {
 	}))
 
 	//tab.Append(container.NewTabItem("Maps", widget.NewLabel("Maps")))
-	tab.Append(container.NewTabItem("Settings", mw.settings))
-	return tab
+	mw.tab.Append(container.NewTabItem("Settings", mw.settings))
+	return mw.tab
 }
 
 func (mw *MainWindow) Log(s string) {

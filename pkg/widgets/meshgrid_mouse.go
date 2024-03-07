@@ -42,6 +42,20 @@ func (m *Meshgrid) MouseMoved(event *desktop.MouseEvent) {
 		// Clamping angles to prevent flipping
 		// Note: Consider removing these clamps or adjusting them based on your requirements
 
+		if m.ax > 90 {
+			m.ax = 90
+		}
+		if m.ax < -90 {
+			m.ax = -90
+		}
+
+		if m.ay > 70 {
+			m.ay = 70
+		}
+		if m.ay < -70 {
+			m.ay = -70
+		}
+
 		m.Refresh()
 	}
 	// Update the last mouse position

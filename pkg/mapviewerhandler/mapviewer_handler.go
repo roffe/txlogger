@@ -100,6 +100,7 @@ func (mvh *MapViewerHandler) run() {
 		case <-mvh.quit:
 			return
 		case sub := <-mvh.subChan:
+			log.Println("sub", sub.SymbolName)
 			mvh.subs[sub.SymbolName] = append(mvh.subs[sub.SymbolName], sub.Widget)
 		case unsub := <-mvh.unsubChan:
 			for i, m := range mvh.subs[unsub.SymbolName] {

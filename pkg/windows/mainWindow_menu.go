@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/dialog"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/mainmenu"
@@ -99,33 +98,15 @@ func (mw *MainWindow) openMapz(typ symbol.ECUType, mapNames ...string) {
 	mv.RequestFocus()
 }
 
-func (mw *MainWindow) newMapViewerWindow(w fyne.Window, mv mapviewerhandler.MapViewerWindowWidget, axis symbol.Axis) mapviewerhandler.MapViewerWindowInterface {
-	mww := mapviewerhandler.NewWindow(w, mv)
-
-	mw.openMaps[axis.Z] = mww
-	if axis.XFrom == "" {
-		axis.XFrom = "MAF.m_AirInlet"
-	}
-	if axis.YFrom == "" {
-		axis.YFrom = "ActualIn.n_Engine"
-	}
-
-	mw.mvh.Subscribe(mw.settings.GetLambdaSymbolName(), mv)
-	mw.mvh.Subscribe(axis.XFrom, mv)
-	mw.mvh.Subscribe(axis.YFrom, mv)
-	return mww
-}
-
 func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	axis := symbol.GetInfo(typ, mapName)
+
 	mww, found := mw.openMaps[axis.Z]
 	if found {
 		mww.RequestFocus()
 		return
 	}
 
-	//w := fyne.CurrentApp().Driver().CreateWindow("Map Viewer - " + axis.Z)
-	w := mw.app.NewWindow(axis.Z + " - Map Viewer")
 	//w.SetFixedSize(true)
 	if mw.fw == nil {
 		mw.Log("No binary loaded")
@@ -183,7 +164,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 			data, err := mw.dlc.GetRAM(addr, uint32(symZ.Length))
 			if err != nil {
-				dialog.ShowError(err, w)
+				mw.Log(err.Error())
 				return
 			}
 			ints := symZ.BytesToInts(data)
@@ -268,6 +249,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		return
 	}
 
+	w := mw.app.NewWindow(axis.Z + " - Map Viewer")
 	w.Canvas().SetOnTypedKey(mv.TypedKey)
 
 	mw.openMaps[axis.Z] = mw.newMapViewerWindow(w, mv, axis)
@@ -275,8 +257,12 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	w.SetCloseIntercept(func() {
 		delete(mw.openMaps, axis.Z)
 		mw.mvh.Unsubscribe(mw.settings.GetLambdaSymbolName(), mv)
-		mw.mvh.Unsubscribe(axis.XFrom, mv)
-		mw.mvh.Unsubscribe(axis.YFrom, mv)
+		if axis.XFrom != "" {
+			mw.mvh.Unsubscribe(axis.XFrom, mv)
+		}
+		if axis.YFrom == "" {
+			mw.mvh.Unsubscribe(axis.YFrom, mv)
+		}
 		w.Close()
 	})
 
@@ -287,7 +273,22 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		p.Hide()
 	}
 
+	// mw.tab.Append(container.NewTabItem(axis.Z, mv))
+
 	w.SetContent(mv)
 	w.Show()
+}
 
+func (mw *MainWindow) newMapViewerWindow(w fyne.Window, mv mapviewerhandler.MapViewerWindowWidget, axis symbol.Axis) mapviewerhandler.MapViewerWindowInterface {
+	mww := mapviewerhandler.NewWindow(w, mv)
+	mw.openMaps[axis.Z] = mww
+	if axis.XFrom != "" {
+		mw.mvh.Subscribe(axis.XFrom, mv)
+	}
+	if axis.YFrom != "" {
+		mw.mvh.Subscribe(axis.YFrom, mv)
+	}
+	mw.mvh.Subscribe(mw.settings.GetLambdaSymbolName(), mv)
+
+	return mww
 }

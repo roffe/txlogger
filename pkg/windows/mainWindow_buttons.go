@@ -3,6 +3,7 @@ package windows
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
@@ -184,6 +185,13 @@ func (mw *MainWindow) createButtons() {
 	})
 
 	mw.logBtn = widget.NewButtonWithIcon("Start logging", theme.MediaPlayIcon(), func() {
+		if mw.loggingRunning {
+			if mw.dlc != nil {
+				mw.dlc.Close()
+				time.Sleep(200 * time.Millisecond)
+			}
+			return
+		}
 		for _, v := range mw.symbolList.Symbols() {
 			if v.Name == "AirMassMast.m_Request" && mw.ecuSelect.Selected == "T7" {
 				dialog.ShowError(fmt.Errorf("AirMassMast.m_Request is not supported on T7, Did you forget to change preset?"), mw)
@@ -193,12 +201,7 @@ func (mw *MainWindow) createButtons() {
 				dialog.ShowError(fmt.Errorf("m_Request is not supported on T8, Did you forget to change preset?"), mw)
 				return
 			}
-		}
-		if mw.loggingRunning {
-			if mw.dlc != nil {
-				mw.dlc.Close()
-			}
-			return
+			v.Skip = false
 		}
 		mw.startLogging()
 		mw.symbolList.UpdateBars(mw.settings.GetRealtimeBars())

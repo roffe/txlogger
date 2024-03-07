@@ -4,6 +4,9 @@ import (
 	"errors"
 	"log"
 	"sync"
+	"time"
+
+	"github.com/jellydator/ttlcache/v3"
 )
 
 type EBusMessage struct {
@@ -22,10 +25,14 @@ var (
 	inChan       = make(chan *EBusMessage, 100)
 	unsubChan    = make(chan chan float64, 100)
 	unsubAllChan = make(chan chan *EBusMessage, 100)
+	cache        *ttlcache.Cache[string, float64]
 )
 
 func init() {
 	initOnce.Do(func() {
+		cache = ttlcache.New[string, float64](
+			ttlcache.WithTTL[string, float64](1 * time.Minute),
+		)
 		go run()
 	})
 }
@@ -34,6 +41,12 @@ func run() {
 	for {
 		select {
 		case msg := <-inChan:
+			if v := cache.Get(*msg.Topic); v != nil {
+				if v.Value() == *msg.Data {
+					continue
+				}
+			}
+			cache.Set(*msg.Topic, *msg.Data, ttlcache.DefaultTTL)
 			for _, sub := range subsAll {
 				select {
 				case sub <- msg:
@@ -95,6 +108,13 @@ func SubscribeAll() chan *EBusMessage {
 	subsAllMutex.Lock()
 	subsAll = append(subsAll, respChan)
 	subsAllMutex.Unlock()
+
+	cache.Range(func(item *ttlcache.Item[string, float64]) bool {
+		k := item.Key()
+		v := item.Value()
+		respChan <- &EBusMessage{Topic: &k, Data: &v}
+		return true
+	})
 	return respChan
 }
 
@@ -134,6 +154,9 @@ func Subscribe(topic string) chan float64 {
 	subsMutex.Lock()
 	subs[topic] = append(subs[topic], respChan)
 	subsMutex.Unlock()
+	if itm := cache.Get(topic); itm != nil {
+		respChan <- itm.Value()
+	}
 	return respChan
 }
 

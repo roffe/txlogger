@@ -83,10 +83,8 @@ func NewT8(dl Logger, cfg Config, lw LogWriter) (Provider, error) {
 		updateChan: make(chan *RamUpdate, 1),
 		readChan:   make(chan *ReadRequest),
 		quitChan:   make(chan struct{}, 2),
-		sysvars: &ThreadSafeMap{
-			values: make(map[string]string),
-		},
-		lw: lw,
+		sysvars:    NewThreadSafeMap(),
+		lw:         lw,
 	}, nil
 }
 
@@ -137,10 +135,8 @@ func (c *T8Client) Start() error {
 	}
 	defer cl.Close()
 
-	var order []string
-	for k := range c.sysvars.values {
-		order = append(order, k)
-	}
+	order := c.sysvars.Keys()
+
 	// sort order
 	sort.StringSlice(order).Sort()
 
@@ -234,7 +230,7 @@ func (c *T8Client) Start() error {
 				}
 			}
 			buf := bytes.NewBuffer(nil)
-			var databuff []byte
+
 		outer:
 			for {
 				select {
@@ -313,7 +309,7 @@ func (c *T8Client) Start() error {
 						testerPresent()
 						continue
 					}
-					databuff, err = gm.ReadDataByIdentifier(ctx, 0x18)
+					databuff, err := gm.ReadDataByIdentifier(ctx, 0x18)
 					if err != nil {
 						errCount++
 						errPerSecond++
@@ -324,25 +320,25 @@ func (c *T8Client) Start() error {
 					if len(databuff) != int(expectedPayloadSize) {
 						return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
 					}
+					r := bytes.NewReader(databuff)
 
 					for _, va := range c.Symbols {
 						buf.Reset()
 						buf.Write(va.Bytes())
-						if err := va.SetData(databuff[:va.Length]); err != nil {
+						if err := va.Read(r); err != nil {
 							errCount++
 							errPerSecond++
 							c.ErrorCounter.Set(errCount)
 							c.OnMessage(fmt.Sprintf("Failed to set data: %v", err))
 							break
 						}
-						databuff = databuff[va.Length:]
 						if !bytes.Equal(va.Bytes(), buf.Bytes()) {
 							ebus.Publish(va.Name, va.Float64())
 						}
 					}
 
-					if len(databuff) > 0 {
-						c.OnMessage(fmt.Sprintf("Leftovers %d: %X", len(databuff), databuff))
+					if r.Len() > 0 {
+						c.OnMessage(fmt.Sprintf("%d leftover bytes!", r.Len()))
 					}
 
 					if c.lamb != nil {

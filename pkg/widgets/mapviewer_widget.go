@@ -41,12 +41,12 @@ type MapViewer struct {
 	loadECUFunc   LoadFunc
 	saveECUFunc   SaveFunc
 
-	tik uint8
-
 	symbol *symbol.Symbol
 
-	xData, yData, zData          []int
-	xValue, yValue               int
+	xData, yData, zData []int
+
+	xValue, yValue int
+
 	xCorrFac, yCorrFac, zCorrFac float64
 	xFrom, yFrom                 string
 	numColumns, numRows, numData int
@@ -274,6 +274,7 @@ func (mv *MapViewer) Info() MapViewerInfo {
 }
 
 func (mv *MapViewer) SetValue(name string, value float64) {
+	//	log.Println("MapViewer: SetValue", name, value)
 	defer func() {
 		if r := recover(); r != nil {
 			log.Println(r)
@@ -284,31 +285,26 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 		mv.lamb.SetValue(value)
 		return
 	}
-
+	var hit bool
 	//log.Printf("MapViewer: SetValue: %s: %f", name, value)
-	if name == mv.xFrom || (mv.xFrom == "" && name == "MAF.m_AirInlet") {
+	if name == mv.xFrom {
 		mv.xValue = int(value)
-		mv.tik++
+		hit = true
 	}
-	if name == mv.yFrom || (mv.yFrom == "" && name == "ActualIn.n_Engine") {
+	if name == mv.yFrom {
 		if name == "ActualIn.p_AirInlet" {
 			mv.yValue = int(value * 1000)
-			mv.tik++
-			return
+		} else {
+			mv.yValue = int(value)
 		}
-		mv.yValue = int(value)
-		mv.tik++
+		hit = true
 	}
-	if mv.tik >= 2 {
-		update := xyUpdate{mv.xValue, mv.yValue}
-		//log.Printf("MapViewer: SetValue: x: %d, y: %d", mv.xValue, mv.yValue)
+	if hit {
 		select {
-		case mv.setChan <- update:
+		case mv.setChan <- xyUpdate{mv.xValue, mv.yValue}:
 		default:
 			log.Println("MapViewer: setChan full")
-
 		}
-		mv.tik = 0
 	}
 }
 
