@@ -70,31 +70,6 @@ func (s *VBar) Size() fyne.Size {
 	return s.canvas.Size()
 }
 
-func (s *VBar) Resize(space fyne.Size) {
-	s.canvas.Resize(space)
-	diameter := space.Width
-	middle := diameter / 2
-	heightFactor := float32(space.Height) / float32(s.cfg.Steps)
-
-	s.face.Resize(space)
-
-	s.titleText.Move(fyne.NewPos(middle-s.titleText.Size().Width/2, space.Height+2))
-	s.displayText.Move(fyne.NewPos(space.Width/2-s.displayText.Size().Width/2, space.Height-(float32(s.value)*heightFactor)-12.5))
-
-	s.bar.Move(fyne.NewPos(0, space.Height-float32(s.value)))
-
-	for i, line := range s.bars {
-		if i%2 == 0 {
-			line.Position1 = fyne.NewPos(middle-diameter/3, float32(i)*heightFactor)
-			line.Position2 = fyne.NewPos(middle+diameter/3, float32(i)*heightFactor)
-			continue
-		}
-		line.Position1 = fyne.NewPos(middle-diameter/7, float32(i)*heightFactor)
-		line.Position2 = fyne.NewPos(middle+diameter/7, float32(i)*heightFactor)
-	}
-	s.SetValue(s.value)
-}
-
 func (s *VBar) SetValue(value float64) {
 	// if value == s.value {
 	// return
@@ -142,8 +117,36 @@ type vbarRenderer struct {
 func (vr *vbarRenderer) Destroy() {
 }
 
-func (vr *vbarRenderer) Layout(size fyne.Size) {
-	vr.vbar.canvas.Resize(size)
+func (vr *vbarRenderer) Layout(space fyne.Size) {
+	vr.vbar.canvas.Resize(space)
+	middle := space.Width / 2
+	heightFactor := float32(space.Height) / float32(vr.vbar.cfg.Steps)
+
+	vr.vbar.face.Resize(space)
+
+	// Calculate positions once to avoid redundant calculations
+	titleX := middle - vr.vbar.titleText.Size().Width/2
+	displayTextX := middle - vr.vbar.displayText.Size().Width/2
+	displayTextY := space.Height - (float32(vr.vbar.value) * heightFactor) - 12.5
+	barY := space.Height - float32(vr.vbar.value)
+
+	vr.vbar.titleText.Move(fyne.NewPos(titleX, space.Height+2))
+	vr.vbar.displayText.Move(fyne.NewPos(displayTextX, displayTextY))
+	vr.vbar.bar.Move(fyne.NewPos(0, barY))
+
+	for i, line := range vr.vbar.bars {
+		divisor := 3
+		if i%2 != 0 {
+			divisor = 7
+		}
+
+		offsetX := space.Width / float32(divisor)
+		lineY := float32(i) * heightFactor
+
+		line.Position1 = fyne.NewPos(middle-offsetX, lineY)
+		line.Position2 = fyne.NewPos(middle+offsetX, lineY)
+	}
+	vr.vbar.SetValue(vr.vbar.value)
 }
 
 func (vr *vbarRenderer) MinSize() fyne.Size {

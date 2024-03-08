@@ -91,14 +91,6 @@ func NewDial(cfg DialConfig) *Dial {
 	}
 	c.container.Objects = append(c.container.Objects, c.center, c.needle, c.displayText)
 
-	//listener := make(chan fyne.Settings)
-	//fyne.CurrentApp().Settings().AddChangeListener(listener)
-	//go func() {
-	//	for {
-	//		settings := <-listener
-	//		s.applyTheme(settings)
-	//	}
-	//}()
 	return c
 }
 
@@ -117,13 +109,14 @@ func (c *Dial) rotatePips(hand *canvas.Line, middle fyne.Position, facePosition 
 }
 
 func (c *Dial) rotate(hand *canvas.Line, middle fyne.Position, rotation float64, offset, length float32) {
-	x2 := length * float32(math.Sin(rotation))
-	y2 := -length * float32(math.Cos(rotation))
+	sinRotation := float32(math.Sin(rotation))
+	cosRotation := float32(math.Cos(rotation))
 
-	offX := float32(0)
-	offY := float32(0)
-	offX += offset * float32(math.Sin(rotation))
-	offY += -offset * float32(math.Cos(rotation))
+	x2 := length * sinRotation
+	y2 := -length * cosRotation
+
+	offX := offset * sinRotation
+	offY := -offset * cosRotation
 
 	hand.Position1 = fyne.NewPos(middle.X+offX, middle.Y+offY)
 	hand.Position2 = fyne.NewPos(middle.X+offX+x2, middle.Y+offY+y2)
@@ -155,62 +148,6 @@ func (c *Dial) SetValue(value float64) {
 	c.displayText.Text = fmt.Sprintf(c.displayString, value)
 	c.displayText.Refresh()
 }
-
-/*
-func (c *Dial) AnimateValue(value float64, dur time.Duration) {
-	if value > c.max {
-		value = c.max
-	}
-
-	if value < c.min {
-		value = c.min
-	}
-	if c.animating {
-		return
-	}
-	c.value = value
-
-	//sz := c.canvas.Size()
-	//diameter := fyne.Min(sz.Width, sz.Height)
-	//middle := fyne.NewPos(sz.Width/2, sz.Height/2)
-	//radius := diameter / 2
-
-	start := value
-	fyne.NewAnimation(dur, func(v float32) {
-		val := start + (value-start)*float64(v)
-		c.setPosition(val, c.canvas.Size())
-		//log.Println(val)
-		//c.displayText.Text = fmt.Sprintf(c.displayString, val)
-		//c.rotateNeedle(c.needle, middle, val, radius*.15, radius*.8)
-		c.needle.Refresh()
-		c.displayText.Refresh()
-		if v == 1 {
-			c.animating = false
-		}
-	}).Start()
-}
-*/
-
-/*
-func (c *Dial) applyTheme(_ fyne.Settings) {
-	c.face.StrokeColor = theme.DisabledColor()
-	c.needle.StrokeColor = theme.ErrorColor()
-	c.speed.Color = theme.ForegroundColor()
-	c.cover.FillColor = theme.BackgroundColor()
-
-	for i, pip := range c.pips {
-		if i == 0 {
-			pip.StrokeColor = theme.ForegroundColor()
-		} else if i >= 100 && i < 110 {
-			pip.StrokeColor = theme.WarningColor()
-		} else if i >= 110 {
-			pip.StrokeColor = theme.ErrorColor()
-		} else {
-			pip.StrokeColor = theme.DisabledColor()
-		}
-	}
-}
-*/
 
 func (c *Dial) CreateRenderer() fyne.WidgetRenderer {
 	return &DialRenderer{

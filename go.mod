@@ -64,7 +64,7 @@ require (
 	honnef.co/go/js/dom v0.0.0-20231112215516-51f43a291193 // indirect
 )
 
-require github.com/roffe/ecusymbol v0.0.0-20240305001640-198b6e8760b6
+require github.com/roffe/ecusymbol v0.0.0-20240308231438-8ad3e7498614
 
 require fyne.io/x/fyne v0.0.0-20240216160529-61d0ff41acd7
 
@@ -72,4 +72,4 @@ require github.com/jellydator/ttlcache/v3 v3.2.0
 
 // replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
 
-replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
+// replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol

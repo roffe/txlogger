@@ -169,7 +169,6 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 	}
 
 	s.titleText.Move(fyne.NewPos(diameter/2-s.titleText.Size().Width/2, height-30))
-	//s.displayText.TextSize = min((diameter/2)/6, 40)
 	s.displayText.Move(fyne.NewPos(diameter/2-s.displayText.MinSize().Width/2, y))
 
 	for i, line := range s.bars {

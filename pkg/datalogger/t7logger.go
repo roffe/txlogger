@@ -100,9 +100,23 @@ func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client)
 		case 0x280:
 			data := msg.Data()[4]
 			data2 := msg.Data()[3]
-			ebus.Publish("CRUISE", float64(data&0x20))
-			ebus.Publish("CEL", float64(data&0x80))
-			ebus.Publish("LIMP", float64(data2&0x01))
+			if data2&0x01 == 1 {
+				ebus.Publish("LIMP", 1)
+			} else {
+				ebus.Publish("LIMP", 0)
+			}
+
+			if data&0x20 == 0x20 {
+				ebus.Publish("CRUISE", 1)
+			} else {
+				ebus.Publish("CRUISE", 0)
+			}
+
+			if data&0x80 == 0x80 {
+				ebus.Publish("CEL", 1)
+			} else {
+				ebus.Publish("CEL", 0)
+			}
 		case 0x3A0:
 			speed = uint16(msg.Data()[4]) | uint16(msg.Data()[3])<<8
 			realSpeed = float64(speed) / 10

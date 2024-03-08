@@ -1,12 +1,19 @@
 package ebus
 
 import (
+	"sync"
+
 	"github.com/roffe/txlogger/pkg/eventbus"
 )
 
-var (
-	eb = eventbus.New()
-)
+var once sync.Once
+var eb *eventbus.Controller
+
+func init() {
+	once.Do(func() {
+		eb = eventbus.New()
+	})
+}
 
 func Publish(topic string, data float64) error {
 	return eb.Publish(topic, data)

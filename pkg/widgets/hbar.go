@@ -50,14 +50,15 @@ func (s *HBar) render() *fyne.Container {
 	s.titleText = &canvas.Text{Text: s.cfg.Title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
 	s.titleText.TextStyle.Monospace = true
 	s.titleText.Alignment = fyne.TextAlignCenter
-
 	bar := container.NewWithoutLayout(s.face)
 	for i := 0; i < int(s.cfg.Steps+1); i++ {
 		line := &canvas.Line{StrokeColor: color.RGBA{0x00, 0xE5, 0x00, 0xFF}, StrokeWidth: 2}
 		s.bars = append(s.bars, line)
 		bar.Add(line)
 	}
-	bar.Objects = append(bar.Objects, s.bar, s.titleText)
+	bar.Add(s.bar)
+	bar.Add(s.titleText)
+	//bar.Objects = append(bar.Objects, s.bar, s.titleText)
 	return bar
 }
 
@@ -85,7 +86,6 @@ func (s *HBar) SetValue(value float64) {
 	} else {
 		s.bar.FillColor = color.RGBA{0x2C, 0xA5, 0x00, 0x90}
 	}
-
 	s.bar.Move(fyne.NewPos(0, size.Height/8))
 	s.bar.Resize(fyne.NewSize((float32(value) * widthFactor), size.Height-(size.Height/8*2)))
 	//s.bar.Refresh()
@@ -107,20 +107,14 @@ type HBarRenderer struct {
 
 func (dr *HBarRenderer) Layout(space fyne.Size) {
 	dr.d.container.Resize(space)
-
 	s := dr.d
-
 	diameter := space.Width
 	height := space.Height
 	middle := height / 2
 	widthFactor := float32(diameter) / float32(s.cfg.Steps)
-
 	s.face.Resize(space)
-
 	s.titleText.Move(fyne.NewPos(diameter/2-s.titleText.Size().Width/2, height-30))
-
 	s.bar.Move(fyne.NewPos(space.Width-float32(s.value), 0))
-
 	for i, line := range s.bars {
 		if i%2 == 0 {
 			line.Position1 = fyne.NewPos(float32(i)*widthFactor, middle-height/3)
@@ -130,9 +124,7 @@ func (dr *HBarRenderer) Layout(space fyne.Size) {
 		line.Position1 = fyne.NewPos(float32(i)*widthFactor, middle-height/7)
 		line.Position2 = fyne.NewPos(float32(i)*widthFactor, middle+height/7)
 	}
-
 	s.SetValue(s.value)
-
 }
 
 func (dr *HBarRenderer) MinSize() fyne.Size {

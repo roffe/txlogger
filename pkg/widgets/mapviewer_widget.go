@@ -130,15 +130,14 @@ func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 }
 
 func (mv *MapViewer) render() fyne.CanvasObject {
-
 	// y must be created before x as it's width is used to calculate x's offset
 	mv.yAxisLabels = mv.createYAxis()
 	mv.xAxisLabels = mv.createXAxis()
 	mv.zDataRects = mv.createZdata()
 
-	mv.crosshair = NewCrosshair(color.RGBA{255, 0, 242, 255}, 4)
+	mv.crosshair = NewCrosshair(color.RGBA{255, 0, 180, 255}, 3)
 
-	mv.cursor = NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 235}, 4)
+	mv.cursor = NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 235}, 3)
 	mv.selectedX = -1
 	mv.cursor.Resize(fyne.NewSize(1, 1))
 
@@ -229,7 +228,6 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 				mv.innerView,
 			),
 		)
-
 	}
 
 	mapview := container.NewBorder(
@@ -274,7 +272,6 @@ func (mv *MapViewer) Info() MapViewerInfo {
 }
 
 func (mv *MapViewer) SetValue(name string, value float64) {
-	//	log.Println("MapViewer: SetValue", name, value)
 	defer func() {
 		if r := recover(); r != nil {
 			log.Println(r)
@@ -286,7 +283,6 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 		return
 	}
 	var hit bool
-	//log.Printf("MapViewer: SetValue: %s: %f", name, value)
 	if name == mv.xFrom {
 		mv.xValue = int(value)
 		hit = true
@@ -301,11 +297,6 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 	}
 	if hit {
 		mv.setXY(mv.xValue, mv.yValue)
-		//select {
-		//case mv.setChan <- xyUpdate{mv.xValue, mv.yValue}:
-		//default:
-		//	log.Println("MapViewer: setChan full")
-		//}
 	}
 }
 
@@ -364,16 +355,6 @@ func (mv *MapViewer) resize(size fyne.Size) {
 			iDx := (i * mv.numColumns) - (mv.numColumns - j)
 			t := mv.textValues[iDx]
 			t.TextSize = textSize
-			// t.Resize(t.MinSize())
-			// t.Move(fyne.NewPos(
-			// 	(float32(j)*widthFactor)+(widthFactor/2)-(t.MinSize().Width/2),
-			// 	(sz.Height-float32(i)*heightFactor)+(heightFactor/2)-(t.MinSize().Height/2),
-			// ))
-			// mv.zDataRects[iDx].Resize(fyne.NewSize(widthFactor, heightFactor))
-			// mv.zDataRects[iDx].Move(fyne.NewPos(
-			// 	float32(j)*widthFactor,
-			// 	(sz.Height - float32(i)*heightFactor),
-			// ))
 		}
 	}
 
@@ -564,15 +545,6 @@ func (mv *MapViewer) setXY(xValue, yValue int) error {
 	mv.yIdx = yIdx
 	sz := mv.innerView.Size()
 
-	//fyne.NewAnimation(10*time.Millisecond, func(p float32) {
-	//	//mv.cursor.Resize(fyne.NewSize(1, 1))
-	//	mv.crosshair.Move(
-	//		fyne.NewPos(
-	//			p*float32(min(xIdx, float64(mv.numColumns)))*sz.Width/float32(mv.numColumns),
-	//			p*float32(float64(mv.numRows-1)-yIdx)*sz.Height/float32(mv.numRows),
-	//		),
-	//	)
-	//}).Start()
 	mv.crosshair.Move(
 		fyne.NewPos(
 			float32(xIdx)*sz.Width/float32(mv.numColumns),

@@ -77,7 +77,6 @@ func (mw *MainWindow) openMapz(typ symbol.ECUType, mapNames ...string) {
 		mw.openMaps[joinedNames] = w
 
 		var cancelFuncs []func()
-
 		for _, mv := range view.Children() {
 			xf := mv.Info().XFrom
 			yf := mv.Info().YFrom

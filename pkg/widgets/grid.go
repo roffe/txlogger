@@ -28,12 +28,14 @@ func (g *Grid) CreateRenderer() fyne.WidgetRenderer {
 	var xlines []*canvas.Line
 	for i := 0; i < g.cols; i++ {
 		line := canvas.NewLine(color.Black)
+		line.StrokeWidth = 2
 		xlines = append(xlines, line)
 		con.Add(line)
 	}
 	var ylines []*canvas.Line
 	for i := 0; i < g.rows; i++ {
 		line := canvas.NewLine(color.Black)
+		line.StrokeWidth = 2
 		ylines = append(ylines, line)
 		con.Add(line)
 	}
@@ -54,20 +56,15 @@ type GridRenderer struct {
 }
 
 func (gr *GridRenderer) Layout(size fyne.Size) {
-	cw := size.Width / float32(len(gr.xlines))
-	ch := size.Height / float32(len(gr.ylines))
+	cw := size.Width / float32(gr.g.cols)  // Use cols from the Grid struct
+	ch := size.Height / float32(gr.g.rows) // Use rows from the Grid struct
 
 	for i, l := range gr.xlines {
-		l.Move(fyne.NewPos((float32(i) * cw), 0))
-		l.StrokeWidth = 2
 		l.Position1 = fyne.NewPos((float32(i) * cw), 0)
 		l.Position2 = fyne.NewPos((float32(i) * cw), size.Height)
 		l.Refresh()
-
 	}
 	for i, l := range gr.ylines {
-		l.Move(fyne.NewPos(0, float32(i)*ch))
-		l.StrokeWidth = 2
 		l.Position1 = fyne.NewPos(0, (float32(i) * ch))
 		l.Position2 = fyne.NewPos(size.Width, (float32(i) * ch))
 		l.Refresh()
