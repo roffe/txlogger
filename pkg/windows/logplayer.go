@@ -344,6 +344,7 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 			case OpNext:
 				playonce = true
 			case OpExit:
+				log.Println("Exiting logplayer playback controller")
 				return
 			}
 		}
@@ -381,6 +382,7 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 			playonce = false
 		}
 	}
+	log.Println("Exiting logplayer playback")
 }
 
 func currentTimeFormatted(t time.Time) string {

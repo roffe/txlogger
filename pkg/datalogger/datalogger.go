@@ -186,6 +186,9 @@ func New(cfg Config) (Logger, error) {
 }
 
 func (d *Client) Start() error {
+	d.cfg.ErrorCounter.Set(0)
+	d.cfg.CaptureCounter.Set(0)
+	d.cfg.FpsCounter.Set(0)
 	return d.p.Start()
 }
 

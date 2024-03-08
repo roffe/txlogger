@@ -69,7 +69,7 @@ type MapViewer struct {
 	valueRects *fyne.Container
 	valueTexts *fyne.Container
 
-	setChan chan xyUpdate
+	//setChan chan xyUpdate
 
 	xIdx, yIdx           float64
 	selectedX, SelectedY int
@@ -94,7 +94,7 @@ type MapViewer struct {
 
 func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 	mv := &MapViewer{
-		setChan:       make(chan xyUpdate, 10),
+		//setChan:       make(chan xyUpdate, 10),
 		editable:      true,
 		loadECUFunc:   func() {},
 		saveECUFunc:   func(data []int) {},
@@ -120,11 +120,11 @@ func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 		return nil, fmt.Errorf("NewMapViewer columns * rows != datalen")
 	}
 
-	go func() {
-		for xy := range mv.setChan {
-			mv.setXY(xy.x, xy.y)
-		}
-	}()
+	//go func() {
+	//	for xy := range mv.setChan {
+	//		mv.setXY(xy.x, xy.y)
+	//	}
+	//}()
 
 	return mv, nil
 }
@@ -136,7 +136,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 	mv.xAxisLabels = mv.createXAxis()
 	mv.zDataRects = mv.createZdata()
 
-	mv.crosshair = NewRectangle(color.RGBA{0xfc, 0x4a, 0xFA, 235}, 4)
+	mv.crosshair = NewCrosshair(color.RGBA{255, 0, 242, 255}, 4)
 
 	mv.cursor = NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 235}, 4)
 	mv.selectedX = -1
@@ -300,11 +300,12 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 		hit = true
 	}
 	if hit {
-		select {
-		case mv.setChan <- xyUpdate{mv.xValue, mv.yValue}:
-		default:
-			log.Println("MapViewer: setChan full")
-		}
+		mv.setXY(mv.xValue, mv.yValue)
+		//select {
+		//case mv.setChan <- xyUpdate{mv.xValue, mv.yValue}:
+		//default:
+		//	log.Println("MapViewer: setChan full")
+		//}
 	}
 }
 
@@ -469,7 +470,7 @@ func (mv *MapViewer) Refresh() {
 }
 
 func (mv *MapViewer) Close() {
-	close(mv.setChan)
+	//close(mv.setChan)
 }
 
 func getPrecission(corrFac float64) int {

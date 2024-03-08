@@ -3,7 +3,9 @@ package datalogger
 import (
 	"encoding/csv"
 	"fmt"
+	"math"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -58,6 +60,7 @@ type CSVWriter struct {
 	file          *os.File
 	headerWritten bool
 	cw            *csv.Writer
+	precission    int
 }
 
 func (c *CSVWriter) Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time.Time, sysvarOrder []string) error {
@@ -66,11 +69,16 @@ func (c *CSVWriter) Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time
 			return err
 		}
 	}
-
 	var record []string
 	record = append(record, ts.Format(ISONICO))
 	for _, k := range sysvarOrder {
-		record = append(record, sysvars.Get(k))
+		val := sysvars.Get(k)
+		if val == math.Trunc(val) {
+			c.precission = 0
+		} else {
+			c.precission = 2
+		}
+		record = append(record, strconv.FormatFloat(val, 'f', c.precission, 64))
 	}
 	for _, va := range vars {
 		if va.Skip {
@@ -78,7 +86,6 @@ func (c *CSVWriter) Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time
 		}
 		record = append(record, va.StringValue())
 	}
-
 	return c.cw.Write(record)
 }
 
@@ -105,7 +112,8 @@ func (c *CSVWriter) Close() error {
 }
 
 type TXWriter struct {
-	file *os.File
+	file       *os.File
+	precission int
 }
 
 func (t *TXWriter) Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time.Time, sysvarOrder []string) error {
@@ -114,7 +122,13 @@ func (t *TXWriter) Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time.
 		return err
 	}
 	for _, k := range sysvarOrder {
-		t.file.Write([]byte(k + "=" + replaceDot(sysvars.Get(k)) + "|"))
+		val := sysvars.Get(k)
+		if val == math.Trunc(val) {
+			t.precission = 0
+		} else {
+			t.precission = 2
+		}
+		t.file.Write([]byte(k + "=" + replaceDot(strconv.FormatFloat(val, 'f', t.precission, 64)) + "|"))
 	}
 	for _, va := range vars {
 		if va.Skip {

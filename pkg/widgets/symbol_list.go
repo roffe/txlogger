@@ -120,6 +120,12 @@ func (s *SymbolListWidget) SetValue(name string, value float64) {
 	}
 }
 
+func (s *SymbolListWidget) Clear() {
+	for _, e := range s.entrys {
+		e.symbolValue.SetText("")
+	}
+}
+
 func (s *SymbolListWidget) Disable() {
 	/*
 		for _, e := range s.entrys {

@@ -14,6 +14,9 @@ type EBusMessage struct {
 	Data  *float64
 }
 
+type Controller struct {
+}
+
 var (
 	initOnce  sync.Once
 	subs      = make(map[string][]chan float64)
@@ -26,10 +29,18 @@ var (
 	unsubChan    = make(chan chan float64, 100)
 	unsubAllChan = make(chan chan *EBusMessage, 100)
 	cache        *ttlcache.Cache[string, float64]
+
+	aggregators []*EventAggregator
+
+	aggregatorsLock sync.Mutex
 )
 
 func init() {
 	initOnce.Do(func() {
+		RegisterAggregator(
+			DIFFAggregator("MAF.m_AirInlet", "m_Request", "AirDIFF"),
+			DIFFAggregator("MAF.m_AirInlet", "AirMassMast.m_Request", "AirDIFF"),
+		)
 		cache = ttlcache.New[string, float64](
 			ttlcache.WithTTL[string, float64](1 * time.Minute),
 		)
@@ -60,6 +71,9 @@ func run() {
 				default:
 				}
 			}
+			for _, agg := range aggregators {
+				agg.fun(*msg.Topic, *msg.Data)
+			}
 
 		case unsub := <-unsubAllChan:
 			subsAllMutex.Lock()
@@ -78,7 +92,7 @@ func run() {
 			for topic, subz := range subs {
 				for i, sub := range subz {
 					if sub == unsub {
-						log.Println("unsub", unsub)
+						log.Println("Unsubscribe", topic)
 						subs[topic] = append(subz[:i], subz[i+1:]...)
 						close(unsub)
 						if len(subs[topic]) == 0 {

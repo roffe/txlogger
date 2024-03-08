@@ -7,6 +7,8 @@ import (
 	"fyne.io/fyne/v2"
 )
 
+// DEPRECATED, To be removed
+
 type MapViewerWindowInterface interface {
 	RequestFocus()
 	Close()

@@ -43,8 +43,6 @@ type SettingsWidget struct {
 	useMPH       *widget.Check
 
 	container *fyne.Container
-
-	OnClose func()
 }
 
 func (sw *SettingsWidget) GetLambdaSource() string {

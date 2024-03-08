@@ -3,15 +3,14 @@ package windows
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/mainmenu"
-	"github.com/roffe/txlogger/pkg/mapviewerhandler"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/skratchdot/open-golang/open"
 	sdialog "github.com/sqweek/dialog"
@@ -75,18 +74,29 @@ func (mw *MainWindow) openMapz(typ symbol.ECUType, mapNames ...string) {
 			return
 		}
 
-		mw.openMaps[joinedNames] = mw.newMapViewerWindow(w, view, symbol.Axis{})
+		mw.openMaps[joinedNames] = w
+
+		var cancelFuncs []func()
 
 		for _, mv := range view.Children() {
-			mw.mvh.Subscribe(mv.Info().XFrom, mv)
-			mw.mvh.Subscribe(mv.Info().YFrom, mv)
+			xf := mv.Info().XFrom
+			yf := mv.Info().YFrom
+			if xf != "" {
+				cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(xf, func(value float64) {
+					mv.SetValue(xf, value)
+				}))
+			}
+			if yf != "" {
+				cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(yf, func(value float64) {
+					mv.SetValue(yf, value)
+				}))
+			}
 		}
 
 		w.SetCloseIntercept(func() {
 			delete(mw.openMaps, joinedNames)
-			for _, mv := range view.Children() {
-				mw.mvh.Unsubscribe(mv.Info().XFrom, mv)
-				mw.mvh.Unsubscribe(mv.Info().YFrom, mv)
+			for _, f := range cancelFuncs {
+				f()
 			}
 			w.Close()
 		})
@@ -107,7 +117,6 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		return
 	}
 
-	//w.SetFixedSize(true)
 	if mw.fw == nil {
 		mw.Log("No binary loaded")
 		return
@@ -134,7 +143,6 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			}
 
 			var addr uint32
-
 			switch mw.ecuSelect.Selected {
 			case "T7":
 				addr = symZ.Address
@@ -211,8 +219,6 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			mw.Log(fmt.Sprintf("failed to find symbol %s", axis.Z))
 			return
 		}
-
-		log.Println("Save", mw.filename)
 		if err := ss.SetData(ss.EncodeInts(data)); err != nil {
 			mw.Log(err.Error())
 			return
@@ -249,46 +255,43 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		return
 	}
 
-	w := mw.app.NewWindow(axis.Z + " - Map Viewer")
-	w.Canvas().SetOnTypedKey(mv.TypedKey)
+	var cancelFuncs []func()
 
-	mw.openMaps[axis.Z] = mw.newMapViewerWindow(w, mv, axis)
+	if axis.XFrom != "" {
+		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.XFrom, func(value float64) {
+			mv.SetValue(axis.XFrom, value)
+		}))
+	}
 
-	w.SetCloseIntercept(func() {
-		delete(mw.openMaps, axis.Z)
-		mw.mvh.Unsubscribe(mw.settings.GetLambdaSymbolName(), mv)
-		if axis.XFrom != "" {
-			mw.mvh.Unsubscribe(axis.XFrom, mv)
-		}
-		if axis.YFrom == "" {
-			mw.mvh.Unsubscribe(axis.YFrom, mv)
-		}
-		w.Close()
-	})
+	if axis.YFrom != "" {
+		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.YFrom, func(value float64) {
+			mv.SetValue(axis.YFrom, value)
+		}))
+	}
 
-	if mw.settings.GetAutoLoad() {
+	if mw.settings.GetLambdaSource() != "ECU" {
+		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(mw.settings.GetLambdaSymbolName(), func(value float64) {
+			mv.SetValue(mw.settings.GetLambdaSymbolName(), value)
+		}))
+	}
+
+	if mw.settings.GetAutoLoad() && mw.dlc != nil {
 		p := widgets.NewProgressModal(mw.Window.Content(), "Loading "+axis.Z)
 		p.Show()
 		loadFunc()
 		p.Hide()
 	}
-
 	// mw.tab.Append(container.NewTabItem(axis.Z, mv))
-
+	w := mw.app.NewWindow(axis.Z + " - Map Viewer")
+	w.Canvas().SetOnTypedKey(mv.TypedKey)
+	mw.openMaps[axis.Z] = w
+	w.SetCloseIntercept(func() {
+		delete(mw.openMaps, axis.Z)
+		for _, f := range cancelFuncs {
+			f()
+		}
+		w.Close()
+	})
 	w.SetContent(mv)
 	w.Show()
-}
-
-func (mw *MainWindow) newMapViewerWindow(w fyne.Window, mv mapviewerhandler.MapViewerWindowWidget, axis symbol.Axis) mapviewerhandler.MapViewerWindowInterface {
-	mww := mapviewerhandler.NewWindow(w, mv)
-	mw.openMaps[axis.Z] = mww
-	if axis.XFrom != "" {
-		mw.mvh.Subscribe(axis.XFrom, mv)
-	}
-	if axis.YFrom != "" {
-		mw.mvh.Subscribe(axis.YFrom, mv)
-	}
-	mw.mvh.Subscribe(mw.settings.GetLambdaSymbolName(), mv)
-
-	return mww
 }

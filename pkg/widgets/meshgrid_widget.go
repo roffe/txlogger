@@ -691,3 +691,31 @@ func (m *Meshgrid) getColorInterpolation(value float64) color.RGBA {
 		A: 255,
 	}
 }
+
+func (m *Meshgrid) getColorInterpolation2(value float64) color.RGBA {
+	t := (value - m.zmin) / (m.zmax - m.zmin)
+	// Clamp t to be within [0, 1]
+	if t < 0 {
+		t = 0
+	} else if t > 1 {
+		t = 1
+	}
+
+	divider := .5
+	var r, g, b float64
+	if t < divider { // Green to Yellow interpolation
+		r = lerp(0, 1, t/divider)
+		g = 1
+	} else { // Yellow to Red interpolation
+		r = 1
+		g = lerp(1, 0, (t-divider)/(1-divider))
+	}
+	b = 0
+	// Convert from 0-1 range to 0-255 for color.RGBA
+	return color.RGBA{
+		R: uint8(r * 255),
+		G: uint8(g * 255),
+		B: uint8(b * 255),
+		A: 255,
+	}
+}

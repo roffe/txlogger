@@ -18,11 +18,9 @@ import (
 	"github.com/roffe/txlogger/pkg/capture"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
-	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/mainmenu"
-	"github.com/roffe/txlogger/pkg/mapviewerhandler"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"golang.org/x/net/context"
@@ -83,7 +81,6 @@ type MainWindow struct {
 
 	dlc       datalogger.Logger
 	dashboard *widgets.Dashboard
-	mvh       *mapviewerhandler.MapViewerHandler
 
 	buttonsDisabled bool
 
@@ -91,7 +88,7 @@ type MainWindow struct {
 
 	settings *widgets.SettingsWidget
 
-	openMaps map[string]mapviewerhandler.MapViewerWindowInterface
+	openMaps map[string]fyne.Window
 
 	tab *container.AppTabs
 	//doctab *container.DocTabs
@@ -107,34 +104,22 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		errorCounter:   binding.NewInt(),
 		fpsCounter:     binding.NewInt(),
 
-		openMaps: make(map[string]mapviewerhandler.MapViewerWindowInterface),
-		mvh:      mapviewerhandler.New(),
+		openMaps: make(map[string]fyne.Window),
 		settings: widgets.NewSettingsWidget(),
 	}
 
-	ebus.SubscribeAllFunc(mw.mvh.SetValue)
-
 	updateSymbols := func(syms []*symbol.Symbol) {
-		//log.Println("Updating symbols")
 		if mw.dlc != nil {
-			//log.Println("Updating symbols in dlc")
 			if err := mw.dlc.SetSymbols(mw.symbolList.Symbols()); err != nil {
 				if err.Error() == "pending" {
-					//log.Println("Pending")
 					return
 				}
 				mw.Log(err.Error())
 			}
-			//log.Println("Updating symbols in dlc done")
 		}
 	}
 
 	mw.symbolList = widgets.NewSymbolListWidget(updateSymbols)
-
-	mw.settings.OnClose = func() {
-		mw.SetCloseIntercept(mw.closeIntercept)
-		mw.SetContent(mw.render())
-	}
 
 	mw.setupMenu()
 
@@ -217,9 +202,11 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		mw.setTitle("No symbols loaded")
 	}
 
+	mw.render()
+
 	mw.SetMaster()
 	mw.Resize(fyne.NewSize(1024, 768))
-	mw.SetContent(mw.render())
+	mw.SetContent(mw.tab)
 	return mw
 }
 func (mw *MainWindow) closeIntercept() {
@@ -227,7 +214,6 @@ func (mw *MainWindow) closeIntercept() {
 		mw.dlc.Close()
 		time.Sleep(500 * time.Millisecond)
 	}
-	mw.mvh.Close()
 	mw.SaveSymbolList()
 	debug.Close()
 	mw.Close()

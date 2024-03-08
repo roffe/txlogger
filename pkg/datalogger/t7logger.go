@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -82,10 +81,10 @@ func (c *T7Client) GetRAM(address uint32, length uint32) ([]byte, error) {
 
 func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client) {
 	sub := cl.Subscribe(ctx, 0x1A0, 0x280, 0x3A0)
-	var speed uint16 = 0
-	var rpm uint16 = 0
-	var throttle int = 0
-
+	var speed uint16
+	var rpm uint16
+	var throttle float64
+	var realSpeed float64
 	go func() {
 		<-c.quitChan
 		sub.Close()
@@ -95,38 +94,23 @@ func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client)
 		switch msg.Identifier() {
 		case 0x1A0:
 			rpm = binary.BigEndian.Uint16(msg.Data()[1:3])
-			c.sysvars.Set("ActualIn.n_Engine", strconv.Itoa(int(rpm)))
-			ebus.Publish("ActualIn.n_Engine", float64(rpm))
-			throttle = int(msg.Data()[5])
-			c.sysvars.Set("Out.X_AccPedal", strconv.Itoa(throttle)+".0")
-			ebus.Publish("Out.X_AccPedal", float64(throttle))
+			throttle = float64(msg.Data()[5])
+			c.sysvars.Set("ActualIn.n_Engine", float64(rpm))
+			c.sysvars.Set("Out.X_AccPedal", throttle)
 		case 0x280:
 			data := msg.Data()[4]
-			if data&0x20 == 0x20 {
-				ebus.Publish("CRUISE", 1)
-			} else {
-				ebus.Publish("CRUISE", 0)
-			}
-			if data&0x80 == 0x80 {
-				ebus.Publish("CEL", 1)
-			} else {
-				ebus.Publish("CEL", 0)
-			}
 			data2 := msg.Data()[3]
-			if data2&0x01 == 0x01 {
-				ebus.Publish("LIMP", 1)
-			} else {
-				ebus.Publish("LIMP", 0)
-			}
+			ebus.Publish("CRUISE", float64(data&0x20))
+			ebus.Publish("CEL", float64(data&0x80))
+			ebus.Publish("LIMP", float64(data2&0x01))
 		case 0x3A0:
 			speed = uint16(msg.Data()[4]) | uint16(msg.Data()[3])<<8
-			realSpeed := float64(speed) / 10
-			c.sysvars.Set("In.v_Vehicle", strconv.FormatFloat(realSpeed, 'f', 1, 64))
-			ebus.Publish("In.v_Vehicle", realSpeed)
+			realSpeed = float64(speed) / 10
+			c.sysvars.Set("In.v_Vehicle", realSpeed)
 		}
 	}
 
-	c.OnMessage("Stopped broadcast listener..")
+	c.OnMessage("Stopped broadcast listener")
 }
 
 func (c *T7Client) onError(err error) {
@@ -140,29 +124,31 @@ func (c *T7Client) Start() error {
 	defer c.lw.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	cl, err := gocan.NewWithOpts(
-		ctx,
-		c.Device,
-	)
+	cl, err := gocan.NewWithOpts(ctx, c.Device)
 	if err != nil {
 		return err
 	}
 	defer cl.Close()
 
-	for _, sym := range c.Symbols {
-		if c.sysvars.Exists(sym.Name) {
-			c.sysvars.Delete(sym.Name)
-			continue
-		}
-	}
-
-	go c.startBroadcastListener(ctx, cl)
+	//for _, sym := range c.Symbols {
+	//	if c.sysvars.Exists(sym.Name) {
+	//		c.sysvars.Delete(sym.Name)
+	//		continue
+	//	}
+	//}
+	bctx, bcancel := context.WithCancel(ctx)
+	defer bcancel()
+	go c.startBroadcastListener(bctx, cl)
 
 	c.OnMessage("Watching for broadcast messages")
-	<-time.After(800 * time.Millisecond)
+	<-time.After(300 * time.Millisecond)
 	order := c.sysvars.Keys()
 	sort.StringSlice(order).Sort()
 	c.OnMessage(fmt.Sprintf("Found %s", order))
+
+	if len(order) == 0 {
+		bcancel()
+	}
 
 	switch c.Config.Lambda {
 	case "ECU":
@@ -180,17 +166,10 @@ func (c *T7Client) Start() error {
 		}
 	}
 
-	kwp := kwp2000.New(cl)
-
 	count := 0
-
-	c.ErrorCounter.Set(c.errCount)
-
-	//c.ErrorPerSecondCounter.Set(errPerSecond)
-
-	//cps := 0
 	retries := 0
 
+	kwp := kwp2000.New(cl)
 	err = retry.Do(func() error {
 		if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
 			if retries == 0 {
@@ -322,18 +301,15 @@ func (c *T7Client) Start() error {
 				r := bytes.NewReader(databuff)
 				for _, va := range c.Symbols {
 					if va.Skip {
+						ebus.Publish(va.Name, c.sysvars.Get(va.Name))
 						continue
 					}
-					//buf.Reset()
-					//buf.Write(va.Bytes())
 					if err := va.Read(r); err != nil {
 						log.Printf("data ex %d %X len %d", expectedPayloadSize, databuff, len(databuff))
 						c.onError(err)
 						break
 					}
 					ebus.Publish(va.Name, va.Float64())
-					//if !bytes.Equal(va.Bytes(), buf.Bytes()) {
-					//}
 				}
 
 				if r.Len() > 0 {
@@ -341,9 +317,8 @@ func (c *T7Client) Start() error {
 				}
 
 				if c.lamb != nil {
-					value := fmt.Sprintf("%.2f", c.lamb.GetLambda())
 					ebus.Publish(EXTERNALWBLSYM, c.lamb.GetLambda())
-					c.sysvars.Set(EXTERNALWBLSYM, value)
+					c.sysvars.Set(EXTERNALWBLSYM, c.lamb.GetLambda())
 				}
 
 				//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)

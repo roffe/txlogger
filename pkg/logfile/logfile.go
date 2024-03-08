@@ -36,11 +36,6 @@ func (r *Record) SetValue(key string, value float64) {
 	r.Values[key] = value
 }
 
-type RecordValue struct {
-	Key   string
-	Value float64
-}
-
 func Open(filename string) (Logfile, error) {
 	switch strings.ToLower(path.Ext(filename)) {
 	case ".csv":

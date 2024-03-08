@@ -156,7 +156,7 @@ func (c *T8Client) Start() error {
 	errPerSecond := 0
 	//c.ErrorPerSecondCounter.Set(errPerSecond)
 
-	cps := 0
+	fps := 0
 	retries := 0
 
 	lastPresentInterval := 3500 * time.Millisecond
@@ -197,8 +197,8 @@ func (c *T8Client) Start() error {
 				case <-gctx.Done():
 					return nil
 				case <-secondTicker.C:
-					c.FpsCounter.Set(cps)
-					cps = 0
+					c.FpsCounter.Set(fps)
+					fps = 0
 					if errPerSecond > 10 {
 						return errors.New("too many errors, reconnecting")
 					}
@@ -235,7 +235,7 @@ func (c *T8Client) Start() error {
 			for {
 				select {
 				case <-c.quitChan:
-					c.OnMessage("Stopped logging..")
+					c.OnMessage("Finished logging")
 					return nil
 				case <-gctx.Done():
 					return nil
@@ -342,9 +342,8 @@ func (c *T8Client) Start() error {
 					}
 
 					if c.lamb != nil {
-						value := fmt.Sprintf("%.2f", c.lamb.GetLambda())
 						ebus.Publish(EXTERNALWBLSYM, c.lamb.GetLambda())
-						c.sysvars.Set(EXTERNALWBLSYM, value)
+						c.sysvars.Set(EXTERNALWBLSYM, c.lamb.GetLambda())
 					}
 
 					//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
@@ -354,7 +353,7 @@ func (c *T8Client) Start() error {
 						c.ErrorCounter.Set(errCount)
 						c.OnMessage(fmt.Sprintf("Failed to write log: %v", err))
 					}
-					cps++
+					fps++
 					count++
 					if count%10 == 0 {
 						c.CaptureCounter.Set(count)

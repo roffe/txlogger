@@ -3,13 +3,13 @@ package datalogger
 import "sync"
 
 type ThreadSafeMap struct {
-	values map[string]string
+	values map[string]float64
 	sync.Mutex
 }
 
 func NewThreadSafeMap() *ThreadSafeMap {
 	return &ThreadSafeMap{
-		values: make(map[string]string),
+		values: make(map[string]float64),
 	}
 }
 
@@ -30,13 +30,13 @@ func (t *ThreadSafeMap) Exists(name string) bool {
 	return ok
 }
 
-func (t *ThreadSafeMap) Set(name, value string) {
+func (t *ThreadSafeMap) Set(name string, value float64) {
 	t.Lock()
 	defer t.Unlock()
 	t.values[name] = value
 }
 
-func (t *ThreadSafeMap) Get(name string) string {
+func (t *ThreadSafeMap) Get(name string) float64 {
 	t.Lock()
 	defer t.Unlock()
 	return t.values[name]

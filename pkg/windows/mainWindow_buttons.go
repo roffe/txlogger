@@ -135,7 +135,7 @@ func (mw *MainWindow) createButtons() {
 			}
 			mw.dashboard = nil
 			mw.SetFullScreen(false)
-			mw.SetContent(mw.render())
+			mw.SetContent(mw.tab)
 			mw.SetCloseIntercept(mw.closeIntercept)
 		}
 
@@ -243,6 +243,8 @@ func (mw *MainWindow) startLogging() {
 
 	if mw.settings.GetLivePreview() {
 		cancel = ebus.SubscribeAllFunc(mw.symbolList.SetValue)
+	} else {
+		mw.symbolList.Clear()
 	}
 
 	go func() {
