@@ -1,4 +1,4 @@
-package ebus
+package eventbus
 
 type EventAggregatorFunc func(name string, value float64)
 
@@ -6,22 +6,22 @@ type EventAggregator struct {
 	fun EventAggregatorFunc
 }
 
-func RegisterAggregator(aggs ...*EventAggregator) {
-	aggregatorsLock.Lock()
-	defer aggregatorsLock.Unlock()
+func (e *Controller) RegisterAggregator(aggs ...*EventAggregator) {
+	e.aggregatorsLock.Lock()
+	defer e.aggregatorsLock.Unlock()
 outer:
 
 	for _, agg := range aggs {
-		for _, existing := range aggregators {
+		for _, existing := range e.aggregators {
 			if existing == agg {
 				continue outer
 			}
 		}
-		aggregators = append(aggregators, agg)
+		e.aggregators = append(e.aggregators, agg)
 	}
 }
 
-func DIFFAggregator(first, second, outputName string) *EventAggregator {
+func DIFFAggregator(c *Controller, first, second, outputName string) *EventAggregator {
 	var firstUpdated, secondUpdated bool
 	var firstValue, secondValue float64
 	return &EventAggregator{
@@ -35,7 +35,7 @@ func DIFFAggregator(first, second, outputName string) *EventAggregator {
 				secondUpdated = true
 			}
 			if firstUpdated && secondUpdated {
-				Publish(outputName, secondValue-firstValue)
+				c.Publish(outputName, secondValue-firstValue)
 				firstUpdated, secondUpdated = false, false
 			}
 		},

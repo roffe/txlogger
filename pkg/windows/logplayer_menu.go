@@ -3,7 +3,6 @@ package windows
 import (
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -17,7 +16,6 @@ func (lp *LogPlayer) openMapz(typ symbol.ECUType, mapNames ...string) {
 	joinedNames := strings.Join(mapNames, "|")
 	mv, found := lp.openMaps[joinedNames]
 	if !found {
-		w := lp.app.NewWindow(strings.Join(mapNames, ", ") + " - Map Viewer")
 		//w.SetFixedSize(true)
 		if lp.symbols == nil {
 			dialog.ShowError(errors.New("no symbols loaded"), lp.Window)
@@ -28,21 +26,31 @@ func (lp *LogPlayer) openMapz(typ symbol.ECUType, mapNames ...string) {
 			dialog.ShowError(err, lp.Window)
 			return
 		}
-		lp.openMaps[joinedNames] = lp.newMapViewerWindow(w, view, symbol.Axis{})
 
+		w := lp.app.NewWindow(strings.Join(mapNames, ", ") + " - Map Viewer")
+		lp.openMaps[joinedNames] = w
+
+		var cancelFuncs []func()
 		for _, mv := range view.Children() {
-			lp.mvh.Subscribe(mv.Info().XFrom, mv)
-			lp.mvh.Subscribe(mv.Info().YFrom, mv)
+			xf := mv.Info().XFrom
+			yf := mv.Info().YFrom
+			if xf != "" {
+				cancelFuncs = append(cancelFuncs, lp.ebus.SubscribeFunc(xf, func(value float64) {
+					mv.SetValue(xf, value)
+				}))
+			}
+			if yf != "" {
+				cancelFuncs = append(cancelFuncs, lp.ebus.SubscribeFunc(yf, func(value float64) {
+					mv.SetValue(yf, value)
+				}))
+			}
 		}
 
 		w.SetCloseIntercept(func() {
-			log.Println("closing", joinedNames)
 			delete(lp.openMaps, joinedNames)
-			for _, mv := range view.Children() {
-				lp.mvh.Unsubscribe(mv.Info().XFrom, mv)
-				lp.mvh.Unsubscribe(mv.Info().YFrom, mv)
+			for _, f := range cancelFuncs {
+				f()
 			}
-
 			w.Close()
 		})
 
@@ -63,10 +71,8 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 		dialog.ShowError(errors.New("no symbol name"), lp.Window)
 	}
 	axis := symbol.GetInfo(typ, symbolName)
-	mw, found := lp.openMaps[axis.Z]
+	w, found := lp.openMaps[axis.Z]
 	if !found {
-		w := lp.app.NewWindow(fmt.Sprintf("%s - Map Viewer", axis.Z))
-
 		xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := lp.symbols.GetXYZ(axis.X, axis.Y, axis.Z)
 		if err != nil {
 			dialog.ShowError(err, lp.Window)
@@ -87,9 +93,30 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 			widgets.WithLambdaSymbolName(lp.lambSymbolName),
 		)
 		if err != nil {
-
 			dialog.ShowError(fmt.Errorf("x: %s y: %s z: %s err: %w", axis.X, axis.Y, axis.Z, err), lp.Window)
+			return
 		}
+
+		var cancelFuncs []func()
+
+		if axis.XFrom != "" {
+			cancelFuncs = append(cancelFuncs, lp.ebus.SubscribeFunc(axis.XFrom, func(value float64) {
+				mv.SetValue(axis.XFrom, value)
+			}))
+		}
+
+		if axis.YFrom != "" {
+			cancelFuncs = append(cancelFuncs, lp.ebus.SubscribeFunc(axis.YFrom, func(value float64) {
+				mv.SetValue(axis.YFrom, value)
+			}))
+		}
+
+		cancelFuncs = append(cancelFuncs, lp.ebus.SubscribeFunc("Lambda.External", func(value float64) {
+			mv.SetValue("Lambda.External", value)
+		}))
+
+		w := lp.app.NewWindow(fmt.Sprintf("%s - Map Viewer", axis.Z))
+		lp.openMaps[axis.Z] = w
 
 		w.Canvas().SetOnTypedKey(func(ke *fyne.KeyEvent) {
 			if ke.Name == fyne.KeySpace {
@@ -100,19 +127,16 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 		})
 
 		w.SetCloseIntercept(func() {
-			//log.Println("closing", axis.Z)
 			delete(lp.openMaps, axis.Z)
-			lp.mvh.Unsubscribe(lp.lambSymbolName, mv)
-			lp.mvh.Unsubscribe(axis.XFrom, mv)
-			lp.mvh.Unsubscribe(axis.YFrom, mv)
-			mv.Close()
+			for _, f := range cancelFuncs {
+				f()
+			}
 			w.Close()
 		})
 
-		mw = lp.newMapViewerWindow(w, mv, axis)
-
 		w.SetContent(mv)
 		w.Show()
+		return
 	}
-	mw.RequestFocus()
+	w.RequestFocus()
 }

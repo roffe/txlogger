@@ -4,8 +4,10 @@ $env:GOARCH = "386"
 $env:CGO_ENABLED = "1"
 # $env:CC = "C:\\mingw32\\bin\\i686-w64-mingw32-gcc.exe"
 # $env:CXX = "C:\\mingw32\\bin\\i686-w64-mingw32-gcc.exe"
+Invoke-Expression "rsrc -arch 386 -manifest manifest.xml"
 Invoke-Expression "go generate ./..."
 Invoke-Expression "fyne package -tags combi --release"
+Remove-Item "rsrc_windows_386.syso" -ErrorAction SilentlyContinue
 
 
 

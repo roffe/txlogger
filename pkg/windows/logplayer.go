@@ -17,10 +17,10 @@ import (
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/capture"
 	"github.com/roffe/txlogger/pkg/datalogger"
+	"github.com/roffe/txlogger/pkg/eventbus"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/mainmenu"
-	"github.com/roffe/txlogger/pkg/mapviewerhandler"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
@@ -76,9 +76,9 @@ type LogPlayer struct {
 
 	logType string
 
-	openMaps map[string]mapviewerhandler.MapViewerWindowInterface
+	openMaps map[string]fyne.Window
 
-	mvh *mapviewerhandler.MapViewerHandler
+	ebus *eventbus.Controller
 
 	handler func(ev *fyne.KeyEvent)
 
@@ -107,9 +107,9 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 
 		controlChan: make(chan *controlMsg, 10),
 
-		openMaps: make(map[string]mapviewerhandler.MapViewerWindowInterface),
+		openMaps: make(map[string]fyne.Window),
 		symbols:  symbols,
-		mvh:      mapviewerhandler.New(),
+		ebus:     eventbus.New(),
 
 		closed: false,
 
@@ -158,7 +158,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 		for _, ma := range lp.openMaps {
 			ma.Close()
 		}
-		lp.mvh.Close()
+		lp.ebus.Close()
 		w.Close()
 	})
 
@@ -294,25 +294,6 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 	return main
 }
 
-func (lp *LogPlayer) newMapViewerWindow(w fyne.Window, mv mapviewerhandler.MapViewerWindowWidget, axis symbol.Axis) *mapviewerhandler.MapViewerWindow {
-	mw := mapviewerhandler.NewWindow(w, mv)
-	lp.openMaps[axis.Z] = mw
-
-	if axis.XFrom == "" {
-		axis.XFrom = "MAF.m_AirInlet"
-	}
-
-	if axis.YFrom == "" {
-		axis.YFrom = "ActualIn.n_Engine"
-	}
-
-	lp.mvh.Subscribe(datalogger.EXTERNALWBLSYM, mv)
-	lp.mvh.Subscribe(axis.XFrom, mv)
-	lp.mvh.Subscribe(axis.YFrom, mv)
-
-	return mw
-}
-
 func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 	play := true
 	if play {
@@ -374,7 +355,7 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 			for k, v := range rec.Values {
 				lp.db.SetValue(k, v)
 				if len(lp.openMaps) > 0 {
-					lp.mvh.SetValue(k, v)
+					lp.ebus.Publish(k, v)
 				}
 			}
 		}

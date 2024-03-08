@@ -60,12 +60,6 @@ func NewMapViewerMulti(typ symbol.ECUType, symbols symbol.SymbolCollection, mapN
 	return mvm, nil
 }
 
-func (mvm *MapViewerMulti) Close() {
-	for _, r := range mvm.mvs {
-		r.Close()
-	}
-}
-
 func (mvm *MapViewerMulti) Children() []*MapViewer {
 	return mvm.mvs
 }

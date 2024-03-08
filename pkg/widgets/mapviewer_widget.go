@@ -469,10 +469,6 @@ func (mv *MapViewer) Refresh() {
 	}
 }
 
-func (mv *MapViewer) Close() {
-	//close(mv.setChan)
-}
-
 func getPrecission(corrFac float64) int {
 	precission := 0
 	switch corrFac {
