@@ -44,8 +44,8 @@ func New() *Controller {
 		quit:     make(chan struct{}),
 	}
 	c.RegisterAggregator(
-		DIFFAggregator(c, "MAF.m_AirInlet", "m_Request", "AirDIFF"),
-		DIFFAggregator(c, "MAF.m_AirInlet", "AirMassMast.m_Request", "AirDIFF"),
+		DIFFAggregator("MAF.m_AirInlet", "m_Request", "AirDIFF"),
+		DIFFAggregator("MAF.m_AirInlet", "AirMassMast.m_Request", "AirDIFF"),
 	)
 
 	go c.run()
@@ -79,7 +79,7 @@ func (e *Controller) run() {
 				}
 			}
 			for _, agg := range e.aggregators {
-				agg.fun(*msg.Topic, *msg.Data)
+				agg.fun(e, *msg.Topic, *msg.Data)
 			}
 
 		case unsub := <-e.unsubAll:
@@ -144,7 +144,7 @@ func (e *Controller) SubscribeAll() chan *EBusMessage {
 	return respChan
 }
 
-func (e *Controller) SubscribeAllFunc(f func(topic string, value float64)) func() /*unsubscribe*/ {
+func (e *Controller) SubscribeAllFunc(f func(topic string, value float64)) (cancel func()) {
 	respChan := e.SubscribeAll()
 	go func() {
 		for v := range respChan {
@@ -152,9 +152,10 @@ func (e *Controller) SubscribeAllFunc(f func(topic string, value float64)) func(
 		}
 	}()
 	// return a function that can be used to unsubscribe
-	return func() { // unsubscribe
+	cancel = func() { // unsubscribe
 		e.UnsubscribeAll(respChan)
 	}
+	return
 }
 
 func (e *Controller) UnsubscribeAll(channel chan *EBusMessage) {
@@ -162,16 +163,17 @@ func (e *Controller) UnsubscribeAll(channel chan *EBusMessage) {
 }
 
 // SubscribeFunc returns a function that can be used to unsubscribe the function
-func (e *Controller) SubscribeFunc(topic string, f func(float64)) func() {
+func (e *Controller) SubscribeFunc(topic string, f func(float64)) (cancel func()) {
 	respChan := e.Subscribe(topic)
 	go func() {
 		for v := range respChan {
 			f(v)
 		}
 	}()
-	return func() {
+	cancel = func() {
 		e.Unsubscribe(respChan)
 	}
+	return
 }
 
 func (e *Controller) Subscribe(topic string) chan float64 {
@@ -188,4 +190,19 @@ func (e *Controller) Subscribe(topic string) chan float64 {
 
 func (e *Controller) Unsubscribe(channel chan float64) {
 	e.unsub <- channel
+}
+
+func (e *Controller) RegisterAggregator(aggs ...*EventAggregator) {
+	e.aggregatorsLock.Lock()
+	defer e.aggregatorsLock.Unlock()
+outer:
+
+	for _, agg := range aggs {
+		for _, existing := range e.aggregators {
+			if existing == agg {
+				continue outer
+			}
+		}
+		e.aggregators = append(e.aggregators, agg)
+	}
 }

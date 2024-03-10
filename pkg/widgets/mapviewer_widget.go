@@ -272,11 +272,11 @@ func (mv *MapViewer) Info() MapViewerInfo {
 }
 
 func (mv *MapViewer) SetValue(name string, value float64) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Println(r)
-		}
-	}()
+	//defer func() {
+	//	if r := recover(); r != nil {
+	//		log.Println(r)
+	//	}
+	//}()
 
 	if name == mv.lambdaName {
 		mv.lamb.SetValue(value)

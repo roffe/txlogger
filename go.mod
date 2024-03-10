@@ -6,7 +6,7 @@ require (
 	github.com/avast/retry-go/v4 v4.5.1
 	github.com/fatih/color v1.16.0
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
-	github.com/roffe/gocan v0.0.0-20240308201926-a8f7a6cfc502
+	github.com/roffe/gocan v0.0.0-20240309213347-4f36c3d8a735
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/sqweek/dialog v0.0.0-20220809060634-e981b270ebbf
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9
@@ -19,7 +19,7 @@ require (
 )
 
 require (
-	fyne.io/fyne/v2 v2.4.4
+	fyne.io/fyne/v2 v2.4.4-rc2.0.20240307214057-417de2f7f70c
 	fyne.io/systray v1.10.1-0.20231230205326-d160fd363db9 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
@@ -32,7 +32,7 @@ require (
 	github.com/fyne-io/glfw-js v0.0.0-20240101223322-6e1efdc71b7a // indirect
 	github.com/fyne-io/image v0.0.0-20240121103648-c3c798e60e6b // indirect
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71 // indirect
-	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20240118000515-a250818d05e3 // indirect
+	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20240306074159-ea2d69986ecb // indirect
 	github.com/go-text/render v0.0.0-20240129162809-b6410f7d78ad // indirect
 	github.com/go-text/typesetting v0.1.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
@@ -70,6 +70,11 @@ require fyne.io/x/fyne v0.0.0-20240216160529-61d0ff41acd7
 
 require github.com/jellydator/ttlcache/v3 v3.2.0
 
-// replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
+require (
+	github.com/jeandeaual/go-locale v0.0.0-20240204043739-672d8d016d9a // indirect
+	github.com/nicksnyder/go-i18n/v2 v2.4.0 // indirect
+)
+
+//replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
 
 // replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol

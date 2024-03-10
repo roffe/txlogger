@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
 	"log"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/theme"
+	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/windows"
 )
 
@@ -23,6 +25,9 @@ func main() {
 func mainz(args []string) {
 	a := app.NewWithID("com.roffe.txlogger")
 	a.Settings().SetTheme(&txTheme{})
+
+	meta := a.Metadata()
+	debug.Log(fmt.Sprintf("starting txlogger v%s build %d", meta.Version, meta.Build))
 
 	var mw *windows.MainWindow
 

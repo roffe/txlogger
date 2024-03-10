@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"fmt"
 	"image/color"
-	"log"
 	"strconv"
 	"time"
 
@@ -289,11 +288,11 @@ func (db *Dashboard) SetTimeText(text string) {
 }
 
 func (db *Dashboard) SetValue(key string, value float64) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Println(err)
-		}
-	}()
+	//defer func() {
+	//	if err := recover(); err != nil {
+	//		log.Println(err)
+	//	}
+	//}()
 	if db != nil {
 		if fun, ok := db.metrics[key]; ok {
 			fun(value)

@@ -3,7 +3,6 @@ package kwp2000
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -14,6 +13,7 @@ import (
 	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
+	"github.com/roffe/txlogger/pkg/debug"
 )
 
 var (
@@ -67,7 +67,7 @@ func (t *Client) StartSession(ctx context.Context, id, responseID uint32) error 
 }
 
 func (t *Client) StopSession(ctx context.Context) error {
-	payload := []byte{0x40, 0xA1, 0x02, STOP_COMMUNICATION, 0x00, 0x00, 0x00, 0x00}
+	payload := []byte{0x40, 0xA1, 0x02, STOP_COMMUNICATION}
 	frame := gocan.NewFrame(REQ_MSG_ID, payload, gocan.ResponseRequired)
 	return t.c.Send(frame)
 }
@@ -404,7 +404,7 @@ func (t *Client) RequestSecurityAccess(ctx context.Context, force bool) (bool, e
 	for i := 0; i <= 4; i++ {
 		ok, err := t.letMeIn(ctx, i)
 		if err != nil {
-			log.Printf("/!\\ Failed to obtain security access: %v", err)
+			debug.Log(fmt.Sprintf("failed to obtain security access: %v", err))
 			time.Sleep(3 * time.Second)
 			continue
 		}
@@ -414,55 +414,50 @@ func (t *Client) RequestSecurityAccess(ctx context.Context, force bool) (bool, e
 		}
 	}
 
-	return false, retry.Unrecoverable(fmt.Errorf("RequestSecurityAccess: access was not granted"))
+	return false, retry.Unrecoverable(fmt.Errorf("security access was not granted"))
 }
 
 func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 	msg := []byte{0x40, 0xA1, 0x02, SECURITY_ACCESS, DEVELOPMENT_PRIORITY}
-	msgReply := []byte{0x40, 0xA1, 0x04, SECURITY_ACCESS, DEVELOPMENT_PRIORITY + 1, 0x00, 0x00}
 
-	f, err := t.c.SendAndPoll(ctx, gocan.NewFrame(REQ_MSG_ID, msg, gocan.ResponseRequired), t.defaultTimeout, t.responseID)
+	ff, err := t.c.SendAndPoll(ctx, gocan.NewFrame(REQ_MSG_ID, msg, gocan.ResponseRequired), t.defaultTimeout, t.responseID)
 	if err != nil {
 		return false, fmt.Errorf("request seed: %v", err)
 	}
 
-	if err := checkErr(f); err != nil {
+	if err := checkErr(ff); err != nil {
 		return false, err
 	}
 
-	d := f.Data()
-	t.Ack(d[0], gocan.ResponseRequired)
+	d := ff.Data()
 
-	s := int(d[5])<<8 | int(d[6])
-	k := CalcSeed(s, method)
+	seed := int(d[5])<<8 | int(d[6])
+	key := CalcKey(seed, method)
 
-	msgReply[5] = byte(int(k) >> 8 & int(0xFF))
-	msgReply[6] = byte(k) & 0xFF
-
-	time.Sleep(10 * time.Millisecond)
-
-	f2, err := t.c.SendAndPoll(ctx, gocan.NewFrame(REQ_MSG_ID, msgReply, gocan.ResponseRequired), 200*time.Millisecond, t.responseID)
+	msgReply := []byte{0x40, 0xA1, 0x04, SECURITY_ACCESS, DEVELOPMENT_PRIORITY + 1, byte(int(key) >> 8), byte(key)}
+	f2, err := t.c.SendAndPoll(ctx, gocan.NewFrame(REQ_MSG_ID, msgReply, gocan.ResponseRequired), t.defaultTimeout*2, t.responseID)
 	if err != nil {
 		return false, fmt.Errorf("send seed: %v", err)
 
 	}
 	d2 := f2.Data()
-	t.Ack(d2[0], gocan.ResponseRequired)
 	if d2[3] == 0x67 && d2[5] == 0x34 {
 		return true, nil
 	} else {
-		log.Println(f2.String())
-		return false, errors.New("invalid response")
+		err := fmt.Errorf("invalid response security access: %X", d2)
+		debug.Log(err.Error())
+		return false, err
 	}
 }
 
 // 266h Send acknowledgement, has 0x3F on 3rd!
 func (t *Client) Ack(val byte, typ gocan.CANFrameType) error {
-	ack := []byte{0x40, 0xA1, 0x3F, val & 0xBF, 0x00, 0x00, 0x00, 0x00}
-	return t.c.Send(gocan.NewFrame(0x266, ack, typ))
+	frame := gocan.NewFrame(0x266, []byte{0x40, 0xA1, 0x3F, val & 0xBF}, typ)
+	//debug.Log(fmt.Sprintf("Ack: %s", frame.String()))
+	return t.c.Send(frame)
 }
 
-func CalcSeed(seed int, method int) int {
+func CalcKey(seed int, method int) int {
 	key := seed << 2
 	key &= 0xFFFF
 	switch method {
@@ -473,13 +468,13 @@ func CalcSeed(seed int, method int) int {
 		key ^= 0x4081
 		key -= 0x1F6F
 	case 2:
-		key ^= 0x3DC
+		key ^= 0x03DC
 		key -= 0x2356
 	case 3:
-		key ^= 0x3D7
+		key ^= 0x03D7
 		key -= 0x2356
 	case 4:
-		key ^= 0x409
+		key ^= 0x0409
 		key -= 0x2356
 	}
 	key &= 0xFFFF

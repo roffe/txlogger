@@ -1,31 +1,19 @@
 package eventbus
 
-type EventAggregatorFunc func(name string, value float64)
+import "log"
 
 type EventAggregator struct {
 	fun EventAggregatorFunc
 }
 
-func (e *Controller) RegisterAggregator(aggs ...*EventAggregator) {
-	e.aggregatorsLock.Lock()
-	defer e.aggregatorsLock.Unlock()
-outer:
+type EventAggregatorFunc func(c *Controller, name string, value float64)
 
-	for _, agg := range aggs {
-		for _, existing := range e.aggregators {
-			if existing == agg {
-				continue outer
-			}
-		}
-		e.aggregators = append(e.aggregators, agg)
-	}
-}
-
-func DIFFAggregator(c *Controller, first, second, outputName string) *EventAggregator {
+func DIFFAggregator(first, second, output string) *EventAggregator {
 	var firstUpdated, secondUpdated bool
 	var firstValue, secondValue float64
+	var diff float64
 	return &EventAggregator{
-		fun: func(name string, value float64) {
+		fun: func(c *Controller, name string, value float64) {
 			if name == first {
 				firstValue = value
 				firstUpdated = true
@@ -35,7 +23,10 @@ func DIFFAggregator(c *Controller, first, second, outputName string) *EventAggre
 				secondUpdated = true
 			}
 			if firstUpdated && secondUpdated {
-				c.Publish(outputName, secondValue-firstValue)
+				diff = secondValue - firstValue
+				if err := c.Publish(output, diff); err != nil {
+					log.Printf("failed to publish diff %s: %v", output, err)
+				}
 				firstUpdated, secondUpdated = false, false
 			}
 		},
