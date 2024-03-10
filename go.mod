@@ -19,7 +19,7 @@ require (
 )
 
 require (
-	fyne.io/fyne/v2 v2.4.4-rc2.0.20240307214057-417de2f7f70c
+	fyne.io/fyne/v2 v2.4.4
 	fyne.io/systray v1.10.1-0.20231230205326-d160fd363db9 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
@@ -69,11 +69,6 @@ require github.com/roffe/ecusymbol v0.0.0-20240308231438-8ad3e7498614
 require fyne.io/x/fyne v0.0.0-20240216160529-61d0ff41acd7
 
 require github.com/jellydator/ttlcache/v3 v3.2.0
-
-require (
-	github.com/jeandeaual/go-locale v0.0.0-20240204043739-672d8d016d9a // indirect
-	github.com/nicksnyder/go-i18n/v2 v2.4.0 // indirect
-)
 
 //replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
 
