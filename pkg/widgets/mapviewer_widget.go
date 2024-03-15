@@ -88,6 +88,8 @@ type MapViewer struct {
 	mousePos fyne.Position
 	popup    *widget.PopUpMenu
 
+	showWBL bool
+
 	lamb       *CBar
 	lambdaName string
 }
@@ -165,17 +167,19 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		mv.valueTexts,
 	)
 
-	mv.lamb = NewCBar(&CBarConfig{
-		Title:           "",
-		Min:             0.50,
-		Center:          1,
-		Max:             1.50,
-		Steps:           20,
-		Minsize:         fyne.NewSize(100, 25),
-		TextPosition:    TextAtCenter,
-		DisplayString:   "λ %.2f",
-		DisplayTextSize: 25,
-	})
+	if mv.showWBL {
+		mv.lamb = NewCBar(&CBarConfig{
+			Title:           "",
+			Min:             0.50,
+			Center:          1,
+			Max:             1.50,
+			Steps:           20,
+			Minsize:         fyne.NewSize(100, 25),
+			TextPosition:    TextAtCenter,
+			DisplayString:   "λ %.2f",
+			DisplayTextSize: 25,
+		})
+	}
 
 	var buttons *fyne.Container
 	if mv.buttonsEnabled {
@@ -230,15 +234,23 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		)
 	}
 
-	mapview := container.NewBorder(
-		mv.xAxisLabels,
-		container.NewBorder(
+	var mid fyne.CanvasObject
+
+	if mv.showWBL {
+		mid = container.NewBorder(
 			mv.lamb,
 			nil,
 			nil,
 			nil,
 			buttons,
-		),
+		)
+	} else {
+		mid = buttons
+	}
+
+	mapview := container.NewBorder(
+		mv.xAxisLabels,
+		mid,
 		mv.yAxisLabels,
 		nil,
 		mv.innerView,

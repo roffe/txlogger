@@ -224,7 +224,7 @@ func (c *T7Client) Start() error {
 				return err
 			}
 			dpos++
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 		}
 		c.OnMessage("Configured dynamic register")
 
@@ -309,7 +309,9 @@ func (c *T7Client) Start() error {
 				}
 
 				if len(databuff) != int(expectedPayloadSize) {
-					return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
+					c.onError(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
+					continue
+					//return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
 				}
 
 				r := bytes.NewReader(databuff)
@@ -408,13 +410,23 @@ func AirDemToStringT7(v float64) string {
 	case 53:
 		return "Max Turbo Speed"
 	case 54:
-		return "N.A"
+		return "Crankcase vent error"
 	case 55:
 		return "Faulty APC valve"
 	case 60:
 		return "Emission Limitation"
+	case 61:
+		return "Engine Tipin"
+	case 62:
+		return "Engine Tipout"
 	case 70:
-		return "Safety Switch Limit"
+		return "Safety Switch"
+	case 71:
+		return "O2 Sens fault, E85"
+	case 80:
+		return "Cold engine temp"
+	case 81:
+		return "Overheating"
 	default:
 		return "Unknown"
 	}

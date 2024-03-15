@@ -140,12 +140,13 @@ func (mw *MainWindow) createButtons() {
 		}
 
 		dbcfg := &widgets.DashboardConfig{
-			App:       mw.app,
-			Mw:        mw,
-			Logplayer: false,
-			LogBtn:    mw.logBtn,
-			OnClose:   onClose,
-			UseMPH:    mw.settings.GetUseMPH(),
+			App:             mw.app,
+			Mw:              mw,
+			Logplayer:       false,
+			LogBtn:          mw.logBtn,
+			OnClose:         onClose,
+			UseMPH:          mw.settings.GetUseMPH(),
+			SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
 		}
 
 		switch mw.ecuSelect.Selected {

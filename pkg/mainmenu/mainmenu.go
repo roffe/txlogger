@@ -41,6 +41,7 @@ var T7SymbolsTuning = map[string][]string{
 	},
 	"Limiters": {
 		"BstKnkCal.MaxAirmass",
+		"BstKnkCal.MaxAirmassAu",
 		"TorqueCal.M_ManGearLim",
 	},
 	"Fuel": {
@@ -75,6 +76,8 @@ var T7SymbolsTuning = map[string][]string{
 		"MyrtilosCal.Launch_RPM",
 		"MyrtilosCal.Launch_InjFac_at_rpm",
 		"MyrtilosCal.Launch_PWM_max_at_stand",
+		"MyrtilosAdap.WBLambda_FeedbackMap",
+		"MyrtilosAdap.WBLambda_FFMap",
 	},
 }
 

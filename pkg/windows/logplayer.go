@@ -94,11 +94,12 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 	w.Resize(fyne.NewSize(1024, 530))
 
 	dbCfg := &widgets.DashboardConfig{
-		App:       a,
-		Mw:        w,
-		Logplayer: true,
-		LogBtn:    nil,
-		UseMPH:    a.Preferences().BoolWithFallback("useMPH", false),
+		App:             a,
+		Mw:              w,
+		Logplayer:       true,
+		LogBtn:          nil,
+		UseMPH:          a.Preferences().BoolWithFallback("useMPH", false),
+		SwapRPMandSpeed: a.Preferences().BoolWithFallback("swapRPMandSpeed", false),
 	}
 
 	lp := &LogPlayer{

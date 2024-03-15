@@ -91,6 +91,7 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 			widgets.WithInterPolFunc(interpolate.Interpolate),
 			widgets.WithEditable(false),
 			widgets.WithLambdaSymbolName(lp.lambSymbolName),
+			widgets.WithWBL(true),
 		)
 		if err != nil {
 			dialog.ShowError(fmt.Errorf("x: %s y: %s z: %s err: %w", axis.X, axis.Y, axis.Z, err), lp.Window)

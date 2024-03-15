@@ -129,6 +129,13 @@ func WithMeshView(meshView bool) MapViewerOption {
 	}
 }
 
+func WithWBL(enabled bool) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.showWBL = enabled
+		return nil
+	}
+}
+
 func WithEditable(editable bool) MapViewerOption {
 	return func(mv *MapViewer) error {
 		mv.editable = editable

@@ -60,14 +60,14 @@ func (mw *MainWindow) setupMenu() {
 }
 
 func (mw *MainWindow) openMapz(typ symbol.ECUType, mapNames ...string) {
+	if mw.fw == nil {
+		mw.Log("No binary loaded")
+		return
+	}
 	joinedNames := strings.Join(mapNames, "|")
 	mv, found := mw.openMaps[joinedNames]
 	if !found {
 		w := mw.app.NewWindow(strings.Join(mapNames, ", ") + " - Map Viewer")
-		if mw.fw == nil {
-			mw.Log("No binary loaded")
-			return
-		}
 		view, err := widgets.NewMapViewerMulti(typ, mw.fw, mapNames...)
 		if err != nil {
 			mw.Log(err.Error())
@@ -108,16 +108,14 @@ func (mw *MainWindow) openMapz(typ symbol.ECUType, mapNames ...string) {
 }
 
 func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
+	if mw.fw == nil {
+		mw.Log("No binary loaded")
+		return
+	}
 	axis := symbol.GetInfo(typ, mapName)
-
 	mww, found := mw.openMaps[axis.Z]
 	if found {
 		mww.RequestFocus()
-		return
-	}
-
-	if mw.fw == nil {
-		mw.Log("No binary loaded")
 		return
 	}
 	xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := mw.fw.GetXYZ(axis.X, axis.Y, axis.Z)
@@ -248,6 +246,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		widgets.WithLambdaSymbolName(mw.settings.GetLambdaSymbolName()),
 		widgets.WithEditable(true),
 		widgets.WithButtons(true),
+		widgets.WithWBL(true),
 	)
 	if err != nil {
 		mw.Log(err.Error())

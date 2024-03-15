@@ -25,22 +25,24 @@ const (
 	prefsLogPath           = "logPath"
 	prefsLambdaSource      = "lambdaSource"
 	prefsUseMPH            = "useMPH"
+	prefsSwapRPMandSpeed   = "swapRPMandSpeed"
 )
 
 type SettingsWidget struct {
 	widget.BaseWidget
 
-	freqSlider   *widget.Slider
-	freqValue    *widget.Label
-	autoSave     *widget.Check
-	autoLoad     *widget.Check
-	livePreview  *widget.Check
-	meshView     *widget.Check
-	realtimeBars *widget.Check
-	logFormat    *widget.Select
-	logPath      *widget.Label
-	lambdaSource *widget.Select
-	useMPH       *widget.Check
+	freqSlider      *widget.Slider
+	freqValue       *widget.Label
+	autoSave        *widget.Check
+	autoLoad        *widget.Check
+	livePreview     *widget.Check
+	meshView        *widget.Check
+	realtimeBars    *widget.Check
+	logFormat       *widget.Select
+	logPath         *widget.Label
+	lambdaSource    *widget.Select
+	useMPH          *widget.Check
+	swapRPMandSpeed *widget.Check
 
 	container *fyne.Container
 }
@@ -96,6 +98,10 @@ func (sw *SettingsWidget) GetUseMPH() bool {
 	return sw.useMPH.Checked
 }
 
+func (sw *SettingsWidget) GetSwapRPMandSpeed() bool {
+	return sw.swapRPMandSpeed.Checked
+}
+
 func NewSettingsWidget() *SettingsWidget {
 	sw := &SettingsWidget{}
 	sw.ExtendBaseWidget(sw)
@@ -114,6 +120,7 @@ func NewSettingsWidget() *SettingsWidget {
 
 	lambdaSel := sw.newLambdaSelector()
 	sw.useMPH = sw.newUserMPH()
+	sw.swapRPMandSpeed = sw.newSwapRPMandSpeed()
 
 	sw.container =
 		container.NewVBox(
@@ -195,6 +202,13 @@ func NewSettingsWidget() *SettingsWidget {
 				nil,
 				sw.useMPH,
 			),
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewIcon(theme.InfoIcon()),
+				nil,
+				sw.swapRPMandSpeed,
+			),
 		)
 	sw.loadPrefs()
 	return sw
@@ -267,6 +281,11 @@ func (sw *SettingsWidget) newUserMPH() *widget.Check {
 	})
 }
 
+func (sw *SettingsWidget) newSwapRPMandSpeed() *widget.Check {
+	return widget.NewCheck("Swap RPM and Speed gauge position", func(b bool) {
+		fyne.CurrentApp().Preferences().SetBool(prefsSwapRPMandSpeed, b)
+	})
+}
 func (sw *SettingsWidget) loadPrefs() {
 	freq := fyne.CurrentApp().Preferences().IntWithFallback(prefsFreq, 25)
 	sw.freqSlider.SetValue(float64(freq))
@@ -279,6 +298,7 @@ func (sw *SettingsWidget) loadPrefs() {
 	sw.logPath.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogPath, datalogger.LOGPATH))
 	sw.lambdaSource.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLambdaSource, "ECU"))
 	sw.useMPH.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsUseMPH, false))
+	sw.swapRPMandSpeed.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsSwapRPMandSpeed, false))
 }
 
 func (sw *SettingsWidget) CreateRenderer() fyne.WidgetRenderer {

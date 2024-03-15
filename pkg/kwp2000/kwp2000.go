@@ -382,15 +382,15 @@ func (t *Client) DynamicallyDefineLocalIdRequest(ctx context.Context, index int,
 	for _, msg := range t.splitRequest(message, false) {
 		if msg.Type().Type == 1 {
 			if err := t.c.Send(msg); err != nil {
-				return fmt.Errorf("DynamicallyDefineLocalIdRequest: %w", err)
+				return fmt.Errorf("DynamicallyDefineLocalIdRequest1: %w", err)
 			}
 		} else {
-			resp, err := t.c.SendAndPoll(ctx, msg, t.defaultTimeout, REQ_CHUNK_CONF_ID, t.responseID)
+			resp, err := t.c.SendAndPoll(ctx, msg, t.defaultTimeout, REQ_CHUNK_CONF_ID)
 			if err != nil {
-				return fmt.Errorf("DynamicallyDefineLocalIdRequest: %w", err)
+				return fmt.Errorf("DynamicallyDefineLocalIdRequest2: %w", err)
 			}
 			if err := TranslateErrorCode(resp.Data()[3+2]); err != nil {
-				return fmt.Errorf("DynamicallyDefineLocalIdRequest: %w", err)
+				return fmt.Errorf("DynamicallyDefineLocalIdRequest3: %w", err)
 			}
 		}
 	}

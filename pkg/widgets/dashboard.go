@@ -33,6 +33,7 @@ type Dashboard struct {
 	nblambda, wblambda              *CBar
 	boost, air                      *DualDial
 	ioff, activeAirDem, ign, cruise *canvas.Text
+	idc                             *canvas.Text
 	checkEngine                     *canvas.Image
 	limpMode                        *canvas.Image
 	knockIcon                       *Icon
@@ -53,13 +54,14 @@ type Dashboard struct {
 }
 
 type DashboardConfig struct {
-	App            fyne.App
-	Mw             fyne.Window
-	Logplayer      bool
-	LogBtn         *widget.Button
-	OnClose        func()
-	AirDemToString func(float64) string
-	UseMPH         bool
+	App             fyne.App
+	Mw              fyne.Window
+	Logplayer       bool
+	LogBtn          *widget.Button
+	OnClose         func()
+	AirDemToString  func(float64) string
+	UseMPH          bool
+	SwapRPMandSpeed bool
 }
 
 // func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.Button, onClose func()) *Dashboard {
@@ -167,6 +169,12 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 			TextSize:  28,
 			Color:     color.RGBA{R: 0, G: 255, B: 0, A: 255},
 		},
+		idc: &canvas.Text{
+			Text:      "Idc: 00%",
+			Alignment: fyne.TextAlignLeading,
+			TextSize:  44,
+			Color:     color.RGBA{R: 0, G: 255, B: 0, A: 255},
+		},
 		air: NewDualDial(DualDialConfig{
 			Title: "mg/c",
 			Min:   0,
@@ -228,6 +236,7 @@ func (db *Dashboard) render() *fyne.Container {
 		//db.dbgBar,
 		db.ign,
 		db.ioff,
+		db.idc,
 		db.rpm,
 		db.air,
 		db.boost,
@@ -308,6 +317,22 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		}
 	}
 
+	idcSetter := func(obj *canvas.Text, text string) func(float64) {
+		return func(value float64) {
+			///obj.Text = text + ": " + strconv.FormatFloat(value, 'f', 0, 64) + "%"
+			obj.Text = fmt.Sprintf(text+": %02.0f%%", value)
+			switch {
+			case value > 60 && value < 85:
+				obj.Color = color.RGBA{R: 0xFF, G: 0xA5, B: 0, A: 0xFF}
+			case value >= 85:
+				obj.Color = color.RGBA{R: 0xFF, G: 0, B: 0, A: 0xFF}
+			default:
+				obj.Color = color.RGBA{R: 0, G: 0xFF, B: 0, A: 0xFF}
+			}
+			obj.Refresh()
+		}
+	}
+
 	ioff := func(value float64) {
 		db.ioff.Text = "Ioff: " + strconv.FormatFloat(value, 'f', 1, 64)
 		//db.ioff.Text = fmt.Sprintf("Ioff: %-6s", strconv.FormatFloat(value, 'f', 1, 64))
@@ -371,31 +396,32 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 	}
 
 	router := map[string]func(float64){
-		"In.v_Vehicle":              setVehicleSpeed,
-		"ActualIn.n_Engine":         db.rpm.SetValue,
-		"ActualIn.T_AirInlet":       db.iat.SetValue,
-		"ActualIn.T_Engine":         db.engineTemp.SetValue,
-		"In.p_AirInlet":             db.boost.SetValue,
-		"ActualIn.p_AirInlet":       db.boost.SetValue,
-		"In.p_AirBefThrottle":       db.boost.SetValue2,
-		"ActualIn.p_AirBefThrottle": db.boost.SetValue2,
-		"Out.X_AccPedal":            db.throttle.SetValue, // t7
-		"Out.X_AccPos":              db.throttle.SetValue, // t8
-		"Out.PWM_BoostCntrl":        db.pwm.SetValue,
-		"DisplProt.LambdaScanner":   db.wblambda.SetValue,
-		"Lambda.External":           db.wblambda.SetValue,
-		"Lambda.LambdaInt":          db.nblambda.SetValue,
-		"MAF.m_AirInlet":            db.air.SetValue,
-		"m_Request":                 db.air.SetValue2,
-		"AirMassMast.m_Request":     db.air.SetValue2,
-		"Out.fi_Ignition":           textSetter(db.ign, "Ign", 1),
-		"ECMStat.ST_ActiveAirDem":   ecmstat,
-		"IgnProt.fi_Offset":         ioff,
-		"IgnMastProt.fi_Offset":     ioff,
-		"CRUISE":                    showHider(db.cruise),
-		"CEL":                       showHider(db.checkEngine),
-		"LIMP":                      showHider(db.limpMode),
-		"KnkDet.KnockCyl":           knkDet,
+		"In.v_Vehicle":               setVehicleSpeed,
+		"ActualIn.n_Engine":          db.rpm.SetValue,
+		"ActualIn.T_AirInlet":        db.iat.SetValue,
+		"ActualIn.T_Engine":          db.engineTemp.SetValue,
+		"In.p_AirInlet":              db.boost.SetValue,
+		"ActualIn.p_AirInlet":        db.boost.SetValue,
+		"In.p_AirBefThrottle":        db.boost.SetValue2,
+		"ActualIn.p_AirBefThrottle":  db.boost.SetValue2,
+		"Out.X_AccPedal":             db.throttle.SetValue, // t7
+		"Out.X_AccPos":               db.throttle.SetValue, // t8
+		"Out.PWM_BoostCntrl":         db.pwm.SetValue,
+		"DisplProt.LambdaScanner":    db.wblambda.SetValue,
+		"Lambda.External":            db.wblambda.SetValue,
+		"Lambda.LambdaInt":           db.nblambda.SetValue,
+		"MAF.m_AirInlet":             db.air.SetValue,
+		"m_Request":                  db.air.SetValue2,
+		"AirMassMast.m_Request":      db.air.SetValue2,
+		"Out.fi_Ignition":            textSetter(db.ign, "Ign", 1),
+		"ECMStat.ST_ActiveAirDem":    ecmstat,
+		"IgnProt.fi_Offset":          ioff,
+		"IgnMastProt.fi_Offset":      ioff,
+		"CRUISE":                     showHider(db.cruise),
+		"CEL":                        showHider(db.checkEngine),
+		"LIMP":                       showHider(db.limpMode),
+		"KnkDet.KnockCyl":            knkDet,
+		"Myrtilos.InjectorDutyCycle": idcSetter(db.idc, "Idc"),
 	}
 
 	return router
@@ -601,8 +627,22 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 
 	// Dials
 
-	db.rpm.Resize(fyne.NewSize(sixthWidth, thirdHeight))
-	db.rpm.Move(fyne.NewPos(0, 0))
+	if !db.cfg.SwapRPMandSpeed {
+		// Top left
+		db.rpm.Resize(fyne.NewSize(sixthWidth, thirdHeight))
+		db.rpm.Move(fyne.NewPos(0, 0))
+
+		// Center dial
+		db.speed.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth/3*2)-20, space.Height-115))
+		db.speed.Move(fyne.NewPos(space.Width/2-db.speed.Size().Width/2, space.Height/2-db.speed.Size().Height/2+25))
+	} else {
+		db.speed.Resize(fyne.NewSize(sixthWidth, thirdHeight))
+		db.speed.Move(fyne.NewPos(0, 0))
+
+		// Center dial
+		db.rpm.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth/3*2)-20, space.Height-115))
+		db.rpm.Move(fyne.NewPos(space.Width/2-db.rpm.Size().Width/2, space.Height/2-db.rpm.Size().Height/2+25))
+	}
 
 	db.air.Resize(fyne.NewSize(sixthWidth, thirdHeight))
 	db.air.Move(fyne.NewPos(0, thirdHeight))
@@ -615,11 +655,6 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 
 	db.engineTemp.Resize(fyne.NewSize(sixthWidth, halfHeight))
 	db.engineTemp.Move(fyne.NewPos(space.Width-db.engineTemp.Size().Width, halfHeight))
-
-	// Center dial
-
-	db.speed.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth/3*2)-20, space.Height-115))
-	db.speed.Move(fyne.NewPos(space.Width/2-db.speed.Size().Width/2, space.Height/2-db.speed.Size().Height/2+25))
 
 	// Vbar
 	pwm := db.pwm
@@ -677,6 +712,9 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 
 	//db.ioff.TextSize = textSize
 	db.ioff.Move(fyne.NewPos(db.nblambda.Position().X, db.ign.Position().Y+54))
+
+	//db.idc.TextSize = textSize
+	db.idc.Move(fyne.NewPos((db.nblambda.Position().X+db.nblambda.Size().Width)-db.idc.MinSize().Width, db.nblambda.Size().Height-14))
 
 	db.activeAirDem.TextSize = min(space.Width/25.0, 45)
 	db.activeAirDem.Move(fyne.NewPos(space.Width/2, thirdHeight))
