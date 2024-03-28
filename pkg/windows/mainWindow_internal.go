@@ -17,13 +17,18 @@ func (mw *MainWindow) setTitle(str string) {
 }
 
 func (mw *MainWindow) loadPrefs(filename string) {
-	if cfg := mw.app.Preferences().String(prefsSymbolList); cfg != "" {
-		mw.LoadConfigFromString(cfg)
-	}
+	//if cfg := mw.app.Preferences().String(prefsSymbolList); cfg != "" {
+	//	mw.LoadPresetFromString(cfg)
+	//}
 
 	if ecu := mw.app.Preferences().StringWithFallback(prefsSelectedECU, "T7"); ecu != "" {
 		mw.ecuSelect.SetSelected(ecu)
 	}
+
+	if preset := mw.app.Preferences().String(prefsSelectedPreset); preset != "" {
+		mw.presetSelect.SetSelected(preset)
+	}
+
 	if filename == "" {
 		if filename := mw.app.Preferences().String(prefsLastBinFile); filename != "" {
 			if err := mw.LoadSymbolsFromFile(filename); err != nil {

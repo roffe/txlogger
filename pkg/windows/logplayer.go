@@ -21,6 +21,7 @@ import (
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/mainmenu"
+	"github.com/roffe/txlogger/pkg/plotter"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
@@ -86,6 +87,8 @@ type LogPlayer struct {
 
 	lambSymbolName string
 
+	plotter *plotter.Plotter
+
 	fyne.Window
 }
 
@@ -119,6 +122,8 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 		Window: w,
 	}
 
+	unsubDB := lp.ebus.SubscribeAllFunc(lp.db.SetValue)
+
 	l, err := readFirstLine(filename)
 	if err != nil {
 		log.Println(err)
@@ -151,6 +156,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 	}, lp.openMap, lp.openMapz)
 
 	w.SetCloseIntercept(func() {
+		unsubDB()
 		lp.controlChan <- &controlMsg{Op: OpExit}
 		if lp.db != nil {
 			lp.db.Close()
@@ -252,8 +258,6 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 	lp.Canvas().SetOnTypedKey(lp.handler)
 
 	w.SetMainMenu(lp.menu.GetMenu(lp.logType))
-	w.SetContent(lp.render())
-	w.Show()
 
 	start := time.Now()
 	logz, err = logfile.Open(filename)
@@ -263,36 +267,69 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 	}
 	log.Printf("Parsed %d records in %s", logz.Len(), time.Since(start))
 
+	lp.setupPlot(filename, logz)
+
 	lp.slider.Max = float64(logz.Len())
 	lp.posLabel.SetText("0.0%")
 	lp.slider.Refresh()
+
+	w.SetContent(lp.render())
+	w.Show()
+
 	go lp.PlayLog(logz)
 
 	return lp
 }
 
-func (lp *LogPlayer) render() fyne.CanvasObject {
-	main := container.NewBorder(
-		nil,
-		container.NewBorder(
-			nil,
-			nil,
-			container.NewGridWithColumns(3,
-				lp.prevBtn,
-				lp.toggleBtn,
-				lp.nextBtn,
-			),
-			container.NewGridWithColumns(2,
-				lp.restartBtn,
-				layout.NewFixedWidth(75, lp.speedSelect),
-			),
-			container.NewBorder(nil, nil, nil, lp.posLabel, lp.slider),
-		),
-		nil,
-		nil,
-		lp.db,
+func (lp *LogPlayer) setupPlot(filename string, logz logfile.Logfile) {
+	start := time.Now()
+	values := make(map[string][]float64)
+	for {
+		if rec := logz.Next(); rec != nil {
+			//times = append(times, rec.Time)
+			for k, v := range rec.Values {
+				values[k] = append(values[k], v)
+			}
+		} else {
+			break
+		}
+	}
+	logz.Seek(0)
+
+	lp.plotter = plotter.NewPlotter(
+		values,
+		plotter.WithControls(false),
 	)
-	return main
+	lp.plotter.Logplayer = true
+	log.Println("creating plotter took", time.Since(start))
+}
+
+func (lp *LogPlayer) render() fyne.CanvasObject {
+	split := container.NewVSplit(
+		lp.db,
+		container.NewBorder(
+			container.NewBorder(
+				nil,
+				nil,
+				container.NewGridWithColumns(3,
+					lp.prevBtn,
+					lp.toggleBtn,
+					lp.nextBtn,
+				),
+				container.NewGridWithColumns(2,
+					lp.restartBtn,
+					layout.NewFixedWidth(75, lp.speedSelect),
+				),
+				container.NewBorder(nil, nil, nil, lp.posLabel, lp.slider),
+			),
+			nil,
+			nil,
+			nil,
+			lp.plotter,
+		),
+	)
+	split.Offset = .65
+	return split
 }
 
 func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
@@ -313,8 +350,12 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 			case OpTogglePlayback:
 				play = !play
 			case OpSeek:
+				//log.Println("lp seeking to", op.Pos)
 				logz.Seek(op.Pos)
 				playonce = true
+				if lp.plotter != nil {
+					lp.plotter.Seek(op.Pos)
+				}
 			case OpPrev:
 				pos := logz.Pos() - 2
 				if pos < 0 {
@@ -326,13 +367,15 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 			case OpNext:
 				playonce = true
 			case OpExit:
-				log.Println("Exiting logplayer playback controller")
+				log.Println("exiting logplayer playback controller")
 				return
 			}
 		}
 	}()
 
+	var currPos int
 	for !lp.closed {
+		currPos = logz.Pos()
 		currentMillis = time.Now().UnixMilli()
 		if logz.Pos() >= logz.Len()-1 || (!play && !playonce) {
 			time.Sleep(10 * time.Millisecond)
@@ -345,7 +388,10 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 		if currentMillis < nextFrame {
 			continue
 		}
-		lp.currLine.Set(float64(logz.Pos()))
+		lp.currLine.Set(float64(currPos))
+		if lp.plotter != nil {
+			lp.plotter.Seek(currPos)
+		}
 		if rec := logz.Next(); rec != nil {
 			lp.db.SetTimeText(currentTimeFormatted(rec.Time))
 			delayTilNext := int64(float64(rec.DelayTillNext) * speedMultiplier)
@@ -354,10 +400,10 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 			}
 			nextFrame = (currentMillis + delayTilNext) - 3
 			for k, v := range rec.Values {
-				lp.db.SetValue(k, v)
-				if len(lp.openMaps) > 0 {
-					lp.ebus.Publish(k, v)
-				}
+				//lp.db.SetValue(k, v)
+				//if len(lp.openMaps) > 0 {
+				lp.ebus.Publish(k, v)
+				//}
 			}
 		}
 		if playonce {

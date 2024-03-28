@@ -2,7 +2,6 @@ package windows
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"fyne.io/fyne/v2/dialog"
@@ -11,6 +10,7 @@ import (
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
+	"github.com/roffe/txlogger/pkg/plotter"
 	"github.com/roffe/txlogger/pkg/widgets"
 	sdialog "github.com/sqweek/dialog"
 )
@@ -24,7 +24,7 @@ func (mw *MainWindow) createButtons() {
 		}
 
 		mw.symbolList.Add(sym)
-		mw.SaveSymbolList()
+		//mw.SaveSymbolList()
 		//log.Printf("Name: %s, Method: %d, Value: %d, Type: %X", s.Name, s.Method, s.Value, s.Type)
 	})
 
@@ -65,56 +65,14 @@ func (mw *MainWindow) createButtons() {
 	})
 
 	mw.loadSymbolsEcuBtn = widget.NewButtonWithIcon("Load from ECU", theme.DownloadIcon(), func() {
-		//		mw.progressBar.Start()
 		mw.Disable()
 		go func() {
 			defer mw.Enable()
-			//		defer mw.progressBar.Stop()
 			if err := mw.LoadSymbolsFromECU(); err != nil {
-				// dialog.ShowError(err, mw)
 				mw.Log(err.Error())
 				return
 			}
 		}()
-	})
-
-	mw.loadConfigBtn = widget.NewButtonWithIcon("Load symbols", theme.FileIcon(), func() {
-		filename, err := sdialog.File().Filter("*.json", "json").Load()
-		if err != nil {
-			if err.Error() == "Cancelled" {
-				return
-			}
-			// dialog.ShowError(err, mw)
-			mw.Log(err.Error())
-			return
-		}
-		if err := mw.LoadConfig(filename); err != nil {
-			// dialog.ShowError(err, mw)
-			mw.Log(err.Error())
-			return
-		}
-		mw.SyncSymbols()
-	})
-
-	mw.saveConfigBtn = widget.NewButtonWithIcon("Save symbols", theme.DocumentSaveIcon(), func() {
-		filename, err := sdialog.File().Filter("json", "json").Save()
-		if err != nil {
-			if err.Error() == "Cancelled" {
-				return
-			}
-			// dialog.ShowError(err, mw)
-			mw.Log(err.Error())
-			return
-		}
-		if !strings.HasSuffix(filename, ".json") {
-			filename += ".json"
-		}
-		if err := mw.SaveConfig(filename); err != nil {
-			// dialog.ShowError(err, mw)
-			mw.Log(err.Error())
-			return
-
-		}
 	})
 
 	mw.helpBtn = widget.NewButtonWithIcon("Help", theme.HelpIcon(), func() {
@@ -136,7 +94,7 @@ func (mw *MainWindow) createButtons() {
 			mw.dashboard = nil
 			mw.SetFullScreen(false)
 			mw.SetContent(mw.tab)
-			mw.SetCloseIntercept(mw.closeIntercept)
+			mw.SetCloseIntercept(mw.CloseIntercept)
 		}
 
 		dbcfg := &widgets.DashboardConfig{
@@ -169,6 +127,58 @@ func (mw *MainWindow) createButtons() {
 		})
 
 		mw.SetContent(mw.dashboard)
+	})
+
+	mw.plotterBtn = widget.NewButtonWithIcon("Plotter", theme.VisibilityIcon(), func() {
+		//var unsubDB func()
+
+		quit := make(chan struct{})
+
+		onClose := func() {
+			//if unsubDB != nil {
+			//	unsubDB()
+			//}
+			close(quit)
+			if mw.plotter != nil {
+				//mw.plotter.Close()
+			}
+			mw.plotter = nil
+			mw.SetFullScreen(false)
+			mw.SetContent(mw.tab)
+			mw.SetCloseIntercept(mw.CloseIntercept)
+		}
+
+		values := make(map[string][]float64)
+		for _, sym := range mw.symbolList.Symbols() {
+			values[sym.Name] = append(values[sym.Name], sym.Float64())
+		}
+
+		mw.plotter = plotter.NewPlotter(values)
+
+		go func() {
+			for {
+				select {
+				case <-quit:
+					return
+				case <-time.After(40 * time.Millisecond):
+					val := make(map[string]float64)
+					for _, sym := range mw.symbolList.Symbols() {
+						val[sym.Name] = sym.Float64()
+					}
+					mw.plotter.SetValues(val)
+				}
+			}
+
+		}()
+
+		//unsubDB = ebus.SubscribeAllFunc(mw.plotter.SetValue)
+
+		mw.SetCloseIntercept(func() {
+			onClose()
+		})
+
+		mw.SetContent(mw.plotter)
+
 	})
 
 	mw.logplayerBtn = widget.NewButtonWithIcon("Log Player", theme.MediaFastForwardIcon(), func() {
@@ -214,8 +224,8 @@ func (mw *MainWindow) newSettingsBtn() *widget.Button {
 	btn := widget.NewButtonWithIcon("Settings", theme.SettingsIcon(), func() {
 		mw.SetContent(mw.settings)
 		mw.SetCloseIntercept(func() {
-			mw.SetCloseIntercept(mw.closeIntercept)
-			mw.SetContent(mw.render())
+			mw.SetCloseIntercept(mw.CloseIntercept)
+			mw.SetContent(mw.tab)
 		})
 	})
 	return btn

@@ -19,19 +19,21 @@ type SymbolListWidget struct {
 	widget.BaseWidget
 	symbols    []*symbol.Symbol
 	entryMap   map[string]*SymbolWidgetEntry
-	entrys     []*SymbolWidgetEntry
+	entries    []*SymbolWidgetEntry
 	container  *fyne.Container
 	scroll     fyne.CanvasObject
 	mu         sync.Mutex
 	border     *fyne.Container
 	updateBars bool
 	onUpdate   func([]*symbol.Symbol)
+	w          fyne.Window
 }
 
-func NewSymbolListWidget(updateFunc func([]*symbol.Symbol), symbols ...*symbol.Symbol) *SymbolListWidget {
+func NewSymbolListWidget(w fyne.Window, updateFunc func([]*symbol.Symbol), symbols ...*symbol.Symbol) *SymbolListWidget {
 	sl := &SymbolListWidget{
 		entryMap: make(map[string]*SymbolWidgetEntry),
 		onUpdate: updateFunc,
+		w:        w,
 	}
 	sl.ExtendBaseWidget(sl)
 	sl.render()
@@ -60,6 +62,7 @@ func (s *SymbolListWidget) render() {
 
 	s.border = container.NewBorder(
 		container.New(&layout.RatioContainer{Widths: sz},
+			widget.NewLabel(""),
 			name,
 			value,
 			num,
@@ -121,8 +124,8 @@ func (s *SymbolListWidget) SetValue(name string, value float64) {
 }
 
 func (s *SymbolListWidget) Clear() {
-	for _, e := range s.entrys {
-		e.symbolValue.SetText("")
+	for _, e := range s.entries {
+		e.symbolValue.SetText("---")
 	}
 }
 
@@ -149,18 +152,17 @@ func (s *SymbolListWidget) Enable() {
 func (s *SymbolListWidget) Add(symbols ...*symbol.Symbol) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.symbols = append(s.symbols, symbols...)
 	for _, sym := range symbols {
 		if _, found := s.entryMap[sym.Name]; found {
 			continue
 		}
-		entry := NewSymbolWidgetEntry(sym, func(sw *SymbolWidgetEntry) {
-			for i, e := range s.entrys {
+		entry := NewSymbolWidgetEntry(s.w, sym, func(sw *SymbolWidgetEntry) {
+			for i, e := range s.entries {
 				if e == sw {
 					s.mu.Lock()
 					defer s.mu.Unlock()
 					s.symbols = append(s.symbols[:i], s.symbols[i+1:]...)
-					s.entrys = append(s.entrys[:i], s.entrys[i+1:]...)
+					s.entries = append(s.entries[:i], s.entries[i+1:]...)
 					delete(s.entryMap, sw.symbol.Name)
 					s.container.Remove(sw)
 					s.scroll.Refresh()
@@ -168,55 +170,30 @@ func (s *SymbolListWidget) Add(symbols ...*symbol.Symbol) {
 					break
 				}
 			}
-			//canvas := fyne.CurrentApp().Driver().CanvasForObject(entry)
-			//canvas.Refresh(entry)
 		})
-		s.entrys = append(s.entrys, entry)
+		s.symbols = append(s.symbols, sym)
+		s.entries = append(s.entries, entry)
 		s.container.Add(entry)
 		s.entryMap[sym.Name] = entry
 	}
+	s.border.Refresh()
+	s.onUpdate(s.symbols)
+}
+
+func (s *SymbolListWidget) clear() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.symbols = []*symbol.Symbol{}
+	s.entries = []*SymbolWidgetEntry{}
+	s.container.RemoveAll()
+	s.entryMap = make(map[string]*SymbolWidgetEntry)
 	s.border.Refresh()
 	s.onUpdate(s.symbols)
 }
 
 func (s *SymbolListWidget) LoadSymbols(symbols ...*symbol.Symbol) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.symbols = symbols
-	s.entrys = []*SymbolWidgetEntry{}
-	s.container.RemoveAll()
-	for _, sym := range s.symbols {
-		entry := NewSymbolWidgetEntry(sym, func(sw *SymbolWidgetEntry) {
-			for i, e := range s.entrys {
-				if e == sw {
-					s.mu.Lock()
-					defer s.mu.Unlock()
-					s.symbols = append(s.symbols[:i], s.symbols[i+1:]...)
-					s.entrys = append(s.entrys[:i], s.entrys[i+1:]...)
-					delete(s.entryMap, sw.symbol.Name)
-					s.container.Remove(sw)
-					s.scroll.Refresh()
-					s.onUpdate(s.symbols)
-					break
-				}
-			}
-			//canvas := fyne.CurrentApp().Driver().CanvasForObject(entry)
-			//canvas.Refresh(entry)
-		})
-		s.entrys = append(s.entrys, entry)
-		s.container.Add(entry)
-		s.entryMap[sym.Name] = entry
-	}
-	s.border.Refresh()
-	s.onUpdate(s.symbols)
-}
-
-func (s *SymbolListWidget) SetSymbols(symbols ...*symbol.Symbol) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.symbols = symbols
-	s.render()
-	s.Refresh()
+	s.clear()
+	s.Add(symbols...)
 }
 
 func (s *SymbolListWidget) Symbols() []*symbol.Symbol {
@@ -245,7 +222,7 @@ func (sr *SymbolListWidgetRenderer) Layout(size fyne.Size) {
 func (sr *SymbolListWidgetRenderer) MinSize() fyne.Size {
 	var width float32
 	var height float32
-	for _, en := range sr.sl.entrys {
+	for _, en := range sr.sl.entries {
 		sz := en.MinSize()
 		if sz.Width > width {
 			width = sz.Width
@@ -256,7 +233,7 @@ func (sr *SymbolListWidgetRenderer) MinSize() fyne.Size {
 }
 
 func (sr *SymbolListWidgetRenderer) Refresh() {
-	for _, e := range sr.sl.entrys {
+	for _, e := range sr.sl.entries {
 		e.Refresh()
 	}
 }
@@ -271,7 +248,8 @@ func (sr *SymbolListWidgetRenderer) Objects() []fyne.CanvasObject {
 type SymbolWidgetEntry struct {
 	widget.BaseWidget
 	symbol                 *symbol.Symbol
-	symbolName             *widget.Entry
+	copyName               *widget.Button
+	symbolName             *widget.Label
 	symbolValue            *widget.Label
 	symbolNumber           *widget.Label
 	symbolType             *widget.Label
@@ -288,15 +266,16 @@ type SymbolWidgetEntry struct {
 	min, max float64
 }
 
-func NewSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry)) *SymbolWidgetEntry {
+func NewSymbolWidgetEntry(w fyne.Window, sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry)) *SymbolWidgetEntry {
 	sw := &SymbolWidgetEntry{
 		symbol:     sym,
 		deleteFunc: deleteFunc,
 	}
 	sw.ExtendBaseWidget(sw)
-
-	sw.symbolName = widget.NewEntry()
-	sw.symbolName.SetText(sw.symbol.Name)
+	sw.copyName = widget.NewButtonWithIcon("", theme.ContentCopyIcon(), func() {
+		w.Clipboard().SetContent(sym.Name)
+	})
+	sw.symbolName = widget.NewLabel(sw.symbol.Name)
 	sw.symbolValue = widget.NewLabel("---")
 	sw.symbolNumber = widget.NewLabel(strconv.Itoa(sw.symbol.Number))
 	sw.symbolType = widget.NewLabel(fmt.Sprintf("%02X", sw.symbol.Type))
@@ -320,6 +299,7 @@ func NewSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry
 	sw.valueBar = canvas.NewRectangle(color.RGBA{255, 0, 0, 255})
 
 	sw.container = container.NewWithoutLayout(
+		sw.copyName,
 		sw.valueBar,
 		sw.symbolName,
 		sw.symbolValue,
@@ -359,12 +339,13 @@ type SymbolWidgetEntryRenderer struct {
 }
 
 var sz = []float32{
+	.04, // copy
 	.32, // name
 	.18, // value
 	.12, // number
-	.16, // correctionfactor
+	.14, // correctionfactor
 	.08, // type
-	.08, // deletebtn
+	.04, // deletebtn
 }
 
 func sumFloat32(a []float32) float32 {
@@ -380,14 +361,18 @@ func (sr *SymbolWidgetEntryRenderer) Layout(size fyne.Size) {
 	sw.container.Resize(size)
 
 	padd := size.Width * ((1.0 - sumFloat32(sz)) / float32(len(sz)))
-	sw.symbolName.Resize(fyne.NewSize(size.Width*sz[0], size.Height))
-	sw.symbolValue.Resize(fyne.NewSize(size.Width*sz[1], size.Height))
-	sw.symbolNumber.Resize(fyne.NewSize(size.Width*sz[2], size.Height))
-	sw.symbolType.Resize(fyne.NewSize(size.Width*sz[3], size.Height))
-	sw.symbolCorrectionfactor.Resize(fyne.NewSize(size.Width*sz[4], size.Height))
-	sw.deleteBTN.Resize(fyne.NewSize(size.Width*sz[5], size.Height))
+	sw.copyName.Resize(fyne.NewSize(size.Width*sz[0], size.Height))
+	sw.symbolName.Resize(fyne.NewSize(size.Width*sz[1], size.Height))
+	sw.symbolValue.Resize(fyne.NewSize(size.Width*sz[2], size.Height))
+	sw.symbolNumber.Resize(fyne.NewSize(size.Width*sz[3], size.Height))
+	sw.symbolType.Resize(fyne.NewSize(size.Width*sz[4], size.Height))
+	sw.symbolCorrectionfactor.Resize(fyne.NewSize(size.Width*sz[5], size.Height))
+	sw.deleteBTN.Resize(fyne.NewSize(size.Width*sz[6], size.Height))
 
 	var x float32
+
+	sw.copyName.Move(fyne.NewPos(x, 0))
+	x += sw.copyName.Size().Width + padd
 
 	sw.symbolName.Move(fyne.NewPos(x, 0))
 	x += sw.symbolName.Size().Width + padd
@@ -412,6 +397,7 @@ func (sr *SymbolWidgetEntryRenderer) MinSize() fyne.Size {
 	sw := sr.sw
 	var width float32
 	var height float32 = sw.symbolName.MinSize().Height
+	width += sw.copyName.MinSize().Width
 	width += sw.symbolName.MinSize().Width
 	width += sw.symbolValue.MinSize().Width
 	width += sw.symbolNumber.MinSize().Width
@@ -421,11 +407,11 @@ func (sr *SymbolWidgetEntryRenderer) MinSize() fyne.Size {
 }
 
 func (sr *SymbolWidgetEntryRenderer) Refresh() {
-	sr.sw.symbolName.SetText(sr.sw.symbol.Name)
-	sr.sw.symbolNumber.SetText(strconv.Itoa(sr.sw.symbol.Number))
-	sr.sw.symbolType.SetText(fmt.Sprintf("%02X", sr.sw.symbol.Type))
-	sr.sw.SetCorrectionFactor(sr.sw.symbol.Correctionfactor)
-	sr.sw.symbolValue.SetText(sr.sw.symbol.StringValue())
+	//sr.sw.symbolName.SetText(sr.sw.symbol.Name)
+	//sr.sw.symbolNumber.SetText(strconv.Itoa(sr.sw.symbol.Number))
+	//sr.sw.symbolType.SetText(fmt.Sprintf("%02X", sr.sw.symbol.Type))
+	//sr.sw.SetCorrectionFactor(sr.sw.symbol.Correctionfactor)
+	//sr.sw.symbolValue.SetText(sr.sw.symbol.StringValue())
 }
 
 func (sr *SymbolWidgetEntryRenderer) Destroy() {

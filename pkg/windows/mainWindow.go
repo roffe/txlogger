@@ -4,13 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	xwidget "fyne.io/x/fyne/widget"
@@ -21,16 +20,18 @@ import (
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/mainmenu"
+	"github.com/roffe/txlogger/pkg/plotter"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"golang.org/x/net/context"
 )
 
 const (
-	prefsLastBinFile = "lastBinFile"
-	prefsLastConfig  = "lastConfig"
-	prefsSelectedECU = "lastECU"
-	prefsSymbolList  = "symbolList"
+	prefsLastBinFile    = "lastBinFile"
+	prefsLastConfig     = "lastConfig"
+	prefsSelectedECU    = "lastECU"
+	prefsSymbolList     = "symbolList"
+	prefsSelectedPreset = "selectedPreset"
 )
 
 type MainWindow struct {
@@ -56,14 +57,14 @@ type MainWindow struct {
 	syncSymbolsBtn     *widget.Button
 
 	dashboardBtn *widget.Button
-
+	plotterBtn   *widget.Button
 	logplayerBtn *widget.Button
 	helpBtn      *widget.Button
 	settingsBtn  *widget.Button
 
-	loadConfigBtn *widget.Button
-	saveConfigBtn *widget.Button
-	presetSelect  *widget.Select
+	//loadConfigBtn *widget.Button
+	//saveConfigBtn *widget.Button
+	presetSelect *widget.Select
 
 	captureCounter binding.Int
 	errorCounter   binding.Int
@@ -81,6 +82,7 @@ type MainWindow struct {
 
 	dlc       datalogger.Logger
 	dashboard *widgets.Dashboard
+	plotter   *plotter.Plotter
 
 	buttonsDisabled bool
 
@@ -95,6 +97,7 @@ type MainWindow struct {
 }
 
 func NewMainWindow(a fyne.App, filename string) *MainWindow {
+
 	mw := &MainWindow{
 		Window:         a.NewWindow("txlogger"),
 		app:            a,
@@ -107,6 +110,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		openMaps: make(map[string]fyne.Window),
 		settings: widgets.NewSettingsWidget(),
 	}
+	mw.Resize(fyne.NewSize(1024, 768))
 
 	updateSymbols := func(syms []*symbol.Symbol) {
 		if mw.dlc != nil {
@@ -119,7 +123,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		}
 	}
 
-	mw.symbolList = widgets.NewSymbolListWidget(updateSymbols)
+	mw.symbolList = widgets.NewSymbolListWidget(mw, updateSymbols)
 
 	mw.setupMenu()
 
@@ -130,15 +134,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		}
 	})
 
-	quitChan := make(chan os.Signal, 2)
-	signal.Notify(quitChan, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-quitChan
-		mw.closeIntercept()
-		mw.app.Quit()
-	}()
-
-	mw.Window.SetCloseIntercept(mw.closeIntercept)
+	mw.Window.SetCloseIntercept(mw.CloseIntercept)
 
 	mw.createButtons()
 
@@ -148,17 +144,19 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		Options:     append([]string{"Select preset"}, presets.Names()...),
 
 		OnChanged: func(s string) {
-			preset, ok := presets.Map[s]
-			if !ok {
+			if s == "Select preset" {
 				return
 			}
-			if err := mw.LoadConfigFromString(preset); err != nil {
-				mw.Log(err.Error())
+			preset, err := presets.Get(s)
+			if err != nil {
+				dialog.ShowError(err, mw)
 				return
 			}
-			mw.symbolList.Refresh()
-			mw.presetSelect.SetSelected("Select preset")
+			mw.symbolList.LoadSymbols(preset...)
+			//mw.SaveSymbolList()
+			//mw.symbolList.Refresh()
 			mw.SyncSymbols()
+			mw.app.Preferences().SetString(prefsSelectedPreset, s)
 		},
 	}
 
@@ -197,24 +195,23 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		mw.SetMainMenu(mw.menu.GetMenu(s))
 	})
 
+	mw.setupTabs()
+
 	mw.loadPrefs(filename)
 	if mw.fw == nil {
 		mw.setTitle("No symbols loaded")
 	}
 
-	mw.render()
-
 	mw.SetMaster()
-	mw.Resize(fyne.NewSize(1024, 768))
 	mw.SetContent(mw.tab)
 	return mw
 }
-func (mw *MainWindow) closeIntercept() {
+func (mw *MainWindow) CloseIntercept() {
 	if mw.dlc != nil {
 		mw.dlc.Close()
 		time.Sleep(500 * time.Millisecond)
 	}
-	mw.SaveSymbolList()
+	//mw.SaveSymbolList()
 	debug.Close()
 	mw.Close()
 }
@@ -236,22 +233,24 @@ func (mw *MainWindow) createLeading() *fyne.Container {
 				mw.symbolLookup,
 			),
 		),
-		container.NewVBox(
-			container.NewGridWithColumns(2,
-				mw.loadConfigBtn,
-				mw.saveConfigBtn,
-			),
-		),
+		//container.NewVBox(
+		//	container.NewGridWithColumns(2,
+		//		mw.loadConfigBtn,
+		//		mw.saveConfigBtn,
+		//	),
+		//),
 		nil,
 		nil,
+		nil,
+		//widget.NewLabel("Symbols..."),
 		mw.symbolList,
 	)
 }
 
-func (mw *MainWindow) render() fyne.CanvasObject {
+func (mw *MainWindow) setupTabs() {
 	mw.leading = mw.createLeading()
 	mw.tab = container.NewAppTabs()
-	mw.tab.Append(container.NewTabItem("Realtime", &container.Split{
+	mw.tab.Append(container.NewTabItemWithIcon("Symbols", theme.ListIcon(), &container.Split{
 		Offset:     0.7,
 		Horizontal: true,
 		Leading:    mw.leading,
@@ -282,6 +281,7 @@ func (mw *MainWindow) render() fyne.CanvasObject {
 				Leading:    mw.output,
 				Trailing: container.NewVBox(
 					mw.dashboardBtn,
+					//mw.plotterBtn,
 					mw.logplayerBtn,
 					mw.helpBtn,
 					//mw.settingsBtn,
@@ -295,16 +295,14 @@ func (mw *MainWindow) render() fyne.CanvasObject {
 		},
 	}))
 
-	//tab.Append(container.NewTabItem("Maps", widget.NewLabel("Maps")))
-	mw.tab.Append(container.NewTabItem("Settings", mw.settings))
-	return mw.tab
+	mw.tab.Append(container.NewTabItemWithIcon("Settings", theme.SettingsIcon(), mw.settings))
 }
 
 func (mw *MainWindow) Log(s string) {
 	debug.Log(s)
 	mw.outputData.Append(s)
 	mw.output.ScrollToBottom()
-	mw.output.Refresh()
+	//mw.output.Refresh()
 }
 
 func (mw *MainWindow) SyncSymbols() {
@@ -328,15 +326,15 @@ func (mw *MainWindow) SyncSymbols() {
 		}
 	}
 	mw.symbolList.Refresh()
-	mw.SaveSymbolList()
+	//mw.SaveSymbolList()
 	mw.Log(fmt.Sprintf("Synced %d / %d symbols", cnt, len(mw.symbolList.Symbols())))
 }
 
 func (mw *MainWindow) Disable() {
 	mw.buttonsDisabled = true
 	//mw.addSymbolBtn.Disable()
-	mw.loadConfigBtn.Disable()
-	mw.saveConfigBtn.Disable()
+	//mw.loadConfigBtn.Disable()
+	//mw.saveConfigBtn.Disable()
 	mw.loadSymbolsFileBtn.Disable()
 	mw.loadSymbolsEcuBtn.Disable()
 	mw.syncSymbolsBtn.Disable()
@@ -352,8 +350,8 @@ func (mw *MainWindow) Disable() {
 func (mw *MainWindow) Enable() {
 	mw.buttonsDisabled = false
 	//mw.addSymbolBtn.Enable()
-	mw.loadConfigBtn.Enable()
-	mw.saveConfigBtn.Enable()
+	//mw.loadConfigBtn.Enable()
+	//mw.saveConfigBtn.Enable()
 	mw.loadSymbolsFileBtn.Enable()
 	mw.loadSymbolsEcuBtn.Enable()
 	mw.syncSymbolsBtn.Enable()
@@ -423,17 +421,17 @@ func (mw *MainWindow) LoadConfig(filename string) error {
 	return nil
 }
 
-func (mw *MainWindow) LoadConfigFromString(str string) error {
+func (mw *MainWindow) LoadPresetFromStringx(str string) error {
 	var cfg []*symbol.Symbol
 	if err := json.Unmarshal([]byte(str), &cfg); err != nil {
 		return fmt.Errorf("failed to unmarshal config file: %w", err)
 	}
 	mw.symbolList.LoadSymbols(cfg...)
-	mw.SaveSymbolList()
+	mw.SaveSymbolListx()
 	return nil
 }
 
-func (mw *MainWindow) SaveSymbolList() {
+func (mw *MainWindow) SaveSymbolListx() {
 	b, err := json.Marshal(mw.symbolList.Symbols())
 	if err != nil {
 		mw.Log(err.Error())

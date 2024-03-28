@@ -3,7 +3,6 @@ package layout
 import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/theme"
 )
 
 type MinHeight struct {
@@ -99,10 +98,10 @@ func (d *FixedWidthContainer) MinSize(objects []fyne.CanvasObject) fyne.Size {
 	for _, o := range objects {
 		childSize := o.MinSize()
 		if childSize.Height > h {
-			h = childSize.Height
+			h += childSize.Height
 		}
 	}
-	return fyne.NewSize(d.width+theme.Padding()*2, h)
+	return fyne.NewSize(d.width, h)
 }
 
 func (d *FixedWidthContainer) Layout(objects []fyne.CanvasObject, containerSize fyne.Size) {

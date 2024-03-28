@@ -3,6 +3,7 @@ package widgets
 import (
 	"fmt"
 	"image/color"
+	"log"
 	"math"
 
 	"fyne.io/fyne/v2"
@@ -52,6 +53,13 @@ type DualDial struct {
 	container *fyne.Container
 
 	minsize fyne.Size
+
+	diameter                   float32
+	radius                     float32
+	middle                     fyne.Position
+	needleOffset, needleLength float32
+	needleRotConst             float64
+	lineRotConst               float64
 }
 
 func NewDualDial(cfg DualDialConfig) *DualDial {
@@ -77,10 +85,12 @@ func NewDualDial(cfg DualDialConfig) *DualDial {
 	}
 
 	s.factor = s.max / s.steps
+	s.needleRotConst = pi15 / (s.steps * s.factor)
+	s.lineRotConst = pi15 / s.steps
 
 	s.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0x80}, StrokeWidth: 2}
 	s.cover = &canvas.Rectangle{FillColor: theme.BackgroundColor()}
-	s.center = &canvas.Circle{FillColor: color.Black}
+	s.center = &canvas.Circle{FillColor: color.RGBA{R: 0x01, G: 0x0B, B: 0x13, A: 0xFF}}
 	s.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 4}
 	s.needle2 = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x40, B: 0, A: 0xa0}, StrokeWidth: 3}
 
@@ -111,21 +121,18 @@ func NewDualDial(cfg DualDialConfig) *DualDial {
 	return s
 }
 
-func (c *DualDial) rotateNeedle(hand *canvas.Line, middle fyne.Position, facePosition float64, offset, length float32) {
+func (c *DualDial) rotateNeedle(hand *canvas.Line, facePosition float64) {
 	if facePosition < 0 {
 		facePosition = 0
 	}
-	rotation := math.Pi*1.5/(c.steps*c.factor)*facePosition - math.Pi/4*3
-	c.rotate(hand, middle, rotation, offset, length)
-	hand.Refresh()
+	c.rotate(hand, c.needleRotConst*facePosition-pi43, c.needleOffset, c.needleLength)
 }
 
-func (c *DualDial) rotatePips(hand *canvas.Line, middle fyne.Position, facePosition float64, offset, length float32) {
-	rotation := math.Pi*1.5/c.steps*facePosition - math.Pi/4*3
-	c.rotate(hand, middle, rotation, offset, length)
+func (c *DualDial) rotateLines(hand *canvas.Line, facePosition float64, offset, length float32) {
+	c.rotate(hand, c.lineRotConst*facePosition-pi43, offset, length)
 }
 
-func (c *DualDial) rotate(hand *canvas.Line, middle fyne.Position, rotation float64, offset, length float32) {
+func (c *DualDial) rotate(hand *canvas.Line, rotation float64, offset, length float32) {
 	sinRotation := float32(math.Sin(rotation))
 	cosRotation := float32(math.Cos(rotation))
 
@@ -134,65 +141,24 @@ func (c *DualDial) rotate(hand *canvas.Line, middle fyne.Position, rotation floa
 
 	offX := offset * sinRotation
 	offY := -offset * cosRotation
+	midOffX := c.middle.X + offX
+	midY := c.middle.Y + offY
 
-	hand.Position1 = fyne.NewPos(middle.X+offX, middle.Y+offY)
-	hand.Position2 = fyne.NewPos(middle.X+offX+x2, middle.Y+offY+y2)
-}
-
-func (c *DualDial) Value() float64 {
-	return c.value
-}
-
-func (c *DualDial) Value2() float64 {
-	return c.value2
+	hand.Position1 = fyne.NewPos(midOffX, midY)
+	hand.Position2 = fyne.NewPos(midOffX+x2, midY+y2)
+	hand.Refresh()
 }
 
 func (c *DualDial) SetValue(value float64) {
-	if value == c.value {
-		return
-	}
-	if value > c.max {
-		value = c.max
-	}
-	if value < c.min {
-		value = c.min
-	}
 	c.value = value
-
-	size := c.container.Size()
-
-	diameter := fyne.Min(size.Width, size.Height)
-	middle := fyne.NewPos(size.Width/2, size.Height/2)
-	radius := diameter / 2
-
-	//c.rotateNeedle(c.needle, middle, value, radius*.15, radius*.85)
-	c.rotateNeedle(c.needle, middle, value, -radius*.15, radius*1.14)
-
+	c.rotateNeedle(c.needle, value)
 	c.displayText.Text = fmt.Sprintf(c.displayString, value)
 	c.displayText.Refresh()
 }
 
 func (c *DualDial) SetValue2(value float64) {
-	if value == c.value2 {
-		return
-	}
-	if value > c.max {
-		value = c.max
-	}
-	if value < c.min {
-		value = c.min
-	}
 	c.value2 = value
-
-	size := c.container.Size()
-
-	diameter := fyne.Min(size.Width, size.Height)
-	middle := fyne.NewPos(size.Width/2, size.Height/2)
-	radius := diameter / 2
-
-	//c.rotateNeedle(c.needle, middle, value, radius*.15, radius*.85)
-	c.rotateNeedle(c.needle2, middle, value, -radius*.15, radius*1.14)
-
+	c.rotateNeedle(c.needle2, value)
 	c.displayText2.Text = fmt.Sprintf(c.displayString, value)
 	c.displayText2.Refresh()
 }
@@ -204,70 +170,87 @@ func (c *DualDial) CreateRenderer() fyne.WidgetRenderer {
 }
 
 type DualDialRenderer struct {
-	d *DualDial
+	d    *DualDial
+	size fyne.Size
 }
 
 func (dr *DualDialRenderer) Layout(space fyne.Size) {
-	dr.d.container.Resize(space)
+	if dr.size.Width == space.Width && dr.size.Height == space.Height {
+		return
+	}
+	dr.size = space
+	log.Println("dual_dial.Layout", dr.d.title, space.Width, space.Height)
 	c := dr.d
-	diameter := fyne.Min(space.Width, space.Height)
-	radius := diameter / 2
+	c.container.Resize(space)
+	c.diameter = fyne.Min(space.Width, space.Height)
+	c.radius = c.diameter / 2
+	c.needleOffset = -c.radius * .15
+	c.needleLength = c.radius * 1.14
 
 	// Pre-calculate stroke sizes
-	stroke := diameter / 60
-	midStroke := diameter / 80
-	smallStroke := diameter / 300
+	stroke := c.diameter / 60
+	midStroke := c.diameter / 80
+	smallStroke := c.diameter / 300
+
+	c.middle = fyne.NewPos(space.Width/2, space.Height/2)
 
 	// Pre-calculate sizes and positions that are used multiple times
-	size := fyne.NewSize(diameter, diameter)
-	halfWidth := space.Width / 2
-	halfHeight := space.Height / 2
-	middle := fyne.NewPos(halfWidth, halfHeight)
-	topleft := fyne.NewPos(middle.X-radius, middle.Y-radius)
+	size := fyne.NewSize(c.diameter, c.diameter)
+
+	topleft := fyne.NewPos(c.middle.X-c.radius, c.middle.Y-c.radius)
 
 	// Text and element sizing
-	c.titleText.TextSize = radius / 3
-	c.titleText.Move(middle.Add(fyne.NewPos(0, diameter/4)))
+	c.titleText.TextSize = c.radius / 3
+	c.titleText.Move(c.middle.Add(fyne.NewPos(0, c.diameter/4)))
 
 	// Calculate the size of the center component directly
-	centerWidth := radius / 4
-	centerHeight := radius / 4
-	c.center.Move(middle.SubtractXY(centerWidth/2, centerHeight/2))
-	c.center.Resize(fyne.NewSize(centerWidth, centerHeight))
+	center := c.radius / 4
+
+	c.center.Move(c.middle.SubtractXY(center/2, center/2))
+	c.center.Resize(fyne.NewSize(center, center))
 
 	coverHeight := size.Height / 6
-	c.cover.Move(fyne.NewPos(0, middle.Y+radius/7*5))
+	c.cover.Move(fyne.NewPos(0, c.middle.Y+c.radius/7*5))
 	c.cover.Resize(fyne.NewSize(space.Width, coverHeight))
 
-	c.displayText.TextSize = radius / 2
+	sixthDiameter := c.diameter / 6
+
+	c.displayText.TextSize = c.radius / 2
 	c.displayText.Text = fmt.Sprintf(c.displayString, c.value)
-	c.displayText.Move(topleft.AddXY(0, diameter/6))
+	c.displayText.Move(topleft.AddXY(0, sixthDiameter))
 	c.displayText.Resize(size)
 
-	c.displayText2.TextSize = radius / 4
+	c.displayText2.TextSize = c.radius / 4
 	c.displayText2.Text = fmt.Sprintf(c.displayString, c.value2)
-	c.displayText2.Move(topleft.AddXY(0, -diameter/6))
+	c.displayText2.Move(topleft.AddXY(0, -sixthDiameter))
 	c.displayText2.Resize(size)
 
 	// Needle and face styling
 	c.needle.StrokeWidth = stroke
-	c.rotateNeedle(c.needle, middle, c.value, -radius*.15, radius*1.14)
-	c.rotateNeedle(c.needle2, middle, c.value2, -radius*.15, radius*1.14)
+	c.rotateNeedle(c.needle, c.value)
+	c.rotateNeedle(c.needle2, c.value2)
 
 	c.face.StrokeWidth = smallStroke
 	c.face.Move(topleft)
 	c.face.Resize(size)
 
+	fourthRadius := c.radius / 4
+	eightRadius := c.radius / 8
+
 	// Optimize pip rotation and styling
+	radius43 := c.radius / 4 * 3
+	radius87 := c.radius / 8 * 7
+
 	for i, p := range c.pips {
-		outerRadius, innerRadius := radius/4*3, radius/4 // default for even i
-		p.StrokeWidth = midStroke
-		if i%2 != 0 {
-			outerRadius, innerRadius = radius/8*7, radius/8
+		if i%2 == 0 {
+			p.StrokeWidth = midStroke
+			c.rotateLines(p, float64(i), radius43, fourthRadius)
+		} else {
 			p.StrokeWidth = smallStroke
+			c.rotateLines(p, float64(i), radius87, eightRadius)
 		}
-		c.rotatePips(p, middle, float64(i), outerRadius, innerRadius)
 	}
+
 }
 
 func (dr *DualDialRenderer) MinSize() fyne.Size {

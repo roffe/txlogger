@@ -21,7 +21,11 @@ type HBar struct {
 
 	value float64
 
-	container *fyne.Container
+	widthFactor  float32
+	container    *fyne.Container
+	max75, max90 float64
+	eightHeight  float32
+	height       float32
 }
 
 type HBarConfig struct {
@@ -39,6 +43,10 @@ func NewHBar(cfg *HBarConfig) *HBar {
 	if s.cfg.Steps == 0 {
 		s.cfg.Steps = 10
 	}
+
+	s.max75 = s.cfg.Max * .75
+	s.max90 = s.cfg.Max * .90
+
 	s.container = s.render()
 	return s
 }
@@ -63,32 +71,25 @@ func (s *HBar) render() *fyne.Container {
 }
 
 func (s *HBar) SetValue(value float64) {
-	if value == s.value {
-		return
-	}
-	if value > s.cfg.Max {
-		value = s.cfg.Max
-	}
-	if value < s.cfg.Min {
-		value = s.cfg.Min
-	}
+	// if value == s.value {
+	// 	return
+	// }
+	// if value > s.cfg.Max {
+	// 	value = s.cfg.Max
+	// }
+	// if value < s.cfg.Min {
+	// 	value = s.cfg.Min
+	// }
 	s.value = value
-
-	size := s.container.Size()
-
-	widthFactor := float32(size.Width) / float32(s.cfg.Max)
-	//	log.Println("Height:", size.Height, "heightFacor", heightFactor, "sfac", s.factor)
-
-	if value >= s.cfg.Max*.75 && value < s.cfg.Max*.9 {
+	if value >= s.max75 && value < s.max90 {
 		s.bar.FillColor = color.RGBA{R: 0xFF, G: 0x98, B: 0x00, A: 0x90}
-	} else if value >= s.cfg.Max*.9 {
+	} else if value >= s.max90 {
 		s.bar.FillColor = color.RGBA{R: 0xF4, G: 0x43, B: 0x36, A: 0x90}
 	} else {
 		s.bar.FillColor = color.RGBA{0x2C, 0xA5, 0x00, 0x90}
 	}
-	s.bar.Move(fyne.NewPos(0, size.Height/8))
-	s.bar.Resize(fyne.NewSize((float32(value) * widthFactor), size.Height-(size.Height/8*2)))
-	//s.bar.Refresh()
+	s.bar.Move(fyne.NewPos(0, s.eightHeight))
+	s.bar.Resize(fyne.NewSize((float32(value) * s.widthFactor), s.height))
 }
 
 func (s *HBar) Value() float64 {
@@ -108,21 +109,25 @@ type HBarRenderer struct {
 func (dr *HBarRenderer) Layout(space fyne.Size) {
 	dr.d.container.Resize(space)
 	s := dr.d
+
 	diameter := space.Width
 	height := space.Height
 	middle := height / 2
-	widthFactor := float32(diameter) / float32(s.cfg.Steps)
+	s.widthFactor = float32(diameter) / float32(s.cfg.Max)
+	stepsFactor := float32(diameter) / float32(s.cfg.Steps)
+	s.eightHeight = space.Height / 8
+	s.height = space.Height - (s.eightHeight * 2)
 	s.face.Resize(space)
 	s.titleText.Move(fyne.NewPos(diameter/2-s.titleText.Size().Width/2, height-30))
 	s.bar.Move(fyne.NewPos(space.Width-float32(s.value), 0))
 	for i, line := range s.bars {
 		if i%2 == 0 {
-			line.Position1 = fyne.NewPos(float32(i)*widthFactor, middle-height/3)
-			line.Position2 = fyne.NewPos(float32(i)*widthFactor, middle+height/3)
+			line.Position1 = fyne.NewPos(float32(i)*stepsFactor, middle-height/3)
+			line.Position2 = fyne.NewPos(float32(i)*stepsFactor, middle+height/3)
 			continue
 		}
-		line.Position1 = fyne.NewPos(float32(i)*widthFactor, middle-height/7)
-		line.Position2 = fyne.NewPos(float32(i)*widthFactor, middle+height/7)
+		line.Position1 = fyne.NewPos(float32(i)*stepsFactor, middle-height/7)
+		line.Position2 = fyne.NewPos(float32(i)*stepsFactor, middle+height/7)
 	}
 	s.SetValue(s.value)
 }

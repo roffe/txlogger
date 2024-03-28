@@ -3,6 +3,7 @@ package widgets
 import (
 	"fmt"
 	"image/color"
+	"log"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -23,6 +24,13 @@ type CBar struct {
 	value float64
 
 	container *fyne.Container
+
+	size        fyne.Size
+	valueRange  float64
+	widthFactor float32
+	center      float32
+	eightHeight float32
+	barHeight   float32
 }
 
 type TextPosition int
@@ -59,6 +67,8 @@ func NewCBar(cfg *CBarConfig) *CBar {
 		s.cfg.DisplayTextSize = 25
 	}
 
+	s.valueRange = s.cfg.Max - s.cfg.Min
+
 	s.face = &canvas.Rectangle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0x80}, FillColor: color.RGBA{0x00, 0x00, 0x00, 0x00}, StrokeWidth: 3}
 	s.bar = &canvas.Rectangle{FillColor: color.RGBA{0x2C, 0xA5, 0x00, 0x80}}
 
@@ -70,23 +80,17 @@ func NewCBar(cfg *CBarConfig) *CBar {
 	s.displayText.TextStyle.Monospace = true
 	s.displayText.Alignment = fyne.TextAlignLeading
 
-	bar := container.NewWithoutLayout(s.face)
+	s.container = container.NewWithoutLayout(s.face)
 	for i := 0; i < int(s.cfg.Steps+1); i++ {
 		line := &canvas.Line{StrokeColor: color.RGBA{0x00, 0xE5, 0x00, 0xFF}, StrokeWidth: 2}
 		s.bars = append(s.bars, line)
-		bar.Add(line)
+		s.container.Add(line)
 	}
-	bar.Objects = append(bar.Objects, s.bar, s.titleText, s.displayText)
-
-	s.container = bar
-
+	s.container.Objects = append(s.container.Objects, s.bar, s.titleText, s.displayText)
 	return s
 }
 
 func (s *CBar) SetValue(value float64) {
-	if value == s.value {
-		return
-	}
 	if value > s.cfg.Max {
 		value = s.cfg.Max
 	}
@@ -98,42 +102,30 @@ func (s *CBar) SetValue(value float64) {
 }
 
 func (s *CBar) refresh() {
-	size := s.container.Size()
-	rangeWidth := s.cfg.Max - s.cfg.Min
-	center := size.Width / 2
-	widthFactor := float32(size.Width) / float32(rangeWidth)
-
 	s.displayText.Text = fmt.Sprintf(s.cfg.DisplayString, s.value)
 	s.displayText.Refresh()
-
 	var newBarPos fyne.Position
 	var newBarSize fyne.Size
-
 	if s.value < s.cfg.Center {
 		s.bar.FillColor = color.RGBA{0x26, 0xcc, 0x00, 0x80}
 		barWidth := float32(s.cfg.Center - s.value)
-		barPosition := center - float32(s.cfg.Center-s.value)*widthFactor
-		newBarPos = fyne.NewPos(barPosition, size.Height/8)
-		newBarSize = fyne.NewSize(barWidth*widthFactor, size.Height-(size.Height/8*2))
+		barPosition := s.center - float32(s.cfg.Center-s.value)*s.widthFactor
+		newBarPos = fyne.NewPos(barPosition, s.eightHeight)
+		newBarSize = fyne.NewSize(barWidth*s.widthFactor, s.barHeight)
 	} else if s.value > s.cfg.Center {
 		s.bar.FillColor = color.RGBA{0xA5, 0x00, 0x00, 0x80}
 		barWidth := float32(s.value - s.cfg.Center)
-		barPosition := center
-		newBarPos = fyne.NewPos(barPosition, size.Height/8)
-		newBarSize = fyne.NewSize(barWidth*widthFactor, size.Height-(size.Height/8*2))
+		barPosition := s.center
+		newBarPos = fyne.NewPos(barPosition, s.eightHeight)
+		newBarSize = fyne.NewSize(barWidth*s.widthFactor, s.barHeight)
 	} else {
 		s.bar.FillColor = color.RGBA{252, 186, 3, 0x80}
-		barPosition := center - 3
-		newBarPos = fyne.NewPos(barPosition, size.Height/8)
-		newBarSize = fyne.NewSize(6, size.Height-(size.Height/8*2))
+		barPosition := s.center - 3
+		newBarPos = fyne.NewPos(barPosition, s.eightHeight)
+		newBarSize = fyne.NewSize(6, s.barHeight)
 	}
-
 	s.bar.Move(newBarPos)
 	s.bar.Resize(newBarSize)
-}
-
-func (s *CBar) Value() float64 {
-	return s.value
 }
 
 func (s *CBar) CreateRenderer() fyne.WidgetRenderer {
@@ -147,22 +139,30 @@ type CBarRenderer struct {
 }
 
 func (dr *CBarRenderer) Layout(space fyne.Size) {
+	if dr.d.size.Width == space.Width && dr.d.size.Height == space.Height {
+		return
+	}
+	log.Println("cbar.Layout", dr.d.displayText.Text, space.Width, space.Height)
 	dr.d.container.Resize(space)
 	s := dr.d
+	s.size = space
+	s.eightHeight = s.size.Height / 8
 	diameter := space.Width
+	s.center = diameter / 2
 	height := space.Height
 	middle := height / 2
-	widthFactor := float32(diameter) / float32(s.cfg.Steps)
-
+	stepFactor := float32(diameter) / float32(s.cfg.Steps)
+	s.widthFactor = space.Width / float32(s.valueRange)
+	s.barHeight = s.size.Height - (s.eightHeight * 2)
 	s.face.Resize(space)
 
 	var y float32
 
 	switch s.cfg.TextPosition {
 	case TextAtTop:
-		y = float32(-s.bar.Size().Height * .47)
+		y = -s.bar.Size().Height * .47
 	case TextAtBottom:
-		y = float32(s.bar.Size().Height * 0.85)
+		y = s.bar.Size().Height * 0.85
 	case TextAtCenter:
 		//y = (s.bar.Size().Height - s.displayText.MinSize().Height) / 2
 
@@ -173,12 +173,12 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 
 	for i, line := range s.bars {
 		if i%2 == 0 {
-			line.Position1 = fyne.NewPos(float32(i)*widthFactor, middle-height/3)
-			line.Position2 = fyne.NewPos(float32(i)*widthFactor, middle+height/3)
+			line.Position1 = fyne.NewPos(float32(i)*stepFactor, middle-height/3)
+			line.Position2 = fyne.NewPos(float32(i)*stepFactor, middle+height/3)
 			continue
 		}
-		line.Position1 = fyne.NewPos(float32(i)*widthFactor, middle-height/7)
-		line.Position2 = fyne.NewPos(float32(i)*widthFactor, middle+height/7)
+		line.Position1 = fyne.NewPos(float32(i)*stepFactor, middle-height/7)
+		line.Position2 = fyne.NewPos(float32(i)*stepFactor, middle+height/7)
 	}
 	s.refresh()
 }

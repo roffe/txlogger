@@ -21,42 +21,53 @@ const chunkSize = 128
 func (mw *MainWindow) setupMenu() {
 	menus := []*fyne.Menu{
 		fyne.NewMenu("File",
-			fyne.NewMenuItem("Load binary", func() {
-				filename, err := sdialog.File().Filter("Binary file", "bin").Load()
-				if err != nil {
-					if err.Error() == "Cancelled" {
-						return
-					}
-					// dialog.ShowError(err, mw)
-					mw.Log(err.Error())
-					return
-				}
-				if err := mw.LoadSymbolsFromFile(filename); err != nil {
-					// dialog.ShowError(err, mw)
-					mw.Log(err.Error())
-					return
-				}
-			}),
-			fyne.NewMenuItem("Play log", func() {
-				filename, err := sdialog.File().Filter("logfile", "t7l", "t8l", "csv").SetStartDir(mw.settings.GetLogPath()).Load()
-				if err != nil {
-					if err.Error() == "Cancelled" {
-						return
-					}
-					// dialog.ShowError(err, mw)
-					mw.Log(err.Error())
-					return
-				}
-				go NewLogPlayer(mw.app, filename, mw.fw)
-			}),
+			fyne.NewMenuItem("Load binary", mw.loadBinary),
+			fyne.NewMenuItem("Play log", mw.playLog),
 			fyne.NewMenuItem("Open log folder", func() {
 				if err := open.Run(mw.settings.GetLogPath()); err != nil {
-					fyne.LogError("Failed to open logs folder", err)
+					mw.Log("failed to open logs folder: " + err.Error())
 				}
 			}),
 		),
+		fyne.NewMenu("Preset",
+			fyne.NewMenuItem("Save", mw.savePreset),
+			fyne.NewMenuItem("New", mw.newPreset),
+			fyne.NewMenuItem("Import", mw.importPreset),
+			fyne.NewMenuItem("Export", mw.exportPreset),
+			fyne.NewMenuItem("Delete", mw.deletePreset),
+		),
 	}
 	mw.menu = mainmenu.New(mw, menus, mw.openMap, mw.openMapz)
+}
+
+func (mw *MainWindow) loadBinary() {
+	filename, err := sdialog.File().Filter("Binary file", "bin").Load()
+	if err != nil {
+		if err.Error() == "Cancelled" {
+			return
+		}
+		// dialog.ShowError(err, mw)
+		mw.Log(err.Error())
+		return
+	}
+	if err := mw.LoadSymbolsFromFile(filename); err != nil {
+		// dialog.ShowError(err, mw)
+		mw.Log(err.Error())
+		return
+	}
+}
+
+func (mw *MainWindow) playLog() {
+	filename, err := sdialog.File().Filter("logfile", "t7l", "t8l", "csv").SetStartDir(mw.settings.GetLogPath()).Load()
+	if err != nil {
+		if err.Error() == "Cancelled" {
+			return
+		}
+		// dialog.ShowError(err, mw)
+		mw.Log(err.Error())
+		return
+	}
+	go NewLogPlayer(mw.app, filename, mw.fw)
 }
 
 func (mw *MainWindow) openMapz(typ symbol.ECUType, mapNames ...string) {
@@ -280,7 +291,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		p.Hide()
 	}
 	// mw.tab.Append(container.NewTabItem(axis.Z, mv))
-	w := mw.app.NewWindow(axis.Z + " - Map Viewer")
+	w := mw.app.NewWindow(axis.Z + " - " + axis.ZDescription)
 	w.Canvas().SetOnTypedKey(mv.TypedKey)
 	mw.openMaps[axis.Z] = w
 	w.SetCloseIntercept(func() {

@@ -367,6 +367,7 @@ func enhanceLineColor(baseColor color.RGBA, value float64) color.RGBA {
 	}
 }
 
+/*
 func (m *Meshgrid) drawMeshgridLines2(img *image.RGBA) {
 	ti := 0
 	for i := m.rows - 1; i >= 0; i-- {
@@ -455,8 +456,9 @@ func (m *Meshgrid) drawMeshgridLines2(img *image.RGBA) {
 		}
 	}
 }
+*/
 
-const (
+/* const (
 	dimmfactor = .35
 )
 
@@ -476,7 +478,7 @@ func dimmedColor2(col color.RGBA) color.RGBA {
 		B: uint8(float64(col.B) * .10),
 		A: 127, // Use a fully opaque alpha
 	}
-}
+} */
 
 func (m *Meshgrid) drawLine(img *image.RGBA, p1, p2 image.Point, startThickness, endThickness int, startColor, endColor color.RGBA) {
 	dx := float64(p2.X - p1.X)
@@ -692,30 +694,30 @@ func (m *Meshgrid) getColorInterpolation(value float64) color.RGBA {
 	}
 }
 
-func (m *Meshgrid) getColorInterpolation2(value float64) color.RGBA {
-	t := (value - m.zmin) / (m.zmax - m.zmin)
-	// Clamp t to be within [0, 1]
-	if t < 0 {
-		t = 0
-	} else if t > 1 {
-		t = 1
-	}
+// func (m *Meshgrid) getColorInterpolation2(value float64) color.RGBA {
+// 	t := (value - m.zmin) / (m.zmax - m.zmin)
+// 	// Clamp t to be within [0, 1]
+// 	if t < 0 {
+// 		t = 0
+// 	} else if t > 1 {
+// 		t = 1
+// 	}
 
-	divider := .5
-	var r, g, b float64
-	if t < divider { // Green to Yellow interpolation
-		r = lerp(0, 1, t/divider)
-		g = 1
-	} else { // Yellow to Red interpolation
-		r = 1
-		g = lerp(1, 0, (t-divider)/(1-divider))
-	}
-	b = 0
-	// Convert from 0-1 range to 0-255 for color.RGBA
-	return color.RGBA{
-		R: uint8(r * 255),
-		G: uint8(g * 255),
-		B: uint8(b * 255),
-		A: 255,
-	}
-}
+// 	divider := .5
+// 	var r, g, b float64
+// 	if t < divider { // Green to Yellow interpolation
+// 		r = lerp(0, 1, t/divider)
+// 		g = 1
+// 	} else { // Yellow to Red interpolation
+// 		r = 1
+// 		g = lerp(1, 0, (t-divider)/(1-divider))
+// 	}
+// 	b = 0
+// 	// Convert from 0-1 range to 0-255 for color.RGBA
+// 	return color.RGBA{
+// 		R: uint8(r * 255),
+// 		G: uint8(g * 255),
+// 		B: uint8(b * 255),
+// 		A: 255,
+// 	}
+// }

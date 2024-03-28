@@ -2,6 +2,7 @@ package widgets
 
 import (
 	"image/color"
+	"log"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -23,6 +24,12 @@ type VBar struct {
 	value float64
 
 	canvas fyne.CanvasObject
+
+	middle        float32
+	heightFactor  float32
+	diameterEight float32
+	twoEight      float32
+	size          fyne.Size
 }
 
 type VBarConfig struct {
@@ -45,7 +52,7 @@ func NewVBar(cfg *VBarConfig) *VBar {
 }
 
 func (s *VBar) render() *fyne.Container {
-	s.face = &canvas.Rectangle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0x80}, FillColor: color.RGBA{0x00, 0x00, 0x00, 0x00}, StrokeWidth: 2}
+	s.face = &canvas.Rectangle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0x80}, FillColor: color.RGBA{0x00, 0x00, 0x00, 0x00}, StrokeWidth: 3}
 	s.bar = &canvas.Rectangle{StrokeColor: color.RGBA{0x2C, 0xA5, 0x00, 0x80}, FillColor: color.RGBA{0x2C, 0xA5, 0x00, 0x80}}
 
 	s.titleText = &canvas.Text{Text: s.cfg.Title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
@@ -69,36 +76,16 @@ func (s *VBar) render() *fyne.Container {
 func (s *VBar) Size() fyne.Size {
 	return s.canvas.Size()
 }
-
 func (s *VBar) SetValue(value float64) {
-	// if value == s.value {
-	// return
-	// }
-	if value > s.cfg.Max {
-		value = s.cfg.Max
-	}
-	if value < s.cfg.Min {
-		value = s.cfg.Min
-	}
-
 	s.value = value
-	size := s.canvas.Size()
-	heightFactor := float32(size.Height) / float32(s.cfg.Max)
-	diameter := size.Width
-
-	br := 0xA5 * (value / s.cfg.Max)
+	br := uint8(0xA5 * (value / s.cfg.Max))
 	bg := 0xA5 - br
-	if bg < 0 {
-		bg = 0
-	}
-
-	s.bar.FillColor = color.RGBA{byte(br), byte(bg), 0x00, 0x80}
-
-	s.bar.Move(fyne.NewPos(diameter/8, size.Height-(float32(value)*heightFactor)))
-	s.bar.Resize(fyne.NewSize(size.Width-(diameter/8*2), (float32(value) * heightFactor)))
-
+	s.bar.FillColor = color.RGBA{br, bg, 0x00, 0x80}
+	valueHeightfactor := float32(value) * s.heightFactor
+	s.bar.Resize(fyne.NewSize(s.size.Width-s.twoEight, valueHeightfactor))
+	s.bar.Move(fyne.NewPos(s.diameterEight, s.size.Height-valueHeightfactor))
 	s.displayText.Text = strconv.FormatFloat(value, 'f', 0, 64)
-	s.displayText.Move(fyne.NewPos(size.Width/2-s.displayText.Size().Width/2, size.Height-(float32(value)*heightFactor)-12.5))
+	s.displayText.Move(fyne.NewPos(s.middle-s.displayText.Size().Width/2, s.size.Height-valueHeightfactor-12.5))
 	s.displayText.Refresh()
 }
 
@@ -107,7 +94,7 @@ func (s *VBar) Value() float64 {
 }
 
 func (s *VBar) CreateRenderer() fyne.WidgetRenderer {
-	return &vbarRenderer{s}
+	return &vbarRenderer{vbar: s}
 }
 
 type vbarRenderer struct {
@@ -118,34 +105,38 @@ func (vr *vbarRenderer) Destroy() {
 }
 
 func (vr *vbarRenderer) Layout(space fyne.Size) {
+	if vr.vbar.size.Width == space.Width && vr.vbar.size.Height == space.Height {
+		return
+	}
+	log.Println("vbar.Layout", vr.vbar.cfg.Title, space.Width, space.Height)
+	vr.vbar.size = space
 	vr.vbar.canvas.Resize(space)
-	middle := space.Width / 2
-	heightFactor := float32(space.Height) / float32(vr.vbar.cfg.Steps)
-
+	vr.vbar.middle = space.Width / 2
+	vr.vbar.diameterEight = space.Width / 8
+	vr.vbar.twoEight = vr.vbar.diameterEight * 2
+	stepFactor := float32(space.Height) / float32(vr.vbar.cfg.Steps)
+	vr.vbar.heightFactor = float32(space.Height) / float32(vr.vbar.cfg.Max)
 	vr.vbar.face.Resize(space)
 
-	// Calculate positions once to avoid redundant calculations
-	titleX := middle - vr.vbar.titleText.Size().Width/2
-	displayTextX := middle - vr.vbar.displayText.Size().Width/2
-	displayTextY := space.Height - (float32(vr.vbar.value) * heightFactor) - 12.5
-	barY := space.Height - float32(vr.vbar.value)
+	titleX := vr.vbar.middle - vr.vbar.titleText.Size().Width/2
+	displayTextX := vr.vbar.middle - vr.vbar.displayText.Size().Width/2
+	displayTextY := space.Height - (float32(vr.vbar.value) * stepFactor) - 12.5
 
 	vr.vbar.titleText.Move(fyne.NewPos(titleX, space.Height+2))
 	vr.vbar.displayText.Move(fyne.NewPos(displayTextX, displayTextY))
-	vr.vbar.bar.Move(fyne.NewPos(0, barY))
 
-	for i, line := range vr.vbar.bars {
-		divisor := 3
-		if i%2 != 0 {
-			divisor = 7
+	s := vr.vbar
+	for i, line := range s.bars {
+		stepFactor := float32(i) * stepFactor
+		if i%2 == 0 {
+			line.Position1 = fyne.NewPos(s.middle-space.Width/3, stepFactor)
+			line.Position2 = fyne.NewPos(s.middle+space.Width/3, stepFactor)
+			continue
 		}
-
-		offsetX := space.Width / float32(divisor)
-		lineY := float32(i) * heightFactor
-
-		line.Position1 = fyne.NewPos(middle-offsetX, lineY)
-		line.Position2 = fyne.NewPos(middle+offsetX, lineY)
+		line.Position1 = fyne.NewPos(s.middle-space.Width/7, stepFactor)
+		line.Position2 = fyne.NewPos(s.middle+space.Width/7, stepFactor)
 	}
+
 	vr.vbar.SetValue(vr.vbar.value)
 }
 

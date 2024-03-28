@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"image/color"
+	"log"
 	"strconv"
 	"time"
 
@@ -14,14 +15,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/assets"
 )
-
-/*
-type Gauge interface {
-	SetValue(float64)
-	Value() float64
-	Content() fyne.CanvasObject
-}
-*/
 
 type Dashboard struct {
 	cfg *DashboardConfig
@@ -190,7 +183,6 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 			Minsize: fyne.NewSize(90, 90),
 		}),
 		limpMode: canvas.NewImageFromResource(fyne.NewStaticResource("limp.png", assets.LimpBytes)),
-		//metricsChan: make(chan *model.DashboardMetric, 60),
 	}
 	db.ExtendBaseWidget(db)
 
@@ -238,15 +230,12 @@ func (db *Dashboard) render() *fyne.Container {
 		db.ioff,
 		db.idc,
 		db.rpm,
+		db.speed,
 		db.air,
 		db.boost,
 		db.iat,
 		db.engineTemp,
 
-		//db.mReq.Content(),
-		//db.mAir.Content(),
-
-		db.speed,
 		db.activeAirDem,
 
 		db.nblambda,
@@ -280,7 +269,6 @@ func (db *Dashboard) Focused() bool {
 }
 
 func (db *Dashboard) Close() {
-
 }
 
 func (db *Dashboard) SetTime(t time.Time) {
@@ -297,15 +285,8 @@ func (db *Dashboard) SetTimeText(text string) {
 }
 
 func (db *Dashboard) SetValue(key string, value float64) {
-	//defer func() {
-	//	if err := recover(); err != nil {
-	//		log.Println(err)
-	//	}
-	//}()
-	if db != nil {
-		if fun, ok := db.metrics[key]; ok {
-			fun(value)
-		}
+	if fun, ok := db.metrics[key]; ok {
+		fun(value)
 	}
 }
 
@@ -427,18 +408,6 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 	return router
 }
 
-/*
-func (db *Dashboard) startParser() {
-	metrics := db.createRouter()
-	for metric := range db.metricsChan {
-		if fun, ok := metrics[metric.Name]; ok {
-			fun(metric.Value)
-			continue
-		}
-	}
-}
-*/
-
 func (db *Dashboard) Sweep() {
 	db.checkEngine.Hide()
 	an := fyne.NewAnimation(900*time.Millisecond, func(p float32) {
@@ -553,59 +522,60 @@ func (db *Dashboard) NewDebugBar() *fyne.Container {
 	)
 }
 
-func lambdaToString(v float64) string {
-	switch v {
-	case 0:
-		return "Closed loop activated"
-	case 1:
-		return "Load to high during a specific time"
-	case 2:
-		return "Load to low"
-	case 3:
-		return "Load to high, no knocking"
-	case 4:
-		return "Load to high, knocking"
-	case 5:
-		return "Cooling water temp to low, closed throttle"
-	case 6:
-		return "Cooling water temp to low, open throttle"
-	case 7:
-		return "Engine speed to low"
-	case 8:
-		return "Throttle transient in progress"
-	case 9:
-		return "Throttle transient in progress and low temp"
-	case 10:
-		return "Fuel cut"
-	case 11:
-		return "Load to high and exhaust temperature algorithm decides it is time to enrich."
-	case 12:
-		return "Diagnostic failure that affects the lambda control"
-	case 13:
-		return "Cloosed loop not enabled"
-	case 14:
-		return "Waiting number of combustion before hardware check" //, ie U_lambda_probe < 300mV AND U_lambda_probe > 600mV"
-	case 15:
-		return "Waiting until engine probe is warm"
-	case 16:
-		return "Waiting until number of combustions have past after probe is warm"
-	case 17:
-		return "SAI request open loop"
-	case 18:
-		return "Number of combustion to start closed loop has not passed. Only active when SAI is activated"
-	case 19:
-		return "Lambda integrator is freezed to 0 by SAI Lean Clamp"
-	case 20:
-		return "Catalyst diagnose for V6 controls the fuel"
-	case 21:
-		return "Gas hybrid active, T7 lambdacontrol stopped"
-	case 22:
-		return "Lambda integrator may not decrease below 0 during start"
-	default:
-		return "Unknown"
+/*
+	func lambdaToString(v float64) string {
+		switch v {
+		case 0:
+			return "Closed loop activated"
+		case 1:
+			return "Load to high during a specific time"
+		case 2:
+			return "Load to low"
+		case 3:
+			return "Load to high, no knocking"
+		case 4:
+			return "Load to high, knocking"
+		case 5:
+			return "Cooling water temp to low, closed throttle"
+		case 6:
+			return "Cooling water temp to low, open throttle"
+		case 7:
+			return "Engine speed to low"
+		case 8:
+			return "Throttle transient in progress"
+		case 9:
+			return "Throttle transient in progress and low temp"
+		case 10:
+			return "Fuel cut"
+		case 11:
+			return "Load to high and exhaust temperature algorithm decides it is time to enrich."
+		case 12:
+			return "Diagnostic failure that affects the lambda control"
+		case 13:
+			return "Cloosed loop not enabled"
+		case 14:
+			return "Waiting number of combustion before hardware check" //, ie U_lambda_probe < 300mV AND U_lambda_probe > 600mV"
+		case 15:
+			return "Waiting until engine probe is warm"
+		case 16:
+			return "Waiting until number of combustions have past after probe is warm"
+		case 17:
+			return "SAI request open loop"
+		case 18:
+			return "Number of combustion to start closed loop has not passed. Only active when SAI is activated"
+		case 19:
+			return "Lambda integrator is freezed to 0 by SAI Lean Clamp"
+		case 20:
+			return "Catalyst diagnose for V6 controls the fuel"
+		case 21:
+			return "Gas hybrid active, T7 lambdacontrol stopped"
+		case 22:
+			return "Lambda integrator may not decrease below 0 during start"
+		default:
+			return "Unknown"
+		}
 	}
-}
-
+*/
 func (db *Dashboard) CreateRenderer() fyne.WidgetRenderer {
 	return &DashboardRenderer{
 		db: db,
@@ -613,10 +583,17 @@ func (db *Dashboard) CreateRenderer() fyne.WidgetRenderer {
 }
 
 type DashboardRenderer struct {
-	db *Dashboard
+	db   *Dashboard
+	size fyne.Size
 }
 
 func (dr *DashboardRenderer) Layout(space fyne.Size) {
+	if dr.size.Width == space.Width && dr.size.Height == space.Height {
+		return
+	}
+	dr.size = space
+
+	log.Println("dashboard.Layout", space.Width, space.Height)
 	dr.db.container.Resize(space)
 
 	db := dr.db
@@ -638,7 +615,6 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	} else {
 		db.speed.Resize(fyne.NewSize(sixthWidth, thirdHeight))
 		db.speed.Move(fyne.NewPos(0, 0))
-
 		// Center dial
 		db.rpm.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth/3*2)-20, space.Height-115))
 		db.rpm.Move(fyne.NewPos(space.Width/2-db.rpm.Size().Width/2, space.Height/2-db.rpm.Size().Height/2+25))
@@ -724,7 +700,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 }
 
 func (dr *DashboardRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(800, 600)
+	return fyne.NewSize(600, 500)
 }
 
 func (dr *DashboardRenderer) Refresh() {

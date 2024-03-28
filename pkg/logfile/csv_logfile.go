@@ -10,9 +10,10 @@ import (
 )
 
 type CSVLogfile struct {
-	records []*Record
-	length  int
-	pos     int
+	headerNames map[string]*string
+	records     []*Record
+	length      int
+	pos         int
 }
 
 func NewFromCSVLogfile(filename string) (Logfile, error) {

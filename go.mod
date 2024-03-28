@@ -6,7 +6,7 @@ require (
 	github.com/avast/retry-go/v4 v4.5.1
 	github.com/fatih/color v1.16.0
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
-	github.com/roffe/gocan v0.0.0-20240309213347-4f36c3d8a735
+	github.com/roffe/gocan v0.0.0-20240319172924-d7f61278c4a1
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9
@@ -23,7 +23,6 @@ require (
 	fyne.io/systray v1.10.1-0.20231230205326-d160fd363db9 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
-	github.com/bendikro/dl v0.0.0-20190410215913-e41fdb9069d4 // indirect
 	github.com/creack/goselect v0.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fredbi/uri v1.1.0 // indirect
@@ -60,24 +59,27 @@ require (
 	golang.org/x/tools v0.19.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	honnef.co/go/js/dom v0.0.0-20231112215516-51f43a291193 // indirect
 )
 
-require github.com/roffe/ecusymbol v0.0.0-20240308231438-8ad3e7498614
+require github.com/roffe/ecusymbol v0.0.0-20240315205145-824aa43f3437
 
 require fyne.io/x/fyne v0.0.0-20240216160529-61d0ff41acd7
 
 require github.com/jellydator/ttlcache/v3 v3.2.0
 
+require honnef.co/go/js/dom v0.0.0-20210725211120-f030747120f2 // indirect
+
 require (
+	github.com/bendikro/dl v0.0.0-20190410215913-e41fdb9069d4 // indirect
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20240307211618-a69d953ea142 // indirect
-	github.com/go-ole/go-ole v1.3.0 // indirect
-	github.com/saltosystems/winrt-go v0.0.0-20240312144256-43a71786fba4 // indirect
+	github.com/go-ole/go-ole v1.2.6 // indirect
+	github.com/lusingander/colorpicker v0.7.2
+	github.com/saltosystems/winrt-go v0.0.0-20240110120258-ad49e9790c38 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/tinygo-org/cbgo v0.0.4 // indirect
 	tinygo.org/x/bluetooth v0.8.1-0.20240221113924-0087e0549b0b // indirect
 )
 
-replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
+// replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
 
-replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
+// replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol

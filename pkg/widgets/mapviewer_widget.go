@@ -19,10 +19,6 @@ import (
 	"github.com/roffe/txlogger/pkg/layout"
 )
 
-type xyUpdate struct {
-	x, y int
-}
-
 type MapViewerInfo struct {
 	XName, YName, ZName string
 	XLen, YLen, ZLen    int
@@ -359,7 +355,7 @@ func (mv *MapViewer) resize(size fyne.Size) {
 	)
 
 	// Calculate text size
-	textSize := calculateOptimalTextSize(sz.Width, sz.Height, mv.numColumns, mv.numRows)
+	textSize := calculateOptimalTextSize(sz.Width, mv.numColumns)
 
 	// Position and resize text values
 	for i := mv.numRows; i > 0; i-- {
@@ -385,7 +381,7 @@ func (mv *MapViewer) resize(size fyne.Size) {
 	mv.resizeCursor(sz, numColumnsFloat, numRowsFloat, widthFactor, heightFactor)
 }
 
-func calculateOptimalTextSize(width, height float32, columns, rows int) float32 {
+func calculateOptimalTextSize(width float32, columns int) float32 {
 	cellWidth := float64(width / float32(columns))
 	return max(min(float32(cellWidth/5), 21), 12)
 }

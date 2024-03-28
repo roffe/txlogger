@@ -5,14 +5,25 @@ import (
 	"image/color"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
+
+	_ "embed"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
+	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/debug"
+	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/windows"
 )
+
+//go:embed WHATSNEW.md
+var whatsNew string
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
@@ -26,6 +37,10 @@ func mainz(args []string) {
 	a := app.NewWithID("com.roffe.txlogger")
 	a.Settings().SetTheme(&txTheme{})
 
+	if err := presets.Load(a); err != nil {
+		log.Println(err)
+	}
+
 	meta := a.Metadata()
 	debug.Log(fmt.Sprintf("starting txlogger v%s build %d", meta.Version, meta.Build))
 
@@ -36,7 +51,7 @@ func mainz(args []string) {
 		if strings.HasSuffix(filename, ".bin") {
 			mw = windows.NewMainWindow(a, filename)
 		}
-		if strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") {
+		if strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") || strings.HasSuffix(filename, ".csv") {
 			windows.NewLogPlayer(a, filename, nil).ShowAndRun()
 			return
 		}
@@ -46,7 +61,31 @@ func mainz(args []string) {
 		mw = windows.NewMainWindow(a, "")
 	}
 
+	quitChan := make(chan os.Signal, 1)
+	signal.Notify(quitChan, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-quitChan
+		mw.CloseIntercept()
+		a.Quit()
+	}()
+
+	lastVersion := a.Preferences().String("lastVersion")
+	if lastVersion != a.Metadata().Version {
+		go func() {
+			time.Sleep(1500 * time.Millisecond)
+			ww := a.NewWindow("What's new")
+			md := widget.NewRichTextFromMarkdown(whatsNew)
+			md.Wrapping = fyne.TextWrapWord
+			ww.SetContent(container.NewVScroll(md))
+			ww.Resize(fyne.NewSize(700, 400))
+			ww.Show()
+			time.Sleep(200 * time.Millisecond)
+			ww.RequestFocus()
+		}()
+	}
+	a.Preferences().SetString("lastVersion", a.Metadata().Version)
 	//go updateCheck(a, mw)
+
 	mw.ShowAndRun()
 }
 
@@ -119,13 +158,13 @@ func (m txTheme) Size(name fyne.ThemeSizeName) float32 {
 		return 0
 	}
 	if name == theme.SizeNameScrollBarSmall {
-		return 5
+		return 4
 	}
 	if name == theme.SizeNameScrollBar {
 		return 8
 	}
 	if name == theme.SizeNamePadding {
-		return 3
+		return 2
 	}
 	return theme.DefaultTheme().Size(name)
 }
