@@ -63,6 +63,37 @@ func (ts *TimeSeries) Plot(values map[string][]float64, start, numPoints int, w,
 	return img
 }
 
+func (ts *TimeSeries) PlotImage(img *image.RGBA, values map[string][]float64, start, numPoints int) {
+	dl := len(values[ts.Name]) - 1
+	startN, endN := min(max(start, 0), dl), min(start+numPoints, dl)
+
+	s := img.Bounds().Size()
+	w := s.X
+	h := s.Y
+
+	//log.Println("Plotting", ts.Name, "from", start, "to", numPoints, "width", w, "height", h)
+	hh := h - 1
+	dataLen := endN - startN
+	heightFactor := float64(hh) / ts.valueRange
+	widthFactor := float64(w) / float64(dataLen)
+
+	// start at 1 since we need to draw a line from the previous point
+	data := values[ts.Name][startN:endN]
+	dle := dataLen - 1
+
+	for x := 1; x < dataLen; x++ {
+		fx := float64(x)
+		x0 := int(((fx - 1) * widthFactor))
+		y0 := int(float64(hh) - (data[x-1]-ts.Min)*heightFactor)
+		x1 := (int(fx * widthFactor))
+		if x == dle {
+			x1 = w
+		}
+		y1 := int(float64(hh) - (data[x]-ts.Min)*heightFactor)
+		Bresenham(img, x0, y0, x1, y1, ts.Color)
+	}
+}
+
 /* func (ts *TimeSeries) newImage(data []float64, w, h int) image.Image {
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
 	hh := h - 1

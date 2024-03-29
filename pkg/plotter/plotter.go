@@ -27,7 +27,7 @@ type Plotter struct {
 	legend *fyne.Container
 	cursor *canvas.Line
 	zoom   *widget.Slider
-	sel    *widget.Slider
+	//sel    *widget.Slider
 
 	ts               []TimeSeries
 	start            int
@@ -117,11 +117,11 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 	}
 	maxZoom := min(float64(p.dataLength-25), 6000)
 
-	p.dataPointsToShow = int(max(maxZoom/10, 250.0))
+	p.dataPointsToShow = min(p.dataLength, 250.0)
 
-	p.sel = widget.NewSlider(0, float64(p.dataLength))
-	p.sel.Max = float64(p.dataLength - p.dataPointsToShow)
-	p.sel.OnChanged = p.onSelect
+	//p.sel = widget.NewSlider(0, float64(p.dataLength))
+	//p.sel.Max = float64(p.dataLength - p.dataPointsToShow)
+	//p.sel.OnChanged = p.onSelect
 
 	p.zoom = widget.NewSlider(25, maxZoom)
 	p.zoom.SetValue(float64(p.dataPointsToShow))
@@ -147,7 +147,7 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 	if p.controls {
 		br = container.NewBorder(
 			nil,
-			p.sel,
+			nil, //p.sel,
 			p.zoom,
 			nil,
 			split,
@@ -161,10 +161,6 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		p.cursor,
 	)
 	return p
-}
-
-func (p *Plotter) Next() {
-	p.sel.SetValue(p.sel.Value + 1)
 }
 
 func (p *Plotter) SetValues(values map[string]float64) {
@@ -198,21 +194,24 @@ func (p *Plotter) Seek(pos int) {
 	if pp < 0 {
 		// if we are at the start of the data advance the cursor until we reach the middle of the screen
 		p.cursor.Move(fyne.NewPos(p.zoom.Size().Width+float32(pos)*widthFactor, 0))
-		p.sel.SetValue(pp)
+		//p.sel.SetValue(pp)
 	} else if pos > p.dataLength-halfDataPointsToShow {
 		// if we are at the end of the data move the cursor to the end of the screen by calculating
 		// position based on the data length and the width of the screen
 		cursorPos := p.zoom.Size().Width + p.plotContainer.Size().Width - float32(p.dataLength-pos)*widthFactor
 		p.cursor.Move(fyne.NewPos(cursorPos, 0))
-		p.sel.Value = pp
-		p.sel.Refresh()
+		//p.sel.Value = pp
+		//p.sel.Refresh()
+		p.start = int(pp)
 
 	} else {
 		// if we are in between the start and end of the data draw it in the middle of the screen
 		p.cursor.Move(fyne.NewPos(p.plotContainer.Position().X+p.plotContainer.Size().Width/2, 0))
-		p.sel.SetValue(pp)
+		//p.sel.SetValue(pp)
+		p.start = int(pp)
 	}
 	p.updateLegend(float64(pos))
+	p.RefreshImages(p.plotContainer.Size())
 }
 
 func (p *Plotter) onSelect(pos float64) {
@@ -257,34 +256,4 @@ func (p *Plotter) RefreshImages(size fyne.Size) {
 
 func (p *Plotter) CreateRenderer() fyne.WidgetRenderer {
 	return &plotterRenderer{plotter: p}
-}
-
-type plotterRenderer struct {
-	plotter *Plotter
-	size    fyne.Size
-}
-
-func (r *plotterRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(500, 200)
-}
-
-func (r *plotterRenderer) Destroy() {}
-
-func (r *plotterRenderer) Refresh() {}
-
-func (r *plotterRenderer) Layout(size fyne.Size) {
-	//if r.size.Width == size.Width && r.size.Height == size.Height {
-	//	return
-	//}
-	r.size = size
-	log.Println("plotter.Layout", size.Width, size.Height)
-	r.plotter.container.Resize(size)
-	pl := r.plotter.plotContainer.Size()
-	r.plotter.cursor.Position2 = fyne.NewPos(r.plotter.cursor.Position1.X, pl.Height)
-	r.plotter.cursor.Refresh()
-	r.plotter.RefreshImages(pl)
-}
-
-func (r *plotterRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.plotter.container}
 }

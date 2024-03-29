@@ -7,8 +7,7 @@ import (
 )
 
 func (p *Plotter) Dragged(event *fyne.DragEvent) {
-	p.sel.SetValue(p.sel.Value - float64(event.Dragged.DX))
-	//p.cursor.Move(fyne.NewPos(p.cursor.Position1.X, 0))
+	//p.sel.SetValue(p.sel.Value - float64(event.Dragged.DX))
 
 }
 
@@ -36,7 +35,7 @@ func (p *Plotter) onZoom(pos float64) {
 	//}
 	//p.zoom.Max = min(float64(p.dataLength-p.dataPointsToShow), 6000)
 	p.zoom.Refresh()
-	p.sel.Refresh()
+	//p.sel.Refresh()
 	p.RefreshImages(p.plotContainer.Size())
 }
 

@@ -155,22 +155,6 @@ func (mw *MainWindow) createButtons() {
 
 		mw.plotter = plotter.NewPlotter(values)
 
-		go func() {
-			for {
-				select {
-				case <-quit:
-					return
-				case <-time.After(40 * time.Millisecond):
-					val := make(map[string]float64)
-					for _, sym := range mw.symbolList.Symbols() {
-						val[sym.Name] = sym.Float64()
-					}
-					mw.plotter.SetValues(val)
-				}
-			}
-
-		}()
-
 		//unsubDB = ebus.SubscribeAllFunc(mw.plotter.SetValue)
 
 		mw.SetCloseIntercept(func() {

@@ -297,7 +297,7 @@ func (lp *LogPlayer) setupPlot(logz logfile.Logfile) {
 
 	lp.plotter = plotter.NewPlotter(
 		values,
-		plotter.WithControls(false),
+		plotter.WithControls(true),
 	)
 	lp.plotter.Logplayer = true
 	log.Println("creating plotter took", time.Since(start))
