@@ -250,51 +250,54 @@ func (mw *MainWindow) createLeading() *fyne.Container {
 func (mw *MainWindow) setupTabs() {
 	mw.leading = mw.createLeading()
 	mw.tab = container.NewAppTabs()
-	mw.tab.Append(container.NewTabItemWithIcon("Symbols", theme.ListIcon(), &container.Split{
-		Offset:     0.7,
-		Horizontal: true,
-		Leading:    mw.leading,
-		Trailing: &container.Split{
-			Offset:     0,
-			Horizontal: false,
-			Leading: container.NewVBox(
-				container.NewBorder(
-					nil,
-					nil,
-					layout.NewFixedWidth(75, widget.NewLabel("ECU")),
-					nil,
-					mw.ecuSelect,
-				),
-				container.NewBorder(
-					nil,
-					nil,
-					layout.NewFixedWidth(75, widget.NewLabel("Preset")),
-					nil,
-					mw.presetSelect,
-				),
-				mw.canSettings,
-				mw.logBtn,
-			),
-			Trailing: &container.Split{
-				Offset:     1,
-				Horizontal: false,
-				Leading:    mw.output,
-				Trailing: container.NewVBox(
-					mw.dashboardBtn,
-					//mw.plotterBtn,
-					mw.logplayerBtn,
-					mw.helpBtn,
-					//mw.settingsBtn,
-					container.NewGridWithColumns(3,
-						mw.capturedCounterLabel,
-						mw.errorCounterLabel,
-						mw.fpsLabel,
-					),
-				),
-			},
-		},
-	}))
 
+	bottomSplit := container.NewVSplit(
+		mw.output,
+		container.NewVBox(
+			mw.dashboardBtn,
+			//mw.plotterBtn,
+			mw.logplayerBtn,
+			mw.helpBtn,
+			//mw.settingsBtn,
+			container.NewGridWithColumns(3,
+				mw.capturedCounterLabel,
+				mw.errorCounterLabel,
+				mw.fpsLabel,
+			),
+		),
+	)
+	bottomSplit.SetOffset(0.9)
+
+	trailing := container.NewVSplit(
+		container.NewVBox(
+			container.NewBorder(
+				nil,
+				nil,
+				layout.NewFixedWidth(75, widget.NewLabel("ECU")),
+				nil,
+				mw.ecuSelect,
+			),
+			container.NewBorder(
+				nil,
+				nil,
+				layout.NewFixedWidth(75, widget.NewLabel("Preset")),
+				nil,
+				mw.presetSelect,
+			),
+			mw.canSettings,
+			mw.logBtn,
+		),
+		bottomSplit,
+	)
+	trailing.SetOffset(0.1)
+
+	hsplit := container.NewHSplit(
+		mw.leading,
+		trailing,
+	)
+	hsplit.SetOffset(0.7)
+
+	mw.tab.Append(container.NewTabItemWithIcon("Symbols", theme.ListIcon(), hsplit))
 	mw.tab.Append(container.NewTabItemWithIcon("Settings", theme.SettingsIcon(), mw.settings))
 }
 
