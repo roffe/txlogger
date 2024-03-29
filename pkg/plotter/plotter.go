@@ -29,7 +29,7 @@ type Plotter struct {
 	zoom   *widget.Slider
 	sel    *widget.Slider
 
-	ts               []*TimeSeries
+	ts               []TimeSeries
 	start            int
 	values           map[string][]float64
 	valueOrder       []string

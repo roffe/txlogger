@@ -15,8 +15,8 @@ type TimeSeries struct {
 	Color      color.RGBA
 }
 
-func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
-	ts := &TimeSeries{
+func NewTimeSeries(name string, values map[string][]float64) TimeSeries {
+	ts := TimeSeries{
 		Name:  name,
 		Color: hashToRGB(name),
 	}

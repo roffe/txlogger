@@ -11,7 +11,7 @@ import (
 
 type CSVLogfile struct {
 	headerNames map[string]*string
-	records     []*Record
+	records     []Record
 	length      int
 	pos         int
 }
@@ -30,25 +30,31 @@ func NewFromCSVLogfile(filename string) (Logfile, error) {
 	return csvlog, nil
 }
 
-func (l *CSVLogfile) Next() *Record {
+func (l *CSVLogfile) Next() Record {
 	if l.pos+1 > l.length-1 || l.pos+1 < 0 {
-		return nil
+		return Record{
+			EOF: true,
+		}
 	}
 	l.pos++
 	return l.records[l.pos]
 }
 
-func (l *CSVLogfile) Prev() *Record {
+func (l *CSVLogfile) Prev() Record {
 	if l.pos-1 < 0 {
-		return nil
+		return Record{
+			EOF: true,
+		}
 	}
 	l.pos--
 	return l.records[l.pos]
 }
 
-func (l *CSVLogfile) Seek(pos int) *Record {
+func (l *CSVLogfile) Seek(pos int) Record {
 	if pos < 0 || pos >= l.length {
-		return nil
+		return Record{
+			EOF: true,
+		}
 	}
 	l.pos = pos
 	return l.records[pos]
@@ -58,8 +64,10 @@ func (l *CSVLogfile) Pos() int {
 	return l.pos
 }
 
-func (l *CSVLogfile) SeekTime(time.Time) *Record {
-	return nil
+func (l *CSVLogfile) SeekTime(time.Time) Record {
+	return Record{
+		EOF: true,
+	}
 }
 
 func (l *CSVLogfile) Len() int {
@@ -80,7 +88,7 @@ func (l *CSVLogfile) End() time.Time {
 	return time.Time{}
 }
 
-func parseCSVLogfile(filename string) ([]*Record, error) {
+func parseCSVLogfile(filename string) ([]Record, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -91,7 +99,7 @@ func parseCSVLogfile(filename string) ([]*Record, error) {
 		return nil, err
 	}
 
-	var recs []*Record
+	var recs []Record
 
 	for i := 1; i < len(records); i++ {
 		ts, err := time.Parse(datalogger.ISONICO, records[i][0])

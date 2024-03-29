@@ -13,7 +13,7 @@ import (
 )
 
 type TxLogfile struct {
-	records []*Record
+	records []Record
 	length  int
 	pos     int
 }
@@ -34,25 +34,31 @@ func NewFromTxLogfile(filename string) (Logfile, error) {
 	return txlog, nil
 }
 
-func (l *TxLogfile) Next() *Record {
+func (l *TxLogfile) Next() Record {
 	if l.pos+1 > l.length-1 || l.pos+1 < 0 {
-		return nil
+		return Record{
+			EOF: true,
+		}
 	}
 	l.pos++
 	return l.records[l.pos]
 }
 
-func (l *TxLogfile) Prev() *Record {
+func (l *TxLogfile) Prev() Record {
 	if l.pos-1 < 0 {
-		return nil
+		return Record{
+			EOF: true,
+		}
 	}
 	l.pos--
 	return l.records[l.pos]
 }
 
-func (l *TxLogfile) Seek(pos int) *Record {
+func (l *TxLogfile) Seek(pos int) Record {
 	if pos < 0 || pos >= l.length {
-		return nil
+		return Record{
+			EOF: true,
+		}
 	}
 	l.pos = pos
 	return l.records[pos]
@@ -101,7 +107,7 @@ func detectTimeFormat(text string) (string, error) {
 	return "", errors.New("could not detect time format")
 }
 
-func parseTxLogfile(filename string) ([]*Record, error) {
+func parseTxLogfile(filename string) ([]Record, error) {
 	lines, err := readTxLogfile(filename)
 	if err != nil {
 		return nil, err
@@ -117,7 +123,7 @@ func parseTxLogfile(filename string) ([]*Record, error) {
 		return nil, err
 	}
 
-	records := make([]*Record, noLines)
+	records := make([]Record, noLines)
 	semChan := make(chan struct{}, runtime.NumCPU())
 	var wg sync.WaitGroup
 	for pos := 0; pos < noLines; pos++ {
@@ -140,10 +146,10 @@ func parseTxLogfile(filename string) ([]*Record, error) {
 	return records, nil
 }
 
-func parseLine(line, timeFormat string) (*Record, error) {
+func parseLine(line, timeFormat string) (Record, error) {
 	parsedTime, rawValues, err := splitTxLogLine(line, timeFormat)
 	if err != nil {
-		return nil, err
+		return Record{}, err
 	}
 	record := NewRecord(parsedTime)
 	for _, kv := range rawValues {
@@ -152,7 +158,7 @@ func parseLine(line, timeFormat string) (*Record, error) {
 		}
 		key, value, err := parseCommaValue(kv)
 		if err != nil {
-			return nil, err
+			return Record{}, err
 		}
 		record.SetValue(key, value)
 	}

@@ -267,7 +267,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 	}
 	log.Printf("Parsed %d records in %s", logz.Len(), time.Since(start))
 
-	lp.setupPlot(filename, logz)
+	lp.setupPlot(logz)
 
 	lp.slider.Max = float64(logz.Len())
 	lp.posLabel.SetText("0.0%")
@@ -281,12 +281,11 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 	return lp
 }
 
-func (lp *LogPlayer) setupPlot(filename string, logz logfile.Logfile) {
+func (lp *LogPlayer) setupPlot(logz logfile.Logfile) {
 	start := time.Now()
 	values := make(map[string][]float64)
 	for {
-		if rec := logz.Next(); rec != nil {
-			//times = append(times, rec.Time)
+		if rec := logz.Next(); !rec.EOF {
 			for k, v := range rec.Values {
 				values[k] = append(values[k], v)
 			}
@@ -392,7 +391,7 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 		if lp.plotter != nil {
 			lp.plotter.Seek(currPos)
 		}
-		if rec := logz.Next(); rec != nil {
+		if rec := logz.Next(); !rec.EOF {
 			lp.db.SetTimeText(currentTimeFormatted(rec.Time))
 			delayTilNext := int64(float64(rec.DelayTillNext) * speedMultiplier)
 			if delayTilNext > 1000 {

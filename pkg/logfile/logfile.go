@@ -7,17 +7,17 @@ import (
 )
 
 type Logfile interface {
-	Next() *Record
-	Prev() *Record
-	Seek(int) *Record
+	Next() Record
+	Prev() Record
+	Seek(int) Record
 	Pos() int
 	Len() int
 	Start() time.Time
 	End() time.Time
 }
 
-func NewRecord(time time.Time) *Record {
-	return &Record{
+func NewRecord(time time.Time) Record {
+	return Record{
 		Time:   time,
 		Values: make(map[string]float64),
 	}
@@ -27,6 +27,7 @@ type Record struct {
 	Time          time.Time
 	DelayTillNext int64
 	Values        map[string]float64
+	EOF           bool
 	//mu            sync.Mutex
 }
 
