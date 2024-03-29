@@ -7,8 +7,8 @@ import (
 )
 
 type plotterRenderer struct {
-	plotter *Plotter
-	size    fyne.Size
+	p    *Plotter
+	size fyne.Size
 }
 
 func (r *plotterRenderer) MinSize() fyne.Size {
@@ -23,15 +23,17 @@ func (r *plotterRenderer) Layout(size fyne.Size) {
 	//if r.size.Width == size.Width && r.size.Height == size.Height {
 	//	return
 	//}
+
+	r.p.plotMiddle = size.Width / 2
 	r.size = size
 	log.Println("plotter.Layout", size.Width, size.Height)
-	r.plotter.container.Resize(size)
-	pl := r.plotter.plotContainer.Size()
-	r.plotter.cursor.Position2 = fyne.NewPos(r.plotter.cursor.Position1.X, pl.Height)
-	r.plotter.cursor.Refresh()
-	r.plotter.RefreshImages(pl)
+	r.p.container.Resize(size)
+	pl := r.p.plotContainer.Size()
+	r.p.cursor.Position2 = fyne.NewPos(r.p.cursor.Position1.X, pl.Height)
+	r.p.cursor.Refresh()
+	r.p.RefreshImages(pl)
 }
 
 func (r *plotterRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.plotter.container}
+	return []fyne.CanvasObject{r.p.container}
 }
