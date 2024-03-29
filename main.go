@@ -139,7 +139,7 @@ type txTheme struct{}
 
 func (m txTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
 	if name == theme.ColorNameBackground {
-		return color.RGBA{R: 23, G: 23, B: 24, A: 0xff}
+		return color.RGBA{R: 23, G: 23, B: 24, A: 255}
 	}
 
 	return theme.DefaultTheme().Color(name, theme.VariantDark)
@@ -154,17 +154,37 @@ func (m txTheme) Font(style fyne.TextStyle) fyne.Resource {
 }
 
 func (m txTheme) Size(name fyne.ThemeSizeName) float32 {
-	if name == theme.SizeNameSeparatorThickness {
+	switch name {
+	case theme.SizeNameSeparatorThickness: // denna 0
+		return 0
+	case theme.SizeNameInlineIcon:
+		return 20
+	case theme.SizeNameInnerPadding:
+		return 8
+	case theme.SizeNameLineSpacing:
+		return 4
+	case theme.SizeNamePadding: // 2
+		return 2
+	case theme.SizeNameScrollBar: // 8
+		return 16
+	case theme.SizeNameScrollBarSmall:
+		return 4
+	case theme.SizeNameText:
+		return 14
+	case theme.SizeNameHeadingText:
+		return 24
+	case theme.SizeNameSubHeadingText:
+		return 18
+	case theme.SizeNameCaptionText:
+		return 11
+	case theme.SizeNameInputBorder:
+		return 1
+	case theme.SizeNameInputRadius:
+		return 5
+	case theme.SizeNameSelectionRadius:
+		return 3
+	default:
 		return 0
 	}
-	if name == theme.SizeNameScrollBarSmall {
-		return 4
-	}
-	if name == theme.SizeNameScrollBar {
-		return 8
-	}
-	if name == theme.SizeNamePadding {
-		return 2
-	}
-	return theme.DefaultTheme().Size(name)
+
 }
