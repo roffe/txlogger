@@ -43,6 +43,8 @@ dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7
 fyne.io/fyne/v2 v2.4.3/go.mod h1:1h3BKxmQYRJlr2g+RGVxedzr6vLVQ/AJmFWcF9CJnoQ=
 fyne.io/fyne/v2 v2.4.4-rc2.0.20240327210355-7adde9f37cb7 h1:aW4G29SvCLqIj5XUN86MgKOGtkbn95mMvPVLi+xdHG8=
 fyne.io/fyne/v2 v2.4.4-rc2.0.20240327210355-7adde9f37cb7/go.mod h1:YDkwyydMKsSDGKgVpWAQjk9bleX6b0CCp8cYxlKWVVk=
+fyne.io/fyne/v2 v2.4.4-rc2.0.20240329173153-506db546dbfd h1:cosf6jyxf1UvkCYrnOQIW5jsrSKIhXYZ6QuXqVMcfIw=
+fyne.io/fyne/v2 v2.4.4-rc2.0.20240329173153-506db546dbfd/go.mod h1:YDkwyydMKsSDGKgVpWAQjk9bleX6b0CCp8cYxlKWVVk=
 fyne.io/systray v1.10.1-0.20231115130155-104f5ef7839e/go.mod h1:oM2AQqGJ1AMo4nNqZFYU8xYygSBZkW2hmdJ7n4yjedE=
 fyne.io/systray v1.10.1-0.20231230205326-d160fd363db9 h1:E/gHmMVyk8TuI6JIgNIv/Qu1JABMVFBIkQ8lYRa5gkQ=
 fyne.io/systray v1.10.1-0.20231230205326-d160fd363db9/go.mod h1:RVwqP9nYMo7h5zViCBHri2FgjXF7H2cub7MAq4NSoLs=

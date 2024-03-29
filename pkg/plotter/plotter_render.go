@@ -20,17 +20,18 @@ func (r *plotterRenderer) Destroy() {}
 func (r *plotterRenderer) Refresh() {}
 
 func (r *plotterRenderer) Layout(size fyne.Size) {
-	//if r.size.Width == size.Width && r.size.Height == size.Height {
-	//	return
-	//}
-
-	r.p.plotMiddle = size.Width / 2
+	if r.size.Width == size.Width && r.size.Height == size.Height {
+		return
+	}
 	r.size = size
+
 	log.Println("plotter.Layout", size.Width, size.Height)
+
 	r.p.container.Resize(size)
+
 	pl := r.p.plotContainer.Size()
-	r.p.cursor.Position2 = fyne.NewPos(r.p.cursor.Position1.X, pl.Height)
-	r.p.cursor.Refresh()
+	r.p.plotMiddle = pl.Width / 2
+	r.p.widthFactor = pl.Width / float32(r.p.dataPointsToShow)
 	r.p.RefreshImages(pl)
 }
 
