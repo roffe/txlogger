@@ -13,12 +13,14 @@ type TimeSeries struct {
 	Max        float64
 	valueRange float64
 	Color      color.RGBA
+	Enabled    bool
 }
 
-func NewTimeSeries(name string, values map[string][]float64) TimeSeries {
-	ts := TimeSeries{
-		Name:  name,
-		Color: hashToRGB(name),
+func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
+	ts := &TimeSeries{
+		Name:    name,
+		Color:   hashToRGB(name),
+		Enabled: true,
 	}
 
 	data, ok := values[name]
@@ -32,7 +34,7 @@ func NewTimeSeries(name string, values map[string][]float64) TimeSeries {
 	return ts
 }
 
-func (ts *TimeSeries) Plot(values map[string][]float64, start, numPoints int, w, h int) image.Image {
+func (ts *TimeSeries) Plotx(values map[string][]float64, start, numPoints int, w, h int) image.Image {
 	//log.Println("Plotting", ts.Name, "from", start, "to", numPoints, "width", w)
 	dl := len(values[ts.Name]) - 1
 	startN, endN := min(max(start, 0), dl), min(start+numPoints, dl)

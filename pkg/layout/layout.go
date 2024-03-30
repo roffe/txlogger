@@ -42,7 +42,7 @@ func (l *Horizontal) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	width := (size.Width - offset) / float32(len(objects))
 	for i, o := range objects {
 		o.Resize(fyne.NewSize(o.MinSize().Width, o.MinSize().Height))
-		o.Move(fyne.NewPos(offset+(float32(i)*width)+(width/2)-o.MinSize().Width/2, 0))
+		o.Move(fyne.NewPos(offset+(float32(i)*width)+(width*.5)-o.MinSize().Width*.5, 0))
 	}
 }
 

@@ -29,6 +29,7 @@ var T7SymbolsTuning = map[string][]string{
 	"Calibration": {
 		"AirCompCal.PressMap",
 		"MAFCal.m_RedundantAirMap",
+		"PedalMapCal.m_RequestMap",
 		"TCompCal.EnrFacE85Tab",
 		"TCompCal.EnrFacTab",
 		"VIOSMAFCal.FreqSP",

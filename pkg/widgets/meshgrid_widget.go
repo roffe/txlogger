@@ -115,8 +115,8 @@ func (m *Meshgrid) createVertices(width, height float32) {
 		var row []Vertex
 		for j := 0; j < m.cols; j++ {
 			// Calculate the x and y coordinates based on the current row and column
-			x := -float64(width)/2 + float64(j)*float64(m.cellWidth)
-			y := -float64(height)/2 + float64(i)*float64(m.cellHeight)
+			x := -float64(width)*.5 + float64(j)*float64(m.cellWidth)
+			y := -float64(height)*.5 + float64(i)*float64(m.cellHeight)
 			z := ((m.values[valueIndex] - m.zmin) / m.zrange) * m.depth // Normalize to [0, 1]
 			//zValues = append(zValues, m.values[valueIndex])
 			row = append(row, Vertex{
@@ -143,7 +143,7 @@ func (m *Meshgrid) RotateMeshgrid(ax, ay, az float64) {
 
 func (m *Meshgrid) scaleMeshgrid() {
 	//	log.Println("Scaling meshgrid", m.sx, m.sy, m.sz)
-	cz := m.depth / 2
+	cz := m.depth * .5
 	xmax := 0.0
 	ymax := 0.0
 	for i, row := range m.vertices {
@@ -167,9 +167,9 @@ func (m *Meshgrid) scaleMeshgrid() {
 			}
 		}
 	}
-	m.cx = xmax / 2
-	m.cy = ymax / 2
-	m.cz = m.depth / 2
+	m.cx = xmax * .5
+	m.cy = ymax * .5
+	m.cz = m.depth * .5
 	// m.cx = m.vertices[len(m.vertices)-1][m.cols-1].X / 2
 	// m.cy = m.vertices[len(m.vertices)-1][m.cols-1].Y / 2
 }
@@ -183,7 +183,7 @@ func (m *Meshgrid) rotateMeshgrid(ax, ay, az float64) {
 	sinAy, cosAy := math.Sin(ay), math.Cos(ay)
 	sinAz, cosAz := math.Sin(az), math.Cos(az)
 
-	cz := m.depth / 2 // This assumes your z-values range symmetrically around zero.
+	cz := m.depth * .5 // This assumes your z-values range symmetrically around zero.
 	xmax := 0.0
 	ymax := 0.0
 	for i, row := range m.vertices {
@@ -213,9 +213,9 @@ func (m *Meshgrid) rotateMeshgrid(ax, ay, az float64) {
 			}
 		}
 	}
-	m.cx = xmax / 2
-	m.cy = ymax / 2
-	m.cz = m.depth / 2
+	m.cx = xmax * .5
+	m.cy = ymax * .5
+	m.cz = m.depth * .5
 }
 
 func (m *Meshgrid) SetFloat64(idx int, value float64) {
@@ -266,8 +266,8 @@ func findMinMaxRange(values []float64) (float64, float64, float64) {
 func (m *Meshgrid) project(v Vertex) (int, int) {
 	// Translate the vertex position by the center of the screen
 	// and adjust by the camera position to get screen coordinates.
-	centerX := float64(m.size.Width / 2)
-	centerY := float64(m.size.Height / 2)
+	centerX := float64(m.size.Width * .5)
+	centerY := float64(m.size.Height * .5)
 	screenX := centerX + v.X - m.px
 	screenY := centerY + v.Y - m.py
 	return int(screenX), int(screenY)
@@ -355,7 +355,7 @@ func (m *Meshgrid) drawMeshgridLines(img *image.RGBA) {
 func enhanceLineColor(baseColor color.RGBA, value float64) color.RGBA {
 	// Adjust the base color based on value to simulate depth; higher values are "closer"
 	// This is a simple approach where we map the value to a brightness factor
-	factor := 0.5 + (value / 2.0) // Assuming value is normalized between 0 and 1
+	factor := 0.5 + (value * .5) // Assuming value is normalized between 0 and 1
 	if factor > 1 {
 		factor = 1
 	}

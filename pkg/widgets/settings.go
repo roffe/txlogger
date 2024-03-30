@@ -26,6 +26,7 @@ const (
 	prefsLambdaSource      = "lambdaSource"
 	prefsUseMPH            = "useMPH"
 	prefsSwapRPMandSpeed   = "swapRPMandSpeed"
+	prefsPlotResolution    = "plotResolution"
 )
 
 type SettingsWidget struct {
@@ -43,6 +44,7 @@ type SettingsWidget struct {
 	lambdaSource    *widget.Select
 	useMPH          *widget.Check
 	swapRPMandSpeed *widget.Check
+	plotResolution  *widget.Select
 
 	container *fyne.Container
 }
@@ -102,6 +104,17 @@ func (sw *SettingsWidget) GetSwapRPMandSpeed() bool {
 	return sw.swapRPMandSpeed.Checked
 }
 
+func (sw *SettingsWidget) GetPlotResolution() float32 {
+	switch sw.plotResolution.Selected {
+	case "Half":
+		return 0.5
+	case "Full":
+		return 1
+	default:
+		return 1
+	}
+}
+
 func NewSettingsWidget() *SettingsWidget {
 	sw := &SettingsWidget{}
 	sw.ExtendBaseWidget(sw)
@@ -121,6 +134,8 @@ func NewSettingsWidget() *SettingsWidget {
 	lambdaSel := sw.newLambdaSelector()
 	sw.useMPH = sw.newUserMPH()
 	sw.swapRPMandSpeed = sw.newSwapRPMandSpeed()
+
+	sw.plotResolution = sw.newPlotResolution()
 
 	sw.container =
 		container.NewVBox(
@@ -209,6 +224,14 @@ func NewSettingsWidget() *SettingsWidget {
 				nil,
 				sw.swapRPMandSpeed,
 			),
+			container.NewBorder(
+				nil,
+				nil,
+				//widget.NewIcon(theme.ZoomFitIcon()),
+				widget.NewLabel("Plot resolution"),
+				nil,
+				sw.plotResolution,
+			),
 		)
 	sw.loadPrefs()
 	return sw
@@ -286,6 +309,13 @@ func (sw *SettingsWidget) newSwapRPMandSpeed() *widget.Check {
 		fyne.CurrentApp().Preferences().SetBool(prefsSwapRPMandSpeed, b)
 	})
 }
+
+func (sw *SettingsWidget) newPlotResolution() *widget.Select {
+	return widget.NewSelect([]string{"Full", "Half"}, func(s string) {
+		fyne.CurrentApp().Preferences().SetString(prefsPlotResolution, s)
+	})
+}
+
 func (sw *SettingsWidget) loadPrefs() {
 	freq := fyne.CurrentApp().Preferences().IntWithFallback(prefsFreq, 25)
 	sw.freqSlider.SetValue(float64(freq))
@@ -299,6 +329,7 @@ func (sw *SettingsWidget) loadPrefs() {
 	sw.lambdaSource.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLambdaSource, "ECU"))
 	sw.useMPH.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsUseMPH, false))
 	sw.swapRPMandSpeed.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsSwapRPMandSpeed, false))
+	sw.plotResolution.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsPlotResolution, "Full"))
 }
 
 func (sw *SettingsWidget) CreateRenderer() fyne.WidgetRenderer {

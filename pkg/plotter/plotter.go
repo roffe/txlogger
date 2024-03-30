@@ -1,7 +1,9 @@
 package plotter
 
 import (
+	"image"
 	"image/color"
+	"log"
 	"runtime"
 	"sort"
 	"strconv"
@@ -11,48 +13,62 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/txlogger/pkg/layout"
 )
 
 type Plotter struct {
 	widget.BaseWidget
 
-	plotContainer *fyne.Container
-	plotImages    []*canvas.Image
+	cursor      *canvas.Line
+	canvasImage *canvas.Image
+	container   *fyne.Container
+	canvas      fyne.CanvasObject
 
 	texts  []*TappableText
 	legend *fyne.Container
 	zoom   *widget.Slider
 
-	ts               []TimeSeries
-	start            int
+	ts               []*TimeSeries
+	startPos         int
+	cursorPos        int
 	values           map[string][]float64
 	valueOrder       []string
 	dataPointsToShow int
 	dataLength       int
-
-	container *fyne.Container
 
 	Logplayer bool
 
 	mu      sync.Mutex
 	semChan chan struct{}
 
-	plotMiddle  float32
-	widthFactor float32
+	widthFactor          float32
+	plotResolution       fyne.Size
+	plotResolutionFactor float32
 }
 
 type PlotterOpt func(*Plotter)
 
+func WithPlotResolutionFactor(factor float32) PlotterOpt {
+	return func(p *Plotter) {
+		p.plotResolutionFactor = factor
+	}
+}
+
 func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 	p := &Plotter{
-		values:           values,
-		dataPointsToShow: 0,
-		semChan:          make(chan struct{}, runtime.NumCPU()),
-		plotContainer:    container.NewStack(),
-		legend:           container.NewVBox(),
-		zoom:             widget.NewSlider(1, 100),
+		values:               values,
+		dataPointsToShow:     0,
+		semChan:              make(chan struct{}, runtime.NumCPU()),
+		legend:               container.NewVBox(),
+		zoom:                 widget.NewSlider(1, 100),
+		canvasImage:          canvas.NewImageFromImage(image.NewRGBA(image.Rect(0, 0, 500, 200))),
+		cursor:               canvas.NewLine(color.White),
+		ts:                   make([]*TimeSeries, len(values)),
+		plotResolutionFactor: 1.0,
 	}
+
+	p.canvasImage.FillMode = canvas.ImageFillOriginal
+	p.canvasImage.ScaleMode = canvas.ImageScalePixels
+	//p.canvasImage.Translucency = 0.2
 
 	p.zoom.Orientation = widget.Vertical
 	p.zoom.Value = 10
@@ -69,7 +85,7 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 	}
 	sort.Strings(p.valueOrder)
 
-	for _, k := range p.valueOrder {
+	for n, k := range p.valueOrder {
 		v, ok := values[k]
 		if !ok {
 			continue
@@ -78,34 +94,22 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		if valuesLenght > p.dataLength {
 			p.dataLength = valuesLenght - 1
 		}
-		ts := NewTimeSeries(k, values)
 
-		p.ts = append(p.ts, ts)
+		p.ts[n] = NewTimeSeries(k, values)
 
-		cimg := canvas.NewImageFromImage(ts.Plot(values, 0, 0, 0, 0))
-		cimg.FillMode = canvas.ImageFillOriginal
-		cimg.ScaleMode = canvas.ImageScaleFastest
-		p.plotContainer.Add(cimg)
-		p.plotImages = append(p.plotImages, cimg)
-
-		onTapped := func(enable bool) {
-			if !enable {
-				cimg.Hide()
-				return
-			}
-			cimg.Image = ts.Plot(p.values, p.start, p.dataPointsToShow, cimg.Image.Bounds().Dx(), cimg.Image.Bounds().Dy())
-			cimg.Refresh()
-			cimg.Show()
+		onTapped := func(enabled bool) {
+			log.Println("Tapped", k, enabled)
+			p.ts[n].Enabled = enabled
+			p.RefreshImage()
 		}
 
 		onColorUpdate := func(col color.Color) {
 			r, g, b, a := col.RGBA()
-			ts.Color = color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)}
-			cimg.Image = ts.Plot(p.values, p.start, p.dataPointsToShow, cimg.Image.Bounds().Dx(), cimg.Image.Bounds().Dy())
-			cimg.Refresh()
+			p.ts[n].Color = color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)}
+			p.RefreshImage()
 		}
 
-		legendLabel := NewTappableText(k, ts.Color, onTapped, onColorUpdate)
+		legendLabel := NewTappableText(k, p.ts[n].Color, onTapped, onColorUpdate)
 		legendLabel.SetTextSize(11)
 		p.texts = append(p.texts, legendLabel)
 		p.legend.Add(legendLabel)
@@ -114,17 +118,17 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 
 	p.dataPointsToShow = min(p.dataLength, 250.0)
 
-	legend := layout.NewFixedWidth(
-		180,
-		p.legend,
-	)
-
 	p.container = container.NewBorder(
 		nil,
 		nil,
 		p.zoom,
-		legend,
-		p.plotContainer,
+		container.NewVScroll(p.legend),
+		p.canvasImage,
+	)
+
+	p.canvas = container.NewWithoutLayout(
+		p.container,
+		p.cursor,
 	)
 	return p
 }
@@ -133,23 +137,32 @@ func (p *Plotter) Seek(pos int) {
 	halfDataPointsToShow := p.dataPointsToShow / 2
 	offsetPosition := float64(pos - halfDataPointsToShow)
 	if offsetPosition > 0 && pos < p.dataLength-halfDataPointsToShow {
-		p.start = int(offsetPosition)
-		p.RefreshImages(p.plotContainer.Size())
+		p.startPos = int(offsetPosition)
+		p.RefreshImage()
 	}
-	p.updateLegend(float64(pos + 1))
+	p.cursorPos = pos + 1
+	p.updateLegend()
+	p.updateCursor()
 }
 
-func (p *Plotter) updateLegend(pos float64) {
+func (p *Plotter) updateCursor() {
+	x := float32(p.cursorPos-p.startPos) * p.widthFactor
+	xOffset := p.zoom.Size().Width + x
+	p.cursor.Position1 = fyne.NewPos(xOffset, 0)
+	p.cursor.Position2 = fyne.NewPos(xOffset+1, p.canvasImage.Size().Height)
+	p.cursor.Refresh()
+}
+
+func (p *Plotter) updateLegend() {
 	for i, v := range p.valueOrder {
-		valueIndex := min(p.dataLength, int(pos))
+		valueIndex := min(p.dataLength, p.cursorPos)
 		obj := p.texts[i]
 		obj.text.Text = v + ": " + strconv.FormatFloat(p.values[v][valueIndex], 'f', 2, 64)
 	}
 	p.legend.Refresh()
-
 }
 
-func (p *Plotter) RefreshImages(size fyne.Size) {
+/* func (p *Plotter) RefreshImages(size fyne.Size) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	//startx := time.Now()
@@ -171,6 +184,27 @@ func (p *Plotter) RefreshImages(size fyne.Size) {
 	wg.Wait()
 	p.plotContainer.Refresh()
 	//log.Println("RefreshImages took", time.Since(startx))
+} */
+
+func (p *Plotter) RefreshImage() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	//startx := time.Now()
+
+	//draw.Draw(p.canvasImage.Image.(*image.RGBA), p.canvasImage.Image.Bounds(), image.NewUniform(color.RGBA{0, 0, 0, 0}), image.Point{}, draw.Src)
+	img := image.NewRGBA(image.Rect(0, 0, int(p.plotResolution.Width), int(p.plotResolution.Height)))
+	for n := range len(p.ts) {
+		if !p.ts[n].Enabled {
+			continue
+		}
+		p.ts[n].PlotImage(img, p.values, p.startPos, p.dataPointsToShow)
+	}
+
+	p.canvasImage.Image = img
+	p.canvasImage.Refresh()
+
+	//log.Println("RefreshImage took", time.Since(startx).Nanoseconds())
+
 }
 
 func (p *Plotter) CreateRenderer() fyne.WidgetRenderer {

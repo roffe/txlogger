@@ -26,15 +26,14 @@ func (r *plotterRenderer) Layout(size fyne.Size) {
 	r.size = size
 
 	log.Println("plotter.Layout", size.Width, size.Height)
-
 	r.p.container.Resize(size)
-
-	pl := r.p.plotContainer.Size()
-	r.p.plotMiddle = pl.Width / 2
+	pl := r.p.canvasImage.Size()
+	r.p.plotResolution = fyne.NewSize(pl.Width*r.p.plotResolutionFactor, pl.Height*r.p.plotResolutionFactor)
 	r.p.widthFactor = pl.Width / float32(r.p.dataPointsToShow)
-	r.p.RefreshImages(pl)
+	r.p.RefreshImage()
+	r.p.updateCursor()
 }
 
 func (r *plotterRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.p.container}
+	return []fyne.CanvasObject{r.p.canvas}
 }

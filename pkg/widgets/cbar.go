@@ -148,9 +148,9 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 	s.size = space
 	s.eightHeight = s.size.Height / 8
 	diameter := space.Width
-	s.center = diameter / 2
+	s.center = diameter * .5
 	height := space.Height
-	middle := height / 2
+	middle := height * .5
 	stepFactor := float32(diameter) / float32(s.cfg.Steps)
 	s.widthFactor = space.Width / float32(s.valueRange)
 	s.barHeight = s.size.Height - (s.eightHeight * 2)
@@ -168,13 +168,13 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 
 	}
 
-	s.titleText.Move(fyne.NewPos(diameter/2-s.titleText.Size().Width/2, height-30))
-	s.displayText.Move(fyne.NewPos(diameter/2-s.displayText.MinSize().Width/2, y))
+	s.titleText.Move(fyne.NewPos(diameter*.5-s.titleText.Size().Width*.5, height-30))
+	s.displayText.Move(fyne.NewPos(diameter*.5-s.displayText.MinSize().Width*.5, y))
 
 	for i, line := range s.bars {
 		if i%2 == 0 {
-			line.Position1 = fyne.NewPos(float32(i)*stepFactor, middle-height/3)
-			line.Position2 = fyne.NewPos(float32(i)*stepFactor, middle+height/3)
+			line.Position1 = fyne.NewPos(float32(i)*stepFactor, middle-height*.33)
+			line.Position2 = fyne.NewPos(float32(i)*stepFactor, middle+height*.33)
 			continue
 		}
 		line.Position1 = fyne.NewPos(float32(i)*stepFactor, middle-height/7)

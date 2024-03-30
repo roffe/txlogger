@@ -27,7 +27,7 @@ func (g *Grid) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 			if g.Text {
 				// Center the object within its grid cell if it's text
 				obj.Move(fyne.NewPos(
-					xPosition+(widthFactor/2)-(obj.MinSize().Width/2),
+					xPosition+(widthFactor*.5)-(obj.MinSize().Width*.5),
 					yPosition,
 				))
 			} else {

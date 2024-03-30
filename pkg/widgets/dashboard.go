@@ -258,6 +258,14 @@ func (db *Dashboard) render() *fyne.Container {
 	return content
 }
 
+func (db *Dashboard) GetMetricNames() []string {
+	names := make([]string, 0, len(db.metrics))
+	for k := range db.metrics {
+		names = append(names, k)
+	}
+	return names
+}
+
 func (db *Dashboard) FocusGained() {
 	db.focused = true
 }
@@ -599,8 +607,8 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	db := dr.db
 
 	var sixthWidth float32 = space.Width / 6
-	var thirdHeight float32 = (space.Height - 50) / 3
-	var halfHeight float32 = (space.Height - 50) / 2
+	var thirdHeight float32 = (space.Height - 50) * .33
+	var halfHeight float32 = (space.Height - 50) * .5
 
 	// Dials
 
@@ -611,13 +619,13 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 
 		// Center dial
 		db.speed.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth/3*2)-20, space.Height-115))
-		db.speed.Move(fyne.NewPos(space.Width/2-db.speed.Size().Width/2, space.Height/2-db.speed.Size().Height/2+25))
+		db.speed.Move(fyne.NewPos(space.Width*.5-db.speed.Size().Width*.5, space.Height*.5-db.speed.Size().Height*.5+25))
 	} else {
 		db.speed.Resize(fyne.NewSize(sixthWidth, thirdHeight))
 		db.speed.Move(fyne.NewPos(0, 0))
 		// Center dial
 		db.rpm.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth/3*2)-20, space.Height-115))
-		db.rpm.Move(fyne.NewPos(space.Width/2-db.rpm.Size().Width/2, space.Height/2-db.rpm.Size().Height/2+25))
+		db.rpm.Move(fyne.NewPos(space.Width*.5-db.rpm.Size().Width*.5, space.Height*.5-db.rpm.Size().Height*.5+25))
 	}
 
 	db.air.Resize(fyne.NewSize(sixthWidth, thirdHeight))
@@ -650,12 +658,12 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 
 	// Icons
 	db.limpMode.Resize(fyne.NewSize(sixthWidth, thirdHeight))
-	db.limpMode.Move(fyne.NewPos(space.Width/2-db.limpMode.Size().Width/2, space.Height/2-db.limpMode.Size().Height/2-(thirdHeight/2)))
+	db.limpMode.Move(fyne.NewPos(space.Width*.5-db.limpMode.Size().Width*.5, space.Height*.5-db.limpMode.Size().Height*.5-(thirdHeight*.5)))
 
-	db.checkEngine.Resize(fyne.NewSize(sixthWidth/2, thirdHeight/2))
+	db.checkEngine.Resize(fyne.NewSize(sixthWidth*.5, thirdHeight*.5))
 	db.checkEngine.Move(fyne.NewPos(space.Width-db.engineTemp.Size().Width-db.throttle.Size().Width-db.checkEngine.Size().Width-15, space.Height-db.checkEngine.Size().Height-db.wblambda.Size().Height))
 
-	db.knockIcon.Move(fyne.NewPos((space.Width/2)-(db.checkEngine.Size().Width/2)-(sixthWidth*.7), space.Height/2-60))
+	db.knockIcon.Move(fyne.NewPos((space.Width*.5)-(db.checkEngine.Size().Width*.5)-(sixthWidth*.7), space.Height*.5-60))
 
 	// Buttons
 
@@ -677,7 +685,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 		db.logBtn.Resize(fyne.NewSize(db.wblambda.Position().X-db.fullscreenBtn.Size().Width-14, 55))
 		db.logBtn.Move(fyne.NewPos(db.fullscreenBtn.Size().Width+5, space.Height-55))
 	} else {
-		db.time.Move(fyne.NewPos(space.Width/2-100, space.Height/2.6))
+		db.time.Move(fyne.NewPos(space.Width*.5-100, space.Height/2.6))
 	}
 	db.fullscreenBtn.Move(fyne.NewPos(0, space.Height-55))
 
@@ -693,7 +701,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	db.idc.Move(fyne.NewPos((db.nblambda.Position().X+db.nblambda.Size().Width)-db.idc.MinSize().Width, db.nblambda.Size().Height-14))
 
 	db.activeAirDem.TextSize = min(space.Width/25.0, 45)
-	db.activeAirDem.Move(fyne.NewPos(space.Width/2, thirdHeight))
+	db.activeAirDem.Move(fyne.NewPos(space.Width*.5, thirdHeight))
 
 	db.cruise.Move(fyne.NewPos(sixthWidth*1.45, space.Height-(db.checkEngine.Size().Height*.6)-db.wblambda.Size().Height))
 

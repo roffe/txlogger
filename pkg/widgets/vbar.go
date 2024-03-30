@@ -85,7 +85,7 @@ func (s *VBar) SetValue(value float64) {
 	s.bar.Resize(fyne.NewSize(s.size.Width-s.twoEight, valueHeightfactor))
 	s.bar.Move(fyne.NewPos(s.diameterEight, s.size.Height-valueHeightfactor))
 	s.displayText.Text = strconv.FormatFloat(value, 'f', 0, 64)
-	s.displayText.Move(fyne.NewPos(s.middle-s.displayText.Size().Width/2, s.size.Height-valueHeightfactor-12.5))
+	s.displayText.Move(fyne.NewPos(s.middle-s.displayText.Size().Width*.5, s.size.Height-valueHeightfactor-12.5))
 	s.displayText.Refresh()
 }
 
@@ -111,15 +111,15 @@ func (vr *vbarRenderer) Layout(space fyne.Size) {
 	log.Println("vbar.Layout", vr.vbar.cfg.Title, space.Width, space.Height)
 	vr.vbar.size = space
 	vr.vbar.canvas.Resize(space)
-	vr.vbar.middle = space.Width / 2
+	vr.vbar.middle = space.Width * .5
 	vr.vbar.diameterEight = space.Width / 8
 	vr.vbar.twoEight = vr.vbar.diameterEight * 2
 	stepFactor := float32(space.Height) / float32(vr.vbar.cfg.Steps)
 	vr.vbar.heightFactor = float32(space.Height) / float32(vr.vbar.cfg.Max)
 	vr.vbar.face.Resize(space)
 
-	titleX := vr.vbar.middle - vr.vbar.titleText.Size().Width/2
-	displayTextX := vr.vbar.middle - vr.vbar.displayText.Size().Width/2
+	titleX := vr.vbar.middle - vr.vbar.titleText.Size().Width*.5
+	displayTextX := vr.vbar.middle - vr.vbar.displayText.Size().Width*.5
 	displayTextY := space.Height - (float32(vr.vbar.value) * stepFactor) - 12.5
 
 	vr.vbar.titleText.Move(fyne.NewPos(titleX, space.Height+2))
@@ -129,8 +129,8 @@ func (vr *vbarRenderer) Layout(space fyne.Size) {
 	for i, line := range s.bars {
 		stepFactor := float32(i) * stepFactor
 		if i%2 == 0 {
-			line.Position1 = fyne.NewPos(s.middle-space.Width/3, stepFactor)
-			line.Position2 = fyne.NewPos(s.middle+space.Width/3, stepFactor)
+			line.Position1 = fyne.NewPos(s.middle-space.Width*.33, stepFactor)
+			line.Position2 = fyne.NewPos(s.middle+space.Width*.33, stepFactor)
 			continue
 		}
 		line.Position1 = fyne.NewPos(s.middle-space.Width/7, stepFactor)

@@ -41,8 +41,6 @@ cloud.google.com/go/storage v1.10.0/go.mod h1:FLPqc6j+Ki4BU591ie1oL6qBQGu2Bl/tZ9
 cloud.google.com/go/storage v1.14.0/go.mod h1:GrKmX003DSIwi9o29oFT7YDnHYwZoctc3fOKtUw0Xmo=
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 fyne.io/fyne/v2 v2.4.3/go.mod h1:1h3BKxmQYRJlr2g+RGVxedzr6vLVQ/AJmFWcF9CJnoQ=
-fyne.io/fyne/v2 v2.4.4-rc2.0.20240327210355-7adde9f37cb7 h1:aW4G29SvCLqIj5XUN86MgKOGtkbn95mMvPVLi+xdHG8=
-fyne.io/fyne/v2 v2.4.4-rc2.0.20240327210355-7adde9f37cb7/go.mod h1:YDkwyydMKsSDGKgVpWAQjk9bleX6b0CCp8cYxlKWVVk=
 fyne.io/fyne/v2 v2.4.4-rc2.0.20240329173153-506db546dbfd h1:cosf6jyxf1UvkCYrnOQIW5jsrSKIhXYZ6QuXqVMcfIw=
 fyne.io/fyne/v2 v2.4.4-rc2.0.20240329173153-506db546dbfd/go.mod h1:YDkwyydMKsSDGKgVpWAQjk9bleX6b0CCp8cYxlKWVVk=
 fyne.io/systray v1.10.1-0.20231115130155-104f5ef7839e/go.mod h1:oM2AQqGJ1AMo4nNqZFYU8xYygSBZkW2hmdJ7n4yjedE=
@@ -321,8 +319,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/posener/complete v1.1.1/go.mod h1:em0nMJCgc9GFtwrmVmEMR/ZL6WyhyjMBndrE9hABlRI=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
-github.com/roffe/ecusymbol v0.0.0-20240315205145-824aa43f3437 h1:sCGiGDcUoFInH+AMzoH2g9WZKytCoLzoW1xc6cR7WJk=
-github.com/roffe/ecusymbol v0.0.0-20240315205145-824aa43f3437/go.mod h1:b5Wz7voC7PlRahgmFGo3NRPua6Lk3++r34Hn5DOVsT8=
+github.com/roffe/ecusymbol v0.0.0-20240330031055-7cba67c2a27a h1:2ILz1BaNo6Ku0IhPZyEEBXaWYiFozkDyGGwecJoMUUg=
+github.com/roffe/ecusymbol v0.0.0-20240330031055-7cba67c2a27a/go.mod h1:b5Wz7voC7PlRahgmFGo3NRPua6Lk3++r34Hn5DOVsT8=
 github.com/roffe/gocan v0.0.0-20240319172924-d7f61278c4a1 h1:xiota7UD65FaqJbzvCw5/jjn7zhuO3r8pDu1P8iye3g=
 github.com/roffe/gocan v0.0.0-20240319172924-d7f61278c4a1/go.mod h1:fT6gY3ONeFE7AWXQU6DrHYDkxYOSM/Vxx9f8+AXAS6Y=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=

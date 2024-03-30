@@ -10,18 +10,18 @@ import (
 )
 
 type EBusMessage struct {
-	Topic *string
-	Data  *float64
+	Topic string
+	Data  float64
 }
 
 type Controller struct {
 	subs    map[string][]chan float64
-	subsAll []chan *EBusMessage
+	subsAll []chan EBusMessage
 
 	subsLock sync.Mutex
 
-	incoming chan *EBusMessage
-	unsubAll chan chan *EBusMessage
+	incoming chan EBusMessage
+	unsubAll chan chan EBusMessage
 	unsub    chan chan float64
 	cache    *ttlcache.Cache[string, float64]
 
@@ -36,9 +36,9 @@ type Controller struct {
 func New() *Controller {
 	c := &Controller{
 		subs:     make(map[string][]chan float64),
-		subsAll:  make([]chan *EBusMessage, 0),
-		incoming: make(chan *EBusMessage, 100),
-		unsubAll: make(chan chan *EBusMessage, 100),
+		subsAll:  make([]chan EBusMessage, 0),
+		incoming: make(chan EBusMessage, 100),
+		unsubAll: make(chan chan EBusMessage, 100),
 		unsub:    make(chan chan float64, 100),
 		cache:    ttlcache.New[string, float64](ttlcache.WithTTL[string, float64](1 * time.Minute)),
 		quit:     make(chan struct{}),
@@ -59,12 +59,12 @@ func (e *Controller) run() {
 			e.cache.DeleteAll()
 			return
 		case msg := <-e.incoming:
-			if v := e.cache.Get(*msg.Topic); v != nil {
-				if v.Value() == *msg.Data {
+			if v := e.cache.Get(msg.Topic); v != nil {
+				if v.Value() == msg.Data {
 					continue
 				}
 			}
-			e.cache.Set(*msg.Topic, *msg.Data, ttlcache.DefaultTTL)
+			e.cache.Set(msg.Topic, msg.Data, ttlcache.DefaultTTL)
 			for _, sub := range e.subsAll {
 				select {
 				case sub <- msg:
@@ -72,14 +72,14 @@ func (e *Controller) run() {
 					e.UnsubscribeAll(sub)
 				}
 			}
-			for _, sub := range e.subs[*msg.Topic] {
+			for _, sub := range e.subs[msg.Topic] {
 				select {
-				case sub <- *msg.Data:
+				case sub <- msg.Data:
 				default:
 				}
 			}
 			for _, agg := range e.aggregators {
-				agg.fun(e, *msg.Topic, *msg.Data)
+				agg.fun(e, msg.Topic, msg.Data)
 			}
 
 		case unsub := <-e.unsubAll:
@@ -122,15 +122,15 @@ func (e *Controller) Close() {
 
 func (e *Controller) Publish(topic string, data float64) error {
 	select {
-	case e.incoming <- &EBusMessage{Topic: &topic, Data: &data}:
+	case e.incoming <- EBusMessage{Topic: topic, Data: data}:
 		return nil
 	default:
 		return errors.New("publish channel full")
 	}
 }
 
-func (e *Controller) SubscribeAll() chan *EBusMessage {
-	respChan := make(chan *EBusMessage, 100)
+func (e *Controller) SubscribeAll() chan EBusMessage {
+	respChan := make(chan EBusMessage, 100)
 	e.subsLock.Lock()
 	e.subsAll = append(e.subsAll, respChan)
 	e.subsLock.Unlock()
@@ -138,7 +138,7 @@ func (e *Controller) SubscribeAll() chan *EBusMessage {
 	e.cache.Range(func(item *ttlcache.Item[string, float64]) bool {
 		k := item.Key()
 		v := item.Value()
-		respChan <- &EBusMessage{Topic: &k, Data: &v}
+		respChan <- EBusMessage{Topic: k, Data: v}
 		return true
 	})
 	return respChan
@@ -148,7 +148,7 @@ func (e *Controller) SubscribeAllFunc(f func(topic string, value float64)) (canc
 	respChan := e.SubscribeAll()
 	go func() {
 		for v := range respChan {
-			f(*v.Topic, *v.Data)
+			f(v.Topic, v.Data)
 		}
 	}()
 	// return a function that can be used to unsubscribe
@@ -158,7 +158,7 @@ func (e *Controller) SubscribeAllFunc(f func(topic string, value float64)) (canc
 	return
 }
 
-func (e *Controller) UnsubscribeAll(channel chan *EBusMessage) {
+func (e *Controller) UnsubscribeAll(channel chan EBusMessage) {
 	e.unsubAll <- channel
 }
 

@@ -121,8 +121,15 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 
 		Window: w,
 	}
+	cancelFuncs := make([]func(), 0)
+	for _, name := range lp.db.GetMetricNames() {
+		cancel := lp.ebus.SubscribeFunc(name, func(f float64) {
+			lp.db.SetValue(name, f)
+		})
+		cancelFuncs = append(cancelFuncs, cancel)
+	}
 
-	unsubDB := lp.ebus.SubscribeAllFunc(lp.db.SetValue)
+	//unsubDB := lp.ebus.SubscribeAllFunc(lp.db.SetValue)
 
 	l, err := readFirstLine(filename)
 	if err != nil {
@@ -156,7 +163,9 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 	}, lp.openMap, lp.openMapz)
 
 	w.SetCloseIntercept(func() {
-		unsubDB()
+		for _, c := range cancelFuncs {
+			c()
+		}
 		lp.controlChan <- &controlMsg{Op: OpExit}
 		if lp.db != nil {
 			lp.db.Close()
@@ -295,7 +304,21 @@ func (lp *LogPlayer) setupPlot(logz logfile.Logfile) {
 	}
 	logz.Seek(0)
 
-	lp.plotter = plotter.NewPlotter(values)
+	var factor float32
+	switch lp.app.Preferences().StringWithFallback("plotResolution", "Full") {
+	case "Half":
+		factor = 0.5
+	case "Full":
+		fallthrough
+	default:
+		factor = 1
+
+	}
+
+	lp.plotter = plotter.NewPlotter(
+		values,
+		plotter.WithPlotResolutionFactor(factor),
+	)
 	lp.plotter.Logplayer = true
 	log.Println("creating plotter took", time.Since(start))
 }
@@ -333,9 +356,11 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 	if play {
 		lp.toggleBtn.SetIcon(theme.MediaPauseIcon())
 	}
-	var nextFrame, currentMillis int64
+
 	var playonce bool
 	speedMultiplier := 1.0
+
+	var nextFrame int64
 
 	go func() {
 		for op := range lp.controlChan {
@@ -369,43 +394,54 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 		}
 	}()
 
-	var currPos int
+	var (
+		currPos       int
+		currentMillis int64
+		sleepDuration time.Duration
+		sleepMargin   int64 = 4  // Margin for sleep duration
+		minSleepTime  int64 = 4  // Minimum sleep time allowed
+		maxSleepTime  int64 = 20 // Maximum sleep time allowed
+	)
+
 	for !lp.closed {
 		currPos = logz.Pos()
 		currentMillis = time.Now().UnixMilli()
 		if logz.Pos() >= logz.Len()-1 || (!play && !playonce) {
-			time.Sleep(10 * time.Millisecond)
-			continue
-		}
-		if nextFrame-currentMillis > 15 {
-			time.Sleep(10 * time.Millisecond)
-			continue
-		}
-		if currentMillis < nextFrame {
-			continue
-		}
-		lp.currLine.Set(float64(currPos))
-		if lp.plotter != nil {
-			lp.plotter.Seek(currPos)
-		}
-		if rec := logz.Next(); !rec.EOF {
-			lp.db.SetTimeText(currentTimeFormatted(rec.Time))
-			delayTilNext := int64(float64(rec.DelayTillNext) * speedMultiplier)
-			if delayTilNext > 1000 {
-				delayTilNext = 100
+			sleepDuration = time.Duration(maxSleepTime) * time.Millisecond
+		} else if nextFrame-currentMillis > sleepMargin {
+			sleepDuration = time.Duration(nextFrame-currentMillis-sleepMargin) * time.Millisecond
+			if sleepDuration < time.Duration(minSleepTime)*time.Millisecond {
+				sleepDuration = time.Duration(minSleepTime) * time.Millisecond
+			} else if sleepDuration > time.Duration(maxSleepTime)*time.Millisecond {
+				sleepDuration = time.Duration(maxSleepTime) * time.Millisecond
 			}
-			nextFrame = (currentMillis + delayTilNext) - 3
-			for k, v := range rec.Values {
-				//lp.db.SetValue(k, v)
-				//if len(lp.openMaps) > 0 {
-				lp.ebus.Publish(k, v)
-				//}
+		} else if currentMillis < nextFrame {
+			continue
+		} else {
+			lp.currLine.Set(float64(currPos))
+			if lp.plotter != nil {
+				lp.plotter.Seek(currPos)
+			}
+			if rec := logz.Next(); !rec.EOF {
+				lp.db.SetTimeText(currentTimeFormatted(rec.Time))
+				delayTilNext := int64(float64(rec.DelayTillNext) * speedMultiplier)
+				if delayTilNext > 1000 {
+					delayTilNext = 100
+				}
+				nextFrame = (currentMillis + delayTilNext) - sleepMargin
+				for k, v := range rec.Values {
+					lp.ebus.Publish(k, v)
+				}
+			}
+			if playonce {
+				playonce = false
 			}
 		}
-		if playonce {
-			playonce = false
-		}
+
+		// Sleep for the calculated duration
+		time.Sleep(sleepDuration)
 	}
+
 	log.Println("Exiting logplayer playback")
 }
 

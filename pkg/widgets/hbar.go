@@ -115,15 +115,15 @@ func (dr *HBarRenderer) Layout(space fyne.Size) {
 	middle := height / 2
 	s.widthFactor = float32(diameter) / float32(s.cfg.Max)
 	stepsFactor := float32(diameter) / float32(s.cfg.Steps)
-	s.eightHeight = space.Height / 8
+	s.eightHeight = space.Height * oneEight
 	s.height = space.Height - (s.eightHeight * 2)
 	s.face.Resize(space)
-	s.titleText.Move(fyne.NewPos(diameter/2-s.titleText.Size().Width/2, height-30))
+	s.titleText.Move(fyne.NewPos(diameter*.5-s.titleText.Size().Width*.5, height-30))
 	s.bar.Move(fyne.NewPos(space.Width-float32(s.value), 0))
 	for i, line := range s.bars {
 		if i%2 == 0 {
-			line.Position1 = fyne.NewPos(float32(i)*stepsFactor, middle-height/3)
-			line.Position2 = fyne.NewPos(float32(i)*stepsFactor, middle+height/3)
+			line.Position1 = fyne.NewPos(float32(i)*stepsFactor, middle-height*.33)
+			line.Position2 = fyne.NewPos(float32(i)*stepsFactor, middle+height*.33)
 			continue
 		}
 		line.Position1 = fyne.NewPos(float32(i)*stepsFactor, middle-height/7)
