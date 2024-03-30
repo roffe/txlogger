@@ -73,6 +73,9 @@ type T8Client struct {
 
 	lw LogWriter
 
+	errCount     int
+	errPerSecond int
+
 	Config
 }
 
@@ -120,6 +123,15 @@ func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
 
 const T8ChunkSize = 0x10
 
+const lastPresentInterval = 3500 * time.Millisecond
+
+func (c *T8Client) onError(err error) {
+	c.errCount++
+	c.errPerSecond++
+	c.ErrorCounter.Set(c.errCount)
+	c.OnMessage(err.Error())
+}
+
 func (c *T8Client) Start() error {
 	defer c.lw.Close()
 
@@ -149,17 +161,14 @@ func (c *T8Client) Start() error {
 		order = append(order, EXTERNALWBLSYM)
 	}
 
-	count := 0
-	errCount := 0
-	c.ErrorCounter.Set(errCount)
+	c.ErrorCounter.Set(c.errCount)
 
 	errPerSecond := 0
 	//c.ErrorPerSecondCounter.Set(errPerSecond)
 
-	fps := 0
+	cps := 0
+	count := 0
 	retries := 0
-
-	lastPresentInterval := 3500 * time.Millisecond
 
 	err = retry.Do(func() error {
 		gm := gmlan.New(cl, 0x7e0, 0x7e8)
@@ -197,8 +206,8 @@ func (c *T8Client) Start() error {
 				case <-gctx.Done():
 					return nil
 				case <-secondTicker.C:
-					c.FpsCounter.Set(fps)
-					fps = 0
+					c.FpsCounter.Set(cps)
+					cps = 0
 					if errPerSecond > 10 {
 						return errors.New("too many errors, reconnecting")
 					}
@@ -221,10 +230,7 @@ func (c *T8Client) Start() error {
 			testerPresent := func() {
 				if time.Since(lastPresent) > lastPresentInterval {
 					if err := gm.TesterPresentNoResponseAllowed(); err != nil {
-						errCount++
-						errPerSecond++
-						c.ErrorCounter.Set(errCount)
-						c.OnMessage(fmt.Sprintf("Failed to send tester present: %v", err))
+						c.onError(fmt.Errorf("failed to send tester present: %w", err))
 					}
 					lastPresent = time.Now()
 				}
@@ -263,9 +269,7 @@ func (c *T8Client) Start() error {
 					log.Printf("Reading RAM 0x%X %d", read.Address, chunkSize)
 					data, err := gm.ReadMemoryByAddress(ctx, read.Address, chunkSize)
 					if err != nil {
-						errCount++
-						errPerSecond++
-						c.ErrorCounter.Set(errCount)
+						c.onError(fmt.Errorf("failed to read memory: %w", err))
 						read.Complete(err)
 						continue outer
 					}
@@ -288,9 +292,7 @@ func (c *T8Client) Start() error {
 					//					log.Printf("Updating RAM 0x%X", upd.Address)
 					chunkSize = uint32(math.Min(float64(upd.left), 0x06))
 					if err := gm.WriteDataByAddress(ctx, upd.Address, upd.Data[:chunkSize]); err != nil {
-						errCount++
-						errPerSecond++
-						c.ErrorCounter.Set(errCount)
+						c.onError(fmt.Errorf("failed to write data: %w", err))
 						upd.Complete(err)
 						continue outer
 					}
@@ -311,10 +313,7 @@ func (c *T8Client) Start() error {
 					}
 					databuff, err := gm.ReadDataByIdentifier(ctx, 0x18)
 					if err != nil {
-						errCount++
-						errPerSecond++
-						c.ErrorCounter.Set(errCount)
-						c.OnMessage(fmt.Sprintf("Failed to read data: %v", err))
+						c.onError(fmt.Errorf("failed to read data: %w", err))
 						continue
 					}
 					if len(databuff) != int(expectedPayloadSize) {
@@ -326,10 +325,7 @@ func (c *T8Client) Start() error {
 						buf.Reset()
 						buf.Write(va.Bytes())
 						if err := va.Read(r); err != nil {
-							errCount++
-							errPerSecond++
-							c.ErrorCounter.Set(errCount)
-							c.OnMessage(fmt.Sprintf("Failed to set data: %v", err))
+							c.onError(fmt.Errorf("failed to set data: %w", err))
 							break
 						}
 						if !bytes.Equal(va.Bytes(), buf.Bytes()) {
@@ -348,12 +344,9 @@ func (c *T8Client) Start() error {
 
 					//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
 					if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
-						errCount++
-						errPerSecond++
-						c.ErrorCounter.Set(errCount)
-						c.OnMessage(fmt.Sprintf("Failed to write log: %v", err))
+						c.onError(fmt.Errorf("failed to write log: %w", err))
 					}
-					fps++
+					cps++
 					count++
 					if count%10 == 0 {
 						c.CaptureCounter.Set(count)

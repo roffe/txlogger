@@ -321,6 +321,8 @@ github.com/posener/complete v1.1.1/go.mod h1:em0nMJCgc9GFtwrmVmEMR/ZL6WyhyjMBndr
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/roffe/ecusymbol v0.0.0-20240330031055-7cba67c2a27a h1:2ILz1BaNo6Ku0IhPZyEEBXaWYiFozkDyGGwecJoMUUg=
 github.com/roffe/ecusymbol v0.0.0-20240330031055-7cba67c2a27a/go.mod h1:b5Wz7voC7PlRahgmFGo3NRPua6Lk3++r34Hn5DOVsT8=
+github.com/roffe/ecusymbol v0.0.0-20240330140656-ee875d82bea0 h1:nSC48WjYoYv6fCz7bkW2upHAmrF3F1ODnxspVX0/uis=
+github.com/roffe/ecusymbol v0.0.0-20240330140656-ee875d82bea0/go.mod h1:b5Wz7voC7PlRahgmFGo3NRPua6Lk3++r34Hn5DOVsT8=
 github.com/roffe/gocan v0.0.0-20240319172924-d7f61278c4a1 h1:xiota7UD65FaqJbzvCw5/jjn7zhuO3r8pDu1P8iye3g=
 github.com/roffe/gocan v0.0.0-20240319172924-d7f61278c4a1/go.mod h1:fT6gY3ONeFE7AWXQU6DrHYDkxYOSM/Vxx9f8+AXAS6Y=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=

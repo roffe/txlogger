@@ -61,7 +61,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-require github.com/roffe/ecusymbol v0.0.0-20240330031055-7cba67c2a27a
+require github.com/roffe/ecusymbol v0.0.0-20240330140656-ee875d82bea0
 
 require fyne.io/x/fyne v0.0.0-20240216160529-61d0ff41acd7
 

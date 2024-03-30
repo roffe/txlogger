@@ -146,7 +146,7 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 	dr.d.container.Resize(space)
 	s := dr.d
 	s.size = space
-	s.eightHeight = s.size.Height / 8
+	s.eightHeight = s.size.Height * oneEight
 	diameter := space.Width
 	s.center = diameter * .5
 	height := space.Height
@@ -177,8 +177,8 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 			line.Position2 = fyne.NewPos(float32(i)*stepFactor, middle+height*.33)
 			continue
 		}
-		line.Position1 = fyne.NewPos(float32(i)*stepFactor, middle-height/7)
-		line.Position2 = fyne.NewPos(float32(i)*stepFactor, middle+height/7)
+		line.Position1 = fyne.NewPos(float32(i)*stepFactor, middle-height*oneSeventh)
+		line.Position2 = fyne.NewPos(float32(i)*stepFactor, middle+height*oneSeventh)
 	}
 	s.refresh()
 }

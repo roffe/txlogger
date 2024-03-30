@@ -226,15 +226,17 @@ func (db *Dashboard) render() *fyne.Container {
 	content := container.NewWithoutLayout(
 		db.limpMode,
 		//db.dbgBar,
-		db.ign,
-		db.ioff,
-		db.idc,
+
 		db.rpm,
 		db.speed,
 		db.air,
 		db.boost,
 		db.iat,
 		db.engineTemp,
+
+		db.ign,
+		db.ioff,
+		db.idc,
 
 		db.activeAirDem,
 
@@ -606,7 +608,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 
 	db := dr.db
 
-	var sixthWidth float32 = space.Width / 6
+	var sixthWidth float32 = space.Width * oneSixth
 	var thirdHeight float32 = (space.Height - 50) * .33
 	var halfHeight float32 = (space.Height - 50) * .5
 
@@ -618,13 +620,13 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 		db.rpm.Move(fyne.NewPos(0, 0))
 
 		// Center dial
-		db.speed.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth/3*2)-20, space.Height-115))
+		db.speed.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth*oneThird*2)-20, space.Height-115))
 		db.speed.Move(fyne.NewPos(space.Width*.5-db.speed.Size().Width*.5, space.Height*.5-db.speed.Size().Height*.5+25))
 	} else {
 		db.speed.Resize(fyne.NewSize(sixthWidth, thirdHeight))
 		db.speed.Move(fyne.NewPos(0, 0))
 		// Center dial
-		db.rpm.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth/3*2)-20, space.Height-115))
+		db.rpm.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth*oneThird*2)-20, space.Height-115))
 		db.rpm.Move(fyne.NewPos(space.Width*.5-db.rpm.Size().Width*.5, space.Height*.5-db.rpm.Size().Height*.5+25))
 	}
 
@@ -642,11 +644,11 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 
 	// Vbar
 	pwm := db.pwm
-	pwm.Resize(fyne.NewSize(sixthWidth/3, space.Height-125))
+	pwm.Resize(fyne.NewSize(sixthWidth*oneThird, space.Height-125))
 	pwm.Move(fyne.NewPos(sixthWidth+8, 25))
 
 	tps := db.throttle
-	tps.Resize(fyne.NewSize(sixthWidth/3, space.Height-125))
+	tps.Resize(fyne.NewSize(sixthWidth*oneThird, space.Height-125))
 	tps.Move(fyne.NewPos(space.Width-sixthWidth-tps.Size().Width-8, 25))
 
 	// Cbar
@@ -673,19 +675,19 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	if !db.logplayer {
 		if space.Width < 1000 {
 			db.fullscreenBtn.SetText("(F)")
-			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth/2.1, 55))
+			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth*oneHalfOne, 55))
 		} else if space.Width < 1300 {
 			db.fullscreenBtn.SetText("Fullscrn")
-			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth/1.8, 55))
+			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth*oneOneEight, 55))
 		} else {
 			db.fullscreenBtn.SetText("Fullscreen")
-			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth/1.5, 55))
+			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth*oneOneFive, 55))
 		}
 
 		db.logBtn.Resize(fyne.NewSize(db.wblambda.Position().X-db.fullscreenBtn.Size().Width-14, 55))
 		db.logBtn.Move(fyne.NewPos(db.fullscreenBtn.Size().Width+5, space.Height-55))
 	} else {
-		db.time.Move(fyne.NewPos(space.Width*.5-100, space.Height/2.6))
+		db.time.Move(fyne.NewPos(space.Width*.5-100, space.Height*oneHalfSix))
 	}
 	db.fullscreenBtn.Move(fyne.NewPos(0, space.Height-55))
 
@@ -700,7 +702,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	//db.idc.TextSize = textSize
 	db.idc.Move(fyne.NewPos((db.nblambda.Position().X+db.nblambda.Size().Width)-db.idc.MinSize().Width, db.nblambda.Size().Height-14))
 
-	db.activeAirDem.TextSize = min(space.Width/25.0, 45)
+	db.activeAirDem.TextSize = min(space.Width*oneTwentyFifth, 45)
 	db.activeAirDem.Move(fyne.NewPos(space.Width*.5, thirdHeight))
 
 	db.cruise.Move(fyne.NewPos(sixthWidth*1.45, space.Height-(db.checkEngine.Size().Height*.6)-db.wblambda.Size().Height))

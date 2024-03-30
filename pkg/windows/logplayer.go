@@ -306,6 +306,8 @@ func (lp *LogPlayer) setupPlot(logz logfile.Logfile) {
 
 	var factor float32
 	switch lp.app.Preferences().StringWithFallback("plotResolution", "Full") {
+	case "Quarter":
+		factor = 0.25
 	case "Half":
 		factor = 0.5
 	case "Full":

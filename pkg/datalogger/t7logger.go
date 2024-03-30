@@ -34,7 +34,6 @@ type T7Client struct {
 
 	errCount     int
 	errPerSecond int
-	cps          int
 
 	Config
 }
@@ -179,7 +178,7 @@ func (c *T7Client) Start() error {
 			sym.Skip = true
 		}
 	}
-
+	cps := 0
 	count := 0
 	retries := 0
 
@@ -243,6 +242,17 @@ func (c *T7Client) Start() error {
 			expectedPayloadSize += sym.Length
 		}
 
+		lastPresent := time.Now()
+		testerPresent := func() {
+			if time.Since(lastPresent) > lastPresentInterval {
+				if err := kwp.TesterPresent(ctx); err != nil {
+					c.onError(err)
+					return
+				}
+				lastPresent = time.Now()
+			}
+		}
+
 		//buf := bytes.NewBuffer(nil)
 		var databuff []byte
 		for {
@@ -251,12 +261,12 @@ func (c *T7Client) Start() error {
 				c.OnMessage("Stopped logging..")
 				return nil
 			case <-secondTicker.C:
-				c.FpsCounter.Set(c.cps)
+				c.FpsCounter.Set(cps)
 				if c.errPerSecond > 5 {
 					c.errPerSecond = 0
 					return fmt.Errorf("too many errors per second")
 				}
-				c.cps = 0
+				cps = 0
 				c.errPerSecond = 0
 			case symbols := <-c.symbolChan:
 				c.Symbols = symbols
@@ -296,9 +306,7 @@ func (c *T7Client) Start() error {
 			case <-t.C:
 				timeStamp = time.Now()
 				if len(c.Symbols) == 0 {
-					if err := kwp.TesterPresent(ctx); err != nil {
-						c.onError(err)
-					}
+					testerPresent()
 					continue
 				}
 
@@ -342,7 +350,7 @@ func (c *T7Client) Start() error {
 					c.onError(fmt.Errorf("failed to write log: %w", err))
 				}
 				count++
-				c.cps++
+				cps++
 				if count%15 == 0 {
 					c.CaptureCounter.Set(count)
 				}

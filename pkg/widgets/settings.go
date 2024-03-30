@@ -106,10 +106,12 @@ func (sw *SettingsWidget) GetSwapRPMandSpeed() bool {
 
 func (sw *SettingsWidget) GetPlotResolution() float32 {
 	switch sw.plotResolution.Selected {
-	case "Half":
-		return 0.5
 	case "Full":
 		return 1
+	case "Half":
+		return 0.5
+	case "Quarter":
+		return 0.25
 	default:
 		return 1
 	}
@@ -311,7 +313,7 @@ func (sw *SettingsWidget) newSwapRPMandSpeed() *widget.Check {
 }
 
 func (sw *SettingsWidget) newPlotResolution() *widget.Select {
-	return widget.NewSelect([]string{"Full", "Half"}, func(s string) {
+	return widget.NewSelect([]string{"Full", "Half", "Quarter"}, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsPlotResolution, s)
 	})
 }

@@ -79,7 +79,7 @@ func NewDial(cfg DialConfig) *Dial {
 	c.needleRotConst = pi15 / (c.steps * c.factor)
 	c.lineRotConst = pi15 / c.steps
 
-	c.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0x80}, StrokeWidth: 2}
+	c.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 255}, StrokeWidth: 2}
 	c.cover = &canvas.Rectangle{FillColor: theme.BackgroundColor()}
 	c.center = &canvas.Circle{FillColor: color.RGBA{R: 0x01, G: 0x0B, B: 0x13, A: 0xFF}}
 	c.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 3}
@@ -92,7 +92,7 @@ func NewDial(cfg DialConfig) *Dial {
 	c.displayText.TextStyle.Monospace = true
 	c.displayText.Alignment = fyne.TextAlignCenter
 
-	c.container = container.NewWithoutLayout(c.face, c.cover, c.titleText)
+	c.container = container.NewWithoutLayout()
 	fac := float64(0xA5) / c.steps
 	for i := 0; i < int(c.steps+1); i++ {
 		col := color.RGBA{byte(float64(i) * fac), 0x00, 0x00, 0xFF}
@@ -101,7 +101,7 @@ func NewDial(cfg DialConfig) *Dial {
 		c.pips = append(c.pips, pip)
 		c.container.Add(pip)
 	}
-	c.container.Objects = append(c.container.Objects, c.center, c.needle, c.displayText)
+	c.container.Objects = append(c.container.Objects, c.face, c.cover, c.titleText, c.center, c.needle, c.displayText)
 
 	return c
 }
@@ -163,27 +163,32 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 	c.middle = fyne.NewPos(space.Width*.5, space.Height*.5)
 	c.needleOffset = -c.radius * .15
 	c.needleLength = c.radius * 1.14
-	stroke := c.diameter / 60
-	midStroke := c.diameter / 80
-	smallStroke := c.diameter / 300
+
+	// Pre-calculate stroke sizes
+	stroke := c.diameter * oneSixthieth
+	midStroke := c.diameter * oneEighthieth
+	smallStroke := c.diameter * oneTwohundredth
 
 	size := fyne.NewSize(c.diameter, c.diameter)
 
 	topleft := fyne.NewPos(c.middle.X-c.radius, c.middle.Y-c.radius)
 
 	c.titleText.TextSize = c.radius / 3.5
-	c.titleText.Move(c.middle.Add(fyne.NewPos(0, c.diameter/4)))
+	c.titleText.Move(c.middle.Add(fyne.NewPos(0, c.diameter*oneFourth)))
 	c.titleText.Refresh()
 
-	c.center.Move(c.middle.SubtractXY(c.center.Size().Width*.5, c.center.Size().Height*.5))
-	c.center.Resize(fyne.NewSize(c.radius/4, c.radius/4))
+	// Calculate the size of the center component directly
+	center := c.radius * oneFourth
 
-	c.cover.Move(fyne.NewPos(0, c.middle.Y+c.radius/7*5))
-	c.cover.Resize(fyne.NewSize(c.container.Size().Width, size.Height/6))
+	c.center.Move(c.middle.SubtractXY(center*.5, center*.5))
+	c.center.Resize(fyne.NewSize(center, center))
+
+	c.cover.Move(fyne.NewPos(0, c.middle.Y+c.radius*oneSeventh*5))
+	c.cover.Resize(fyne.NewSize(c.container.Size().Width, size.Height*oneSixth))
 
 	c.displayText.TextSize = c.radius * .5
 	c.displayText.Text = fmt.Sprintf(c.displayString, c.value)
-	c.displayText.Move(topleft.AddXY(0, c.diameter/6))
+	c.displayText.Move(topleft.AddXY(0, c.diameter*oneSixth))
 	c.displayText.Resize(size)
 
 	c.needle.StrokeWidth = stroke
@@ -193,12 +198,12 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 	c.face.Move(topleft)
 	c.face.Resize(size)
 
-	fourthRadius := c.radius / 4
-	eightRadius := c.radius / 8
+	fourthRadius := c.radius * oneFourth
+	eightRadius := c.radius * oneEight
 
 	// Optimize pip rotation and styling
-	radius43 := c.radius / 4 * 3
-	radius87 := c.radius / 8 * 7
+	radius43 := c.radius * oneFourth * 3
+	radius87 := c.radius * oneEight * 7
 
 	for i, p := range c.pips {
 		if i%2 == 0 {

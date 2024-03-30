@@ -383,7 +383,7 @@ func (mv *MapViewer) resize(size fyne.Size) {
 
 func calculateOptimalTextSize(width float32, columns int) float32 {
 	cellWidth := float64(width / float32(columns))
-	return max(min(float32(cellWidth/5), 21), 12)
+	return max(min(float32(cellWidth*oneFifth), 21), 12)
 }
 
 func (mv *MapViewer) resizeCursor(viewportSize fyne.Size, numColumnsFloat, numRowsFloat, widthFactor, heightFactor float32) {

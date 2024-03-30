@@ -112,7 +112,7 @@ func (dr *HBarRenderer) Layout(space fyne.Size) {
 
 	diameter := space.Width
 	height := space.Height
-	middle := height / 2
+	middle := height * .5
 	s.widthFactor = float32(diameter) / float32(s.cfg.Max)
 	stepsFactor := float32(diameter) / float32(s.cfg.Steps)
 	s.eightHeight = space.Height * oneEight
@@ -126,8 +126,8 @@ func (dr *HBarRenderer) Layout(space fyne.Size) {
 			line.Position2 = fyne.NewPos(float32(i)*stepsFactor, middle+height*.33)
 			continue
 		}
-		line.Position1 = fyne.NewPos(float32(i)*stepsFactor, middle-height/7)
-		line.Position2 = fyne.NewPos(float32(i)*stepsFactor, middle+height/7)
+		line.Position1 = fyne.NewPos(float32(i)*stepsFactor, middle-height*oneSeventh)
+		line.Position2 = fyne.NewPos(float32(i)*stepsFactor, middle+height*oneSeventh)
 	}
 	s.SetValue(s.value)
 }

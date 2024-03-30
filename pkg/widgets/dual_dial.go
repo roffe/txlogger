@@ -88,7 +88,7 @@ func NewDualDial(cfg DualDialConfig) *DualDial {
 	s.needleRotConst = pi15 / (s.steps * s.factor)
 	s.lineRotConst = pi15 / s.steps
 
-	s.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0x80}, StrokeWidth: 2}
+	s.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 255}, StrokeWidth: 2}
 	s.cover = &canvas.Rectangle{FillColor: theme.BackgroundColor()}
 	s.center = &canvas.Circle{FillColor: color.RGBA{R: 0x01, G: 0x0B, B: 0x13, A: 0xFF}}
 	s.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 4}
@@ -106,7 +106,7 @@ func NewDualDial(cfg DualDialConfig) *DualDial {
 	s.displayText2.TextStyle.Monospace = true
 	s.displayText2.Alignment = fyne.TextAlignCenter
 
-	dial := container.NewWithoutLayout(s.face, s.cover, s.titleText)
+	dial := container.NewWithoutLayout()
 	fac := float64(0xA5) / s.steps
 	for i := 0; i < int(s.steps+1); i++ {
 		col := color.RGBA{byte(float64(i) * fac), 0x00, 0x00, 0xFF}
@@ -116,7 +116,7 @@ func NewDualDial(cfg DualDialConfig) *DualDial {
 		s.pips = append(s.pips, pip)
 	}
 
-	dial.Objects = append(dial.Objects, s.center, s.needle2, s.needle, s.displayText, s.displayText2)
+	dial.Objects = append(dial.Objects, s.face, s.cover, s.titleText, s.center, s.needle2, s.needle, s.displayText, s.displayText2)
 	s.container = dial
 	return s
 }
@@ -135,15 +135,12 @@ func (c *DualDial) rotateLines(hand *canvas.Line, facePosition float64, offset, 
 func (c *DualDial) rotate(hand *canvas.Line, rotation float64, offset, length float32) {
 	sinRotation := float32(math.Sin(rotation))
 	cosRotation := float32(math.Cos(rotation))
-
 	x2 := length * sinRotation
 	y2 := -length * cosRotation
-
 	offX := offset * sinRotation
 	offY := -offset * cosRotation
 	midOffX := c.middle.X + offX
 	midY := c.middle.Y + offY
-
 	hand.Position1 = fyne.NewPos(midOffX, midY)
 	hand.Position2 = fyne.NewPos(midOffX+x2, midY+y2)
 	hand.Refresh()
@@ -188,9 +185,9 @@ func (dr *DualDialRenderer) Layout(space fyne.Size) {
 	c.needleLength = c.radius * 1.14
 
 	// Pre-calculate stroke sizes
-	stroke := c.diameter / 60
-	midStroke := c.diameter / 80
-	smallStroke := c.diameter / 300
+	stroke := c.diameter * oneSixthieth
+	midStroke := c.diameter * oneEighthieth
+	smallStroke := c.diameter * oneTwohundredth
 
 	c.middle = fyne.NewPos(space.Width*.5, space.Height*.5)
 
@@ -200,27 +197,28 @@ func (dr *DualDialRenderer) Layout(space fyne.Size) {
 	topleft := fyne.NewPos(c.middle.X-c.radius, c.middle.Y-c.radius)
 
 	// Text and element sizing
-	c.titleText.TextSize = c.radius / 3
-	c.titleText.Move(c.middle.Add(fyne.NewPos(0, c.diameter/4)))
+	c.titleText.TextSize = c.radius / 3.5
+	c.titleText.Move(c.middle.Add(fyne.NewPos(0, c.diameter*oneFourth)))
+	c.titleText.Refresh()
 
 	// Calculate the size of the center component directly
-	center := c.radius / 4
+	center := c.radius * oneFourth
 
 	c.center.Move(c.middle.SubtractXY(center*.5, center*.5))
 	c.center.Resize(fyne.NewSize(center, center))
 
-	coverHeight := size.Height / 6
-	c.cover.Move(fyne.NewPos(0, c.middle.Y+c.radius/7*5))
+	coverHeight := size.Height * oneSixth
+	c.cover.Move(fyne.NewPos(0, c.middle.Y+c.radius*oneSeventh*5))
 	c.cover.Resize(fyne.NewSize(space.Width, coverHeight))
 
-	sixthDiameter := c.diameter / 6
+	sixthDiameter := c.diameter * oneSixth
 
 	c.displayText.TextSize = c.radius * .5
 	c.displayText.Text = fmt.Sprintf(c.displayString, c.value)
 	c.displayText.Move(topleft.AddXY(0, sixthDiameter))
 	c.displayText.Resize(size)
 
-	c.displayText2.TextSize = c.radius / 4
+	c.displayText2.TextSize = c.radius * oneFourth
 	c.displayText2.Text = fmt.Sprintf(c.displayString, c.value2)
 	c.displayText2.Move(topleft.AddXY(0, -sixthDiameter))
 	c.displayText2.Resize(size)
@@ -234,12 +232,12 @@ func (dr *DualDialRenderer) Layout(space fyne.Size) {
 	c.face.Move(topleft)
 	c.face.Resize(size)
 
-	fourthRadius := c.radius / 4
-	eightRadius := c.radius / 8
+	fourthRadius := c.radius * oneFourth
+	eightRadius := c.radius * oneEight
 
 	// Optimize pip rotation and styling
-	radius43 := c.radius / 4 * 3
-	radius87 := c.radius / 8 * 7
+	radius43 := c.radius * oneFourth * 3
+	radius87 := c.radius * oneEight * 7
 
 	for i, p := range c.pips {
 		if i%2 == 0 {

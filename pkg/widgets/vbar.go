@@ -112,7 +112,7 @@ func (vr *vbarRenderer) Layout(space fyne.Size) {
 	vr.vbar.size = space
 	vr.vbar.canvas.Resize(space)
 	vr.vbar.middle = space.Width * .5
-	vr.vbar.diameterEight = space.Width / 8
+	vr.vbar.diameterEight = space.Width * oneEight
 	vr.vbar.twoEight = vr.vbar.diameterEight * 2
 	stepFactor := float32(space.Height) / float32(vr.vbar.cfg.Steps)
 	vr.vbar.heightFactor = float32(space.Height) / float32(vr.vbar.cfg.Max)
@@ -129,12 +129,12 @@ func (vr *vbarRenderer) Layout(space fyne.Size) {
 	for i, line := range s.bars {
 		stepFactor := float32(i) * stepFactor
 		if i%2 == 0 {
-			line.Position1 = fyne.NewPos(s.middle-space.Width*.33, stepFactor)
-			line.Position2 = fyne.NewPos(s.middle+space.Width*.33, stepFactor)
+			line.Position1 = fyne.NewPos(s.middle-space.Width*oneThird, stepFactor)
+			line.Position2 = fyne.NewPos(s.middle+space.Width*oneThird, stepFactor)
 			continue
 		}
-		line.Position1 = fyne.NewPos(s.middle-space.Width/7, stepFactor)
-		line.Position2 = fyne.NewPos(s.middle+space.Width/7, stepFactor)
+		line.Position1 = fyne.NewPos(s.middle-space.Width*oneSeventh, stepFactor)
+		line.Position2 = fyne.NewPos(s.middle+space.Width*oneSeventh, stepFactor)
 	}
 
 	vr.vbar.SetValue(vr.vbar.value)
