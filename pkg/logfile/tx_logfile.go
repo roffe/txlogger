@@ -5,10 +5,8 @@ import (
 	"errors"
 	"log"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -20,15 +18,14 @@ type TxLogfile struct {
 
 func NewFromTxLogfile(filename string) (Logfile, error) {
 	//	start := time.Now()
-	rec, err := parseTxLogfile(filename)
-	if err != nil {
-		return nil, err
-	}
+
 	//	log.Printf("Parsed %d records in %s", len(rec), time.Since(start))
 	txlog := &TxLogfile{
-		records: rec,
-		length:  len(rec),
-		pos:     -1,
+		pos: -1,
+	}
+
+	if err := txlog.parseTxLogfile(filename); err != nil {
+		return nil, err
 	}
 
 	return txlog, nil
@@ -68,10 +65,6 @@ func (l *TxLogfile) Pos() int {
 	return l.pos
 }
 
-func (l *TxLogfile) SeekTime(time.Time) *Record {
-	return nil
-}
-
 func (l *TxLogfile) Len() int {
 	return l.length
 }
@@ -107,43 +100,48 @@ func detectTimeFormat(text string) (string, error) {
 	return "", errors.New("could not detect time format")
 }
 
-func parseTxLogfile(filename string) ([]Record, error) {
-	lines, err := readTxLogfile(filename)
-	if err != nil {
-		return nil, err
+func (l *TxLogfile) parseTxLogfile(filename string) error {
+	lines := make([]string, 0)
+	readFile, err := os.Open(filename)
+	if readFile != nil {
+		defer readFile.Close()
 	}
+	if err != nil {
+		return err
+	}
+	buffer := make([]byte, 4*1024)
+	fileScanner := bufio.NewScanner(readFile)
+	fileScanner.Buffer(buffer, bufio.MaxScanTokenSize)
+	for fileScanner.Scan() {
+		lines = append(lines, string(fileScanner.Bytes()))
+	}
+
 	noLines := len(lines)
 
 	if noLines <= 0 {
-		return nil, errors.New("no lines in file")
+		return errors.New("no lines in file")
 	}
 
 	timeFormat, err := detectTimeFormat(lines[0])
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	records := make([]Record, noLines)
-	semChan := make(chan struct{}, runtime.NumCPU())
-	var wg sync.WaitGroup
+	l.records = make([]Record, noLines)
 	for pos := 0; pos < noLines; pos++ {
-		semChan <- struct{}{}
-		wg.Add(1)
-		go func(position int) {
-			defer wg.Done()
-			if record, err := parseLine(lines[position], timeFormat); err == nil {
-				if position+1 < noLines {
-					record.DelayTillNext = getDelayTillNext(lines[position+1], timeFormat, record.Time)
-				}
-				records[position] = record
-			} else {
-				log.Println(err)
+		if record, err := parseLine(lines[pos], timeFormat); err == nil {
+			if pos+1 < noLines {
+				record.DelayTillNext = getDelayTillNext(lines[pos+1], timeFormat, record.Time)
 			}
-			<-semChan
-		}(pos)
+			l.records[pos] = record
+		} else {
+			log.Println(err)
+		}
 	}
-	wg.Wait()
-	return records, nil
+
+	l.length = len(l.records)
+
+	return nil
 }
 
 func parseLine(line, timeFormat string) (Record, error) {
@@ -195,18 +193,4 @@ func splitTxLogLine(line, timeFormat string) (time.Time, []string, error) {
 		return time.Time{}, nil, err
 	}
 	return parsedTime, touples[1:], nil
-}
-
-func readTxLogfile(filename string) ([]string, error) {
-	readFile, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer readFile.Close()
-	fileScanner := bufio.NewScanner(readFile)
-	var output []string
-	for fileScanner.Scan() {
-		output = append(output, fileScanner.Text())
-	}
-	return output, nil
 }

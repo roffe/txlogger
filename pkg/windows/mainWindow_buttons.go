@@ -139,9 +139,9 @@ func (mw *MainWindow) createButtons() {
 			//	unsubDB()
 			//}
 			close(quit)
-			if mw.plotter != nil {
-				//mw.plotter.Close()
-			}
+			//if mw.plotter != nil {
+			//	//mw.plotter.Close()
+			//}
 			mw.plotter = nil
 			mw.SetFullScreen(false)
 			mw.SetContent(mw.tab)
@@ -155,14 +155,11 @@ func (mw *MainWindow) createButtons() {
 
 		mw.plotter = plotter.NewPlotter(values)
 
-		//unsubDB = ebus.SubscribeAllFunc(mw.plotter.SetValue)
-
 		mw.SetCloseIntercept(func() {
 			onClose()
 		})
 
 		mw.SetContent(mw.plotter)
-
 	})
 
 	mw.logplayerBtn = widget.NewButtonWithIcon("Log Player", theme.MediaFastForwardIcon(), func() {

@@ -315,15 +315,15 @@ func (sw *SymbolWidgetEntry) SetCorrectionFactor(f float64) {
 	sw.symbol.Correctionfactor = f
 	switch f {
 	case 1:
-		sw.symbolCorrectionfactor.SetText(fmt.Sprintf("%.0f", f))
+		sw.symbolCorrectionfactor.SetText(strconv.FormatFloat(f, 'f', 0, 64))
 	case 0.1:
-		sw.symbolCorrectionfactor.SetText(fmt.Sprintf("%.01f", f))
+		sw.symbolCorrectionfactor.SetText(strconv.FormatFloat(f, 'f', 1, 64))
 	case 0.01:
-		sw.symbolCorrectionfactor.SetText(fmt.Sprintf("%.02f", f))
+		sw.symbolCorrectionfactor.SetText(strconv.FormatFloat(f, 'f', 2, 64))
 	case 0.001:
-		sw.symbolCorrectionfactor.SetText(fmt.Sprintf("%.03f", f))
+		sw.symbolCorrectionfactor.SetText(strconv.FormatFloat(f, 'f', 3, 64))
 	default:
-		sw.symbolCorrectionfactor.SetText(fmt.Sprintf("%.04f", f))
+		sw.symbolCorrectionfactor.SetText(strconv.FormatFloat(f, 'f', 4, 64))
 	}
 }
 

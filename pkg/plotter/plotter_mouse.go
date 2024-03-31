@@ -30,6 +30,7 @@ func (p *Plotter) onZoom(value float64) {
 		p.startPos = 0
 	}
 	p.widthFactor = p.canvasImage.Size().Width / float32(p.dataPointsToShow)
+	p.updateCursor()
 	p.RefreshImage()
 }
 

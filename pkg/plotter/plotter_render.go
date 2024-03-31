@@ -30,6 +30,7 @@ func (r *plotterRenderer) Layout(size fyne.Size) {
 	pl := r.p.canvasImage.Size()
 	r.p.plotResolution = fyne.NewSize(pl.Width*r.p.plotResolutionFactor, pl.Height*r.p.plotResolutionFactor)
 	r.p.widthFactor = pl.Width / float32(r.p.dataPointsToShow)
+	//r.p.canvasImage.Image = image.NewRGBA(image.Rect(0, 0, int(r.p.plotResolution.Width), int(r.p.plotResolution.Height)))
 	r.p.RefreshImage()
 	r.p.updateCursor()
 }

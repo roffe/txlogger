@@ -303,11 +303,8 @@ func (mw *MainWindow) setupTabs() {
 
 func (mw *MainWindow) Log(s string) {
 	debug.Log(s)
-	mw.outputData.Append(s)
-	go func() {
-		time.Sleep(2 * time.Millisecond)
-		mw.output.ScrollToBottom()
-	}()
+	mw.outputData.Prepend(s)
+	//mw.output.ScrollToBottom()
 	//mw.output.Refresh()
 }
 

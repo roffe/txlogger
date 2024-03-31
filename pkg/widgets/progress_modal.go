@@ -17,7 +17,7 @@ func NewProgressModal(obj fyne.CanvasObject, message string) *ProgressModal {
 	bobrK := canvas.NewImageFromResource(fyne.NewStaticResource("bobr.jpg", assets.Bobr))
 	bobrK.SetMinSize(fyne.NewSize(150, 150))
 	bobrK.FillMode = canvas.ImageFillOriginal
-	bobrK.ScaleMode = canvas.ImageScaleSmooth
+	bobrK.ScaleMode = canvas.ImageScalePixels
 	pb := widget.NewProgressBarInfinite()
 	msg := container.NewBorder(bobrK, pb, nil, nil, widget.NewLabel(message))
 	return &ProgressModal{

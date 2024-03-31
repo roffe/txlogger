@@ -68,7 +68,7 @@ func (l *Vertical) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	for i, o := range objects {
 		height := size.Height / float32(len(objects))
 		o.Resize(fyne.NewSize(o.MinSize().Width, o.MinSize().Height))
-		o.Move(fyne.NewPos(0, (float32(i)*height)+(height/2)-o.MinSize().Height/2))
+		o.Move(fyne.NewPos(0, (float32(i)*height)+(height*.5)-o.MinSize().Height*.5))
 	}
 }
 

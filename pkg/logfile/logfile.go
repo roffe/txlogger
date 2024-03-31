@@ -28,12 +28,9 @@ type Record struct {
 	DelayTillNext int64
 	Values        map[string]float64
 	EOF           bool
-	//mu            sync.Mutex
 }
 
-func (r *Record) SetValue(key string, value float64) {
-	//r.mu.Lock()
-	//defer r.mu.Unlock()
+func (r Record) SetValue(key string, value float64) {
 	r.Values[key] = value
 }
 

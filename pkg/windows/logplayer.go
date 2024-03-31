@@ -81,7 +81,7 @@ type LogPlayer struct {
 
 	ebus *eventbus.Controller
 
-	handler func(ev *fyne.KeyEvent)
+	keyHandler func(ev *fyne.KeyEvent)
 
 	closed bool
 
@@ -128,8 +128,6 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 		})
 		cancelFuncs = append(cancelFuncs, cancel)
 	}
-
-	//unsubDB := lp.ebus.SubscribeAllFunc(lp.db.SetValue)
 
 	l, err := readFirstLine(filename)
 	if err != nil {
@@ -261,10 +259,10 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 
 	lp.speedSelect.Selected = "1x"
 
-	lp.handler = keyHandler(w, lp.controlChan, lp.slider, lp.toggleBtn, lp.speedSelect)
-	lp.slider.typedKey = lp.handler
+	lp.keyHandler = keyHandler(w, lp.controlChan, lp.slider, lp.toggleBtn, lp.speedSelect)
+	lp.slider.typedKey = lp.keyHandler
 
-	lp.Canvas().SetOnTypedKey(lp.handler)
+	lp.Canvas().SetOnTypedKey(lp.keyHandler)
 
 	w.SetMainMenu(lp.menu.GetMenu(lp.logType))
 
@@ -376,9 +374,9 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 				//log.Println("lp seeking to", op.Pos)
 				logz.Seek(op.Pos)
 				playonce = true
-				if lp.plotter != nil {
-					lp.plotter.Seek(op.Pos)
-				}
+				//if lp.plotter != nil {
+				//	lp.plotter.Seek(op.Pos)
+				//}
 			case OpPrev:
 				pos := logz.Pos() - 2
 				if pos < 0 {
@@ -397,51 +395,41 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 	}()
 
 	var (
-		currPos       int
 		currentMillis int64
-		sleepDuration time.Duration
-		sleepMargin   int64 = 4  // Margin for sleep duration
-		minSleepTime  int64 = 4  // Minimum sleep time allowed
-		maxSleepTime  int64 = 20 // Maximum sleep time allowed
 	)
 
 	for !lp.closed {
-		currPos = logz.Pos()
+
 		currentMillis = time.Now().UnixMilli()
 		if logz.Pos() >= logz.Len()-1 || (!play && !playonce) {
-			sleepDuration = time.Duration(maxSleepTime) * time.Millisecond
-		} else if nextFrame-currentMillis > sleepMargin {
-			sleepDuration = time.Duration(nextFrame-currentMillis-sleepMargin) * time.Millisecond
-			if sleepDuration < time.Duration(minSleepTime)*time.Millisecond {
-				sleepDuration = time.Duration(minSleepTime) * time.Millisecond
-			} else if sleepDuration > time.Duration(maxSleepTime)*time.Millisecond {
-				sleepDuration = time.Duration(maxSleepTime) * time.Millisecond
-			}
+			time.Sleep(10 * time.Millisecond)
+			continue
 		} else if currentMillis < nextFrame {
+			time.Sleep(time.Duration(nextFrame-currentMillis) * time.Millisecond)
 			continue
 		} else {
-			lp.currLine.Set(float64(currPos))
-			if lp.plotter != nil {
-				lp.plotter.Seek(currPos)
-			}
 			if rec := logz.Next(); !rec.EOF {
 				lp.db.SetTimeText(currentTimeFormatted(rec.Time))
 				delayTilNext := int64(float64(rec.DelayTillNext) * speedMultiplier)
 				if delayTilNext > 1000 {
 					delayTilNext = 100
 				}
-				nextFrame = (currentMillis + delayTilNext) - sleepMargin
 				for k, v := range rec.Values {
 					lp.ebus.Publish(k, v)
 				}
+				currPos := logz.Pos()
+				if lp.plotter != nil {
+					lp.plotter.Seek(currPos)
+				}
+				lp.currLine.Set(float64(currPos))
+				nextFrame = (currentMillis + delayTilNext)
+				time.Sleep(time.Duration(delayTilNext) * time.Millisecond)
 			}
 			if playonce {
 				playonce = false
 			}
-		}
 
-		// Sleep for the calculated duration
-		time.Sleep(sleepDuration)
+		}
 	}
 
 	log.Println("Exiting logplayer playback")

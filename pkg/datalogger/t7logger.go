@@ -135,9 +135,14 @@ func (c *T7Client) onError(err error) {
 
 func (c *T7Client) Start() error {
 	defer c.lw.Close()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	cl, err := gocan.NewWithOpts(ctx, c.Device)
+
+	cl, err := gocan.NewWithOpts(
+		ctx,
+		c.Device,
+	)
 	if err != nil {
 		return err
 	}

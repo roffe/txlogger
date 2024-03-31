@@ -195,11 +195,8 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 	})
 
 	if cfg.Logplayer {
-		db.time = &canvas.Text{
-			Text:     "00:00:00.00",
-			Color:    color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF},
-			TextSize: 35,
-		}
+		db.time = canvas.NewText("00:00:00.00", color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF})
+		db.time.TextSize = 35
 		db.time.Resize(fyne.NewSize(200, 50))
 	}
 
@@ -310,7 +307,6 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 
 	idcSetter := func(obj *canvas.Text, text string) func(float64) {
 		return func(value float64) {
-			///obj.Text = text + ": " + strconv.FormatFloat(value, 'f', 0, 64) + "%"
 			obj.Text = fmt.Sprintf(text+": %02.0f%%", value)
 			switch {
 			case value > 60 && value < 85:
@@ -326,7 +322,6 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 
 	ioff := func(value float64) {
 		db.ioff.Text = "Ioff: " + strconv.FormatFloat(value, 'f', 1, 64)
-		//db.ioff.Text = fmt.Sprintf("Ioff: %-6s", strconv.FormatFloat(value, 'f', 1, 64))
 		switch {
 		case value >= 0:
 			db.ioff.Color = color.RGBA{R: 0, G: 0xFF, B: 0, A: 0xFF}
@@ -369,7 +364,7 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 			if kn&1 == 1 {
 				knockValue += 4
 			}
-			db.knockIcon.SetText(fmt.Sprintf("%d", knockValue))
+			db.knockIcon.SetText(strconv.Itoa(knockValue))
 			db.knockIcon.Show()
 		} else {
 			db.knockIcon.Hide()

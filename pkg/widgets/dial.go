@@ -159,8 +159,8 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 	dr.d.container.Resize(space)
 	c := dr.d
 	c.diameter = fyne.Min(space.Width, space.Height)
-	c.radius = c.diameter * .5
-	c.middle = fyne.NewPos(space.Width*.5, space.Height*.5)
+	c.radius = c.diameter * oneHalf
+	c.middle = fyne.NewPos(space.Width*oneHalf, space.Height*oneHalf)
 	c.needleOffset = -c.radius * .15
 	c.needleLength = c.radius * 1.14
 
@@ -173,20 +173,20 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 
 	topleft := fyne.NewPos(c.middle.X-c.radius, c.middle.Y-c.radius)
 
-	c.titleText.TextSize = c.radius / 3.5
+	c.titleText.TextSize = c.radius * oneThirdAndHalf
 	c.titleText.Move(c.middle.Add(fyne.NewPos(0, c.diameter*oneFourth)))
 	c.titleText.Refresh()
 
 	// Calculate the size of the center component directly
 	center := c.radius * oneFourth
 
-	c.center.Move(c.middle.SubtractXY(center*.5, center*.5))
+	c.center.Move(c.middle.SubtractXY(center*oneHalf, center*oneHalf))
 	c.center.Resize(fyne.NewSize(center, center))
 
 	c.cover.Move(fyne.NewPos(0, c.middle.Y+c.radius*oneSeventh*5))
 	c.cover.Resize(fyne.NewSize(c.container.Size().Width, size.Height*oneSixth))
 
-	c.displayText.TextSize = c.radius * .5
+	c.displayText.TextSize = c.radius * oneHalf
 	c.displayText.Text = fmt.Sprintf(c.displayString, c.value)
 	c.displayText.Move(topleft.AddXY(0, c.diameter*oneSixth))
 	c.displayText.Resize(size)

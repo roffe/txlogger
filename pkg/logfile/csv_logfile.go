@@ -10,24 +10,21 @@ import (
 )
 
 type CSVLogfile struct {
-	headerNames map[string]*string
-	records     []Record
-	length      int
-	pos         int
+	records []Record
+	length  int
+	pos     int
 }
 
 func NewFromCSVLogfile(filename string) (Logfile, error) {
-	rec, err := parseCSVLogfile(filename)
-	if err != nil {
-		return nil, err
-	}
-	csvlog := &CSVLogfile{
-		records: rec,
-		length:  len(rec),
-		pos:     -1,
+	c := &CSVLogfile{
+		pos: -1,
 	}
 
-	return csvlog, nil
+	if err := c.parseCSVLogfile(filename); err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }
 
 func (l *CSVLogfile) Next() Record {
@@ -64,12 +61,6 @@ func (l *CSVLogfile) Pos() int {
 	return l.pos
 }
 
-func (l *CSVLogfile) SeekTime(time.Time) Record {
-	return Record{
-		EOF: true,
-	}
-}
-
 func (l *CSVLogfile) Len() int {
 	return l.length
 }
@@ -88,30 +79,31 @@ func (l *CSVLogfile) End() time.Time {
 	return time.Time{}
 }
 
-func parseCSVLogfile(filename string) ([]Record, error) {
+func (l *CSVLogfile) parseCSVLogfile(filename string) error {
 	f, err := os.Open(filename)
+	if f != nil {
+		defer f.Close()
+	}
 	if err != nil {
-		return nil, err
+		return err
 	}
 	r := csv.NewReader(f)
 	records, err := r.ReadAll()
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	var recs []Record
 
 	for i := 1; i < len(records); i++ {
 		ts, err := time.Parse(datalogger.ISONICO, records[i][0])
 		if err != nil {
-			return nil, err
+			return err
 		}
 		rec := NewRecord(ts)
 
 		for j := 1; j < len(records[i]); j++ {
 			val, err := strconv.ParseFloat(records[i][j], 64)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			rec.SetValue(records[0][j], val)
 		}
@@ -119,13 +111,15 @@ func parseCSVLogfile(filename string) ([]Record, error) {
 		if i < len(records)-1 {
 			ts2, err := time.Parse(datalogger.ISONICO, records[i+1][0])
 			if err != nil {
-				return nil, err
+				return err
 			}
 			rec.DelayTillNext = ts2.Sub(ts).Milliseconds()
 		}
 
-		recs = append(recs, rec)
+		l.records = append(l.records, rec)
 	}
 
-	return recs, nil
+	l.length = len(l.records)
+
+	return nil
 }

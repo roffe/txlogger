@@ -15,6 +15,10 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
+type PlotterControl interface {
+	Seek(int)
+}
+
 type Plotter struct {
 	widget.BaseWidget
 
@@ -134,19 +138,23 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 }
 
 func (p *Plotter) Seek(pos int) {
-	halfDataPointsToShow := p.dataPointsToShow / 2
+	halfDataPointsToShow := int(float64(p.dataPointsToShow) * .5)
 	offsetPosition := float64(pos - halfDataPointsToShow)
-	if offsetPosition > 0 && pos < p.dataLength-halfDataPointsToShow {
-		p.startPos = int(offsetPosition)
-		p.RefreshImage()
+	if pos < p.dataLength-halfDataPointsToShow {
+		if offsetPosition < 0 {
+			offsetPosition = 0
+		}
+		p.startPos = min(int(offsetPosition), p.dataLength)
 	}
-	p.cursorPos = pos + 1
+	p.RefreshImage()
+	p.cursorPos = pos
 	p.updateLegend()
 	p.updateCursor()
 }
 
 func (p *Plotter) updateCursor() {
-	x := float32(p.cursorPos-p.startPos) * p.widthFactor
+
+	x := float32(p.cursorPos-max(p.startPos, 0)) * p.widthFactor
 	xOffset := p.zoom.Size().Width + x
 	p.cursor.Position1 = fyne.NewPos(xOffset, 0)
 	p.cursor.Position2 = fyne.NewPos(xOffset+1, p.canvasImage.Size().Height)
@@ -198,6 +206,8 @@ func (p *Plotter) RefreshImage() {
 			continue
 		}
 		p.ts[n].PlotImage(img, p.values, p.startPos, p.dataPointsToShow)
+		//p.ts[n].PlotImage(p.canvasImage.Image.(*image.RGBA), p.values, p.startPos, p.dataPointsToShow)
+
 	}
 
 	p.canvasImage.Image = img
