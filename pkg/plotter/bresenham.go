@@ -6,26 +6,37 @@ type IPlotter interface {
 	SetRGBA(x int, y int, c color.RGBA)
 }
 
+const (
+	Down = -1
+	Zero = 0
+	Up   = 1
+	Two  = 2
+)
+
 func Bresenham(p IPlotter, x1, y1, x2, y2 int, col color.RGBA) {
 	dx, dy := x2-x1, y2-y1
 	absDx, absDy := abs(dx), abs(dy)
 
-	// Determine the direction of increment along x and y
-	xInc, yInc := sign(dx), sign(dy)
-
 	// Is line a point?
-	if absDx == 0 && absDy == 0 {
+	if absDx == Zero && absDy == Zero {
 		p.SetRGBA(x1, y1, col)
 		return
 	}
 
+	// Determine the direction of increment along x and y
+	xInc, yInc := sign(dx), sign(dy)
+
 	// Initialize decision variables
-	var d, dInc1, dInc2 int
 	isXDominant := absDx > absDy
+
+	doubleAbsDy := Two * absDy
+	doubleAbsDx := Two * absDx
+
+	var direction, dInc1, dInc2 int
 	if isXDominant {
-		d, dInc1, dInc2 = 2*absDy-absDx, 2*absDy, 2*(absDy-absDx)
+		direction, dInc1, dInc2 = doubleAbsDy-absDx, doubleAbsDy, Two*(absDy-absDx)
 	} else {
-		d, dInc1, dInc2 = 2*absDx-absDy, 2*absDx, 2*(absDx-absDy)
+		direction, dInc1, dInc2 = doubleAbsDx-absDy, doubleAbsDx, Two*(absDx-absDy)
 	}
 
 	// Draw the line
@@ -35,37 +46,38 @@ func Bresenham(p IPlotter, x1, y1, x2, y2 int, col color.RGBA) {
 			break
 		}
 		if isXDominant {
-			if d < 0 {
-				d += dInc1
+			if direction < Zero {
+				direction += dInc1
 			} else {
 				y1 += yInc
-				d += dInc2
+				direction += dInc2
 			}
 			x1 += xInc
-		} else {
-			if d < 0 {
-				d += dInc1
-			} else {
-				x1 += xInc
-				d += dInc2
-			}
-			y1 += yInc
+			continue
 		}
+		if direction < Zero {
+			direction += dInc1
+			y1 += yInc
+			continue
+		}
+		x1 += xInc
+		direction += dInc2
+		y1 += yInc
 	}
 }
 
 func abs(n int) int {
-	if n < 0 {
+	if n < Zero {
 		return -n
 	}
 	return n
 }
 
 func sign(n int) int {
-	if n < 0 {
-		return -1
-	} else if n > 0 {
-		return 1
+	if n < Zero {
+		return Down
+	} else if n > Zero {
+		return Up
 	}
-	return 0
+	return Zero
 }

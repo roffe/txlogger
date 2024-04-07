@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/draw"
 	"math"
 
 	"fyne.io/fyne/v2"
@@ -77,14 +76,14 @@ func NewMeshgrid(values []float64, cols, rows int) (*Meshgrid, error) {
 		ay: 15, // Rotation angles Y
 		az: 0,  // Rotation angles Z
 
-		sx: .4, // Scale factors X
-		sy: .4, // Scale factors Y
-		sz: .4, // Scale factors Z
+		sx: .2, // Scale factors X
+		sy: .2, // Scale factors Y
+		sz: .2, // Scale factors Z
 
-		px: 80, // Camera position X
-		py: 70, // Camera position Y
+		px: 60, // Camera position X
+		py: 50, // Camera position Y
 
-		size: fyne.NewSize(400, 400),
+		size: fyne.NewSize(200, 200),
 	}
 
 	if cols == 1 {
@@ -175,47 +174,37 @@ func (m *Meshgrid) scaleMeshgrid() {
 }
 
 func (m *Meshgrid) rotateMeshgrid(ax, ay, az float64) {
-	//	log.Println("Rotating meshgrid", m.ax, m.ay, m.az)
-	ax = ax * math.Pi / 180
-	ay = ay * math.Pi / 180
-	az = az * math.Pi / 180
+	// Convert angles to radians
+	ax = ax * piDiv180
+	ay = ay * piDiv180
+	az = az * piDiv180
+
+	// Calculate sine and cosine of the angles
 	sinAx, cosAx := math.Sin(ax), math.Cos(ax)
 	sinAy, cosAy := math.Sin(ay), math.Cos(ay)
 	sinAz, cosAz := math.Sin(az), math.Cos(az)
 
-	cz := m.depth * .5 // This assumes your z-values range symmetrically around zero.
-	xmax := 0.0
-	ymax := 0.0
-	for i, row := range m.vertices {
-		for j, vertex := range row {
+	cz := m.depth * 0.5 // This assumes your z-values range symmetrically around zero.
+
+	// Iterate over each vertex and apply rotation
+	for i := range m.vertices {
+		for j := range m.vertices[i] {
 			// Translate point to origin for rotation
-			x, y, z := vertex.X-m.cx, vertex.Y-m.cy, vertex.Z-cz
+			x, y, z := m.vertices[i][j].X-m.cx, m.vertices[i][j].Y-m.cy, m.vertices[i][j].Z-cz
+
 			// Rotate around x-axis
 			newY, newZ := cosAx*y-sinAx*z, sinAx*y+cosAx*z
 			// Rotate around y-axis
 			newX, newZ := cosAy*x+sinAy*newZ, -sinAy*x+cosAy*newZ
 			// Rotate around z-axis
 			newX, newY = cosAz*newX-sinAz*newY, sinAz*newX+cosAz*newY
+
 			// Translate point back from origin after rotation
-
-			nx := newX + m.cx
-			ny := newY + m.cy
-			nz := newZ + cz
-
-			m.vertices[i][j].X = nx
-			m.vertices[i][j].Y = ny
-			m.vertices[i][j].Z = nz
-			if nx > xmax {
-				xmax = nx
-			}
-			if ny > ymax {
-				ymax = ny
-			}
+			m.vertices[i][j].X = newX + m.cx
+			m.vertices[i][j].Y = newY + m.cy
+			m.vertices[i][j].Z = newZ + cz
 		}
 	}
-	m.cx = xmax * .5
-	m.cy = ymax * .5
-	m.cz = m.depth * .5
 }
 
 func (m *Meshgrid) SetFloat64(idx int, value float64) {
@@ -276,7 +265,7 @@ func (m *Meshgrid) project(v Vertex) (int, int) {
 func (m *Meshgrid) Refresh() {
 	m.scaleMeshgrid()
 	m.rotateMeshgrid(m.ax, m.ay, m.az)
-	m.image.Image = m.generateImage()
+	m.image.Image = m.drawMeshgridLines()
 	m.image.Refresh()
 }
 
@@ -285,7 +274,8 @@ func (m *Meshgrid) Layout(size fyne.Size) {
 	//m.size.Width = size.Width
 	m.container.Resize(size)
 	m.Refresh()
-	m.image.Resize(size)
+
+	//m.image.Resize(size)
 }
 
 func (m *Meshgrid) CreateRenderer() fyne.WidgetRenderer {
@@ -301,7 +291,7 @@ func (m *meshgridRenderer) Layout(size fyne.Size) {
 }
 
 func (m *meshgridRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(300, 200)
+	return fyne.NewSize(250, 150)
 }
 
 func (m *meshgridRenderer) Refresh() {
@@ -315,14 +305,8 @@ func (m *meshgridRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{m.meshgrid.container}
 }
 
-func (m *Meshgrid) generateImage() image.Image {
+func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 	img := image.NewRGBA(image.Rect(0, 0, int(m.size.Width), int(m.size.Height)))
-	draw.Draw(img, img.Bounds(), &image.Uniform{color.Transparent}, image.Point{}, draw.Src)
-	m.drawMeshgridLines(img)
-	return img
-}
-
-func (m *Meshgrid) drawMeshgridLines(img *image.RGBA) {
 	for i := m.rows - 1; i >= 0; i-- {
 		for j := m.cols - 1; j >= 0; j-- {
 			vertice := m.vertices[i][j]
@@ -350,6 +334,7 @@ func (m *Meshgrid) drawMeshgridLines(img *image.RGBA) {
 			}
 		}
 	}
+	return img
 }
 
 func enhanceLineColor(baseColor color.RGBA, value float64) color.RGBA {
@@ -366,119 +351,6 @@ func enhanceLineColor(baseColor color.RGBA, value float64) color.RGBA {
 		A: baseColor.A,
 	}
 }
-
-/*
-func (m *Meshgrid) drawMeshgridLines2(img *image.RGBA) {
-	ti := 0
-	for i := m.rows - 1; i >= 0; i-- {
-		for j := m.cols - 1; j >= 0; j-- {
-			vertice := m.vertices[i][j]
-			value := m.values[i*m.cols+j]
-			x1, y1 := m.project(vertice)
-			lineColor := m.getColorInterpolation(value)
-			dimmedLineColor := dimmedColor(lineColor)
-
-			if ti == 0 {
-				// Draw diagonal line down-right
-				if i < m.rows-1 && j < m.cols-1 {
-					downRight := m.vertices[i+1][j+1]
-					valueDownRight := m.values[(i+1)*m.cols+j+1]
-					x2, y2 := m.project(downRight)
-					endColor := m.getColorInterpolation(m.values[(i+1)*m.cols+j+1])
-					if value > valueDownRight {
-						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, dimmedColor2(endColor))
-					} else if value == valueDownRight {
-						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, endColor)
-					} else {
-						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, dimmedColor2(lineColor), endColor)
-					}
-				}
-			}
-
-			if ti == 0 {
-				// Draw diagonal line down-left
-				if j > 0 && i < m.rows-1 {
-					downLeft := m.vertices[i+1][j-1]
-					valueDownLeft := m.values[(i+1)*m.cols+j-1]
-					x2, y2 := m.project(downLeft)
-					endColor := m.getColorInterpolation(valueDownLeft)
-					if value > valueDownLeft {
-						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, dimmedColor2(endColor))
-					} else if value == valueDownLeft {
-						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, endColor)
-					} else {
-						m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, dimmedColor2(lineColor), endColor)
-					}
-				}
-			}
-
-			// Draw line downward
-			if i < m.rows-1 {
-				down := m.vertices[i+1][j]
-				valueDown := m.values[(i+1)*m.cols+j]
-				x2, y2 := m.project(down)
-				endColor := m.getColorInterpolation(valueDown)
-				// if j%2 == 0 {
-				// 	m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 1, 1, lineColor, endColor)
-				// } else
-				if value > valueDown {
-					m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, dimmedColor(endColor))
-				} else if value == valueDown {
-					m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 2, 0, lineColor, endColor)
-				} else {
-					m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, dimmedLineColor, endColor)
-				}
-			}
-
-			// Draw line to the right
-			if j < m.cols-1 {
-				right := m.vertices[i][j+1]
-				valueRight := m.values[i*m.cols+j+1]
-				x2, y2 := m.project(right)
-				endColor := m.getColorInterpolation(valueRight)
-				// if i%2 == 0 {
-				// 	m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 1, 1, lineColor, endColor)
-				// } else
-				if value > valueRight {
-					m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, dimmedColor(endColor))
-				} else if value == valueRight {
-					m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, lineColor, endColor)
-				} else {
-					m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, dimmedLineColor, endColor)
-				}
-
-			}
-			ti++
-			if ti == 2 {
-				ti = 0
-			}
-			//drawCircle(img, image.Point{X: x1, Y: y1}, 3, lineColor)
-		}
-	}
-}
-*/
-
-/* const (
-	dimmfactor = .35
-)
-
-func dimmedColor(col color.RGBA) color.RGBA {
-	return color.RGBA{
-		R: uint8(float64(col.R) * dimmfactor),
-		G: uint8(float64(col.G) * dimmfactor),
-		B: uint8(float64(col.B) * dimmfactor),
-		A: 127, // Use a fully opaque alpha
-	}
-}
-
-func dimmedColor2(col color.RGBA) color.RGBA {
-	return color.RGBA{
-		R: uint8(float64(col.R) * .10),
-		G: uint8(float64(col.G) * .10),
-		B: uint8(float64(col.B) * .10),
-		A: 127, // Use a fully opaque alpha
-	}
-} */
 
 func (m *Meshgrid) drawLine(img *image.RGBA, p1, p2 image.Point, startThickness, endThickness int, startColor, endColor color.RGBA) {
 	dx := float64(p2.X - p1.X)
@@ -517,158 +389,6 @@ func drawCircle(img *image.RGBA, p image.Point, radius int, c color.RGBA) {
 	}
 }
 
-/*
-func (m *Meshgrid) drawLine33(img *image.RGBA, p1, p2 image.Point, startWidth, endWidth int, startColor, endColor color.RGBA) {
-	if startWidth <= 0 {
-		startWidth = 1
-	}
-	if endWidth <= 0 {
-		endWidth = 1
-	}
-
-	steep := abs(p2.Y-p1.Y) > abs(p2.X-p1.X)
-
-	// Swap points if necessary and adjust for steep lines
-	if steep {
-		p1.X, p1.Y = p1.Y, p1.X
-		p2.X, p2.Y = p2.Y, p2.X
-	}
-	if p1.X > p2.X {
-		p1.X, p2.X = p2.X, p1.X
-		p1.Y, p2.Y = p2.Y, p1.Y
-	}
-
-	dx := p2.X - p1.X
-	dy := abs(p2.Y - p1.Y)
-	err := dx / 2
-	var ystep int
-	if p1.Y < p2.Y {
-		ystep = 1
-	} else {
-		ystep = -1
-	}
-
-	lineLength := max(dx, dy)
-
-	// Function to interpolate color
-	interpolateColor := func(step, total int) color.RGBA {
-		fraction := float64(step) / float64(total)
-		return color.RGBA{
-			R: uint8(float64(endColor.R)*fraction + float64(startColor.R)*(1-fraction)),
-			G: uint8(float64(endColor.G)*fraction + float64(startColor.G)*(1-fraction)),
-			B: uint8(float64(endColor.B)*fraction + float64(startColor.B)*(1-fraction)),
-			A: uint8(float64(endColor.A)*fraction + float64(startColor.A)*(1-fraction)),
-		}
-	}
-
-	// Function to interpolate width
-	// Adjusted function to interpolate width
-	interpolateWidth := func(step, total, startWidth, endWidth int) float64 {
-		fraction := float64(step) / float64(total)
-		interpolatedWidth := float64(endWidth)*fraction + float64(startWidth)*(1-fraction)
-		return max(interpolatedWidth, 1) // Ensure minimum width of 1
-	}
-
-	var lineStep int
-	for x := p1.X; x <= p2.X; x++ {
-		currentWidth := interpolateWidth(lineStep, lineLength, startWidth, endWidth)
-		interpColor := interpolateColor(lineStep, lineLength)
-
-		if steep {
-			for w := int(-currentWidth / 2); w <= int(currentWidth/2); w++ {
-				img.Set(p1.Y+w, x, interpColor)
-			}
-		} else {
-			for w := int(-currentWidth / 2); w <= int(currentWidth/2); w++ {
-				img.Set(x, p1.Y+w, interpColor)
-			}
-		}
-
-		err -= dy
-		if err < 0 {
-			p1.Y += ystep
-			err += dx
-		}
-
-		lineStep += 1 // Increment lineStep based on the primary axis progression
-	}
-}
-
-func (m *Meshgrid) drawLine333(img *image.RGBA, p1, p2 image.Point, width int, startColor, endColor color.RGBA) {
-	if width <= 0 {
-		width = 1
-	}
-
-	steep := abs(p2.Y-p1.Y) > abs(p2.X-p1.X)
-
-	// Swap points if necessary to ensure we always iterate from p1 to p2
-	if steep {
-		p1.X, p1.Y = p1.Y, p1.X
-		p2.X, p2.Y = p2.Y, p2.X
-	}
-	if p1.X > p2.X {
-		p1.X, p2.X = p2.X, p1.X
-		p1.Y, p2.Y = p2.Y, p1.Y
-	}
-
-	dx := p2.X - p1.X
-	dy := abs(p2.Y - p1.Y)
-	err := dx / 2
-	var ystep int
-	if p1.Y < p2.Y {
-		ystep = 1
-	} else {
-		ystep = -1
-	}
-
-	lineLength := max(dx, dy)
-
-	interpolateColor := func(step, total int) color.RGBA {
-		fraction := float64(step) / float64(total)
-		return color.RGBA{
-			R: uint8(float64(endColor.R)*fraction + float64(startColor.R)*(1-fraction)),
-			G: uint8(float64(endColor.G)*fraction + float64(startColor.G)*(1-fraction)),
-			B: uint8(float64(endColor.B)*fraction + float64(startColor.B)*(1-fraction)),
-			A: uint8(float64(endColor.A)*fraction + float64(startColor.A)*(1-fraction)),
-		}
-	}
-
-	var lineStep int
-	for x := p1.X; x <= p2.X; x++ {
-		interpColor := interpolateColor(lineStep, lineLength)
-
-		if steep {
-			for w := -width / 2; w <= width/2; w++ {
-				img.Set(p1.Y+w, x, interpColor)
-			}
-		} else {
-			for w := -width / 2; w <= width/2; w++ {
-				img.Set(x, p1.Y+w, interpColor)
-			}
-		}
-
-		err -= dy
-		if err < 0 {
-			p1.Y += ystep
-			err += dx
-		}
-
-		if steep {
-			lineStep += abs(ystep)
-		} else {
-			lineStep++
-		}
-	}
-}
-*/
-
-/* func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-} */
-
 func lerp(a, b, t float64) float64 {
 	return a + (b-a)*t
 }
@@ -693,31 +413,3 @@ func (m *Meshgrid) getColorInterpolation(value float64) color.RGBA {
 		A: 255,
 	}
 }
-
-// func (m *Meshgrid) getColorInterpolation2(value float64) color.RGBA {
-// 	t := (value - m.zmin) / (m.zmax - m.zmin)
-// 	// Clamp t to be within [0, 1]
-// 	if t < 0 {
-// 		t = 0
-// 	} else if t > 1 {
-// 		t = 1
-// 	}
-
-// 	divider := .5
-// 	var r, g, b float64
-// 	if t < divider { // Green to Yellow interpolation
-// 		r = lerp(0, 1, t/divider)
-// 		g = 1
-// 	} else { // Yellow to Red interpolation
-// 		r = 1
-// 		g = lerp(1, 0, (t-divider)/(1-divider))
-// 	}
-// 	b = 0
-// 	// Convert from 0-1 range to 0-255 for color.RGBA
-// 	return color.RGBA{
-// 		R: uint8(r * 255),
-// 		G: uint8(g * 255),
-// 		B: uint8(b * 255),
-// 		A: 255,
-// 	}
-// }

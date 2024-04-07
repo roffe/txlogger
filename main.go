@@ -72,14 +72,14 @@ func mainz(args []string) {
 	lastVersion := a.Preferences().String("lastVersion")
 	if lastVersion != a.Metadata().Version {
 		go func() {
-			time.Sleep(1500 * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
 			ww := a.NewWindow("What's new")
 			md := widget.NewRichTextFromMarkdown(whatsNew)
 			md.Wrapping = fyne.TextWrapWord
 			ww.SetContent(container.NewVScroll(md))
 			ww.Resize(fyne.NewSize(700, 400))
 			ww.Show()
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 			ww.RequestFocus()
 		}()
 	}

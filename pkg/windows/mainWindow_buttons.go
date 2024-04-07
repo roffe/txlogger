@@ -46,7 +46,7 @@ func (mw *MainWindow) createButtons() {
 		// d.Show()
 		// return
 
-		filename, err := sdialog.File().Filter("Binary file", "bin").SetStartDir(mw.settings.GetLogPath()).Load()
+		filename, err := sdialog.File().Filter("Binary file", "bin").Load()
 		if err != nil {
 			if err.Error() == "Cancelled" {
 				return
@@ -82,11 +82,11 @@ func (mw *MainWindow) createButtons() {
 	mw.syncSymbolsBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), mw.SyncSymbols)
 
 	mw.dashboardBtn = widget.NewButtonWithIcon("Dashboard", theme.InfoIcon(), func() {
-		var unsubDB func()
+		var cancelFuncs []func()
 
 		onClose := func() {
-			if unsubDB != nil {
-				unsubDB()
+			for _, f := range cancelFuncs {
+				f()
 			}
 			if mw.dashboard != nil {
 				mw.dashboard.Close()
@@ -116,8 +116,6 @@ func (mw *MainWindow) createButtons() {
 
 		mw.dashboard = widgets.NewDashboard(dbcfg)
 
-		unsubDB = ebus.SubscribeAllFunc(mw.dashboard.SetValue)
-
 		for _, s := range mw.symbolList.Symbols() {
 			mw.dashboard.SetValue(s.Name, s.Float64())
 		}
@@ -127,6 +125,12 @@ func (mw *MainWindow) createButtons() {
 		})
 
 		mw.SetContent(mw.dashboard)
+
+		for _, m := range mw.dashboard.GetMetricNames() {
+			cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(m, func(f float64) {
+				mw.dashboard.SetValue(m, f)
+			}))
+		}
 	})
 
 	mw.plotterBtn = widget.NewButtonWithIcon("Plotter", theme.VisibilityIcon(), func() {
@@ -163,7 +167,7 @@ func (mw *MainWindow) createButtons() {
 	})
 
 	mw.logplayerBtn = widget.NewButtonWithIcon("Log Player", theme.MediaFastForwardIcon(), func() {
-		filename, err := sdialog.File().Filter("logfile", "t7l", "t8l", "csv").SetStartDir("logs").Load()
+		filename, err := sdialog.File().Filter("logfile", "t7l", "t8l", "csv").SetStartDir(mw.settings.GetLogPath()).Load()
 		if err != nil {
 			if err.Error() == "Cancelled" {
 				return
@@ -213,7 +217,7 @@ func (mw *MainWindow) newSettingsBtn() *widget.Button {
 }
 
 func (mw *MainWindow) startLogging() {
-	device, err := mw.canSettings.GetAdapter(mw.ecuSelect.Selected, mw.Log)
+	device, err := mw.settings.CanSettings.GetAdapter(mw.ecuSelect.Selected, mw.Log)
 	if err != nil {
 		mw.Log(err.Error())
 		return
@@ -231,10 +235,18 @@ func (mw *MainWindow) startLogging() {
 	mw.logBtn.SetText("Stop logging")
 	mw.Disable()
 
-	var cancel func()
+	//var cancel func()
+	var cancelFuncs []func()
 
 	if mw.settings.GetLivePreview() {
-		cancel = ebus.SubscribeAllFunc(mw.symbolList.SetValue)
+		for _, sym := range mw.symbolList.Symbols() {
+			cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(sym.Name, func(f float64) {
+				mw.symbolList.SetValue(sym.Name, f)
+			}))
+		}
+
+		//cancel = ebus.SubscribeAllFunc(mw.symbolList.SetValue)
+
 	} else {
 		mw.symbolList.Clear()
 	}
@@ -244,8 +256,8 @@ func (mw *MainWindow) startLogging() {
 		if err := mw.dlc.Start(); err != nil {
 			mw.Log(err.Error())
 		}
-		if cancel != nil {
-			cancel()
+		for _, f := range cancelFuncs {
+			f()
 		}
 		mw.dlc = nil
 		mw.loggingRunning = false

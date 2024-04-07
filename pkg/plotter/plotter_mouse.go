@@ -25,9 +25,9 @@ func (p *Plotter) Scrolled(event *fyne.ScrollEvent) {
 func (p *Plotter) onZoom(value float64) {
 	old := p.dataPointsToShow
 	p.dataPointsToShow = min(p.dataLength, 25*int(value))
-	p.startPos += (old - p.dataPointsToShow) / 2
-	if p.startPos < 0 {
-		p.startPos = 0
+	p.plotStartPos += int(float64(old-p.dataPointsToShow) * 0.5)
+	if p.plotStartPos < 0 {
+		p.plotStartPos = 0
 	}
 	p.widthFactor = p.canvasImage.Size().Width / float32(p.dataPointsToShow)
 	p.updateCursor()

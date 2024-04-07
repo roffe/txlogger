@@ -45,8 +45,6 @@ type MainWindow struct {
 	output     *widget.List
 	outputData binding.StringList
 
-	canSettings *widgets.CanSettingsWidget
-
 	ecuSelect *widget.Select
 
 	addSymbolBtn *widget.Button
@@ -102,7 +100,6 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		Window:         a.NewWindow("txlogger"),
 		app:            a,
 		outputData:     binding.NewStringList(),
-		canSettings:    widgets.NewCanSettingsWidget(a),
 		captureCounter: binding.NewInt(),
 		errorCounter:   binding.NewInt(),
 		fpsCounter:     binding.NewInt(),
@@ -284,7 +281,6 @@ func (mw *MainWindow) setupTabs() {
 				nil,
 				mw.presetSelect,
 			),
-			mw.canSettings,
 			mw.logBtn,
 		),
 		bottomSplit,
@@ -295,7 +291,7 @@ func (mw *MainWindow) setupTabs() {
 		mw.leading,
 		trailing,
 	)
-	hsplit.SetOffset(0.7)
+	hsplit.SetOffset(0.8)
 
 	mw.tab.Append(container.NewTabItemWithIcon("Symbols", theme.ListIcon(), hsplit))
 	mw.tab.Append(container.NewTabItemWithIcon("Settings", theme.SettingsIcon(), mw.settings))
@@ -345,9 +341,8 @@ func (mw *MainWindow) Disable() {
 		mw.logBtn.Disable()
 	}
 	mw.ecuSelect.Disable()
-	mw.canSettings.Disable()
-	//mw.presetSelect.Disable()
-	//mw.symbolList.Disable()
+	mw.presetSelect.Disable()
+	mw.symbolList.Disable()
 }
 
 func (mw *MainWindow) Enable() {
@@ -360,13 +355,12 @@ func (mw *MainWindow) Enable() {
 	mw.syncSymbolsBtn.Enable()
 	mw.logBtn.Enable()
 	mw.ecuSelect.Enable()
-	mw.canSettings.Enable()
-	//mw.presetSelect.Enable()
-	//mw.symbolList.Enable()
+	mw.presetSelect.Enable()
+	mw.symbolList.Enable()
 }
 
 func (mw *MainWindow) LoadSymbolsFromECU() error {
-	device, err := mw.canSettings.GetAdapter(mw.ecuSelect.Selected, mw.Log)
+	device, err := mw.settings.CanSettings.GetAdapter(mw.ecuSelect.Selected, mw.Log)
 	if err != nil {
 		return err
 	}

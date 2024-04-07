@@ -27,12 +27,16 @@ type Dial struct {
 	title         string
 	displayString string
 
-	min, max float64
-	steps    float64
-	factor   float64
-	value    float64
+	min, max        float64
+	steps           float64
+	factor          float64
+	value           float64
+	highestObserved float64
 
-	needle      *canvas.Line
+	needle *canvas.Line
+	//highestObservedMarker *canvas.Line
+	//lastHighestObserved   time.Time
+
 	pips        []*canvas.Line
 	face        *canvas.Circle
 	center      *canvas.Circle
@@ -50,6 +54,8 @@ type Dial struct {
 	needleOffset, needleLength float32
 	needleRotConst             float64
 	lineRotConst               float64
+	radius87                   float32
+	eightRadius                float32
 }
 
 func NewDial(cfg DialConfig) *Dial {
@@ -62,6 +68,7 @@ func NewDial(cfg DialConfig) *Dial {
 		minsize:       fyne.NewSize(150, 150),
 	}
 	c.ExtendBaseWidget(c)
+
 	if cfg.Steps > 0 {
 		c.steps = float64(cfg.Steps)
 	}
@@ -83,6 +90,7 @@ func NewDial(cfg DialConfig) *Dial {
 	c.cover = &canvas.Rectangle{FillColor: theme.BackgroundColor()}
 	c.center = &canvas.Circle{FillColor: color.RGBA{R: 0x01, G: 0x0B, B: 0x13, A: 0xFF}}
 	c.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 3}
+	//c.highestObservedMarker = &canvas.Line{StrokeColor: color.RGBA{R: 216, G: 250, B: 8, A: 0xFF}, StrokeWidth: 4}
 
 	c.titleText = &canvas.Text{Text: c.title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
 	c.titleText.TextStyle.Monospace = true
@@ -101,7 +109,7 @@ func NewDial(cfg DialConfig) *Dial {
 		c.pips = append(c.pips, pip)
 		c.container.Add(pip)
 	}
-	c.container.Objects = append(c.container.Objects, c.face, c.cover, c.titleText, c.center, c.needle, c.displayText)
+	c.container.Objects = append(c.container.Objects, c.face, c.cover, c.titleText, c.center /*, c.highestObservedMarker*/, c.needle, c.displayText)
 
 	return c
 }
@@ -137,6 +145,13 @@ func (c *Dial) SetValue(value float64) {
 	c.rotateNeedle(c.needle, value, c.needleOffset, c.needleLength)
 	c.displayText.Text = fmt.Sprintf(c.displayString, value)
 	c.displayText.Refresh()
+	/*
+		if value > c.highestObserved || time.Since(c.lastHighestObserved) > 10*time.Second {
+			c.highestObserved = value
+			c.rotateNeedle(c.highestObservedMarker, c.highestObserved, c.radius, c.eightRadius*0.5)
+			c.lastHighestObserved = time.Now()
+		}
+	*/
 }
 
 func (c *Dial) CreateRenderer() fyne.WidgetRenderer {
@@ -199,7 +214,7 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 	c.face.Resize(size)
 
 	fourthRadius := c.radius * oneFourth
-	eightRadius := c.radius * oneEight
+	c.eightRadius = c.radius * oneEight
 
 	// Optimize pip rotation and styling
 	radius43 := c.radius * oneFourth * 3
@@ -211,9 +226,10 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 			c.rotateLines(p, float64(i), radius43, fourthRadius)
 		} else {
 			p.StrokeWidth = smallStroke
-			c.rotateLines(p, float64(i), radius87, eightRadius)
+			c.rotateLines(p, float64(i), radius87, c.eightRadius)
 		}
 	}
+	//c.rotateNeedle(c.highestObservedMarker, c.highestObserved, c.radius, c.eightRadius*0.5)
 }
 
 func (dr *DialRenderer) MinSize() fyne.Size {

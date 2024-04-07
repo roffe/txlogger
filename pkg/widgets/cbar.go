@@ -173,8 +173,8 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 
 	for i, line := range s.bars {
 		if i%2 == 0 {
-			line.Position1 = fyne.NewPos(float32(i)*stepFactor, middle-height*.33)
-			line.Position2 = fyne.NewPos(float32(i)*stepFactor, middle+height*.33)
+			line.Position1 = fyne.NewPos(float32(i)*stepFactor, middle-height*oneThird)
+			line.Position2 = fyne.NewPos(float32(i)*stepFactor, middle+height*oneThird)
 			continue
 		}
 		line.Position1 = fyne.NewPos(float32(i)*stepFactor, middle-height*oneSeventh)

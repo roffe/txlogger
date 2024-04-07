@@ -197,9 +197,9 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 					mv.zData[cell] = int(num * 100)
 				case 0.001:
 					mv.zData[cell] = int(num * 1000)
-				case 1.0 / 128:
+				case oneHundredTwentyeighth:
 					mv.zData[cell] = int(num * 128)
-				case 1.0 / 1024:
+				case oneThousandTwentyfourth:
 					mv.zData[cell] = int(num * 1024)
 				default:
 					fyne.LogError("unknown zCorrFac", fmt.Errorf("%f", mv.zCorrFac))
@@ -269,22 +269,24 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 		updateCursor = true
 		mv.restoreSelectedValues()
 	}
-	index := mv.SelectedY*mv.numColumns + mv.selectedX
 
 	if updateCursor {
-		size := mv.innerView.Size()
-		mv.selectedCells = []int{index}
-		xPosFactor := float32(mv.selectedX)
-		yPosFactor := float32(float64(mv.numRows-1) - float64(mv.SelectedY))
-		xPos := xPosFactor * (size.Width / float32(mv.numColumns))
-		yPos := yPosFactor * (size.Height / float32(mv.numRows))
-		mv.cursor.Resize(fyne.NewSize(size.Width/float32(mv.numColumns), size.Height/float32(mv.numRows)))
-		mv.cursor.Move(fyne.NewPos(xPos, yPos))
+		mv.updateCursor()
 	}
 
 	if refresh {
 		mv.Refresh()
 	}
+}
+
+func (mv *MapViewer) updateCursor() {
+	mv.selectedCells = []int{mv.SelectedY*mv.numColumns + mv.selectedX}
+	xPosFactor := float32(mv.selectedX)
+	yPosFactor := float32(float64(mv.numRows-1) - float64(mv.SelectedY))
+	xPos := xPosFactor * mv.widthFactor
+	yPos := yPosFactor * mv.heightFactor
+	mv.cursor.Resize(fyne.NewSize(mv.cursorWidth, mv.cursorHeight))
+	mv.cursor.Move(fyne.NewPos(xPos, yPos))
 }
 
 type updateBlock struct {
@@ -303,7 +305,6 @@ func (mv *MapViewer) updateCells() {
 	for _, cell := range mv.selectedCells[1:] {
 		data := mv.zData[cell]
 		last := &updates[len(updates)-1]
-
 		if cell-1 == last.end {
 			last.end = cell
 			last.data = append(last.data, data)

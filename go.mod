@@ -19,7 +19,7 @@ require (
 )
 
 require (
-	fyne.io/fyne/v2 v2.4.4-rc2.0.20240329173153-506db546dbfd
+	fyne.io/fyne/v2 v2.4.4-rc2.0.20240401200252-f528f23733b7
 	fyne.io/systray v1.10.1-0.20231230205326-d160fd363db9 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
@@ -61,7 +61,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-require github.com/roffe/ecusymbol v0.0.0-20240330140656-ee875d82bea0
+require github.com/roffe/ecusymbol v0.0.0-20240407135445-6f811ac1a554
 
 require fyne.io/x/fyne v0.0.0-20240216160529-61d0ff41acd7
 

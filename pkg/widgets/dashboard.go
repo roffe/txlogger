@@ -24,7 +24,7 @@ type Dashboard struct {
 	throttle, pwm                   *VBar
 	engineTemp                      *Dial
 	nblambda, wblambda              *CBar
-	boost, air                      *DualDial
+	pressure, airmass               *DualDial
 	ioff, activeAirDem, ign, cruise *canvas.Text
 	idc                             *canvas.Text
 	checkEngine                     *canvas.Image
@@ -93,7 +93,7 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 			Max:   80,
 			Steps: 16,
 		}),
-		boost: NewDualDial(DualDialConfig{
+		pressure: NewDualDial(DualDialConfig{
 			Title:         "MAP",
 			Min:           0,
 			Max:           3,
@@ -168,7 +168,7 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 			TextSize:  44,
 			Color:     color.RGBA{R: 0, G: 255, B: 0, A: 255},
 		},
-		air: NewDualDial(DualDialConfig{
+		airmass: NewDualDial(DualDialConfig{
 			Title: "mg/c",
 			Min:   0,
 			Max:   2200,
@@ -226,8 +226,8 @@ func (db *Dashboard) render() *fyne.Container {
 
 		db.rpm,
 		db.speed,
-		db.air,
-		db.boost,
+		db.airmass,
+		db.pressure,
 		db.iat,
 		db.engineTemp,
 
@@ -386,19 +386,19 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		"ActualIn.n_Engine":          db.rpm.SetValue,
 		"ActualIn.T_AirInlet":        db.iat.SetValue,
 		"ActualIn.T_Engine":          db.engineTemp.SetValue,
-		"In.p_AirInlet":              db.boost.SetValue,
-		"ActualIn.p_AirInlet":        db.boost.SetValue,
-		"In.p_AirBefThrottle":        db.boost.SetValue2,
-		"ActualIn.p_AirBefThrottle":  db.boost.SetValue2,
+		"In.p_AirInlet":              db.pressure.SetValue,
+		"ActualIn.p_AirInlet":        db.pressure.SetValue,
+		"In.p_AirBefThrottle":        db.pressure.SetValue2,
+		"ActualIn.p_AirBefThrottle":  db.pressure.SetValue2,
 		"Out.X_AccPedal":             db.throttle.SetValue, // t7
 		"Out.X_AccPos":               db.throttle.SetValue, // t8
 		"Out.PWM_BoostCntrl":         db.pwm.SetValue,
 		"DisplProt.LambdaScanner":    db.wblambda.SetValue,
 		"Lambda.External":            db.wblambda.SetValue,
 		"Lambda.LambdaInt":           db.nblambda.SetValue,
-		"MAF.m_AirInlet":             db.air.SetValue,
-		"m_Request":                  db.air.SetValue2,
-		"AirMassMast.m_Request":      db.air.SetValue2,
+		"MAF.m_AirInlet":             db.airmass.SetValue,
+		"m_Request":                  db.airmass.SetValue2,
+		"AirMassMast.m_Request":      db.airmass.SetValue2,
 		"Out.fi_Ignition":            textSetter(db.ign, "Ign", 1),
 		"ECMStat.ST_ActiveAirDem":    ecmstat,
 		"IgnProt.fi_Offset":          ioff,
@@ -420,10 +420,10 @@ func (db *Dashboard) Sweep() {
 		db.speed.SetValue(300 * pa)
 		db.rpm.SetValue(8000 * pa)
 		db.iat.SetValue(80 * pa)
-		db.air.SetValue(2100 * pa)
-		db.air.SetValue2(2200 * pa)
+		db.airmass.SetValue(2100 * pa)
+		db.airmass.SetValue2(2200 * pa)
 		db.engineTemp.SetValue(160 * pa)
-		db.boost.SetValue(3 * pa)
+		db.pressure.SetValue(3 * pa)
 		db.throttle.SetValue(100 * pa)
 		db.pwm.SetValue(100 * pa)
 		db.nblambda.SetValue(25 * pa)
@@ -444,13 +444,13 @@ func (db *Dashboard) setValue(value float64) {
 	db.rpm.SetValue(value)
 	db.iat.SetValue(value)
 	db.engineTemp.SetValue(value)
-	db.boost.SetValue(value)
+	db.pressure.SetValue(value)
 	db.throttle.SetValue(value)
 	db.pwm.SetValue(value)
 	db.nblambda.SetValue(value)
 	db.wblambda.SetValue(value)
-	db.air.SetValue(value)
-	db.air.SetValue2(value)
+	db.airmass.SetValue(value)
+	db.airmass.SetValue2(value)
 }
 
 func (db *Dashboard) NewDebugBar() *fyne.Container {
@@ -496,13 +496,13 @@ func (db *Dashboard) NewDebugBar() *fyne.Container {
 			db.rpm.SetValue(3320)
 			db.iat.SetValue(30)
 			db.engineTemp.SetValue(85)
-			db.boost.SetValue(1.2)
+			db.pressure.SetValue(1.2)
 			db.throttle.SetValue(85)
 			db.pwm.SetValue(47)
 			db.nblambda.SetValue(2.13)
 			db.wblambda.SetValue(1.03)
-			db.air.SetValue(1003)
-			db.air.SetValue2(1200)
+			db.airmass.SetValue(1003)
+			db.airmass.SetValue2(1200)
 		}),
 		widget.NewButton("+0.01", func() {
 			mockValue += 0.01
@@ -597,7 +597,6 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 		return
 	}
 	dr.size = space
-
 	log.Println("dashboard.Layout", space.Width, space.Height)
 	dr.db.container.Resize(space)
 
@@ -608,28 +607,27 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	var halfHeight float32 = (space.Height - 50) * .5
 
 	// Dials
-
 	if !db.cfg.SwapRPMandSpeed {
 		// Top left
 		db.rpm.Resize(fyne.NewSize(sixthWidth, thirdHeight))
-		db.rpm.Move(fyne.NewPos(0, 0))
+		db.rpm.Move(fyne.NewPos(0, 5))
 
 		// Center dial
 		db.speed.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth*oneThird*2)-20, space.Height-115))
 		db.speed.Move(fyne.NewPos(space.Width*.5-db.speed.Size().Width*.5, space.Height*.5-db.speed.Size().Height*.5+25))
 	} else {
 		db.speed.Resize(fyne.NewSize(sixthWidth, thirdHeight))
-		db.speed.Move(fyne.NewPos(0, 0))
+		db.speed.Move(fyne.NewPos(0, 5))
 		// Center dial
 		db.rpm.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth*oneThird*2)-20, space.Height-115))
 		db.rpm.Move(fyne.NewPos(space.Width*.5-db.rpm.Size().Width*.5, space.Height*.5-db.rpm.Size().Height*.5+25))
 	}
 
-	db.air.Resize(fyne.NewSize(sixthWidth, thirdHeight))
-	db.air.Move(fyne.NewPos(0, thirdHeight))
+	db.pressure.Resize(fyne.NewSize(sixthWidth, thirdHeight))
+	db.pressure.Move(fyne.NewPos(0, (thirdHeight*2)+5))
 
-	db.boost.Resize(fyne.NewSize(sixthWidth, thirdHeight))
-	db.boost.Move(fyne.NewPos(0, thirdHeight*2))
+	db.airmass.Resize(fyne.NewSize(sixthWidth, thirdHeight))
+	db.airmass.Move(fyne.NewPos(0, thirdHeight+5))
 
 	db.iat.Resize(fyne.NewSize(sixthWidth, halfHeight))
 	db.iat.Move(fyne.NewPos(space.Width-db.iat.Size().Width, 0))
@@ -687,6 +685,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	db.fullscreenBtn.Move(fyne.NewPos(0, space.Height-55))
 
 	// Text
+	//textSize := min(space.Width*oneTwentyFifth, 45)
 
 	//db.ign.TextSize = textSize
 	db.ign.Move(fyne.NewPos(db.nblambda.Position().X, db.nblambda.Size().Height-14))

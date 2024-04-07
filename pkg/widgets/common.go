@@ -5,6 +5,7 @@ import "math"
 const (
 	pi15            = math.Pi * 1.5
 	pi43            = math.Pi / 4 * 3
+	piDiv180        = math.Pi / 180
 	oneOneFive      = 1.0 / 1.5   // 0.6666666666666666
 	oneOneEight     = 1.0 / 1.8   // 0.5555555555555556
 	oneHalf         = 1.0 / 2.0   // 0.5

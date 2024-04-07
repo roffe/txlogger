@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"log"
+	"math"
 	"strconv"
 	"strings"
 
@@ -53,12 +54,13 @@ type MapViewer struct {
 	xAxisTexts, yAxisTexts   []*canvas.Text
 	zDataRects               []*canvas.Rectangle
 
-	content    fyne.CanvasObject
-	innerView  *fyne.Container
-	grid       *Grid
-	cursor     *canvas.Rectangle
-	crosshair  *canvas.Rectangle
-	textValues []*canvas.Text
+	content               fyne.CanvasObject
+	innerView             *fyne.Container
+	grid                  *Grid
+	cursor                *canvas.Rectangle
+	cursorFollowCrosshair bool
+	crosshair             *canvas.Rectangle
+	textValues            []*canvas.Text
 
 	ipf interpolate.InterPolFunc
 
@@ -86,8 +88,13 @@ type MapViewer struct {
 
 	showWBL bool
 
-	lamb       *CBar
-	lambdaName string
+	lamb         *CBar
+	lambdaName   string
+	cursorWidth  float32
+	cursorHeight float32
+
+	widthFactor  float32
+	heightFactor float32
 }
 
 func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
@@ -141,27 +148,27 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 
 	mv.textValues = createTextValues(mv.zData, mv.zCorrFac)
 
-	mv.valueTexts = container.New(&layout.Grid{Cols: mv.numColumns, Rows: mv.numRows, Text: true})
-	for _, t := range mv.textValues {
-		mv.valueTexts.Add(t)
-	}
+	mv.innerView = container.NewStack()
 
 	mv.valueRects = container.New(&layout.Grid{Cols: mv.numColumns, Rows: mv.numRows})
 	for _, r := range mv.zDataRects {
 		mv.valueRects.Add(r)
 	}
+	mv.innerView.Add(mv.valueRects)
+
+	mv.innerView.Add(container.NewWithoutLayout(
+		mv.crosshair,
+		mv.cursor,
+	))
+
+	mv.valueTexts = container.New(&layout.Grid{Cols: mv.numColumns, Rows: mv.numRows, Text: true})
+	for _, t := range mv.textValues {
+		mv.valueTexts.Add(t)
+	}
+	mv.innerView.Add(mv.valueTexts)
 
 	mv.grid = NewGrid(mv.numColumns, mv.numRows)
-
-	mv.innerView = container.NewStack(
-		mv.valueRects,
-		container.NewWithoutLayout(
-			mv.crosshair,
-			mv.cursor,
-		),
-		mv.grid,
-		mv.valueTexts,
-	)
+	mv.innerView.Add(mv.grid)
 
 	if mv.showWBL {
 		mv.lamb = NewCBar(&CBarConfig{
@@ -308,12 +315,17 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 	}
 }
 
+const (
+	oneThousandTwentyfourth = 1.0 / 1024
+	oneHundredTwentyeighth  = 1.0 / 128
+)
+
 func (mv *MapViewer) SetCellText(idx int, value int) {
 	precission := 0
 	switch mv.zCorrFac {
-	case 1.0 / 1024:
+	case oneThousandTwentyfourth:
 		precission = 4
-	case 1.0 / 128:
+	case oneHundredTwentyeighth:
 		precission = 3
 	case 0.1:
 		precission = 1
@@ -342,20 +354,23 @@ func (mv *MapViewer) resize(size fyne.Size) {
 	// Calculate shared factors
 	numColumnsFloat := float32(mv.numColumns)
 	numRowsFloat := float32(mv.numRows)
-	widthFactor := sz.Width / numColumnsFloat
-	heightFactor := sz.Height / numRowsFloat
+	mv.widthFactor = sz.Width / numColumnsFloat
+	mv.heightFactor = sz.Height / numRowsFloat
+
+	mv.cursorWidth = mv.widthFactor
+	mv.cursorHeight = mv.heightFactor
 
 	// Position and resize crosshair
-	mv.crosshair.Resize(fyne.NewSize(widthFactor, heightFactor))
+	mv.crosshair.Resize(fyne.NewSize(mv.widthFactor, mv.heightFactor))
 	mv.crosshair.Move(
 		fyne.NewPos(
-			float32(mv.xIdx)*widthFactor,
-			float32(float64(mv.numRows)-1-mv.yIdx)*heightFactor,
+			float32(mv.xIdx)*mv.widthFactor,
+			float32(float64(mv.numRows)-1-mv.yIdx)*mv.heightFactor,
 		),
 	)
 
 	// Calculate text size
-	textSize := calculateOptimalTextSize(sz.Width, mv.numColumns)
+	textSize := calculateOptimalTextSize(mv.widthFactor)
 
 	// Position and resize text values
 	for i := mv.numRows; i > 0; i-- {
@@ -363,6 +378,7 @@ func (mv *MapViewer) resize(size fyne.Size) {
 			iDx := (i * mv.numColumns) - (mv.numColumns - j)
 			t := mv.textValues[iDx]
 			t.TextSize = textSize
+			t.Refresh()
 		}
 	}
 
@@ -378,15 +394,15 @@ func (mv *MapViewer) resize(size fyne.Size) {
 		yb.Refresh()
 	}
 
-	mv.resizeCursor(sz, numColumnsFloat, numRowsFloat, widthFactor, heightFactor)
+	mv.resizeCursor()
+	mv.updateCursor()
 }
 
-func calculateOptimalTextSize(width float32, columns int) float32 {
-	cellWidth := float64(width / float32(columns))
-	return max(min(float32(cellWidth*oneFifth), 21), 12)
+func calculateOptimalTextSize(cellwidth float32) float32 {
+	return max(min(float32(cellwidth*oneFifth), 21), 12)
 }
 
-func (mv *MapViewer) resizeCursor(viewportSize fyne.Size, numColumnsFloat, numRowsFloat, widthFactor, heightFactor float32) {
+func (mv *MapViewer) resizeCursor() {
 	// Position and resize cursor
 	if mv.selectedX >= 0 {
 		if len(mv.selectedCells) > 1 {
@@ -413,21 +429,20 @@ func (mv *MapViewer) resizeCursor(viewportSize fyne.Size, numColumnsFloat, numRo
 					maxY = y
 				}
 			}
-			widthFactor := viewportSize.Width / numColumnsFloat
-			heightFactor := viewportSize.Height / numRowsFloat
-			topLeftX := float32(minX) * widthFactor
-			topLeftY := float32(mv.numRows-1-maxY) * heightFactor
-			width := float32(maxX-minX+1) * widthFactor
-			height := float32(maxY-minY+1) * heightFactor
+
+			topLeftX := float32(minX) * mv.widthFactor
+			topLeftY := float32(mv.numRows-1-maxY) * mv.heightFactor
+			width := float32(maxX-minX+1) * mv.widthFactor
+			height := float32(maxY-minY+1) * mv.heightFactor
 			mv.cursor.Resize(fyne.NewSize(width, height))
 			mv.cursor.Move(fyne.NewPos(topLeftX, topLeftY))
 
 		} else {
-			mv.cursor.Resize(fyne.NewSize(widthFactor, heightFactor))
+			mv.cursor.Resize(fyne.NewSize(mv.widthFactor, mv.heightFactor))
 			mv.cursor.Move(
 				fyne.NewPos(
-					float32(mv.selectedX)*widthFactor,
-					float32(mv.numRows-1-mv.SelectedY)*heightFactor,
+					float32(mv.selectedX)*mv.widthFactor,
+					float32(mv.numRows-1-mv.SelectedY)*mv.heightFactor,
 				),
 			)
 		}
@@ -435,6 +450,7 @@ func (mv *MapViewer) resizeCursor(viewportSize fyne.Size, numColumnsFloat, numRo
 }
 
 func (mv *MapViewer) Refresh() {
+	log.Println("MapViewer Refresh")
 	mv.min, mv.max = findMinMax(mv.zData)
 	for i, tv := range mv.zData {
 		mv.SetCellText(i, tv)
@@ -467,7 +483,9 @@ func getPrecission(corrFac float64) int {
 		precission = 2
 	case 0.001:
 		precission = 3
-	case 1.0 / 128:
+	case oneThousandTwentyfourth:
+		precission = 4
+	case oneHundredTwentyeighth:
 		precission = 3
 	}
 	return precission
@@ -490,7 +508,6 @@ func createTextValues(zData []int, corrFac float64) []*canvas.Text {
 func (mv *MapViewer) createXAxis() *fyne.Container {
 	labels := container.New(&layout.Horizontal{Offset: mv.yAxisLabels})
 	if mv.numColumns >= 1 {
-
 		for i := 0; i < mv.numColumns; i++ {
 			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.xData[i])*mv.xCorrFac, 'f', getPrecission(mv.xCorrFac), 64), TextSize: 13}
 			mv.xAxisTexts = append(mv.xAxisTexts, text)
@@ -551,14 +568,18 @@ func (mv *MapViewer) setXY(xValue, yValue int) error {
 	}
 	mv.xIdx = xIdx
 	mv.yIdx = yIdx
-	sz := mv.innerView.Size()
 
 	mv.crosshair.Move(
 		fyne.NewPos(
-			float32(xIdx)*sz.Width/float32(mv.numColumns),
-			float32(float64(mv.numRows-1)-yIdx)*sz.Height/float32(mv.numRows),
+			float32(xIdx)*mv.widthFactor,
+			float32(float64(mv.numRows-1)-yIdx)*mv.heightFactor,
 		),
 	)
+	if mv.cursorFollowCrosshair {
+		mv.selectedX = int(math.Round(xIdx))
+		mv.SelectedY = int(math.Round(yIdx))
+		mv.updateCursor()
+	}
 	return nil
 }
 

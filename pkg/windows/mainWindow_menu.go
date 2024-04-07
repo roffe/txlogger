@@ -2,11 +2,13 @@ package windows
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/dialog"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/interpolate"
@@ -41,6 +43,10 @@ func (mw *MainWindow) setupMenu() {
 }
 
 func (mw *MainWindow) loadBinary() {
+	if mw.dlc != nil {
+		dialog.ShowError(errors.New("stop logging before loading a new binary"), mw.Window)
+		return
+	}
 	filename, err := sdialog.File().Filter("Binary file", "bin").Load()
 	if err != nil {
 		if err.Error() == "Cancelled" {
@@ -258,6 +264,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		widgets.WithEditable(true),
 		widgets.WithButtons(true),
 		widgets.WithWBL(true),
+		widgets.WithFollowCrosshair(mw.settings.GetCursorFollowCrosshair()),
 	)
 	if err != nil {
 		mw.Log(err.Error())

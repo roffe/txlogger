@@ -83,17 +83,10 @@ func (s *SymbolListWidget) UpdateBars(enabled bool) {
 func (s *SymbolListWidget) SetValue(name string, value float64) {
 	val, found := s.entryMap[name]
 	if found {
-		f := val.symbol.Correctionfactor
 		val.value = value
-		if !val.valueSet {
-			//val.min = value
-			val.max = value
-			val.valueSet = true
-		}
 		if value < val.min {
 			val.min = value
-		}
-		if value > val.max {
+		} else if value > val.max {
 			val.max = value
 		}
 		if s.updateBars {
@@ -103,7 +96,7 @@ func (s *SymbolListWidget) SetValue(name string, value float64) {
 			val.valueBar.FillColor = col
 			val.valueBar.Resize(fyne.NewSize(factor*100, 26))
 		}
-		switch f {
+		switch val.symbol.Correctionfactor {
 		case 1:
 			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 0, 64))
 			return
@@ -130,23 +123,19 @@ func (s *SymbolListWidget) Clear() {
 }
 
 func (s *SymbolListWidget) Disable() {
-	/*
-		for _, e := range s.entrys {
-			e.symbolName.Disable()
-			e.symbolCorrectionfactor.Disable()
-			e.deleteBTN.Disable()
-		}
-	*/
+
+	for _, e := range s.entries {
+		e.symbolCorrectionfactor.Disable()
+		e.deleteBTN.Disable()
+	}
+
 }
 
 func (s *SymbolListWidget) Enable() {
-	/*
-		for _, e := range s.entrys {
-			e.symbolName.Enable()
-			e.symbolCorrectionfactor.Enable()
-			e.deleteBTN.Enable()
-		}
-	*/
+	for _, e := range s.entries {
+		e.symbolCorrectionfactor.Enable()
+		e.deleteBTN.Enable()
+	}
 }
 
 func (s *SymbolListWidget) Add(symbols ...*symbol.Symbol) {
@@ -261,7 +250,7 @@ type SymbolWidgetEntry struct {
 
 	deleteFunc func(*SymbolWidgetEntry)
 
-	valueSet bool
+	//valueSet bool
 	value    float64
 	min, max float64
 }

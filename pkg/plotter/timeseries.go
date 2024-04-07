@@ -1,10 +1,11 @@
 package plotter
 
 import (
-	"hash/crc32"
 	"image"
 	"image/color"
 	"log"
+
+	"github.com/roffe/txlogger/pkg/colors"
 )
 
 type TimeSeries struct {
@@ -19,7 +20,7 @@ type TimeSeries struct {
 func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 	ts := &TimeSeries{
 		Name:    name,
-		Color:   hashToRGB(name),
+		Color:   colors.GetColor(name),
 		Enabled: true,
 	}
 
@@ -52,15 +53,12 @@ func (ts *TimeSeries) Plotx(values map[string][]float64, start, numPoints int, w
 		fx := float64(x)
 		x0 := int(((fx - 1) * widthFactor))
 		y0 := int(float64(hh) - (data[x-1]-ts.Min)*heightFactor)
-
 		x1 := (int(fx * widthFactor))
 		if x == dle {
 			x1 = w
 		}
 		y1 := int(float64(hh) - (data[x]-ts.Min)*heightFactor)
-
 		Bresenham(img, x0, y0, x1, y1, ts.Color)
-
 	}
 	return img
 }
@@ -126,11 +124,4 @@ func findMinMaxFloat64(data []float64) (float64, float64) {
 		}
 	}
 	return min, max
-}
-
-func hashToRGB(input string) color.RGBA {
-	// Calculate CRC32 hash
-	hash := crc32.ChecksumIEEE([]byte(input))
-	// Map the hash value to RGB color space
-	return color.RGBA{byte(hash >> 8), byte(hash >> 16), byte(hash), 255}
 }

@@ -15,13 +15,9 @@ type EBusMessage struct {
 }
 
 type Controller struct {
-	subs    map[string][]chan float64
-	subsAll []chan EBusMessage
-
-	subsLock sync.Mutex
-
+	subs     map[string][]chan float64
 	incoming chan EBusMessage
-	unsubAll chan chan EBusMessage
+	sub      chan newSub
 	unsub    chan chan float64
 	cache    *ttlcache.Cache[string, float64]
 
@@ -33,13 +29,17 @@ type Controller struct {
 	quit      chan struct{}
 }
 
+type newSub struct {
+	topic string
+	resp  chan float64
+}
+
 func New() *Controller {
 	c := &Controller{
 		subs:     make(map[string][]chan float64),
-		subsAll:  make([]chan EBusMessage, 0),
 		incoming: make(chan EBusMessage, 100),
-		unsubAll: make(chan chan EBusMessage, 100),
-		unsub:    make(chan chan float64, 100),
+		sub:      make(chan newSub, 10),
+		unsub:    make(chan chan float64, 10),
 		cache:    ttlcache.New[string, float64](ttlcache.WithTTL[string, float64](1 * time.Minute)),
 		quit:     make(chan struct{}),
 	}
@@ -65,13 +65,6 @@ func (e *Controller) run() {
 				}
 			}
 			e.cache.Set(msg.Topic, msg.Data, ttlcache.DefaultTTL)
-			for _, sub := range e.subsAll {
-				select {
-				case sub <- msg:
-				default:
-					e.UnsubscribeAll(sub)
-				}
-			}
 			for _, sub := range e.subs[msg.Topic] {
 				select {
 				case sub <- msg.Data:
@@ -81,26 +74,19 @@ func (e *Controller) run() {
 			for _, agg := range e.aggregators {
 				agg.fun(e, msg.Topic, msg.Data)
 			}
-
-		case unsub := <-e.unsubAll:
-			e.subsLock.Lock()
-			for i, sub := range e.subsAll {
-				if sub == unsub {
-					log.Println("unsubAll", unsub)
-					e.subsAll = append(e.subsAll[:i], e.subsAll[i+1:]...)
-					close(sub)
-					break
-				}
+		case sub := <-e.sub:
+			e.subs[sub.topic] = append(e.subs[sub.topic], sub.resp)
+			if itm := e.cache.Get(sub.topic); itm != nil {
+				log.Println("Cache hit", sub.topic, itm.Value())
+				sub.resp <- itm.Value()
 			}
-			e.subsLock.Unlock()
 		case unsub := <-e.unsub:
-			e.subsLock.Lock()
 		outer:
-			for topic, subz := range e.subs {
-				for i, sub := range subz {
+			for topic, subs := range e.subs {
+				for i, sub := range subs {
 					if sub == unsub {
 						log.Println("Unsubscribe", topic)
-						e.subs[topic] = append(subz[:i], subz[i+1:]...)
+						e.subs[topic] = append(subs[:i], subs[i+1:]...)
 						close(unsub)
 						if len(e.subs[topic]) == 0 {
 							delete(e.subs, topic)
@@ -109,7 +95,6 @@ func (e *Controller) run() {
 					}
 				}
 			}
-			e.subsLock.Unlock()
 		}
 	}
 }
@@ -129,39 +114,6 @@ func (e *Controller) Publish(topic string, data float64) error {
 	}
 }
 
-func (e *Controller) SubscribeAll() chan EBusMessage {
-	respChan := make(chan EBusMessage, 100)
-	e.subsLock.Lock()
-	e.subsAll = append(e.subsAll, respChan)
-	e.subsLock.Unlock()
-
-	e.cache.Range(func(item *ttlcache.Item[string, float64]) bool {
-		k := item.Key()
-		v := item.Value()
-		respChan <- EBusMessage{Topic: k, Data: v}
-		return true
-	})
-	return respChan
-}
-
-func (e *Controller) SubscribeAllFunc(f func(topic string, value float64)) (cancel func()) {
-	respChan := e.SubscribeAll()
-	go func() {
-		for v := range respChan {
-			f(v.Topic, v.Data)
-		}
-	}()
-	// return a function that can be used to unsubscribe
-	cancel = func() { // unsubscribe
-		e.UnsubscribeAll(respChan)
-	}
-	return
-}
-
-func (e *Controller) UnsubscribeAll(channel chan EBusMessage) {
-	e.unsubAll <- channel
-}
-
 // SubscribeFunc returns a function that can be used to unsubscribe the function
 func (e *Controller) SubscribeFunc(topic string, f func(float64)) (cancel func()) {
 	respChan := e.Subscribe(topic)
@@ -178,13 +130,8 @@ func (e *Controller) SubscribeFunc(topic string, f func(float64)) (cancel func()
 
 func (e *Controller) Subscribe(topic string) chan float64 {
 	log.Println("Subscribe", topic)
-	respChan := make(chan float64, 100)
-	e.subsLock.Lock()
-	e.subs[topic] = append(e.subs[topic], respChan)
-	e.subsLock.Unlock()
-	if itm := e.cache.Get(topic); itm != nil {
-		respChan <- itm.Value()
-	}
+	respChan := make(chan float64, 10)
+	e.sub <- newSub{topic: topic, resp: respChan}
 	return respChan
 }
 

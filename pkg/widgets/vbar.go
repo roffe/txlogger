@@ -85,7 +85,7 @@ func (s *VBar) SetValue(value float64) {
 	s.bar.Resize(fyne.NewSize(s.size.Width-s.twoEight, valueHeightfactor))
 	s.bar.Move(fyne.NewPos(s.diameterEight, s.size.Height-valueHeightfactor))
 	s.displayText.Text = strconv.FormatFloat(value, 'f', 0, 64)
-	s.displayText.Move(fyne.NewPos(s.middle-s.displayText.Size().Width*.5, s.size.Height-valueHeightfactor-12.5))
+	//s.displayText.Move(fyne.NewPos(s.middle-s.displayText.Size().Width*.5, s.size.Height-valueHeightfactor-12.5))
 	s.displayText.Refresh()
 }
 
@@ -120,8 +120,8 @@ func (vr *vbarRenderer) Layout(space fyne.Size) {
 
 	titleX := vr.vbar.middle - vr.vbar.titleText.Size().Width*.5
 	displayTextX := vr.vbar.middle - vr.vbar.displayText.Size().Width*.5
-	displayTextY := space.Height - (float32(vr.vbar.value) * stepFactor) - 12.5
-
+	//displayTextY := space.Height - (float32(vr.vbar.value) * stepFactor) - 12.5
+	displayTextY := space.Height - vr.vbar.displayText.MinSize().Height
 	vr.vbar.titleText.Move(fyne.NewPos(titleX, space.Height+2))
 	vr.vbar.displayText.Move(fyne.NewPos(displayTextX, displayTextY))
 

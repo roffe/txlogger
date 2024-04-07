@@ -4,10 +4,8 @@ import (
 	"image"
 	"image/color"
 	"log"
-	"runtime"
 	"sort"
 	"strconv"
-	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -32,7 +30,7 @@ type Plotter struct {
 	zoom   *widget.Slider
 
 	ts               []*TimeSeries
-	startPos         int
+	plotStartPos     int
 	cursorPos        int
 	values           map[string][]float64
 	valueOrder       []string
@@ -40,9 +38,6 @@ type Plotter struct {
 	dataLength       int
 
 	Logplayer bool
-
-	mu      sync.Mutex
-	semChan chan struct{}
 
 	widthFactor          float32
 	plotResolution       fyne.Size
@@ -61,7 +56,6 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 	p := &Plotter{
 		values:               values,
 		dataPointsToShow:     0,
-		semChan:              make(chan struct{}, runtime.NumCPU()),
 		legend:               container.NewVBox(),
 		zoom:                 widget.NewSlider(1, 100),
 		canvasImage:          canvas.NewImageFromImage(image.NewRGBA(image.Rect(0, 0, 500, 200))),
@@ -102,7 +96,6 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		p.ts[n] = NewTimeSeries(k, values)
 
 		onTapped := func(enabled bool) {
-			log.Println("Tapped", k, enabled)
 			p.ts[n].Enabled = enabled
 			p.RefreshImage()
 		}
@@ -110,6 +103,7 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		onColorUpdate := func(col color.Color) {
 			r, g, b, a := col.RGBA()
 			p.ts[n].Color = color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)}
+			log.Printf("\"%s\": {%d, %d, %d, %d},", k, uint8(r), uint8(g), uint8(b), uint8(a))
 			p.RefreshImage()
 		}
 
@@ -144,17 +138,34 @@ func (p *Plotter) Seek(pos int) {
 		if offsetPosition < 0 {
 			offsetPosition = 0
 		}
-		p.startPos = min(int(offsetPosition), p.dataLength)
+		p.plotStartPos = min(int(offsetPosition), p.dataLength)
 	}
-	p.RefreshImage()
 	p.cursorPos = pos
 	p.updateLegend()
 	p.updateCursor()
+	p.RefreshImage()
+}
+
+func (p *Plotter) updateCursor2() {
+	x := float32(p.cursorPos-max(p.plotStartPos, 0)) * p.widthFactor
+	xOffset := p.zoom.Size().Width + x
+	p.cursor.Position1 = fyne.NewPos(xOffset, 0)
+	p.cursor.Position2 = fyne.NewPos(xOffset+2, p.canvasImage.Size().Height)
+	p.cursor.Refresh()
 }
 
 func (p *Plotter) updateCursor() {
+	var x float32
+	halfDataPointsToShow := int(float64(p.dataPointsToShow) * .5)
+	if p.cursorPos >= p.dataLength-halfDataPointsToShow {
+		// If cursor position is at or beyond the end of data
+		x = float32(p.dataLength-p.cursorPos) * p.widthFactor
+		x = p.canvasImage.Size().Width - x
+	} else {
+		// Calculate x position based on plotStartPos
+		x = float32(p.cursorPos-max(p.plotStartPos, 0)) * p.widthFactor
+	}
 
-	x := float32(p.cursorPos-max(p.startPos, 0)) * p.widthFactor
 	xOffset := p.zoom.Size().Width + x
 	p.cursor.Position1 = fyne.NewPos(xOffset, 0)
 	p.cursor.Position2 = fyne.NewPos(xOffset+1, p.canvasImage.Size().Height)
@@ -195,26 +206,20 @@ func (p *Plotter) updateLegend() {
 } */
 
 func (p *Plotter) RefreshImage() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	//p.mu.Lock()
+	//defer p.mu.Unlock()
 	//startx := time.Now()
-
-	//draw.Draw(p.canvasImage.Image.(*image.RGBA), p.canvasImage.Image.Bounds(), image.NewUniform(color.RGBA{0, 0, 0, 0}), image.Point{}, draw.Src)
 	img := image.NewRGBA(image.Rect(0, 0, int(p.plotResolution.Width), int(p.plotResolution.Height)))
 	for n := range len(p.ts) {
 		if !p.ts[n].Enabled {
 			continue
 		}
-		p.ts[n].PlotImage(img, p.values, p.startPos, p.dataPointsToShow)
+		p.ts[n].PlotImage(img, p.values, p.plotStartPos, p.dataPointsToShow)
 		//p.ts[n].PlotImage(p.canvasImage.Image.(*image.RGBA), p.values, p.startPos, p.dataPointsToShow)
-
 	}
-
 	p.canvasImage.Image = img
 	p.canvasImage.Refresh()
-
 	//log.Println("RefreshImage took", time.Since(startx).Nanoseconds())
-
 }
 
 func (p *Plotter) CreateRenderer() fyne.WidgetRenderer {

@@ -1,3 +1,12 @@
+# 1.0.14
+
+- Moved CANBUS adapter settings from main screen into settings
+- OHM ( One Hand Mapping ) has been added. if you enable "Cursor follows crosshair in mapviewer" under settings the cursor for editing will now follow the crosshair in the mapviewer. This makes it possible to edit maps with one hand while driving. a & z for minor increment and s & x for major increment.
+- Fixed colors for certain symbols in plotter
+- Code optimization
+- Dual dial secondary needle is now red to make it easier to see
+- fix bug where logplayer button would not open a file browser in the directory set under settings
+
 # 1.0.13
 
 The default presets has been updated. Be sure to load it once from the settings menu to make sure ActualIn.n_Engine, Out.X_AccPedal & In.v_Vehicle is logged properly on Trionic 7

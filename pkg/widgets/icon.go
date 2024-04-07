@@ -27,17 +27,16 @@ func NewIcon(cfg *IconConfig) *Icon {
 		cfg: cfg,
 	}
 	cfg.Image.FillMode = canvas.ImageFillContain
-	cfg.Image.SetMinSize(cfg.Minsize)
-	ic.render()
-	return ic
-}
+	cfg.Image.ScaleMode = canvas.ImageScaleFastest
 
-func (ic *Icon) render() {
+	cfg.Image.SetMinSize(cfg.Minsize)
+
 	ic.text = canvas.NewText("----", color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF})
 	ic.text.TextSize = 25
 	ic.text.TextStyle.Monospace = true
 	ic.text.Alignment = fyne.TextAlignLeading
 	ic.container = container.NewWithoutLayout(ic.cfg.Image, ic.text)
+	return ic
 }
 
 func (ic *Icon) SetText(text string) {

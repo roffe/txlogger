@@ -149,3 +149,10 @@ func WithLambdaSymbolName(lambdaName string) MapViewerOption {
 		return nil
 	}
 }
+
+func WithFollowCrosshair(enabled bool) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.cursorFollowCrosshair = enabled
+		return nil
+	}
+}

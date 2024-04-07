@@ -15,36 +15,38 @@ import (
 )
 
 const (
-	prefsFreq              = "freq"
-	prefsAutoUpdateLoadEcu = "autoUpdateLoadEcu"
-	prefsAutoUpdateSaveEcu = "autoUpdateSaveEcu"
-	prefsLivePreview       = "livePreview"
-	prefsMeshView          = "liveMeshView"
-	prefsRealtimeBars      = "realtimeBars"
-	prefsLogFormat         = "logFormat"
-	prefsLogPath           = "logPath"
-	prefsLambdaSource      = "lambdaSource"
-	prefsUseMPH            = "useMPH"
-	prefsSwapRPMandSpeed   = "swapRPMandSpeed"
-	prefsPlotResolution    = "plotResolution"
+	prefsFreq                  = "freq"
+	prefsAutoUpdateLoadEcu     = "autoUpdateLoadEcu"
+	prefsAutoUpdateSaveEcu     = "autoUpdateSaveEcu"
+	prefsLivePreview           = "livePreview"
+	prefsMeshView              = "liveMeshView"
+	prefsRealtimeBars          = "realtimeBars"
+	prefsLogFormat             = "logFormat"
+	prefsLogPath               = "logPath"
+	prefsLambdaSource          = "lambdaSource"
+	prefsUseMPH                = "useMPH"
+	prefsSwapRPMandSpeed       = "swapRPMandSpeed"
+	prefsPlotResolution        = "plotResolution"
+	prefsCursorFollowCrosshair = "cursorFollowCrosshair"
 )
 
 type SettingsWidget struct {
 	widget.BaseWidget
-
-	freqSlider      *widget.Slider
-	freqValue       *widget.Label
-	autoSave        *widget.Check
-	autoLoad        *widget.Check
-	livePreview     *widget.Check
-	meshView        *widget.Check
-	realtimeBars    *widget.Check
-	logFormat       *widget.Select
-	logPath         *widget.Label
-	lambdaSource    *widget.Select
-	useMPH          *widget.Check
-	swapRPMandSpeed *widget.Check
-	plotResolution  *widget.Select
+	CanSettings           *CanSettingsWidget
+	freqSlider            *widget.Slider
+	freqValue             *widget.Label
+	autoSave              *widget.Check
+	cursorFollowCrosshair *widget.Check
+	autoLoad              *widget.Check
+	livePreview           *widget.Check
+	meshView              *widget.Check
+	realtimeBars          *widget.Check
+	logFormat             *widget.Select
+	logPath               *widget.Label
+	lambdaSource          *widget.Select
+	useMPH                *widget.Check
+	swapRPMandSpeed       *widget.Check
+	plotResolution        *widget.Select
 
 	container *fyne.Container
 }
@@ -117,6 +119,10 @@ func (sw *SettingsWidget) GetPlotResolution() float32 {
 	}
 }
 
+func (sw *SettingsWidget) GetCursorFollowCrosshair() bool {
+	return sw.cursorFollowCrosshair.Checked
+}
+
 func NewSettingsWidget() *SettingsWidget {
 	sw := &SettingsWidget{}
 	sw.ExtendBaseWidget(sw)
@@ -124,8 +130,10 @@ func NewSettingsWidget() *SettingsWidget {
 	sw.freqSlider = sw.newFreqSlider()
 	sw.freqValue = widget.NewLabel("")
 
-	sw.autoSave = sw.newAutoUpdateSave()
 	sw.autoLoad = sw.newAutoUpdateLoad()
+	sw.autoSave = sw.newAutoUpdateSave()
+	sw.cursorFollowCrosshair = sw.newCursorFollowCrosshair()
+
 	sw.livePreview = sw.newLivePreview()
 	sw.meshView = sw.newMeshView()
 	sw.realtimeBars = sw.newRealtimeBars()
@@ -139,8 +147,11 @@ func NewSettingsWidget() *SettingsWidget {
 
 	sw.plotResolution = sw.newPlotResolution()
 
+	sw.CanSettings = NewCanSettingsWidget(fyne.CurrentApp())
+
 	sw.container =
 		container.NewVBox(
+			sw.CanSettings,
 			container.NewBorder(
 				nil,
 				nil,
@@ -193,6 +204,13 @@ func NewSettingsWidget() *SettingsWidget {
 				widget.NewIcon(theme.WarningIcon()),
 				nil,
 				sw.autoSave,
+			),
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewIcon(theme.MoveUpIcon()),
+				nil,
+				sw.cursorFollowCrosshair,
 			),
 			container.NewBorder(
 				nil,
@@ -277,25 +295,31 @@ func (sw *SettingsWidget) newMeshView() *widget.Check {
 }
 
 func (sw *SettingsWidget) newAutoUpdateLoad() *widget.Check {
-	return widget.NewCheck("Load maps from ECU when connected (X & Y-Axis will still be loaded from binary)", func(b bool) {
+	return widget.NewCheck("Load maps from ECU when online (X & Y-Axis will still be loaded from binary)", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsAutoUpdateLoadEcu, b)
 	})
 }
 
 func (sw *SettingsWidget) newAutoUpdateSave() *widget.Check {
-	return widget.NewCheck("Upload map changes directly when editing if connected to ECU (requires open bin)", func(b bool) {
+	return widget.NewCheck("Save changes automaticly if connected to ECU (requires open bin)", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsAutoUpdateSaveEcu, b)
 	})
 }
 
+func (sw *SettingsWidget) newCursorFollowCrosshair() *widget.Check {
+	return widget.NewCheck("Cursor follows crosshair in MapViewer (one hand mapping)", func(b bool) {
+		fyne.CurrentApp().Preferences().SetBool(prefsCursorFollowCrosshair, b)
+	})
+}
+
 func (sw *SettingsWidget) newLivePreview() *widget.Check {
-	return widget.NewCheck("Live preview of values in symbol list (uncheck this if you have a slow pc)", func(b bool) {
+	return widget.NewCheck("Live preview values in symbollist (uncheck if you have a slow pc)", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsLivePreview, b)
 	})
 }
 
 func (sw *SettingsWidget) newRealtimeBars() *widget.Check {
-	return widget.NewCheck("Bars on live preview of values (uncheck this if you have a slow pc)", func(b bool) {
+	return widget.NewCheck("Bars on live preview values (uncheck if you have a slow pc)", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsRealtimeBars, b)
 	})
 }
@@ -307,7 +331,7 @@ func (sw *SettingsWidget) newUserMPH() *widget.Check {
 }
 
 func (sw *SettingsWidget) newSwapRPMandSpeed() *widget.Check {
-	return widget.NewCheck("Swap RPM and Speed gauge position", func(b bool) {
+	return widget.NewCheck("Swap RPM and speed gauge position", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsSwapRPMandSpeed, b)
 	})
 }
@@ -323,6 +347,7 @@ func (sw *SettingsWidget) loadPrefs() {
 	sw.freqSlider.SetValue(float64(freq))
 	sw.autoLoad.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsAutoUpdateLoadEcu, true))
 	sw.autoSave.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsAutoUpdateSaveEcu, false))
+	sw.cursorFollowCrosshair.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsCursorFollowCrosshair, false))
 	sw.livePreview.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsLivePreview, true))
 	sw.meshView.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsMeshView, true))
 	sw.realtimeBars.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsRealtimeBars, true))
@@ -332,6 +357,7 @@ func (sw *SettingsWidget) loadPrefs() {
 	sw.useMPH.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsUseMPH, false))
 	sw.swapRPMandSpeed.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsSwapRPMandSpeed, false))
 	sw.plotResolution.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsPlotResolution, "Full"))
+
 }
 
 func (sw *SettingsWidget) CreateRenderer() fyne.WidgetRenderer {

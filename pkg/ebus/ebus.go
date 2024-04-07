@@ -19,18 +19,19 @@ func Publish(topic string, data float64) error {
 	return eb.Publish(topic, data)
 }
 
-func SubscribeAll() chan eventbus.EBusMessage {
-	return eb.SubscribeAll()
-}
+/*
+	 func SubscribeAll() chan eventbus.EBusMessage {
+		return eb.SubscribeAll()
+	}
 
-func SubscribeAllFunc(f func(topic string, value float64)) func() {
-	return eb.SubscribeAllFunc(f)
-}
+	func SubscribeAllFunc(f func(topic string, value float64)) func() {
+		return eb.SubscribeAllFunc(f)
+	}
 
-func UnsubscribeAll(channel chan eventbus.EBusMessage) {
-	eb.UnsubscribeAll(channel)
-}
-
+	func UnsubscribeAll(channel chan eventbus.EBusMessage) {
+		eb.UnsubscribeAll(channel)
+	}
+*/
 func SubscribeFunc(topic string, f func(float64)) func() {
 	return eb.SubscribeFunc(topic, f)
 }

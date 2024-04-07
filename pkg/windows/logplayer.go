@@ -11,7 +11,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
@@ -49,6 +48,12 @@ type slider struct {
 	typedKey func(key *fyne.KeyEvent)
 }
 
+func NewSlider() *slider {
+	s := &slider{}
+	s.ExtendBaseWidget(s)
+	return s
+}
+
 func (s *slider) TypedKey(key *fyne.KeyEvent) {
 	if s.typedKey != nil {
 		s.typedKey(key)
@@ -60,11 +65,11 @@ type LogPlayer struct {
 
 	menu *mainmenu.MainMenu
 
-	prevBtn     *widget.Button
-	toggleBtn   *widget.Button
-	restartBtn  *widget.Button
-	nextBtn     *widget.Button
-	currLine    binding.Float
+	prevBtn    *widget.Button
+	toggleBtn  *widget.Button
+	restartBtn *widget.Button
+	nextBtn    *widget.Button
+	//currLine    binding.Float
 	posLabel    *widget.Label
 	speedSelect *widget.Select
 
@@ -120,6 +125,9 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 		lambSymbolName: "DisplProt.LambdaScanner",
 
 		Window: w,
+
+		slider:   NewSlider(),
+		posLabel: widget.NewLabel(""),
 	}
 	cancelFuncs := make([]func(), 0)
 	for _, name := range lp.db.GetMetricNames() {
@@ -180,34 +188,15 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 	lp.db.SetValue("CRUISE", 0)
 	lp.db.SetValue("LIMP", 0)
 
-	logz := (logfile.Logfile)(&logfile.TxLogfile{})
+	//lp.currLine = binding.NewFloat()
 
-	lp.slider = &slider{}
-	lp.slider.Step = 1
-	lp.slider.Orientation = widget.Horizontal
-	lp.slider.ExtendBaseWidget(lp.slider)
-
-	lp.posLabel = widget.NewLabel("")
-
-	lp.currLine = binding.NewFloat()
-
-	lp.currLine.AddListener(binding.NewDataListener(func() {
-		val, err := lp.currLine.Get()
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		lp.slider.Value = val
-		lp.slider.Refresh()
-		currPct := val / float64(logz.Len()) * 100
-		lp.posLabel.SetText(fmt.Sprintf("%.01f%%", currPct))
-	}))
-
-	lp.slider.OnChanged = func(pos float64) {
-		lp.controlChan <- &controlMsg{Op: OpSeek, Pos: int(pos)}
-		currPct := pos / float64(logz.Len()) * 100
-		lp.posLabel.SetText(fmt.Sprintf("%.01f%%", currPct))
+	start := time.Now()
+	logz, err := logfile.Open(filename)
+	if err != nil {
+		log.Println(err)
+		return lp
 	}
+	log.Printf("Parsed %d records in %s", logz.Len(), time.Since(start))
 
 	playing := false
 	lp.toggleBtn = &widget.Button{
@@ -266,19 +255,19 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 
 	w.SetMainMenu(lp.menu.GetMenu(lp.logType))
 
-	start := time.Now()
-	logz, err = logfile.Open(filename)
-	if err != nil {
-		log.Println(err)
-		return lp
-	}
-	log.Printf("Parsed %d records in %s", logz.Len(), time.Since(start))
-
 	lp.setupPlot(logz)
 
-	lp.slider.Max = float64(logz.Len())
+	posFactor := 1 / float64(logz.Len())
+	lp.slider.OnChanged = func(pos float64) {
+		lp.controlChan <- &controlMsg{Op: OpSeek, Pos: int(pos)}
+		currPct := pos * posFactor * 100
+		lp.posLabel.SetText(fmt.Sprintf("%.02f%%", currPct))
+	}
+	lp.slider.Step = 1
+	lp.slider.Orientation = widget.Horizontal
+	lp.slider.Min = 0
+	lp.slider.Max = float64(logz.Len() - 1)
 	lp.posLabel.SetText("0.0%")
-	lp.slider.Refresh()
 
 	w.SetContent(lp.render())
 	w.Show()
@@ -312,7 +301,6 @@ func (lp *LogPlayer) setupPlot(logz logfile.Logfile) {
 		fallthrough
 	default:
 		factor = 1
-
 	}
 
 	lp.plotter = plotter.NewPlotter(
@@ -339,7 +327,13 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 					lp.restartBtn,
 					layout.NewFixedWidth(75, lp.speedSelect),
 				),
-				container.NewBorder(nil, nil, nil, lp.posLabel, lp.slider),
+				container.NewBorder(
+					nil,
+					nil,
+					nil,
+					layout.NewFixedWidth(80, lp.posLabel),
+					lp.slider,
+				),
 			),
 			nil,
 			nil,
@@ -351,6 +345,8 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 	return split
 }
 
+var ddd = 500 * time.Microsecond
+
 func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 	play := true
 	if play {
@@ -360,23 +356,19 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 	var playonce bool
 	speedMultiplier := 1.0
 
-	var nextFrame int64
+	//var nextFrame int64
 
 	go func() {
 		for op := range lp.controlChan {
-			currentMillis := time.Now().UnixMilli()
+			//currentMillis := time.Now().UnixMilli()
 			switch op.Op {
 			case OpPlaybackSpeed:
 				speedMultiplier = op.Rate
 			case OpTogglePlayback:
 				play = !play
 			case OpSeek:
-				//log.Println("lp seeking to", op.Pos)
 				logz.Seek(op.Pos)
 				playonce = true
-				//if lp.plotter != nil {
-				//	lp.plotter.Seek(op.Pos)
-				//}
 			case OpPrev:
 				pos := logz.Pos() - 2
 				if pos < 0 {
@@ -384,7 +376,7 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 				}
 				playonce = true
 				logz.Seek(pos)
-				nextFrame = currentMillis
+				//nextFrame = currentMillis
 			case OpNext:
 				playonce = true
 			case OpExit:
@@ -394,26 +386,12 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 		}
 	}()
 
-	var (
-		currentMillis int64
-	)
-
 	for !lp.closed {
-
-		currentMillis = time.Now().UnixMilli()
-		if logz.Pos() >= logz.Len()-1 || (!play && !playonce) {
+		if logz.Pos() >= logz.Len() || (!play && !playonce) {
 			time.Sleep(10 * time.Millisecond)
-			continue
-		} else if currentMillis < nextFrame {
-			time.Sleep(time.Duration(nextFrame-currentMillis) * time.Millisecond)
 			continue
 		} else {
 			if rec := logz.Next(); !rec.EOF {
-				lp.db.SetTimeText(currentTimeFormatted(rec.Time))
-				delayTilNext := int64(float64(rec.DelayTillNext) * speedMultiplier)
-				if delayTilNext > 1000 {
-					delayTilNext = 100
-				}
 				for k, v := range rec.Values {
 					lp.ebus.Publish(k, v)
 				}
@@ -421,17 +399,20 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 				if lp.plotter != nil {
 					lp.plotter.Seek(currPos)
 				}
-				lp.currLine.Set(float64(currPos))
-				nextFrame = (currentMillis + delayTilNext)
-				time.Sleep(time.Duration(delayTilNext) * time.Millisecond)
+				delayTilNext := int64(float64(rec.DelayTillNext) * speedMultiplier)
+				if delayTilNext > 1000 {
+					delayTilNext = 100
+				}
+				lp.db.SetTimeText(currentTimeFormatted(rec.Time))
+				lp.slider.Value = float64(currPos)
+				lp.slider.Refresh()
+				time.Sleep(time.Duration(delayTilNext)*time.Millisecond - ddd)
 			}
 			if playonce {
 				playonce = false
 			}
-
 		}
 	}
-
 	log.Println("Exiting logplayer playback")
 }
 
@@ -446,7 +427,6 @@ func keyHandler(w fyne.Window, controlChan chan *controlMsg, slider *slider, tb 
 			capture.Screenshot(w.Canvas())
 		case fyne.KeyPlus:
 			sel.SetSelectedIndex(sel.SelectedIndex() + 1)
-
 		case fyne.KeyMinus:
 			sel.SetSelectedIndex(sel.SelectedIndex() - 1)
 		case fyne.KeyEnter:
@@ -494,15 +474,17 @@ func keyHandler(w fyne.Window, controlChan chan *controlMsg, slider *slider, tb 
 func readFirstLine(filename string) (string, error) {
 	// Open the file for reading.
 	file, err := os.Open(filename)
+	if file != nil {
+		defer file.Close() // Ensure the file is closed after finishing reading.
+	}
 	if err != nil {
 		return "", err // Return an empty string and the error.
 	}
-	defer file.Close() // Ensure the file is closed after finishing reading.
 
 	// Create a new scanner to read the file.
 	scanner := bufio.NewScanner(file)
 	if scanner.Scan() { // Read the first line.
-		return scanner.Text(), nil // Return the first line and no error.
+		return string(scanner.Bytes()), nil // Return the first line and no error.
 	}
 
 	// If there is an error scanning the file, return it.

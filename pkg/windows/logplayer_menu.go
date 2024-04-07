@@ -92,6 +92,7 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 			widgets.WithEditable(false),
 			widgets.WithLambdaSymbolName(lp.lambSymbolName),
 			widgets.WithWBL(true),
+			//widgets.WithFollowCrosshair(lp.app.Preferences().BoolWithFallback("cursorFollowCrosshair", false)),
 		)
 		if err != nil {
 			dialog.ShowError(fmt.Errorf("x: %s y: %s z: %s err: %w", axis.X, axis.Y, axis.Z, err), lp.Window)
@@ -114,6 +115,10 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 
 		cancelFuncs = append(cancelFuncs, lp.ebus.SubscribeFunc("Lambda.External", func(value float64) {
 			mv.SetValue("Lambda.External", value)
+		}))
+
+		cancelFuncs = append(cancelFuncs, lp.ebus.SubscribeFunc("DisplProt.LambdaScanner", func(value float64) {
+			mv.SetValue("DisplProt.LambdaScanner", value)
 		}))
 
 		w := lp.app.NewWindow(fmt.Sprintf("%s - Map Viewer", axis.Z))
