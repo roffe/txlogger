@@ -6,6 +6,8 @@
 - Code optimization
 - Dual dial secondary needle is now red to make it easier to see
 - fix bug where logplayer button would not open a file browser in the directory set under settings
+- fixed bug where the logplayer button would not open a file browser in the directory set under settings
+- fixed so AirCtrlCal.Regmap is using m_Req instead of m_Air to show crosshair in mapviewer
 
 # 1.0.13
 
