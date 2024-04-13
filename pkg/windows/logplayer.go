@@ -155,7 +155,8 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 			lp.logType = "T7"
 			dbCfg.AirDemToString = datalogger.AirDemToStringT7
 		}
-
+	case ".t5l":
+		lp.logType = "T5"
 	case ".t7l":
 		lp.logType = "T7"
 		dbCfg.AirDemToString = datalogger.AirDemToStringT7

@@ -1,3 +1,10 @@
+# 1.0.15
+
+- Added support for Trionic 5 (yay!)  
+  Support for Trionic 5 is still in beta, please report any issues you find
+- Added support for using OBDLink cables with Trionic 5  
+  Tested and working devices are OBDLink EX and STN2120, OBDLink SX is unfortunately not supported
+
 # 1.0.14
 
 - Moved CANBUS adapter settings from main screen into settings

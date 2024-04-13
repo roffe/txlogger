@@ -143,7 +143,7 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 		return
 	}
 	log.Println("cbar.Layout", dr.d.displayText.Text, space.Width, space.Height)
-	dr.d.container.Resize(space)
+	//dr.d.container.Resize(space)
 	s := dr.d
 	s.size = space
 	s.eightHeight = s.size.Height * oneEight

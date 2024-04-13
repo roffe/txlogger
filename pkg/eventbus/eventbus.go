@@ -77,7 +77,7 @@ func (e *Controller) run() {
 		case sub := <-e.sub:
 			e.subs[sub.topic] = append(e.subs[sub.topic], sub.resp)
 			if itm := e.cache.Get(sub.topic); itm != nil {
-				log.Println("Cache hit", sub.topic, itm.Value())
+				//				log.Println("Cache hit", sub.topic, itm.Value())
 				sub.resp <- itm.Value()
 			}
 		case unsub := <-e.unsub:
@@ -152,4 +152,12 @@ outer:
 		}
 		e.aggregators = append(e.aggregators, agg)
 	}
+}
+
+func (e *Controller) Values() map[string]float64 {
+	values := make(map[string]float64)
+	for k, v := range e.cache.Items() {
+		values[k] = v.Value()
+	}
+	return values
 }

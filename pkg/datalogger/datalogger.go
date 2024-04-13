@@ -32,10 +32,6 @@ type Consumer interface {
 	SetValue(string, float64)
 }
 
-type Logger interface {
-	Provider
-}
-
 type LambdaProvider interface {
 	GetLambda() float64
 	Start(context.Context)
@@ -59,7 +55,7 @@ type Config struct {
 
 type Client struct {
 	cfg Config
-	p   Provider
+	Provider
 }
 
 type ReadRequest struct {
@@ -154,7 +150,7 @@ func (r *RamUpdate) Wait() error {
 	}
 }
 
-func New(cfg Config) (Logger, error) {
+func New(cfg Config) (Provider, error) {
 	datalogger := &Client{
 		cfg: cfg,
 	}
@@ -166,13 +162,18 @@ func New(cfg Config) (Logger, error) {
 	}
 
 	switch cfg.ECU {
+	case "T5":
+		datalogger.Provider, err = NewT5(cfg, lw)
+		if err != nil {
+			return nil, err
+		}
 	case "T7":
-		datalogger.p, err = NewT7(datalogger, cfg, lw)
+		datalogger.Provider, err = NewT7(cfg, lw)
 		if err != nil {
 			return nil, err
 		}
 	case "T8":
-		datalogger.p, err = NewT8(datalogger, cfg, lw)
+		datalogger.Provider, err = NewT8(cfg, lw)
 		if err != nil {
 			return nil, err
 		}
@@ -189,15 +190,16 @@ func (d *Client) Start() error {
 	d.cfg.ErrorCounter.Set(0)
 	d.cfg.CaptureCounter.Set(0)
 	d.cfg.FpsCounter.Set(0)
-	return d.p.Start()
+	return d.Provider.Start()
 }
 
-func (d *Client) Close() {
-	if d.p != nil {
-		d.p.Close()
-	}
-}
+//func (d *Client) Close() {
+//	if d.p != nil {
+//		d.p.Close()
+//	}
+//}
 
+/*
 func (d *Client) SetRAM(address uint32, data []byte) error {
 	if d.p == nil {
 		return fmt.Errorf("no provider")
@@ -218,3 +220,4 @@ func (d *Client) SetSymbols(symbols []*symbol.Symbol) error {
 	}
 	return d.p.SetSymbols(symbols)
 }
+*/

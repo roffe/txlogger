@@ -38,7 +38,7 @@ func Open(filename string) (Logfile, error) {
 	switch strings.ToLower(path.Ext(filename)) {
 	case ".csv":
 		return NewFromCSVLogfile(filename)
-	case ".t7l", ".t8l":
+	case ".t5l", ".t7l", ".t8l":
 		fallthrough
 	default:
 		return NewFromTxLogfile(filename)

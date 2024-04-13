@@ -38,7 +38,7 @@ type T7Client struct {
 	Config
 }
 
-func NewT7(dl Logger, cfg Config, lw LogWriter) (Provider, error) {
+func NewT7(cfg Config, lw LogWriter) (Provider, error) {
 	return &T7Client{
 		Config:     cfg,
 		symbolChan: make(chan []*symbol.Symbol, 1),
@@ -232,7 +232,7 @@ func (c *T7Client) Start() error {
 		}
 		c.OnMessage("Configured dynamic register")
 
-		secondTicker := time.NewTicker(1001 * time.Millisecond)
+		secondTicker := time.NewTicker(1000 * time.Millisecond)
 		defer secondTicker.Stop()
 
 		t := time.NewTicker(time.Second / time.Duration(c.Rate))

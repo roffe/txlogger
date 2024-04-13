@@ -64,7 +64,7 @@ func (mw *MainWindow) loadBinary() {
 }
 
 func (mw *MainWindow) playLog() {
-	filename, err := sdialog.File().Filter("logfile", "t7l", "t8l", "csv").SetStartDir(mw.settings.GetLogPath()).Load()
+	filename, err := sdialog.File().Filter("logfile", "t5l", "t7l", "t8l", "csv").SetStartDir(mw.settings.GetLogPath()).Load()
 	if err != nil {
 		if err.Error() == "Cancelled" {
 			return
@@ -158,6 +158,8 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 			var addr uint32
 			switch mw.ecuSelect.Selected {
+			case "T5":
+				addr = symZ.SramOffset
 			case "T7":
 				addr = symZ.Address
 			case "T8":

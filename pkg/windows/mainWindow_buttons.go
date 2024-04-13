@@ -167,7 +167,7 @@ func (mw *MainWindow) createButtons() {
 	})
 
 	mw.logplayerBtn = widget.NewButtonWithIcon("Log Player", theme.MediaFastForwardIcon(), func() {
-		filename, err := sdialog.File().Filter("logfile", "t7l", "t8l", "csv").SetStartDir(mw.settings.GetLogPath()).Load()
+		filename, err := sdialog.File().Filter("logfile", "t5l", "t7l", "t8l", "csv").SetStartDir(mw.settings.GetLogPath()).Load()
 		if err != nil {
 			if err.Error() == "Cancelled" {
 				return
@@ -266,7 +266,7 @@ func (mw *MainWindow) startLogging() {
 	}()
 }
 
-func (mw *MainWindow) newDataLogger(device gocan.Adapter) (datalogger.Logger, error) {
+func (mw *MainWindow) newDataLogger(device gocan.Adapter) (datalogger.Provider, error) {
 	return datalogger.New(datalogger.Config{
 		ECU:            mw.ecuSelect.Selected,
 		Lambda:         mw.settings.GetLambdaSource(),

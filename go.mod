@@ -6,7 +6,7 @@ require (
 	github.com/avast/retry-go/v4 v4.5.1
 	github.com/fatih/color v1.16.0
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
-	github.com/roffe/gocan v0.0.0-20240319172924-d7f61278c4a1
+	github.com/roffe/gocan v0.0.0-20240413085740-38c50d46cc85
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9
@@ -19,7 +19,7 @@ require (
 )
 
 require (
-	fyne.io/fyne/v2 v2.4.4-rc2.0.20240401200252-f528f23733b7
+	fyne.io/fyne/v2 v2.4.4-rc2.0.20240412183532-23562bde3686
 	fyne.io/systray v1.10.1-0.20231230205326-d160fd363db9 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
@@ -61,13 +61,14 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-require github.com/roffe/ecusymbol v0.0.0-20240407135445-6f811ac1a554
+require github.com/roffe/ecusymbol v0.0.0-20240408170306-e0094c4122a2
 
 require fyne.io/x/fyne v0.0.0-20240216160529-61d0ff41acd7
 
 require github.com/jellydator/ttlcache/v3 v3.2.0
 
 require (
+	github.com/BurntSushi/toml v1.3.2 // indirect
 	github.com/jeandeaual/go-locale v0.0.0-20240204043739-672d8d016d9a // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.4.0 // indirect
 	github.com/rymdport/portal v0.2.2 // indirect

@@ -27,11 +27,11 @@ type Dial struct {
 	title         string
 	displayString string
 
-	min, max        float64
-	steps           float64
-	factor          float64
-	value           float64
-	highestObserved float64
+	min, max float64
+	steps    float64
+	factor   float64
+	value    float64
+	//highestObserved float64
 
 	needle *canvas.Line
 	//highestObservedMarker *canvas.Line
@@ -54,8 +54,6 @@ type Dial struct {
 	needleOffset, needleLength float32
 	needleRotConst             float64
 	lineRotConst               float64
-	radius87                   float32
-	eightRadius                float32
 }
 
 func NewDial(cfg DialConfig) *Dial {
@@ -171,7 +169,7 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 	}
 	dr.size = space
 	log.Println("dial.Layout", dr.d.title, space.Width, space.Height)
-	dr.d.container.Resize(space)
+	//dr.d.container.Resize(space)
 	c := dr.d
 	c.diameter = fyne.Min(space.Width, space.Height)
 	c.radius = c.diameter * oneHalf
@@ -199,7 +197,7 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 	c.center.Resize(fyne.NewSize(center, center))
 
 	c.cover.Move(fyne.NewPos(0, c.middle.Y+c.radius*oneSeventh*5))
-	c.cover.Resize(fyne.NewSize(c.container.Size().Width, size.Height*oneSixth))
+	c.cover.Resize(fyne.NewSize(space.Width, size.Height*oneSixth))
 
 	c.displayText.TextSize = c.radius * oneHalf
 	c.displayText.Text = fmt.Sprintf(c.displayString, c.value)
@@ -214,7 +212,7 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 	c.face.Resize(size)
 
 	fourthRadius := c.radius * oneFourth
-	c.eightRadius = c.radius * oneEight
+	eightRadius := c.radius * oneEight
 
 	// Optimize pip rotation and styling
 	radius43 := c.radius * oneFourth * 3
@@ -226,7 +224,7 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 			c.rotateLines(p, float64(i), radius43, fourthRadius)
 		} else {
 			p.StrokeWidth = smallStroke
-			c.rotateLines(p, float64(i), radius87, c.eightRadius)
+			c.rotateLines(p, float64(i), radius87, eightRadius)
 		}
 	}
 	//c.rotateNeedle(c.highestObservedMarker, c.highestObserved, c.radius, c.eightRadius*0.5)

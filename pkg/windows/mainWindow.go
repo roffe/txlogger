@@ -78,7 +78,7 @@ type MainWindow struct {
 	symbolList *widgets.SymbolListWidget
 	fw         symbol.SymbolCollection
 
-	dlc       datalogger.Logger
+	dlc       datalogger.Provider
 	dashboard *widgets.Dashboard
 	plotter   *plotter.Plotter
 
@@ -92,6 +92,7 @@ type MainWindow struct {
 
 	tab *container.AppTabs
 	//doctab *container.DocTabs
+	statusText *widget.Label
 }
 
 func NewMainWindow(a fyne.App, filename string) *MainWindow {
@@ -106,6 +107,8 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 
 		openMaps: make(map[string]fyne.Window),
 		settings: widgets.NewSettingsWidget(),
+
+		statusText: widget.NewLabel("Harder, Better, Faster, Stronger"),
 	}
 	mw.Resize(fyne.NewSize(1024, 768))
 
@@ -135,27 +138,23 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 
 	mw.createButtons()
 
-	mw.presetSelect = &widget.Select{
-		Alignment:   fyne.TextAlignLeading,
-		PlaceHolder: "Select preset",
-		Options:     append([]string{"Select preset"}, presets.Names()...),
-
-		OnChanged: func(s string) {
-			if s == "Select preset" {
-				return
-			}
-			preset, err := presets.Get(s)
-			if err != nil {
-				dialog.ShowError(err, mw)
-				return
-			}
-			mw.symbolList.LoadSymbols(preset...)
-			//mw.SaveSymbolList()
-			//mw.symbolList.Refresh()
-			mw.SyncSymbols()
-			mw.app.Preferences().SetString(prefsSelectedPreset, s)
-		},
-	}
+	mw.presetSelect = widget.NewSelect(append([]string{"Select preset"}, presets.Names()...), func(s string) {
+		if s == "Select preset" {
+			return
+		}
+		preset, err := presets.Get(s)
+		if err != nil {
+			dialog.ShowError(err, mw)
+			return
+		}
+		mw.symbolList.LoadSymbols(preset...)
+		mw.SyncSymbols()
+		//mw.SaveSymbolList()
+		//mw.symbolList.Refresh()
+		mw.app.Preferences().SetString(prefsSelectedPreset, s)
+	})
+	mw.presetSelect.Alignment = fyne.TextAlignLeading
+	mw.presetSelect.PlaceHolder = "Select preset"
 
 	mw.newOutputList()
 	mw.newSymbolnameTypeahead()
@@ -187,7 +186,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		}
 	}))
 
-	mw.ecuSelect = widget.NewSelect([]string{"T7", "T8"}, func(s string) {
+	mw.ecuSelect = widget.NewSelect([]string{"T5", "T7", "T8"}, func(s string) {
 		mw.app.Preferences().SetString(prefsSelectedECU, s)
 		mw.SetMainMenu(mw.menu.GetMenu(s))
 	})
@@ -214,7 +213,6 @@ func (mw *MainWindow) CloseIntercept() {
 }
 
 func (mw *MainWindow) createLeading() *fyne.Container {
-	//mw.doctab = container.NewDocTabs()
 	return container.NewBorder(
 		container.NewVBox(
 			container.NewBorder(
@@ -230,16 +228,11 @@ func (mw *MainWindow) createLeading() *fyne.Container {
 				mw.symbolLookup,
 			),
 		),
-		//container.NewVBox(
-		//	container.NewGridWithColumns(2,
-		//		mw.loadConfigBtn,
-		//		mw.saveConfigBtn,
-		//	),
-		//),
+		container.NewGridWithColumns(1,
+			mw.statusText,
+		),
 		nil,
 		nil,
-		nil,
-		//widget.NewLabel("Symbols..."),
 		mw.symbolList,
 	)
 }
@@ -316,6 +309,7 @@ func (mw *MainWindow) SyncSymbols() {
 			v.Name = sym.Name
 			v.Number = sym.Number
 			v.Address = sym.Address
+			v.SramOffset = sym.SramOffset
 			v.Length = sym.Length
 			v.Mask = sym.Mask
 			v.Type = sym.Type
@@ -331,9 +325,7 @@ func (mw *MainWindow) SyncSymbols() {
 
 func (mw *MainWindow) Disable() {
 	mw.buttonsDisabled = true
-	//mw.addSymbolBtn.Disable()
-	//mw.loadConfigBtn.Disable()
-	//mw.saveConfigBtn.Disable()
+	mw.addSymbolBtn.Disable()
 	mw.loadSymbolsFileBtn.Disable()
 	mw.loadSymbolsEcuBtn.Disable()
 	mw.syncSymbolsBtn.Disable()
@@ -347,9 +339,7 @@ func (mw *MainWindow) Disable() {
 
 func (mw *MainWindow) Enable() {
 	mw.buttonsDisabled = false
-	//mw.addSymbolBtn.Enable()
-	//mw.loadConfigBtn.Enable()
-	//mw.saveConfigBtn.Enable()
+	mw.addSymbolBtn.Enable()
 	mw.loadSymbolsFileBtn.Enable()
 	mw.loadSymbolsEcuBtn.Enable()
 	mw.syncSymbolsBtn.Enable()
@@ -366,7 +356,19 @@ func (mw *MainWindow) LoadSymbolsFromECU() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
+
+	p := widgets.NewProgressModal(mw.Window.Content(), "Loading symbols from ECU")
+	p.Show()
+	defer p.Hide()
+
 	switch mw.ecuSelect.Selected {
+	case "T5":
+		symbols, err := ecu.GetSymbolsT5(ctx, device, mw.Log)
+		if err != nil {
+			return err
+		}
+		mw.fw = symbols
+		mw.SyncSymbols()
 	case "T7":
 		symbols, err := ecu.GetSymbolsT7(ctx, device, mw.Log)
 		if err != nil {

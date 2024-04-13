@@ -172,20 +172,26 @@ func (cs *CanSettingsWidget) GetAdapter(ecuType string, logger func(string)) (go
 	}
 
 	var canFilter []uint32
+	var canRate float64
 
 	switch ecuType {
+	case "T5":
+		canFilter = []uint32{0xC}
+		canRate = 615.384
 	case "T7":
 		if strings.HasPrefix(cs.adapterSelector.Selected, "STN") || strings.HasPrefix(cs.adapterSelector.Selected, "OBDLink") || strings.HasSuffix(cs.adapterSelector.Selected, "Wifi") {
 			canFilter = []uint32{0x238, 0x258, 0x270}
 		} else {
 			canFilter = []uint32{0x1A0, 0x238, 0x258, 0x270, 0x280, 0x3A0, 0x664, 0x665}
 		}
+		canRate = 500
 	case "T8":
 		if strings.HasPrefix(cs.adapterSelector.Selected, "STN") || strings.HasPrefix(cs.adapterSelector.Selected, "OBDLink") {
 			canFilter = []uint32{0x7e8}
 		} else {
 			canFilter = []uint32{0x7e8, 0x664, 0x665}
 		}
+		canRate = 500
 	}
 
 	return adapter.New(
@@ -193,7 +199,7 @@ func (cs *CanSettingsWidget) GetAdapter(ecuType string, logger func(string)) (go
 		&gocan.AdapterConfig{
 			Port:         cs.portSelector.Selected,
 			PortBaudrate: baudrate,
-			CANRate:      500,
+			CANRate:      canRate,
 			CANFilter:    canFilter,
 			OnMessage:    logger,
 			Debug:        cs.debugCheckbox.Checked,

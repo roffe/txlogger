@@ -21,7 +21,7 @@ type SymbolListWidget struct {
 	entryMap   map[string]*SymbolWidgetEntry
 	entries    []*SymbolWidgetEntry
 	container  *fyne.Container
-	scroll     fyne.CanvasObject
+	scroll     *container.Scroll
 	mu         sync.Mutex
 	border     *fyne.Container
 	updateBars bool
@@ -183,7 +183,11 @@ func (s *SymbolListWidget) clear() {
 func (s *SymbolListWidget) LoadSymbols(symbols ...*symbol.Symbol) {
 	s.clear()
 	s.Add(symbols...)
+
 }
+
+//func (sr *SymbolListWidget) SyncSymbols() {
+//}
 
 func (s *SymbolListWidget) Symbols() []*symbol.Symbol {
 	//s.mu.Lock()
@@ -347,7 +351,7 @@ func sumFloat32(a []float32) float32 {
 
 func (sr *SymbolWidgetEntryRenderer) Layout(size fyne.Size) {
 	sw := sr.sw
-	sw.container.Resize(size)
+	//sw.container.Resize(size)
 
 	padd := size.Width * ((1.0 - sumFloat32(sz)) / float32(len(sz)))
 	sw.copyName.Resize(fyne.NewSize(size.Width*sz[0], size.Height))

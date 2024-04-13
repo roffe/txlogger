@@ -307,6 +307,7 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 
 	idcSetter := func(obj *canvas.Text, text string) func(float64) {
 		return func(value float64) {
+			log.Println(value)
 			obj.Text = fmt.Sprintf(text+": %02.0f%%", value)
 			switch {
 			case value > 60 && value < 85:
@@ -316,6 +317,21 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 			default:
 				obj.Color = color.RGBA{R: 0, G: 0xFF, B: 0, A: 0xFF}
 			}
+			obj.Refresh()
+		}
+	}
+
+	var rpm float64
+
+	t5rpmSetter := func(value float64) {
+		rpm = value
+		db.rpm.SetValue(value)
+	}
+
+	idcSetterT5 := func(obj *canvas.Text, text string) func(float64) {
+		return func(value float64) {
+			obj.Color = color.RGBA{R: 0, G: 0xFF, B: 0, A: 0xFF}
+			obj.Text = fmt.Sprintf(text+": %02.0f%%", (value*rpm)/1200)
 			obj.Refresh()
 		}
 	}
@@ -381,33 +397,77 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		setVehicleSpeed = db.speed.SetValue
 	}
 
+	var setVehicleSpeedT5 func(float64)
+
+	if db.cfg.UseMPH {
+		setVehicleSpeedT5 = func(value float64) {
+			db.speed.SetValue(value * 0.621371)
+		}
+	} else {
+		setVehicleSpeedT5 = db.speed.SetValue
+	}
+
+	t5throttle := func(value float64) {
+		// value should be 0-100% input is 0 - 192
+		valuePercent := min(192, value) / 192 * 100
+		db.throttle.SetValue(valuePercent)
+	}
+
 	router := map[string]func(float64){
-		"In.v_Vehicle":               setVehicleSpeed,
-		"ActualIn.n_Engine":          db.rpm.SetValue,
-		"ActualIn.T_AirInlet":        db.iat.SetValue,
-		"ActualIn.T_Engine":          db.engineTemp.SetValue,
-		"In.p_AirInlet":              db.pressure.SetValue,
-		"ActualIn.p_AirInlet":        db.pressure.SetValue,
-		"In.p_AirBefThrottle":        db.pressure.SetValue2,
-		"ActualIn.p_AirBefThrottle":  db.pressure.SetValue2,
-		"Out.X_AccPedal":             db.throttle.SetValue, // t7
-		"Out.X_AccPos":               db.throttle.SetValue, // t8
-		"Out.PWM_BoostCntrl":         db.pwm.SetValue,
-		"DisplProt.LambdaScanner":    db.wblambda.SetValue,
-		"Lambda.External":            db.wblambda.SetValue,
-		"Lambda.LambdaInt":           db.nblambda.SetValue,
-		"MAF.m_AirInlet":             db.airmass.SetValue,
-		"m_Request":                  db.airmass.SetValue2,
-		"AirMassMast.m_Request":      db.airmass.SetValue2,
-		"Out.fi_Ignition":            textSetter(db.ign, "Ign", 1),
-		"ECMStat.ST_ActiveAirDem":    ecmstat,
-		"IgnProt.fi_Offset":          ioff,
-		"IgnMastProt.fi_Offset":      ioff,
-		"CRUISE":                     showHider(db.cruise),
-		"CEL":                        showHider(db.checkEngine),
-		"LIMP":                       showHider(db.limpMode),
-		"KnkDet.KnockCyl":            knkDet,
+		"In.v_Vehicle": setVehicleSpeed,   // t7 & t8
+		"Bil_hast":     setVehicleSpeedT5, // t5
+
+		"ActualIn.n_Engine": db.rpm.SetValue,
+		"Rpm":               t5rpmSetter, // t5
+
+		"ActualIn.T_AirInlet": db.iat.SetValue,
+		"Lufttemp":            db.iat.SetValue, // t5
+
+		"ActualIn.T_Engine": db.engineTemp.SetValue,
+		"Kyl_temp":          db.engineTemp.SetValue, // t5
+
+		"P_medel":             db.pressure.SetValue, // t5
+		"In.p_AirInlet":       db.pressure.SetValue,
+		"ActualIn.p_AirInlet": db.pressure.SetValue,
+
+		"Max_tryck":                 db.pressure.SetValue2, // t5
+		"In.p_AirBefThrottle":       db.pressure.SetValue2,
+		"ActualIn.p_AirBefThrottle": db.pressure.SetValue2,
+
+		"Medeltrot":      t5throttle,           // t5
+		"Out.X_AccPedal": db.throttle.SetValue, // t7
+		"Out.X_AccPos":   db.throttle.SetValue, // t8
+
+		"Out.PWM_BoostCntrl": db.pwm.SetValue, // t7 & t8
+		"PWM_ut":             db.pwm.SetValue, // t5
+
+		"DisplProt.LambdaScanner": db.wblambda.SetValue,
+		"Lambda.External":         db.wblambda.SetValue,
+		"AD_EGR":                  db.wblambda.SetValue, // t5 Innovate: 0V=Lambda0.5, 5V=Lambda1.5 or 0V=7.35AFR petrol, 5V=22,39AFR petrol
+
+		"Lambda.LambdaInt": db.nblambda.SetValue,
+
+		"MAF.m_AirInlet":        db.airmass.SetValue,
+		"m_Request":             db.airmass.SetValue2,
+		"AirMassMast.m_Request": db.airmass.SetValue2,
+
+		"Out.fi_Ignition": textSetter(db.ign, "Ign", 1),
+		"Ign_angle":       textSetter(db.ign, "Ign", 1),
+
+		"ECMStat.ST_ActiveAirDem": ecmstat,
+
+		"IgnProt.fi_Offset":     ioff,
+		"IgnMastProt.fi_Offset": ioff,
+
+		"CRUISE": showHider(db.cruise),
+		"CEL":    showHider(db.checkEngine),
+		"LIMP":   showHider(db.limpMode),
+
+		"Knock_offset1234": knkDet,
+		"KnkDet.KnockCyl":  knkDet,
+
 		"Myrtilos.InjectorDutyCycle": idcSetter(db.idc, "Idc"),
+		"Insptid_ms10":               idcSetterT5(db.idc, "Idc"),
 	}
 
 	return router

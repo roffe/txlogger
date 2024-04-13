@@ -79,7 +79,7 @@ type T8Client struct {
 	Config
 }
 
-func NewT8(dl Logger, cfg Config, lw LogWriter) (Provider, error) {
+func NewT8(cfg Config, lw LogWriter) (Provider, error) {
 	return &T8Client{
 		Config:     cfg,
 		symbolChan: make(chan []*symbol.Symbol, 1),

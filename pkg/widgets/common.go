@@ -22,5 +22,5 @@ const (
 	oneSixthieth    = 1.0 / 60.0  // 0.016666666666666666
 	oneEighthieth   = 1.0 / 80.0  // 0.0125
 	oneTwohundredth = 1.0 / 200.0 // 0.005
-
+	oneTwelvehundth = 1.0 / 1200.0
 )

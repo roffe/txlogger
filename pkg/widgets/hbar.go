@@ -97,7 +97,7 @@ type HBarRenderer struct {
 }
 
 func (dr *HBarRenderer) Layout(space fyne.Size) {
-	dr.d.container.Resize(space)
+	//dr.d.container.Resize(space)
 	s := dr.d
 	diameter := space.Width
 	height := space.Height

@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 	"time"
@@ -48,10 +49,11 @@ func mainz(args []string) {
 
 	if len(args) == 2 {
 		filename := args[1]
-		if strings.HasSuffix(filename, ".bin") {
+
+		switch strings.ToLower(path.Ext(filename)) {
+		case ".bin":
 			mw = windows.NewMainWindow(a, filename)
-		}
-		if strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") || strings.HasSuffix(filename, ".csv") {
+		case ".t5l", ".t7l", ".t8l", ".csv":
 			windows.NewLogPlayer(a, filename, nil).ShowAndRun()
 			return
 		}
