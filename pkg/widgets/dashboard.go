@@ -16,6 +16,11 @@ import (
 	"github.com/roffe/txlogger/pkg/assets"
 )
 
+const (
+	lambAt5v = 1.5
+	lambAt0v = 0.5
+)
+
 type Dashboard struct {
 	cfg *DashboardConfig
 
@@ -45,6 +50,54 @@ type Dashboard struct {
 	logplayer bool
 	focused   bool
 }
+
+type DasboardGauge int
+
+func (d DasboardGauge) String() string {
+	switch d {
+	case SpeedDial:
+		return "Speed"
+	case RpmDial:
+		return "Rpm"
+	case IatDial:
+		return "Iat"
+	case EngineTempDial:
+		return "Engine Temp"
+	case AirmassDialPrimary:
+		return "Airmass Primary"
+	case AirmassDialSecondary:
+		return "Airmass Secondary"
+	case PressureDialPrimary:
+		return "Pressure Primary"
+	case PressureDialSecondary:
+		return "Pressure Secondary"
+	case ThrottleBar:
+		return "Throttle"
+	case PWMBar:
+		return "PWM"
+	case WBLambdaBar:
+		return "WBLambda"
+	case NBLambdaBar:
+		return "NBLambda"
+	default:
+		return "Unknown"
+	}
+}
+
+const (
+	SpeedDial DasboardGauge = iota
+	RpmDial
+	IatDial
+	EngineTempDial
+	AirmassDialPrimary
+	AirmassDialSecondary
+	PressureDialPrimary
+	PressureDialSecondary
+	ThrottleBar
+	PWMBar
+	WBLambdaBar
+	NBLambdaBar
+)
 
 type DashboardConfig struct {
 	App             fyne.App
@@ -297,6 +350,41 @@ func (db *Dashboard) SetValue(key string, value float64) {
 	}
 }
 
+func (db *Dashboard) Set(gauge DasboardGauge, value float64) {
+	switch gauge {
+	case SpeedDial:
+		db.speed.SetValue(value)
+	case RpmDial:
+		db.rpm.SetValue(value)
+	case IatDial:
+		db.iat.SetValue(value)
+	case EngineTempDial:
+		db.engineTemp.SetValue(value)
+	case AirmassDialPrimary:
+		db.airmass.SetValue(value)
+	case AirmassDialSecondary:
+		db.airmass.SetValue2(value)
+	case PressureDialPrimary:
+		db.pressure.SetValue(value)
+	case PressureDialSecondary:
+		db.pressure.SetValue2(value)
+	case ThrottleBar:
+		db.throttle.SetValue(value)
+	case PWMBar:
+		db.pwm.SetValue(value)
+	case WBLambdaBar:
+		db.wblambda.SetValue(value)
+	case NBLambdaBar:
+		db.nblambda.SetValue(value)
+	default:
+		log.Println("Unknown gauge", gauge)
+	}
+}
+
+func interpol(x0, y0, x1, y1, x float64) float64 {
+	return y0 + (x-x0)*(y1-y0)/(x1-x0)
+}
+
 func (db *Dashboard) createRouter() map[string]func(float64) {
 	textSetter := func(obj *canvas.Text, text string, precission int) func(float64) {
 		return func(value float64) {
@@ -413,6 +501,20 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		db.throttle.SetValue(valuePercent)
 	}
 
+	t5setwbl := func(value float64) {
+		db.wblambda.SetValue(((lambAt5v-lambAt0v)/256)*value + lambAt0v)
+	}
+
+	t5setnbl := func(value float64) {
+		if value < 128 {
+			// Interpolate in the range 0 to 128, mapping to -25 to 0.
+			db.nblambda.SetValue(interpol(0, -25, 128, 0, value))
+			return
+		}
+		// Interpolate in the range 128 to 255, mapping to 0 to 25.
+		db.nblambda.SetValue(interpol(128, 0, 255, 25, value))
+	}
+
 	router := map[string]func(float64){
 		"In.v_Vehicle": setVehicleSpeed,   // t7 & t8
 		"Bil_hast":     setVehicleSpeedT5, // t5
@@ -439,13 +541,14 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		"Out.X_AccPos":   db.throttle.SetValue, // t8
 
 		"Out.PWM_BoostCntrl": db.pwm.SetValue, // t7 & t8
-		"PWM_ut":             db.pwm.SetValue, // t5
+		"PWM_ut10":           db.pwm.SetValue, // t5
 
 		"DisplProt.LambdaScanner": db.wblambda.SetValue,
 		"Lambda.External":         db.wblambda.SetValue,
-		"AD_EGR":                  db.wblambda.SetValue, // t5 Innovate: 0V=Lambda0.5, 5V=Lambda1.5 or 0V=7.35AFR petrol, 5V=22,39AFR petrol
+		"AD_EGR":                  t5setwbl, // t5
 
 		"Lambda.LambdaInt": db.nblambda.SetValue,
+		"Lambdaint":        t5setnbl, // t5
 
 		"MAF.m_AirInlet":        db.airmass.SetValue,
 		"m_Request":             db.airmass.SetValue2,

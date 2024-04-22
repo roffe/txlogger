@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/ebus"
@@ -94,58 +95,68 @@ func (c *T5Client) Start() error {
 	for n, s := range c.Symbols {
 		log.Println(s.String())
 		order[n] = s.Name
-		s.Correctionfactor = 0.2
+		s.Correctionfactor = 0.1
 	}
-	for {
-		select {
-		case <-c.quitChan:
-			c.OnMessage("Stopped logging..")
-			return nil
-		case <-secondTicker.C:
-			c.FpsCounter.Set(cps)
-			if c.errPerSecond > 5 {
+
+	err = retry.Do(func() error {
+		for {
+			select {
+			case <-c.quitChan:
+				c.OnMessage("Stopped logging..")
+				return nil
+			case <-secondTicker.C:
+				c.FpsCounter.Set(cps)
+				if c.errPerSecond > 5 {
+					c.errPerSecond = 0
+					return fmt.Errorf("too many errors per second")
+				}
+				cps = 0
 				c.errPerSecond = 0
-				return fmt.Errorf("too many errors per second")
-			}
-			cps = 0
-			c.errPerSecond = 0
-		case symbols := <-c.symbolChan:
-			_ = symbols
-		case read := <-c.readChan:
-			_ = read
-		case upd := <-c.updateChan:
-			_ = upd
-		case <-t.C:
-			ts := time.Now()
-			for _, sym := range c.Symbols {
-				resp, err := t5.ReadRam(ctx, sym.SramOffset, uint32(sym.Length))
-				if err != nil {
-					c.onError(err)
-					continue
-				}
+			case symbols := <-c.symbolChan:
+				_ = symbols
+			case read := <-c.readChan:
+				_ = read
+			case upd := <-c.updateChan:
+				_ = upd
+			case <-t.C:
+				ts := time.Now()
+				for _, sym := range c.Symbols {
+					resp, err := t5.ReadRam(ctx, sym.SramOffset, uint32(sym.Length))
+					if err != nil {
+						c.onError(err)
+						continue
+					}
 
-				r := bytes.NewReader(resp)
-				if err := sym.Read(r); err != nil {
-					c.onError(err)
-					continue
+					r := bytes.NewReader(resp)
+					if err := sym.Read(r); err != nil {
+						return err
+					}
+					val := converto(sym.Name, sym.Bytes())
+					vars.Set(sym.Name, val)
+					if err := ebus.Publish(sym.Name, val); err != nil {
+						c.onError(err)
+					}
 				}
-				val := converto(sym)
-				if err := ebus.Publish(sym.Name, val); err != nil {
-					c.onError(err)
+				count++
+				cps++
+				if count%15 == 0 {
+					c.CaptureCounter.Set(count)
 				}
-				vars.Set(sym.Name, val)
-			}
-			count++
-			cps++
-			if count%15 == 0 {
-				c.CaptureCounter.Set(count)
-			}
-
-			if err := c.lw.Write(vars, []*symbol.Symbol{}, ts, order); err != nil {
-				c.onError(err)
+				if err := c.lw.Write(vars, []*symbol.Symbol{}, ts, order); err != nil {
+					return err
+				}
 			}
 		}
-	}
+	},
+		retry.DelayType(retry.FixedDelay),
+		retry.Delay(1500*time.Millisecond),
+		retry.Attempts(3),
+		retry.OnRetry(func(n uint, err error) {
+			c.onError(fmt.Errorf("retry %d: %w", n, err))
+		}),
+		retry.LastErrorOnly(true),
+	)
+	return err
 }
 
 func (c *T5Client) onError(err error) {
@@ -155,107 +166,77 @@ func (c *T5Client) onError(err error) {
 	c.OnMessage(err.Error())
 }
 
-func converto(sym *symbol.Symbol) float64 {
-	var retval float64
+func converto(name string, data []byte) float64 {
 	correctionForMapsensor := 1.0
-	switch sym.Name {
+	switch name {
 	case "P_medel", "P_Manifold10", "P_Manifold", "Max_tryck", "Regl_tryck":
 		// inlet manifold pressure
-		retval = ConvertByteStringToDouble(sym.Bytes())
-		retval *= correctionForMapsensor
-		retval *= 0.01
-		retval -= 1
-
-	case "Lufttemp":
-		retval = ConvertByteStringToDouble(sym.Bytes())
+		return ConvertByteStringToDouble(data)*correctionForMapsensor*0.01 - 1
+	case "Lambdaint":
+		return ConvertByteStringToDouble(data)
+	case "Lufttemp", "Kyl_temp":
+		retval := ConvertByteStringToDouble(data)
 		if retval > 128 {
 			retval = -(256 - retval)
 		}
-
-	case "Kyl_temp":
-		retval = ConvertByteStringToDouble(sym.Bytes())
-		if retval > 128 {
-			retval = -(256 - retval)
-		}
-
+		return retval
 	case "Rpm":
-		retval = ConvertByteStringToDouble(sym.Bytes())
-		retval *= 10 // factor 10
-
+		return ConvertByteStringToDouble(data) * 10
 	case "AD_sond":
 		// should average, no the realtime panel does that
-		retval = ConvertByteStringToDouble(sym.Bytes())
+		return ConvertByteStringToDouble(data)
 		// fix
 		// retval = ConvertToAFR(retval)
-
 	case "AD_EGR":
-		retval = ConvertByteStringToDouble(sym.Bytes())
-		// fix
-		// retval = ConvertToWidebandAFR(retval)
-		//retval = ConvertToAFR(retval)
-
+		return ConvertByteStringToDouble(data)
 	case "Pgm_status":
 		// now what, just pass it on in a seperate structure
 		// fix
-		// retval = ConvertByteStringToDoubleStatus(sym.Bytes())
-
+		// retval = ConvertByteStringToDoubleStatus(data)
+		return 0
 	case "Insptid_ms10":
-		retval = ConvertByteStringToDouble(sym.Bytes())
-		retval /= 10
-
+		return ConvertByteStringToDouble(data) / 10
 	case "Lacc_mangd", "Acc_mangd", "Lret_mangd", "Ret_mangd":
-		retval = ConvertByteStringToDouble(sym.Bytes())
 		// 4 values in one variable, one for each cylinder
-
+		return ConvertByteStringToDouble(data)
 	case "Ign_angle":
-		retval = ConvertByteStringToDouble(sym.Bytes())
+		retval := ConvertByteStringToDouble(data)
 		if retval > 32000 {
 			retval = -(65536 - retval)
 		}
-		retval /= 10
-
+		return retval / 10
 	case "Knock_offset1", "Knock_offset2", "Knock_offset3", "Knock_offset4", "Knock_offset1234":
-		retval = ConvertByteStringToDouble(sym.Bytes())
+		retval := ConvertByteStringToDouble(data)
 		if retval > 32000 {
 			retval = -(65536 - retval)
 		}
-		retval /= 10
-
+		return retval / 10
 	case "Medeltrot":
-		retval = ConvertByteStringToDouble(sym.Bytes())
-		retval -= 34
 		//TODO: should substract trot_min from this value?
+		return ConvertByteStringToDouble(data) - 34
 	case "Apc_decrese":
-		retval = ConvertByteStringToDouble(sym.Bytes())
-		retval *= correctionForMapsensor
-		retval *= 0.01 // to bar!
-
+		return ConvertByteStringToDouble(data) * correctionForMapsensor * 0.01
 	case "P_fak", "I_fak", "D_fak":
-		retval = ConvertByteStringToDouble(sym.Bytes())
+		retval := ConvertByteStringToDouble(data)
 		if retval > 32000 {
 			retval = -(65535 - retval)
 		}
-
+		return retval
 	case "PWM_ut10":
-		retval = ConvertByteStringToDouble(sym.Bytes())
-
+		return ConvertByteStringToDouble(data)
 	case "Knock_count_cyl1", "Knock_count_cyl2", "Knock_count_cyl3", "Knock_count_cyl4":
-		retval = ConvertByteStringToDouble(sym.Bytes())
-
+		return ConvertByteStringToDouble(data)
 	case "Knock_average":
-		retval = ConvertByteStringToDouble(sym.Bytes())
-
+		return ConvertByteStringToDouble(data)
 	case "Bil_hast":
-		retval = ConvertByteStringToDouble(sym.Bytes())
-
+		return ConvertByteStringToDouble(data)
 	case "TQ":
-		retval = ConvertByteStringToDouble(sym.Bytes())
-		retval *= correctionForMapsensor
+		return ConvertByteStringToDouble(data) * correctionForMapsensor
+	case "Batt_volt":
+		return ConvertByteStringToDouble(data) * 0.1
 	default:
-		retval = ConvertByteStringToDouble(sym.Bytes())
-
+		return ConvertByteStringToDouble(data)
 	}
-	return retval
 }
 
 func ConvertByteStringToDouble(ecudata []byte) float64 {
@@ -268,54 +249,22 @@ func ConvertByteStringToDouble(ecudata []byte) float64 {
 	return retval
 }
 
+func ConvertByteToI16(ecudata []byte) int16 {
+	var retval int16
+	// Iterate over the bytes in ecudata and accumulate the result
+	for i := 0; i < len(ecudata); i++ {
+		// Multiply the current byte by the appropriate power of 256 and add it to the result
+		retval += int16(ecudata[i]) * int16(math.Pow(256, float64(len(ecudata)-i-1)))
+	}
+	return retval
+}
+
 func ConvertByteStringToDoubleStatus(ecudata []byte) float64 {
 	var retval float64
 	// Iterate over the bytes in ecudata and accumulate the result
 	for i := 0; i < len(ecudata); i++ {
 		// Multiply the current byte by the appropriate power of 256 and add it to the result
 		retval += float64(ecudata[i]) * math.Pow(256, float64(i))
-	}
-	return retval
-}
-
-func ConvertByteStringToDoubleStatus2(ecudata []byte) float64 {
-	var retval float64 = 0
-	switch len(ecudata) {
-	case 4:
-		retval = float64(ecudata[3])*256*256*256 +
-			float64(ecudata[2])*256*256 +
-			float64(ecudata[1])*256 +
-			float64(ecudata[0])
-	case 5:
-		retval = float64(ecudata[4])*256*256*256*256 +
-			float64(ecudata[3])*256*256*256 +
-			float64(ecudata[2])*256*256 +
-			float64(ecudata[1])*256 +
-			float64(ecudata[0])
-	case 6:
-		retval = float64(ecudata[5])*256*256*256*256*256 +
-			float64(ecudata[4])*256*256*256*256 +
-			float64(ecudata[3])*256*256*256 +
-			float64(ecudata[2])*256*256 +
-			float64(ecudata[1])*256 +
-			float64(ecudata[0])
-	case 7:
-		retval = float64(ecudata[6])*256*256*256*256*256*256 +
-			float64(ecudata[5])*256*256*256*256*256 +
-			float64(ecudata[4])*256*256*256*256 +
-			float64(ecudata[3])*256*256*256 +
-			float64(ecudata[2])*256*256 +
-			float64(ecudata[1])*256 +
-			float64(ecudata[0])
-	case 8:
-		retval = float64(ecudata[7])*256*256*256*256*256*256*256 +
-			float64(ecudata[6])*256*256*256*256*256*256 +
-			float64(ecudata[5])*256*256*256*256*256 +
-			float64(ecudata[4])*256*256*256*256 +
-			float64(ecudata[3])*256*256*256 +
-			float64(ecudata[2])*256*256 +
-			float64(ecudata[1])*256 +
-			float64(ecudata[0])
 	}
 	return retval
 }

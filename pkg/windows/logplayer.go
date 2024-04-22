@@ -404,7 +404,7 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 				if delayTilNext > 1000 {
 					delayTilNext = 100
 				}
-				lp.db.SetTimeText(currentTimeFormatted(rec.Time))
+				lp.db.SetTime(rec.Time)
 				lp.slider.Value = float64(currPos)
 				lp.slider.Refresh()
 				time.Sleep(time.Duration(delayTilNext)*time.Millisecond - ddd)

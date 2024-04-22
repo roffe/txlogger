@@ -113,30 +113,3 @@ func (d *FixedWidthContainer) Layout(objects []fyne.CanvasObject, containerSize 
 		pos = pos.Add(fyne.NewPos(d.width, size.Height))
 	}
 }
-
-type RatioContainer struct {
-	Widths []float32
-}
-
-func (d *RatioContainer) MinSize(objects []fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(400, 35)
-}
-
-func (d *RatioContainer) Layout(objects []fyne.CanvasObject, size fyne.Size) {
-	var x float32
-	padd := size.Width * ((1.0 - sumFloat32(d.Widths)) / float32(len(d.Widths)))
-	for i, o := range objects {
-		width := size.Width * d.Widths[i]
-		o.Resize(fyne.NewSize(width, size.Height))
-		o.Move(fyne.NewPos(x, 0))
-		x += o.Size().Width + padd
-	}
-}
-
-func sumFloat32(a []float32) float32 {
-	var sum float32
-	for _, v := range a {
-		sum += v
-	}
-	return sum
-}

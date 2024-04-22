@@ -246,7 +246,6 @@ func (mw *MainWindow) startLogging() {
 		}
 
 		//cancel = ebus.SubscribeAllFunc(mw.symbolList.SetValue)
-
 	} else {
 		mw.symbolList.Clear()
 	}

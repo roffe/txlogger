@@ -31,7 +31,6 @@ const (
 )
 
 type SettingsWidget struct {
-	widget.BaseWidget
 	CanSettings           *CanSettingsWidget
 	freqSlider            *widget.Slider
 	freqValue             *widget.Label
@@ -47,8 +46,8 @@ type SettingsWidget struct {
 	useMPH                *widget.Check
 	swapRPMandSpeed       *widget.Check
 	plotResolution        *widget.Select
-
-	container *fyne.Container
+	container             *fyne.Container
+	widget.BaseWidget
 }
 
 func (sw *SettingsWidget) GetLambdaSource() string {

@@ -149,8 +149,6 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		}
 		mw.symbolList.LoadSymbols(preset...)
 		mw.SyncSymbols()
-		//mw.SaveSymbolList()
-		//mw.symbolList.Refresh()
 		mw.app.Preferences().SetString(prefsSelectedPreset, s)
 	})
 	mw.presetSelect.Alignment = fyne.TextAlignLeading
@@ -293,8 +291,6 @@ func (mw *MainWindow) setupTabs() {
 func (mw *MainWindow) Log(s string) {
 	debug.Log(s)
 	mw.outputData.Prepend(s)
-	//mw.output.ScrollToBottom()
-	//mw.output.Refresh()
 }
 
 func (mw *MainWindow) SyncSymbols() {
@@ -319,8 +315,7 @@ func (mw *MainWindow) SyncSymbols() {
 		}
 	}
 	mw.symbolList.Refresh()
-	//mw.SaveSymbolList()
-	mw.Log(fmt.Sprintf("Synced %d / %d symbols", cnt, len(mw.symbolList.Symbols())))
+	mw.Log(fmt.Sprintf("Synced %d / %d symbols", cnt, mw.symbolList.Count()))
 }
 
 func (mw *MainWindow) Disable() {
@@ -406,7 +401,7 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	return nil
 }
 
-func (mw *MainWindow) LoadConfig(filename string) error {
+func (mw *MainWindow) LoadPreset(filename string) error {
 	b, err := os.ReadFile(filename)
 	if err != nil {
 		return fmt.Errorf("failed to read config file: %w", err)
@@ -420,26 +415,7 @@ func (mw *MainWindow) LoadConfig(filename string) error {
 	return nil
 }
 
-func (mw *MainWindow) LoadPresetFromStringx(str string) error {
-	var cfg []*symbol.Symbol
-	if err := json.Unmarshal([]byte(str), &cfg); err != nil {
-		return fmt.Errorf("failed to unmarshal config file: %w", err)
-	}
-	mw.symbolList.LoadSymbols(cfg...)
-	mw.SaveSymbolListx()
-	return nil
-}
-
-func (mw *MainWindow) SaveSymbolListx() {
-	b, err := json.Marshal(mw.symbolList.Symbols())
-	if err != nil {
-		mw.Log(err.Error())
-		return
-	}
-	mw.app.Preferences().SetString(prefsSymbolList, string(b))
-}
-
-func (mw *MainWindow) SaveConfig(filename string) error {
+func (mw *MainWindow) SavePreset(filename string) error {
 	b, err := json.Marshal(mw.symbolList.Symbols())
 	if err != nil {
 		return fmt.Errorf("failed to marshal config file: %w", err)

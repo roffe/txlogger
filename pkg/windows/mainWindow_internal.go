@@ -17,10 +17,6 @@ func (mw *MainWindow) setTitle(str string) {
 }
 
 func (mw *MainWindow) loadPrefs(filename string) {
-	//if cfg := mw.app.Preferences().String(prefsSymbolList); cfg != "" {
-	//	mw.LoadPresetFromString(cfg)
-	//}
-
 	if ecu := mw.app.Preferences().StringWithFallback(prefsSelectedECU, "T7"); ecu != "" {
 		mw.ecuSelect.SetSelected(ecu)
 	}
@@ -51,9 +47,7 @@ func (mw *MainWindow) newOutputList() {
 		mw.outputData,
 		func() fyne.CanvasObject {
 			return &widget.Label{
-				Alignment: fyne.TextAlignLeading,
-				//TextStyle: fyne.TextStyle{Monospace: true},
-				//Wrapping:   fyne.TextWrapBreak,
+				Alignment:  fyne.TextAlignLeading,
 				Truncation: fyne.TextTruncateEllipsis,
 			}
 

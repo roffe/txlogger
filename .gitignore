@@ -16,3 +16,4 @@ symbols.txt
 *.o
 lzhuf/lzhuf.dll
 libusb-1.0.dll
+logs

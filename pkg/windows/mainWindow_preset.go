@@ -65,12 +65,10 @@ func (mw *MainWindow) importPreset() {
 		if err.Error() == "Cancelled" {
 			return
 		}
-		// dialog.ShowError(err, mw)
 		mw.Log(err.Error())
 		return
 	}
-	if err := mw.LoadConfig(filename); err != nil {
-		// dialog.ShowError(err, mw)
+	if err := mw.LoadPreset(filename); err != nil {
 		mw.Log(err.Error())
 		return
 	}
@@ -83,18 +81,15 @@ func (mw *MainWindow) exportPreset() {
 		if err.Error() == "Cancelled" {
 			return
 		}
-		// dialog.ShowError(err, mw)
 		mw.Log(err.Error())
 		return
 	}
 	if !strings.HasSuffix(filename, ".txp") {
 		filename += ".txp"
 	}
-	if err := mw.SaveConfig(filename); err != nil {
-		// dialog.ShowError(err, mw)
+	if err := mw.SavePreset(filename); err != nil {
 		mw.Log(err.Error())
 		return
-
 	}
 }
 

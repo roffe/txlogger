@@ -1,9 +1,10 @@
 # 1.0.15
 
+- Presets are NOT saved autmaticly on exit. If you have made changes to the presets you need to save them manually from the settings menu as a new preset or overwrite an existing one or your changes will get lost
 - Added support for Trionic 5 (yay!)  
   Support for Trionic 5 is still in beta, please report any issues you find
 - Added support for using OBDLink cables with Trionic 5  
-  Tested and working devices are OBDLink EX and STN2120, OBDLink SX is unfortunately not supported
+  Tested and working devices are OBDLink SX & EX and STN2120, STN1170 "should" work but is untested
 
 # 1.0.14
 

@@ -108,7 +108,7 @@ var T8SymbolsTuning = map[string][]string{
 		"PurgeCal.ST_PurgeEnable",
 		"LambdaCal.ST_Enable",
 		"FCutCal.ST_Enable",
-		"FFFuelCal.ST_Enable",
+		"FFFuelCal.ST_enable",
 		"FuelDynCal.ST_Enable",
 		"TCompCal.ST_Enable",
 	},
