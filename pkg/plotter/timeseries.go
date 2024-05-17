@@ -30,8 +30,15 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 		return ts
 	}
 
-	ts.Min, ts.Max = findMinMaxFloat64(data)
+	switch name {
+	case "m_Request", "MAF.m_AirInlet", "AirMassMast.m_Request":
+		ts.Min, _ = findMinMaxFloat64(data)
+		ts.Max = 2200
+	default:
+		ts.Min, ts.Max = findMinMaxFloat64(data)
+	}
 	ts.valueRange = ts.Max - ts.Min
+
 	return ts
 }
 

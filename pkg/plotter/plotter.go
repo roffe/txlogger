@@ -52,6 +52,12 @@ func WithPlotResolutionFactor(factor float32) PlotterOpt {
 	}
 }
 
+func WithOrder(order []string) PlotterOpt {
+	return func(p *Plotter) {
+		p.valueOrder = order
+	}
+}
+
 func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 	p := &Plotter{
 		values:               values,
@@ -78,10 +84,12 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 
 	p.ExtendBaseWidget(p)
 
-	for k := range values {
-		p.valueOrder = append(p.valueOrder, k)
+	if len(p.valueOrder) == 0 {
+		for k := range values {
+			p.valueOrder = append(p.valueOrder, k)
+		}
+		sort.Strings(p.valueOrder)
 	}
-	sort.Strings(p.valueOrder)
 
 	for n, k := range p.valueOrder {
 		v, ok := values[k]
@@ -134,7 +142,7 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 func (p *Plotter) Seek(pos int) {
 	halfDataPointsToShow := int(float64(p.dataPointsToShow) * .5)
 	offsetPosition := float64(pos - halfDataPointsToShow)
-	if pos < p.dataLength-halfDataPointsToShow {
+	if pos <= p.dataLength-halfDataPointsToShow {
 		if offsetPosition < 0 {
 			offsetPosition = 0
 		}

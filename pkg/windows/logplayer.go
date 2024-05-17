@@ -165,9 +165,12 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 		dbCfg.AirDemToString = datalogger.AirDemToStringT8
 	}
 
+	otherFunc := func(s string) {
+	}
+
 	lp.menu = mainmenu.New(lp, []*fyne.Menu{
 		fyne.NewMenu("File"),
-	}, lp.openMap, lp.openMapz)
+	}, lp.openMap, lp.openMapz, otherFunc)
 
 	w.SetCloseIntercept(func() {
 		for _, c := range cancelFuncs {
@@ -281,11 +284,17 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 func (lp *LogPlayer) setupPlot(logz logfile.Logfile) {
 	start := time.Now()
 	values := make(map[string][]float64)
+	order := make([]string, 0)
+	first := true
 	for {
 		if rec := logz.Next(); !rec.EOF {
 			for k, v := range rec.Values {
 				values[k] = append(values[k], v)
+				if first {
+					order = append(order, k)
+				}
 			}
+			first = false
 		} else {
 			break
 		}
@@ -304,9 +313,14 @@ func (lp *LogPlayer) setupPlot(logz logfile.Logfile) {
 		factor = 1
 	}
 
+	plotterOpts := []plotter.PlotterOpt{
+		plotter.WithPlotResolutionFactor(factor),
+		plotter.WithOrder(order),
+	}
+
 	lp.plotter = plotter.NewPlotter(
 		values,
-		plotter.WithPlotResolutionFactor(factor),
+		plotterOpts...,
 	)
 	lp.plotter.Logplayer = true
 	log.Println("creating plotter took", time.Since(start))

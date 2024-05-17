@@ -29,6 +29,9 @@ const (
 	WRITE_DATA_BY_IDENTIFIER              = 0x3B
 	WRITE_DATA_BY_ADDRESS                 = 0x3D
 	TESTER_PRESENT                        = 0x3E
+
+	// Myrtilos specific
+	EU0D_SET_REGISTRATION_KEY = 0x24
 )
 
 func TranslateServiceID(command byte) string {
@@ -89,6 +92,8 @@ func TranslateServiceID(command byte) string {
 		return "WRITE_DATA_BY_ADDRESS"
 	case TESTER_PRESENT:
 		return "TESTER_PRESENT"
+	case EU0D_SET_REGISTRATION_KEY:
+		return "EU0D_SET_REGISTRATION_KEY"
 	default:
 		return "Unknown Command"
 	}

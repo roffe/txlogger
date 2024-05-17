@@ -21,6 +21,14 @@ import (
 const chunkSize = 128
 
 func (mw *MainWindow) setupMenu() {
+	otherFunc := func(str string) {
+		switch str {
+		case "Register EU0D":
+			mr := NewMyrtilosRegistration(mw.app, mw)
+			mr.Show()
+		}
+	}
+
 	menus := []*fyne.Menu{
 		fyne.NewMenu("File",
 			fyne.NewMenuItem("Load binary", mw.loadBinary),
@@ -39,7 +47,7 @@ func (mw *MainWindow) setupMenu() {
 			fyne.NewMenuItem("Delete", mw.deletePreset),
 		),
 	}
-	mw.menu = mainmenu.New(mw, menus, mw.openMap, mw.openMapz)
+	mw.menu = mainmenu.New(mw, menus, mw.openMap, mw.openMapz, otherFunc)
 }
 
 func (mw *MainWindow) loadBinary() {

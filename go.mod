@@ -11,15 +11,15 @@ require (
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9
 	go.bug.st/serial v1.6.2
-	golang.org/x/crypto v0.21.0
+	golang.org/x/crypto v0.22.0
 	golang.org/x/image v0.15.0
 	golang.org/x/mod v0.16.0
-	golang.org/x/net v0.22.0
+	golang.org/x/net v0.24.0
 	golang.org/x/sync v0.6.0
 )
 
 require (
-	fyne.io/fyne/v2 v2.4.6-0.20240418153625-66b892df8f5e
+	fyne.io/fyne/v2 v2.4.6-0.20240515104932-6145be22d752
 	fyne.io/systray v1.10.1-0.20231230205326-d160fd363db9 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
@@ -54,7 +54,7 @@ require (
 	github.com/yuin/goldmark v1.7.0 // indirect
 	go.einride.tech/can v0.7.0 // indirect
 	golang.org/x/mobile v0.0.0-20240213143359-d1f7d3436075 // indirect
-	golang.org/x/sys v0.18.0 // indirect
+	golang.org/x/sys v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.19.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect

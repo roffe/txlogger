@@ -419,7 +419,6 @@ func (t *Client) RequestSecurityAccess(ctx context.Context, force bool) (bool, e
 
 func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 	msg := []byte{0x40, 0xA1, 0x02, SECURITY_ACCESS, DEVELOPMENT_PRIORITY}
-
 	ff, err := t.c.SendAndPoll(ctx, gocan.NewFrame(REQ_MSG_ID, msg, gocan.ResponseRequired), t.defaultTimeout, t.responseID)
 	if err != nil {
 		return false, fmt.Errorf("request seed: %v", err)
@@ -958,7 +957,7 @@ func (t *Client) RequestUpload(ctx context.Context, address, length uint32) erro
 func (t *Client) sendLong(ctx context.Context, data []byte) error {
 	messages := t.splitRequest(data, true)
 	for i, msg := range messages {
-		//		log.Println(msg.String())
+		//log.Println(msg.String())
 		if i == len(messages)-1 {
 			//if err := t.c.Send(msg); err != nil {
 			//	return err
@@ -968,7 +967,7 @@ func (t *Client) sendLong(ctx context.Context, data []byte) error {
 			if err != nil {
 				return err
 			}
-			//log.Println(resp.String())
+			//	log.Println(resp.String())
 			if err := checkErr(resp); err != nil {
 				return err
 			}
@@ -980,7 +979,7 @@ func (t *Client) sendLong(ctx context.Context, data []byte) error {
 			if err := checkErr(resp); err != nil {
 				return err
 			}
-			//log.Println(resp.String())
+			//	log.Println(resp.String())
 		}
 	}
 	return nil

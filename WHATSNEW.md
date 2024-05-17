@@ -5,6 +5,7 @@
   Support for Trionic 5 is still in beta, please report any issues you find
 - Added support for using OBDLink cables with Trionic 5  
   Tested and working devices are OBDLink SX & EX and STN2120, STN1170 "should" work but is untested
+- Added support for registering Myrtilos binaries over CANBUS
 
 # 1.0.14
 

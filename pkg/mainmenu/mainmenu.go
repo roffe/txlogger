@@ -72,6 +72,7 @@ var T7SymbolsTuning = map[string][]string{
 		"E85Cal.ST_Enable",
 	},
 	"Myrtilos": {
+		"Register EU0D",
 		"MyrtilosCal.Launch_DisableSpeed",
 		"MyrtilosCal.Launch_Ign_fi_Min",
 		"MyrtilosCal.Launch_RPM",
@@ -143,14 +144,16 @@ type MainMenu struct {
 	menus     []*fyne.Menu
 	oneFunc   func(symbol.ECUType, string)
 	multiFunc func(symbol.ECUType, ...string)
+	otherFunc func(string)
 }
 
-func New(w fyne.Window, menus []*fyne.Menu, oneFunc func(symbol.ECUType, string), multiFunc func(symbol.ECUType, ...string)) *MainMenu {
+func New(w fyne.Window, menus []*fyne.Menu, oneFunc func(symbol.ECUType, string), multiFunc func(symbol.ECUType, ...string), otherFunc func(string)) *MainMenu {
 	return &MainMenu{
 		w:         w,
 		oneFunc:   oneFunc,
 		multiFunc: multiFunc,
 		menus:     menus,
+		otherFunc: otherFunc,
 	}
 }
 
@@ -175,6 +178,14 @@ func (mw *MainMenu) GetMenu(name string) *fyne.MainMenu {
 	for _, category := range order {
 		var items []*fyne.MenuItem
 		for _, mapName := range ecuM[category] {
+			if mapName == "Register EU0D" {
+				itm := fyne.NewMenuItem(mapName, func() {
+					mw.otherFunc(mapName)
+				})
+				items = append(items, itm)
+				continue
+			}
+
 			if strings.Contains(mapName, "|") {
 				parts := strings.Split(mapName, "|")
 				names := parts[1:]
@@ -191,6 +202,7 @@ func (mw *MainMenu) GetMenu(name string) *fyne.MainMenu {
 				items = append(items, itm)
 				continue
 			}
+
 			itm := fyne.NewMenuItem(mapName, func() {
 				mw.oneFunc(typ, mapName)
 			})

@@ -236,6 +236,7 @@ func (mw *MainWindow) createLeading() *fyne.Container {
 }
 
 func (mw *MainWindow) setupTabs() {
+
 	mw.leading = mw.createLeading()
 	mw.tab = container.NewAppTabs()
 
