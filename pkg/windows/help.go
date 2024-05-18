@@ -21,21 +21,11 @@ func Help(app fyne.App) {
 	kvaserLogo.FillMode = canvas.ImageFillContain
 	kvaserLogo.ScaleMode = canvas.ImageScaleSmooth
 
-	maptunLogo := canvas.NewImageFromResource(fyne.NewStaticResource("maptun_logo.png", assets.MaptunLogoBytes))
-	maptunLogo.SetMinSize(fyne.NewSize(390, 67))
-	maptunLogo.FillMode = canvas.ImageFillContain
-	maptunLogo.ScaleMode = canvas.ImageScaleSmooth
-
 	w := app.NewWindow("Help")
 	w.Resize(fyne.NewSize(500, 300))
 
 	tx, _ := url.Parse("https://txlogger.com")
 	tt, _ := url.Parse("https://www.trionictuning.com")
-
-	mt, _ := url.Parse("https://www.maptun.com/en/")
-	mtLink := widget.NewHyperlink("Maptun Performance AB", mt)
-	mtLink.Alignment = fyne.TextAlignCenter
-
 	kv, _ := url.Parse("https://www.kvaser.com")
 	kvLink := widget.NewHyperlink("Kvaser AB", kv)
 	kvLink.Alignment = fyne.TextAlignCenter
@@ -63,13 +53,6 @@ func Help(app fyne.App) {
 				),
 				container.NewVBox(
 					lb2,
-					container.NewBorder(
-						nil,
-						mtLink,
-						nil,
-						nil,
-						maptunLogo,
-					),
 					container.NewBorder(
 						nil,
 						kvLink,
