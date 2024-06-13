@@ -87,4 +87,4 @@ require (
 
 // replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
 
-// replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
+replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
