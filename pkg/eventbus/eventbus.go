@@ -59,11 +59,12 @@ func (e *Controller) run() {
 			e.cache.DeleteAll()
 			return
 		case msg := <-e.incoming:
-			if v := e.cache.Get(msg.Topic); v != nil {
-				if v.Value() == msg.Data {
-					continue
-				}
-			}
+			// Cache check disabled as dedupping causes problems with mapviewer in some cases
+			//if v := e.cache.Get(msg.Topic); v != nil {
+			//	if v.Value() == msg.Data {
+			//		continue
+			//	}
+			//}
 			e.cache.Set(msg.Topic, msg.Data, ttlcache.DefaultTTL)
 			for _, sub := range e.subs[msg.Topic] {
 				select {

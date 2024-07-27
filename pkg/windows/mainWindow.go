@@ -3,7 +3,10 @@ package windows
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
+	"path"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -198,6 +201,22 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 
 	mw.SetMaster()
 	mw.SetContent(mw.tab)
+
+	mw.SetOnDropped(func(p fyne.Position, uris []fyne.URI) {
+		log.Println("Dropped", uris)
+		for _, u := range uris {
+			filename := u.Path()
+			switch strings.ToLower(path.Ext(filename)) {
+			case ".bin":
+				mw.LoadSymbolsFromFile(filename)
+			case ".t5l", ".t7l", ".t8l", ".csv":
+				NewLogPlayer(a, filename, mw.fw).Show()
+			}
+		}
+	})
+
+	mw.app.Driver().SetDisableScreenBlanking(true)
+
 	return mw
 }
 func (mw *MainWindow) CloseIntercept() {
@@ -285,7 +304,11 @@ func (mw *MainWindow) setupTabs() {
 	)
 	hsplit.SetOffset(0.8)
 
+	// E85.X_EthAct_Tech2
+	//
+
 	mw.tab.Append(container.NewTabItemWithIcon("Symbols", theme.ListIcon(), hsplit))
+	mw.tab.Append(container.NewTabItemWithIcon("T7", theme.ComputerIcon(), NewT7Extras(mw, fyne.NewSize(200, 100))))
 	mw.tab.Append(container.NewTabItemWithIcon("Settings", theme.SettingsIcon(), mw.settings))
 }
 

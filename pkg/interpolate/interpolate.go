@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-type InterPolFunc func([]int, []int, []int, int, int) (float64, float64, float64, error)
+type InterPolFunc func(xAxis, yAxis, data []int, xValue, yValue int) (float64, float64, float64, error)
 
 // Helper function to clamp offset values
 func clamp(offset, max int) int {

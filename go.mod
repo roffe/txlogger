@@ -11,16 +11,16 @@ require (
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9
 	go.bug.st/serial v1.6.2
-	golang.org/x/crypto v0.22.0
-	golang.org/x/image v0.15.0
-	golang.org/x/mod v0.16.0
-	golang.org/x/net v0.24.0
-	golang.org/x/sync v0.6.0
+	golang.org/x/crypto v0.23.0
+	golang.org/x/image v0.18.0
+	golang.org/x/mod v0.17.0
+	golang.org/x/net v0.25.0
+	golang.org/x/sync v0.7.0
 )
 
 require (
-	fyne.io/fyne/v2 v2.4.6-0.20240515104932-6145be22d752
-	fyne.io/systray v1.10.1-0.20231230205326-d160fd363db9 // indirect
+	fyne.io/fyne/v2 v2.5.0
+	fyne.io/systray v1.11.0 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
 	github.com/creack/goselect v0.1.2 // indirect
@@ -51,12 +51,12 @@ require (
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.9.0 // indirect
-	github.com/yuin/goldmark v1.7.0 // indirect
+	github.com/yuin/goldmark v1.7.1 // indirect
 	go.einride.tech/can v0.7.0 // indirect
 	golang.org/x/mobile v0.0.0-20240213143359-d1f7d3436075 // indirect
-	golang.org/x/sys v0.19.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/tools v0.19.0 // indirect
+	golang.org/x/sys v0.20.0 // indirect
+	golang.org/x/text v0.16.0 // indirect
+	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
@@ -68,15 +68,15 @@ require fyne.io/x/fyne v0.0.0-20240216160529-61d0ff41acd7
 require github.com/jellydator/ttlcache/v3 v3.2.0
 
 require (
-	github.com/BurntSushi/toml v1.3.2 // indirect
-	github.com/jeandeaual/go-locale v0.0.0-20240204043739-672d8d016d9a // indirect
+	github.com/BurntSushi/toml v1.4.0 // indirect
+	github.com/jeandeaual/go-locale v0.0.0-20240223122105-ce5225dcaa49 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.4.0 // indirect
 	github.com/rymdport/portal v0.2.2 // indirect
 )
 
 require (
 	github.com/bendikro/dl v0.0.0-20190410215913-e41fdb9069d4 // indirect
-	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20240307211618-a69d953ea142 // indirect
+	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20240506104042-037f3cc74f2a // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/lusingander/colorpicker v0.7.2
 	github.com/saltosystems/winrt-go v0.0.0-20240110120258-ad49e9790c38 // indirect

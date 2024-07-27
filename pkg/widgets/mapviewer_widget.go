@@ -292,14 +292,17 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 	//		log.Println(r)
 	//	}
 	//}()
-
 	if name == mv.lambdaName {
 		mv.lamb.SetValue(value)
 		return
 	}
 	var hit bool
 	if name == mv.xFrom {
-		mv.xValue = int(value)
+		if name == "IgnProt.fi_Offset" {
+			mv.xValue = int(value * 10)
+		} else {
+			mv.xValue = int(value)
+		}
 		hit = true
 	}
 	if name == mv.yFrom {

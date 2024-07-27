@@ -1,3 +1,8 @@
+# 1.0.16
+- Fixed bug where some t5 files would not load
+- Added support for drag and drop loading of binaries and logs
+- Fixed bugg where ioff would not be visualized properly in map viewer
+
 # 1.0.15
 
 - Presets are NOT saved autmaticly on exit. If you have made changes to the presets you need to save them manually from the settings menu as a new preset or overwrite an existing one or your changes will get lost
