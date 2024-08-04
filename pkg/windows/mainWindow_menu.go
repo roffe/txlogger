@@ -273,7 +273,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		widgets.WithLambdaSymbolName(mw.settings.GetLambdaSymbolName()),
 		widgets.WithEditable(true),
 		widgets.WithButtons(true),
-		widgets.WithWBL(true),
+		widgets.WithWBL(mw.settings.GetLambdaSource() != "None"),
 		widgets.WithFollowCrosshair(mw.settings.GetCursorFollowCrosshair()),
 	)
 	if err != nil {

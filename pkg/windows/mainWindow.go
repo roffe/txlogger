@@ -308,7 +308,7 @@ func (mw *MainWindow) setupTabs() {
 	//
 
 	mw.tab.Append(container.NewTabItemWithIcon("Symbols", theme.ListIcon(), hsplit))
-	mw.tab.Append(container.NewTabItemWithIcon("T7", theme.ComputerIcon(), NewT7Extras(mw, fyne.NewSize(200, 100))))
+	//mw.tab.Append(container.NewTabItemWithIcon("T7", theme.ComputerIcon(), NewT7Extras(mw, fyne.NewSize(200, 100))))
 	mw.tab.Append(container.NewTabItemWithIcon("Settings", theme.SettingsIcon(), mw.settings))
 }
 

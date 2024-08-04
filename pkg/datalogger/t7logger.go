@@ -104,13 +104,11 @@ func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client)
 			} else {
 				ebus.Publish("LIMP", 0)
 			}
-
 			if data&0x20 == 0x20 {
 				ebus.Publish("CRUISE", 1)
 			} else {
 				ebus.Publish("CRUISE", 0)
 			}
-
 			if data&0x80 == 0x80 {
 				ebus.Publish("CEL", 1)
 			} else {

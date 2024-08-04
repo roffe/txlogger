@@ -16,7 +16,7 @@ func NewRectangle(strokeColor color.RGBA, strokeWidth float32) *canvas.Rectangle
 
 func NewCrosshair(strokeColor color.RGBA, strokeWidth float32) *canvas.Rectangle {
 	return &canvas.Rectangle{
-		FillColor:   color.RGBA{0, 0, 0, 0},
+		FillColor:   strokeColor,
 		StrokeColor: strokeColor,
 		StrokeWidth: strokeWidth,
 	}

@@ -1,4 +1,12 @@
+# 1.0.17
+
+- If WBL is set to None the WBL will not be shown in logplayer
+- Changed color of crosshair in mapviewer to make it easier to see
+- Fixed a bug where pedal position was not properly translated to pedalmap in Trionic 7
+- changed scaling of AirCompCal.PressMap to bar instead of kPa
+
 # 1.0.16
+
 - Fixed bug where some t5 files would not load
 - Added support for drag and drop loading of binaries and logs
 - Fixed bugg where ioff would not be visualized properly in map viewer

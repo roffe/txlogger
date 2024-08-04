@@ -28,14 +28,14 @@ func (g *Grid) CreateRenderer() fyne.WidgetRenderer {
 	var xlines []*canvas.Line
 	for i := 0; i < g.cols; i++ {
 		line := canvas.NewLine(color.Black)
-		line.StrokeWidth = 2
+		line.StrokeWidth = 1
 		xlines = append(xlines, line)
 		con.Add(line)
 	}
 	var ylines []*canvas.Line
 	for i := 0; i < g.rows; i++ {
 		line := canvas.NewLine(color.Black)
-		line.StrokeWidth = 2
+		line.StrokeWidth = 1
 		ylines = append(ylines, line)
 		con.Add(line)
 	}

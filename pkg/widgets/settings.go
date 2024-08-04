@@ -46,7 +46,7 @@ type SettingsWidget struct {
 	useMPH                *widget.Check
 	swapRPMandSpeed       *widget.Check
 	plotResolution        *widget.Select
-	container             *fyne.Container
+	container             *container.Split
 	widget.BaseWidget
 }
 
@@ -148,110 +148,118 @@ func NewSettingsWidget() *SettingsWidget {
 
 	sw.CanSettings = NewCanSettingsWidget(fyne.CurrentApp())
 
-	sw.container =
-		container.NewVBox(
-			sw.CanSettings,
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewLabel("Logging rate (Hz)"),
-				sw.freqValue,
-				sw.freqSlider,
+	left := container.NewVBox(
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewIcon(theme.InfoIcon()),
+			nil,
+			sw.autoLoad,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewIcon(theme.WarningIcon()),
+			nil,
+			sw.autoSave,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewIcon(theme.MoveUpIcon()),
+			nil,
+			sw.cursorFollowCrosshair,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewIcon(theme.SearchIcon()),
+			nil,
+			container.NewVBox(
+				sw.livePreview,
+				sw.realtimeBars,
+				lambdaSel,
 			),
-			widget.NewSeparator(),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewLabel("Log format"),
-				nil,
-				sw.logFormat,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewLabel("Log folder"),
-				container.NewGridWithColumns(2,
-					widget.NewButtonWithIcon("Reset", theme.ContentClearIcon(), func() {
-						sw.logPath.SetText(datalogger.LOGPATH)
-						fyne.CurrentApp().Preferences().SetString(prefsLogPath, datalogger.LOGPATH)
-					}),
-					widget.NewButtonWithIcon("Browse", theme.FileIcon(), func() {
-						dir, err := sdialog.Directory().Title("Select log folder").Browse()
-						if err != nil {
-							if errors.Is(err, sdialog.ErrCancelled) {
-								return
-							}
-							log.Println(err)
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewIcon(theme.ViewFullScreenIcon()),
+			nil,
+			sw.meshView,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewIcon(theme.InfoIcon()),
+			nil,
+			sw.useMPH,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewIcon(theme.InfoIcon()),
+			nil,
+			sw.swapRPMandSpeed,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			//widget.NewIcon(theme.ZoomFitIcon()),
+			widget.NewLabel("Plot resolution"),
+			nil,
+			sw.plotResolution,
+		),
+	)
+
+	right := container.NewVBox(
+		sw.CanSettings,
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewLabel("Logging rate (Hz)"),
+			sw.freqValue,
+			sw.freqSlider,
+		),
+		widget.NewSeparator(),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewLabel("Log format"),
+			nil,
+			sw.logFormat,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewLabel("Log folder"),
+			container.NewGridWithColumns(2,
+				widget.NewButtonWithIcon("Reset", theme.ContentClearIcon(), func() {
+					sw.logPath.SetText(datalogger.LOGPATH)
+					fyne.CurrentApp().Preferences().SetString(prefsLogPath, datalogger.LOGPATH)
+				}),
+				widget.NewButtonWithIcon("Browse", theme.FileIcon(), func() {
+					dir, err := sdialog.Directory().Title("Select log folder").Browse()
+					if err != nil {
+						if errors.Is(err, sdialog.ErrCancelled) {
 							return
 						}
-						sw.logPath.SetText(dir)
-						fyne.CurrentApp().Preferences().SetString(prefsLogPath, dir)
-					}),
-				),
-				sw.logPath,
+						log.Println(err)
+						return
+					}
+					sw.logPath.SetText(dir)
+					fyne.CurrentApp().Preferences().SetString(prefsLogPath, dir)
+				}),
 			),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewIcon(theme.InfoIcon()),
-				nil,
-				sw.autoLoad,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewIcon(theme.WarningIcon()),
-				nil,
-				sw.autoSave,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewIcon(theme.MoveUpIcon()),
-				nil,
-				sw.cursorFollowCrosshair,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewIcon(theme.SearchIcon()),
-				nil,
-				container.NewVBox(
-					sw.livePreview,
-					sw.realtimeBars,
-					lambdaSel,
-				),
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewIcon(theme.ViewFullScreenIcon()),
-				nil,
-				sw.meshView,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewIcon(theme.InfoIcon()),
-				nil,
-				sw.useMPH,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewIcon(theme.InfoIcon()),
-				nil,
-				sw.swapRPMandSpeed,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				//widget.NewIcon(theme.ZoomFitIcon()),
-				widget.NewLabel("Plot resolution"),
-				nil,
-				sw.plotResolution,
-			),
-		)
+			sw.logPath,
+		),
+	)
+
+	sw.container = container.NewHSplit(
+		left,
+		right,
+	)
+
 	sw.loadPrefs()
 	return sw
 }
@@ -263,13 +271,13 @@ func (sw *SettingsWidget) newLogFormat() *widget.Select {
 }
 
 func (sw *SettingsWidget) newLambdaSelector() *fyne.Container {
-	sw.lambdaSource = widget.NewSelect([]string{"ECU", ecumaster.ProductString}, func(s string) {
+	sw.lambdaSource = widget.NewSelect([]string{"None", "ECU", ecumaster.ProductString}, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsLambdaSource, s)
 	})
 	return container.NewBorder(
 		nil,
 		nil,
-		widget.NewLabel("Lambda source"),
+		widget.NewLabel("WBL"),
 		nil,
 		sw.lambdaSource,
 	)
@@ -352,7 +360,7 @@ func (sw *SettingsWidget) loadPrefs() {
 	sw.realtimeBars.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsRealtimeBars, true))
 	sw.logFormat.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogFormat, "TXL"))
 	sw.logPath.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogPath, datalogger.LOGPATH))
-	sw.lambdaSource.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLambdaSource, "ECU"))
+	sw.lambdaSource.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLambdaSource, "None"))
 	sw.useMPH.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsUseMPH, false))
 	sw.swapRPMandSpeed.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsSwapRPMandSpeed, false))
 	sw.plotResolution.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsPlotResolution, "Full"))

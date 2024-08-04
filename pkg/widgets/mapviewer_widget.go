@@ -140,9 +140,9 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 	mv.xAxisLabels = mv.createXAxis()
 	mv.zDataRects = mv.createZdata()
 
-	mv.crosshair = NewCrosshair(color.RGBA{255, 0, 180, 255}, 3)
+	mv.crosshair = NewCrosshair(color.RGBA{0xCE, 0xA2, 0xFD, 255}, 3)
 
-	mv.cursor = NewRectangle(color.RGBA{0x00, 0x0a, 0xFF, 235}, 3)
+	mv.cursor = NewRectangle(color.RGBA{0x30, 0x70, 0xB3, 235}, 3)
 	mv.selectedX = -1
 	mv.cursor.Resize(fyne.NewSize(1, 1))
 
@@ -154,21 +154,22 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 	for _, r := range mv.zDataRects {
 		mv.valueRects.Add(r)
 	}
-	mv.innerView.Add(mv.valueRects)
-
-	mv.innerView.Add(container.NewWithoutLayout(
-		mv.crosshair,
-		mv.cursor,
-	))
 
 	mv.valueTexts = container.New(&layout.Grid{Cols: mv.numColumns, Rows: mv.numRows, Text: true})
 	for _, t := range mv.textValues {
 		mv.valueTexts.Add(t)
 	}
-	mv.innerView.Add(mv.valueTexts)
 
 	mv.grid = NewGrid(mv.numColumns, mv.numRows)
+
+	mv.innerView.Add(mv.valueRects)
+	mv.innerView.Add(container.NewWithoutLayout(
+		mv.crosshair,
+		mv.cursor,
+	))
+
 	mv.innerView.Add(mv.grid)
+	mv.innerView.Add(mv.valueTexts)
 
 	if mv.showWBL {
 		mv.lamb = NewCBar(&CBarConfig{
@@ -308,6 +309,8 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 	if name == mv.yFrom {
 		if name == "ActualIn.p_AirInlet" {
 			mv.yValue = int(value * 1000)
+		} else if name == "Out.X_AccPedal" {
+			mv.yValue = int(value * 10)
 		} else {
 			mv.yValue = int(value)
 		}
