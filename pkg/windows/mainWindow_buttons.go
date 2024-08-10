@@ -105,6 +105,9 @@ func (mw *MainWindow) createButtons() {
 			OnClose:         onClose,
 			UseMPH:          mw.settings.GetUseMPH(),
 			SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
+			HighAFR:         mw.settings.GetHighAFR(),
+			LowAFR:          mw.settings.GetLowAFR(),
+			WidebandSymbol:  mw.settings.GetWidebandSymbolName(),
 		}
 
 		switch mw.ecuSelect.Selected {
@@ -265,10 +268,9 @@ func (mw *MainWindow) startLogging() {
 	}()
 }
 
-func (mw *MainWindow) newDataLogger(device gocan.Adapter) (datalogger.Provider, error) {
+func (mw *MainWindow) newDataLogger(device gocan.Adapter) (datalogger.IClient, error) {
 	return datalogger.New(datalogger.Config{
 		ECU:            mw.ecuSelect.Selected,
-		Lambda:         mw.settings.GetLambdaSource(),
 		Device:         device,
 		Symbols:        mw.symbolList.Symbols(),
 		Rate:           mw.settings.GetFreq(),
@@ -278,5 +280,13 @@ func (mw *MainWindow) newDataLogger(device gocan.Adapter) (datalogger.Provider, 
 		FpsCounter:     mw.fpsCounter,
 		LogFormat:      mw.settings.GetLogFormat(),
 		LogPath:        mw.settings.GetLogPath(),
+		WidebandConfig: datalogger.WidebandConfig{
+			Type:                   mw.settings.GetWidebandType(),
+			Port:                   mw.settings.GetWidebandPort(),
+			MinimumVoltageWideband: mw.settings.GetMinimumVoltageWideband(),
+			MaximumVoltageWideband: mw.settings.GetMaximumVoltageWideband(),
+			LowAFR:                 mw.settings.GetLowAFR(),
+			HighAFR:                mw.settings.GetHighAFR(),
+		},
 	})
 }

@@ -3,7 +3,6 @@ package widgets
 import (
 	"fmt"
 	"image/color"
-	"log"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -104,28 +103,24 @@ func (s *CBar) SetValue(value float64) {
 func (s *CBar) refresh() {
 	s.displayText.Text = fmt.Sprintf(s.cfg.DisplayString, s.value)
 	s.displayText.Refresh()
-	var newBarPos fyne.Position
-	var newBarSize fyne.Size
 	if s.value < s.cfg.Center {
 		s.bar.FillColor = color.RGBA{0x26, 0xcc, 0x00, 0x80}
 		barWidth := float32(s.cfg.Center - s.value)
 		barPosition := s.center - float32(s.cfg.Center-s.value)*s.widthFactor
-		newBarPos = fyne.NewPos(barPosition, s.eightHeight)
-		newBarSize = fyne.NewSize(barWidth*s.widthFactor, s.barHeight)
+		s.bar.Move(fyne.NewPos(barPosition, s.eightHeight))
+		s.bar.Resize(fyne.NewSize(barWidth*s.widthFactor, s.barHeight))
 	} else if s.value > s.cfg.Center {
 		s.bar.FillColor = color.RGBA{0xA5, 0x00, 0x00, 0x80}
 		barWidth := float32(s.value - s.cfg.Center)
 		barPosition := s.center
-		newBarPos = fyne.NewPos(barPosition, s.eightHeight)
-		newBarSize = fyne.NewSize(barWidth*s.widthFactor, s.barHeight)
+		s.bar.Move(fyne.NewPos(barPosition, s.eightHeight))
+		s.bar.Resize(fyne.NewSize(barWidth*s.widthFactor, s.barHeight))
 	} else {
 		s.bar.FillColor = color.RGBA{252, 186, 3, 0x80}
 		barPosition := s.center - 3
-		newBarPos = fyne.NewPos(barPosition, s.eightHeight)
-		newBarSize = fyne.NewSize(6, s.barHeight)
+		s.bar.Move(fyne.NewPos(barPosition, s.eightHeight))
+		s.bar.Resize(fyne.NewSize(6, s.barHeight))
 	}
-	s.bar.Move(newBarPos)
-	s.bar.Resize(newBarSize)
 }
 
 func (s *CBar) CreateRenderer() fyne.WidgetRenderer {
@@ -142,8 +137,7 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 	if dr.d.size.Width == space.Width && dr.d.size.Height == space.Height {
 		return
 	}
-	log.Println("cbar.Layout", dr.d.displayText.Text, space.Width, space.Height)
-	//dr.d.container.Resize(space)
+	// log.Println("cbar.Layout", dr.d.displayText.Text, space.Width, space.Height)
 	s := dr.d
 	s.size = space
 	s.eightHeight = s.size.Height * oneEight
@@ -154,7 +148,8 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 	stepFactor := float32(diameter) / float32(s.cfg.Steps)
 	s.widthFactor = space.Width / float32(s.valueRange)
 	s.barHeight = s.size.Height - (s.eightHeight * 2)
-	s.face.Resize(space)
+	s.face.Move(fyne.NewPos(-2, 0))
+	s.face.Resize(space.AddWidthHeight(3, 0))
 
 	var y float32
 

@@ -270,10 +270,10 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		widgets.WithSaveECUFunc(saveFunc),
 		widgets.WithSaveFileFunc(saveFileFunc),
 		widgets.WithMeshView(mw.settings.GetMeshView()),
-		widgets.WithLambdaSymbolName(mw.settings.GetLambdaSymbolName()),
+		widgets.WithWidebandSymbolName(mw.settings.GetWidebandSymbolName()),
 		widgets.WithEditable(true),
 		widgets.WithButtons(true),
-		widgets.WithWBL(mw.settings.GetLambdaSource() != "None"),
+		widgets.WithWBL(mw.settings.GetWidebandType() != "None"),
 		widgets.WithFollowCrosshair(mw.settings.GetCursorFollowCrosshair()),
 	)
 	if err != nil {
@@ -295,11 +295,11 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		}))
 	}
 
-	if mw.settings.GetLambdaSource() != "ECU" {
-		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(mw.settings.GetLambdaSymbolName(), func(value float64) {
-			mv.SetValue(mw.settings.GetLambdaSymbolName(), value)
-		}))
-	}
+	//if mw.settings.GetWidebandType() != "ECU" {
+	cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(mw.settings.GetWidebandSymbolName(), func(value float64) {
+		mv.SetValue(mw.settings.GetWidebandSymbolName(), value)
+	}))
+	//}
 
 	if mw.settings.GetAutoLoad() && mw.dlc != nil {
 		p := widgets.NewProgressModal(mw.Window.Content(), "Loading "+axis.Z)

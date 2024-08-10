@@ -3,7 +3,6 @@ package widgets
 import (
 	"fmt"
 	"image/color"
-	"log"
 	"math"
 
 	"fyne.io/fyne/v2"
@@ -176,7 +175,7 @@ func (dr *DualDialRenderer) Layout(space fyne.Size) {
 		return
 	}
 	dr.size = space
-	log.Println("dual_dial.Layout", dr.d.title, space.Width, space.Height)
+	//	log.Println("dual_dial.Layout", dr.d.title, space.Width, space.Height)
 	c := dr.d
 	c.container.Resize(space)
 	c.diameter = fyne.Min(space.Width, space.Height)
@@ -197,7 +196,7 @@ func (dr *DualDialRenderer) Layout(space fyne.Size) {
 	topleft := fyne.NewPos(c.middle.X-c.radius, c.middle.Y-c.radius)
 
 	// Text and element sizing
-	c.titleText.TextSize = c.radius * oneThirdAndHalf
+	c.titleText.TextSize = c.radius * oneFourth
 	c.titleText.Move(c.middle.Add(fyne.NewPos(0, c.diameter*oneFourth)))
 	c.titleText.Refresh()
 

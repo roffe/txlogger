@@ -16,11 +16,6 @@ import (
 	"github.com/roffe/txlogger/pkg/assets"
 )
 
-const (
-	lambAt5v = 1.5
-	lambAt0v = 0.5
-)
-
 type Dashboard struct {
 	cfg *DashboardConfig
 
@@ -108,6 +103,9 @@ type DashboardConfig struct {
 	AirDemToString  func(float64) string
 	UseMPH          bool
 	SwapRPMandSpeed bool
+	HighAFR         float64
+	LowAFR          float64
+	WidebandSymbol  string
 }
 
 // func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.Button, onClose func()) *Dashboard {
@@ -180,7 +178,7 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 			Max:           1.50,
 			Steps:         20,
 			Minsize:       fyne.NewSize(100, 35),
-			DisplayString: "λ %.2f",
+			DisplayString: "λ %.3f",
 		}),
 		nblambda: NewCBar(&CBarConfig{
 			Title:           "",
@@ -385,30 +383,32 @@ func interpol(x0, y0, x1, y1, x float64) float64 {
 	return y0 + (x-x0)*(y1-y0)/(x1-x0)
 }
 
+func textSetter(obj *canvas.Text, text string, precission int) func(float64) {
+	return func(value float64) {
+		obj.Text = text + ": " + strconv.FormatFloat(value, 'f', precission, 64)
+		obj.Refresh()
+	}
+}
+
+func idcSetter(obj *canvas.Text, text string) func(float64) {
+	return func(value float64) {
+		//		log.Println(value)
+		obj.Text = fmt.Sprintf(text+": %02.0f%%", value)
+		switch {
+		case value > 60 && value < 85:
+			obj.Color = color.RGBA{R: 0xFF, G: 0xA5, B: 0, A: 0xFF}
+		case value >= 85:
+			obj.Color = color.RGBA{R: 0xFF, G: 0, B: 0, A: 0xFF}
+		default:
+			obj.Color = color.RGBA{R: 0, G: 0xFF, B: 0, A: 0xFF}
+		}
+		obj.Refresh()
+	}
+}
+
+const rpmIDCconstant = 1.0 / 1200.0
+
 func (db *Dashboard) createRouter() map[string]func(float64) {
-	textSetter := func(obj *canvas.Text, text string, precission int) func(float64) {
-		return func(value float64) {
-			obj.Text = text + ": " + strconv.FormatFloat(value, 'f', precission, 64)
-			obj.Refresh()
-		}
-	}
-
-	idcSetter := func(obj *canvas.Text, text string) func(float64) {
-		return func(value float64) {
-			log.Println(value)
-			obj.Text = fmt.Sprintf(text+": %02.0f%%", value)
-			switch {
-			case value > 60 && value < 85:
-				obj.Color = color.RGBA{R: 0xFF, G: 0xA5, B: 0, A: 0xFF}
-			case value >= 85:
-				obj.Color = color.RGBA{R: 0xFF, G: 0, B: 0, A: 0xFF}
-			default:
-				obj.Color = color.RGBA{R: 0, G: 0xFF, B: 0, A: 0xFF}
-			}
-			obj.Refresh()
-		}
-	}
-
 	var rpm float64
 
 	t5rpmSetter := func(value float64) {
@@ -417,10 +417,12 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 	}
 
 	idcSetterT5 := func(obj *canvas.Text, text string) func(float64) {
+		idcc := idcSetter(obj, text)
 		return func(value float64) {
-			obj.Color = color.RGBA{R: 0, G: 0xFF, B: 0, A: 0xFF}
-			obj.Text = fmt.Sprintf(text+": %02.0f%%", (value*rpm)/1200)
-			obj.Refresh()
+			idcc((value * rpm) * rpmIDCconstant)
+			//obj.Color = color.RGBA{R: 0, G: 0xFF, B: 0, A: 0xFF}
+			//obj.Text = fmt.Sprintf(text+": %02.0f%%", (value*rpm)*rpmIDCconstant)
+			//obj.Refresh()
 		}
 	}
 
@@ -475,34 +477,17 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		}
 	}
 
-	var setVehicleSpeed func(float64)
-
+	setVehicleSpeed := db.speed.SetValue
 	if db.cfg.UseMPH {
 		setVehicleSpeed = func(value float64) {
 			db.speed.SetValue(value * 0.621371)
 		}
-	} else {
-		setVehicleSpeed = db.speed.SetValue
-	}
-
-	var setVehicleSpeedT5 func(float64)
-
-	if db.cfg.UseMPH {
-		setVehicleSpeedT5 = func(value float64) {
-			db.speed.SetValue(value * 0.621371)
-		}
-	} else {
-		setVehicleSpeedT5 = db.speed.SetValue
 	}
 
 	t5throttle := func(value float64) {
 		// value should be 0-100% input is 0 - 192
 		valuePercent := min(192, value) / 192 * 100
 		db.throttle.SetValue(valuePercent)
-	}
-
-	t5setwbl := func(value float64) {
-		db.wblambda.SetValue(((lambAt5v-lambAt0v)/256)*value + lambAt0v)
 	}
 
 	t5setnbl := func(value float64) {
@@ -516,8 +501,8 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 	}
 
 	router := map[string]func(float64){
-		"In.v_Vehicle": setVehicleSpeed,   // t7 & t8
-		"Bil_hast":     setVehicleSpeedT5, // t5
+		"In.v_Vehicle": setVehicleSpeed, // t7 & t8
+		"Bil_hast":     setVehicleSpeed, // t5
 
 		"ActualIn.n_Engine": db.rpm.SetValue,
 		"Rpm":               t5rpmSetter, // t5
@@ -543,24 +528,28 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		"Out.PWM_BoostCntrl": db.pwm.SetValue, // t7 & t8
 		"PWM_ut10":           db.pwm.SetValue, // t5
 
-		"DisplProt.LambdaScanner": db.wblambda.SetValue,
-		"Lambda.External":         db.wblambda.SetValue,
-		"AD_EGR":                  t5setwbl, // t5
+		// Wideband lambda
+		//"DisplProt.LambdaScanner": db.wblambda.SetValue, // t7 & t8
+		//"Lambda.External":     db.wblambda.SetValue,
+		db.cfg.WidebandSymbol: db.wblambda.SetValue, // Wideband lambda
 
-		"Lambda.LambdaInt": db.nblambda.SetValue,
-		"Lambdaint":        t5setnbl, // t5
+		"AD_EGR": db.wblambda.SetValue, // t5
 
-		"MAF.m_AirInlet":        db.airmass.SetValue,
-		"m_Request":             db.airmass.SetValue2,
-		"AirMassMast.m_Request": db.airmass.SetValue2,
+		// NB lambda
+		"Lambda.LambdaInt": db.nblambda.SetValue, // t7 & t8
+		"Lambdaint":        t5setnbl,             // t5
+
+		"MAF.m_AirInlet":        db.airmass.SetValue,  // t7 & t8
+		"m_Request":             db.airmass.SetValue2, // t7
+		"AirMassMast.m_Request": db.airmass.SetValue2, // t8
 
 		"Out.fi_Ignition": textSetter(db.ign, "Ign", 1),
 		"Ign_angle":       textSetter(db.ign, "Ign", 1),
 
-		"ECMStat.ST_ActiveAirDem": ecmstat,
+		"ECMStat.ST_ActiveAirDem": ecmstat, // t7 & t8
 
-		"IgnProt.fi_Offset":     ioff,
-		"IgnMastProt.fi_Offset": ioff,
+		"IgnProt.fi_Offset":     ioff, // t7
+		"IgnMastProt.fi_Offset": ioff, // t8
 
 		"CRUISE": showHider(db.cruise),
 		"CEL":    showHider(db.checkEngine),
@@ -569,8 +558,8 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		"Knock_offset1234": knkDet,
 		"KnkDet.KnockCyl":  knkDet,
 
-		"Myrtilos.InjectorDutyCycle": idcSetter(db.idc, "Idc"),
-		"Insptid_ms10":               idcSetterT5(db.idc, "Idc"),
+		"Myrtilos.InjectorDutyCycle": idcSetter(db.idc, "Idc"),   // t7
+		"Insptid_ms10":               idcSetterT5(db.idc, "Idc"), // t5
 	}
 
 	return router
@@ -760,7 +749,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 		return
 	}
 	dr.size = space
-	log.Println("dashboard.Layout", space.Width, space.Height)
+	// log.Println("dashboard.Layout", space.Width, space.Height)
 	dr.db.container.Resize(space)
 
 	db := dr.db

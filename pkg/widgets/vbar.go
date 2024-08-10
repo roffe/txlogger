@@ -2,7 +2,6 @@ package widgets
 
 import (
 	"image/color"
-	"log"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -108,7 +107,7 @@ func (vr *vbarRenderer) Layout(space fyne.Size) {
 	if vr.vbar.size.Width == space.Width && vr.vbar.size.Height == space.Height {
 		return
 	}
-	log.Println("vbar.Layout", vr.vbar.cfg.Title, space.Width, space.Height)
+	// log.Println("vbar.Layout", vr.vbar.cfg.Title, space.Width, space.Height)
 	vr.vbar.size = space
 	vr.vbar.canvas.Resize(space)
 	vr.vbar.middle = space.Width * .5
@@ -116,7 +115,8 @@ func (vr *vbarRenderer) Layout(space fyne.Size) {
 	vr.vbar.twoEight = vr.vbar.diameterEight * 2
 	stepFactor := float32(space.Height) / float32(vr.vbar.cfg.Steps)
 	vr.vbar.heightFactor = float32(space.Height) / float32(vr.vbar.cfg.Max)
-	vr.vbar.face.Resize(space)
+	vr.vbar.face.Move(fyne.NewPos(0, -2))
+	vr.vbar.face.Resize(space.AddWidthHeight(0, 3))
 
 	titleX := vr.vbar.middle - vr.vbar.titleText.Size().Width*.5
 	displayTextX := vr.vbar.middle - vr.vbar.displayText.Size().Width*.5

@@ -2,7 +2,6 @@ package eventbus
 
 import (
 	"errors"
-	"log"
 	"sync"
 	"time"
 
@@ -86,7 +85,7 @@ func (e *Controller) run() {
 			for topic, subs := range e.subs {
 				for i, sub := range subs {
 					if sub == unsub {
-						log.Println("Unsubscribe", topic)
+						//log.Println("Unsubscribe", topic)
 						e.subs[topic] = append(subs[:i], subs[i+1:]...)
 						close(unsub)
 						if len(e.subs[topic]) == 0 {
@@ -130,7 +129,7 @@ func (e *Controller) SubscribeFunc(topic string, f func(float64)) (cancel func()
 }
 
 func (e *Controller) Subscribe(topic string) chan float64 {
-	log.Println("Subscribe", topic)
+	// log.Println("Subscribe", topic)
 	respChan := make(chan float64, 10)
 	e.sub <- newSub{topic: topic, resp: respChan}
 	return respChan

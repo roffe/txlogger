@@ -81,7 +81,7 @@ type MainWindow struct {
 	symbolList *widgets.SymbolListWidget
 	fw         symbol.SymbolCollection
 
-	dlc       datalogger.Provider
+	dlc       datalogger.IClient
 	dashboard *widgets.Dashboard
 	plotter   *plotter.Plotter
 

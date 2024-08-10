@@ -90,7 +90,7 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 			widgets.WithYFrom(axis.YFrom),
 			widgets.WithInterPolFunc(interpolate.Interpolate),
 			widgets.WithEditable(false),
-			widgets.WithLambdaSymbolName(lp.lambSymbolName),
+			widgets.WithWidebandSymbolName(lp.lambSymbolName),
 			widgets.WithWBL(true),
 			//widgets.WithFollowCrosshair(lp.app.Preferences().BoolWithFallback("cursorFollowCrosshair", false)),
 		)
@@ -113,12 +113,18 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 			}))
 		}
 
-		cancelFuncs = append(cancelFuncs, lp.ebus.SubscribeFunc("Lambda.External", func(value float64) {
-			mv.SetValue("Lambda.External", value)
-		}))
+		/*
+			cancelFuncs = append(cancelFuncs, lp.ebus.SubscribeFunc("Lambda.External", func(value float64) {
+				mv.SetValue("Lambda.External", value)
+			}))
 
-		cancelFuncs = append(cancelFuncs, lp.ebus.SubscribeFunc("DisplProt.LambdaScanner", func(value float64) {
-			mv.SetValue("DisplProt.LambdaScanner", value)
+			cancelFuncs = append(cancelFuncs, lp.ebus.SubscribeFunc("DisplProt.LambdaScanner", func(value float64) {
+				mv.SetValue("DisplProt.LambdaScanner", value)
+			}))
+		*/
+
+		cancelFuncs = append(cancelFuncs, lp.ebus.SubscribeFunc(lp.lambSymbolName, func(value float64) {
+			mv.SetValue(lp.lambSymbolName, value)
 		}))
 
 		w := lp.app.NewWindow(fmt.Sprintf("%s - Map Viewer", axis.Z))

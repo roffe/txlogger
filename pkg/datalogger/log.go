@@ -75,6 +75,8 @@ func (c *CSVWriter) Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time
 		val := sysvars.Get(k)
 		if val == math.Trunc(val) {
 			c.precission = 0
+		} else if k == "Lambda.External" {
+			c.precission = 3
 		} else {
 			c.precission = 2
 		}
@@ -125,6 +127,8 @@ func (t *TXWriter) Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time.
 		val := sysvars.Get(k)
 		if val == math.Trunc(val) {
 			t.precission = 0
+		} else if k == "Lambda.External" {
+			t.precission = 3
 		} else {
 			t.precission = 2
 		}

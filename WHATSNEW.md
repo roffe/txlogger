@@ -1,3 +1,11 @@
+# 1.0.18
+
+- Add code to convert AD_EGR value to lambda 0.5 - 1.5
+- Add settings to configure WBL when reading AD values
+- Fixed bugg where IDC did not change color on threshold values
+- Tweaked border around wbl, nbl, turbo pwm and tps gauges
+- Added support for serial logging of Innovate wideband controllers
+
 # 1.0.17
 
 - If WBL is set to None the WBL will not be shown in logplayer

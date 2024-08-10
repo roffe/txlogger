@@ -20,7 +20,7 @@ type LogWriter interface {
 	Close() error
 }
 
-type Provider interface {
+type IClient interface {
 	Start() error
 	SetRAM(address uint32, data []byte) error
 	GetRAM(address uint32, length uint32) ([]byte, error)
@@ -34,14 +34,13 @@ type Consumer interface {
 
 type LambdaProvider interface {
 	GetLambda() float64
-	Start(context.Context)
+	Start(context.Context) error
 	Stop()
-	PrettyPrint() string
+	String() string
 }
 
 type Config struct {
 	ECU            string
-	Lambda         string
 	Device         gocan.Adapter
 	Symbols        []*symbol.Symbol
 	Rate           int
@@ -51,11 +50,64 @@ type Config struct {
 	FpsCounter     binding.Int
 	LogFormat      string
 	LogPath        string
+	WidebandConfig WidebandConfig
 }
 
 type Client struct {
 	cfg Config
-	Provider
+	IClient
+}
+
+type WidebandConfig struct {
+	Type                   string
+	Port                   string
+	MinimumVoltageWideband float64
+	MaximumVoltageWideband float64
+	LowAFR                 float64
+	HighAFR                float64
+}
+
+func New(cfg Config) (IClient, error) {
+	datalogger := &Client{
+		cfg: cfg,
+	}
+	var err error
+
+	filename, lw, err := NewWriter(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	switch cfg.ECU {
+	case "T5":
+		datalogger.IClient, err = NewT5(cfg, lw)
+		if err != nil {
+			return nil, err
+		}
+	case "T7":
+		datalogger.IClient, err = NewT7(cfg, lw)
+		if err != nil {
+			return nil, err
+		}
+	case "T8":
+		datalogger.IClient, err = NewT8(cfg, lw)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("%s not supported yet", cfg.ECU)
+	}
+
+	cfg.OnMessage(fmt.Sprintf("Logging to %s", filename))
+
+	return datalogger, nil
+}
+
+func (d *Client) Start() error {
+	d.cfg.ErrorCounter.Set(0)
+	d.cfg.CaptureCounter.Set(0)
+	d.cfg.FpsCounter.Set(0)
+	return d.IClient.Start()
 }
 
 type ReadRequest struct {
@@ -148,49 +200,6 @@ func (r *RamUpdate) Wait() error {
 	case <-time.After(5 * time.Second):
 		return fmt.Errorf("timeout")
 	}
-}
-
-func New(cfg Config) (Provider, error) {
-	datalogger := &Client{
-		cfg: cfg,
-	}
-	var err error
-
-	filename, lw, err := NewWriter(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	switch cfg.ECU {
-	case "T5":
-		datalogger.Provider, err = NewT5(cfg, lw)
-		if err != nil {
-			return nil, err
-		}
-	case "T7":
-		datalogger.Provider, err = NewT7(cfg, lw)
-		if err != nil {
-			return nil, err
-		}
-	case "T8":
-		datalogger.Provider, err = NewT8(cfg, lw)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("%s not supported yet", cfg.ECU)
-	}
-
-	cfg.OnMessage(fmt.Sprintf("Logging to %s", filename))
-
-	return datalogger, nil
-}
-
-func (d *Client) Start() error {
-	d.cfg.ErrorCounter.Set(0)
-	d.cfg.CaptureCounter.Set(0)
-	d.cfg.FpsCounter.Set(0)
-	return d.Provider.Start()
 }
 
 //func (d *Client) Close() {

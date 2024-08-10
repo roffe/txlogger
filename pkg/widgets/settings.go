@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"strconv"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -11,23 +12,30 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ecumaster"
+	"github.com/roffe/txlogger/pkg/innovate"
 	sdialog "github.com/sqweek/dialog"
 )
 
 const (
-	prefsFreq                  = "freq"
-	prefsAutoUpdateLoadEcu     = "autoUpdateLoadEcu"
-	prefsAutoUpdateSaveEcu     = "autoUpdateSaveEcu"
-	prefsLivePreview           = "livePreview"
-	prefsMeshView              = "liveMeshView"
-	prefsRealtimeBars          = "realtimeBars"
-	prefsLogFormat             = "logFormat"
-	prefsLogPath               = "logPath"
-	prefsLambdaSource          = "lambdaSource"
-	prefsUseMPH                = "useMPH"
-	prefsSwapRPMandSpeed       = "swapRPMandSpeed"
-	prefsPlotResolution        = "plotResolution"
-	prefsCursorFollowCrosshair = "cursorFollowCrosshair"
+	prefsFreq                   = "freq"
+	prefsAutoUpdateLoadEcu      = "autoUpdateLoadEcu"
+	prefsAutoUpdateSaveEcu      = "autoUpdateSaveEcu"
+	prefsLivePreview            = "livePreview"
+	prefsMeshView               = "liveMeshView"
+	prefsRealtimeBars           = "realtimeBars"
+	prefsLogFormat              = "logFormat"
+	prefsLogPath                = "logPath"
+	prefsLambdaSource           = "lambdaSource"
+	prefsWidebandSymbolName     = "widebandSymbolName"
+	prefsUseMPH                 = "useMPH"
+	prefsSwapRPMandSpeed        = "swapRPMandSpeed"
+	prefsPlotResolution         = "plotResolution"
+	prefsCursorFollowCrosshair  = "cursorFollowCrosshair"
+	prefsWBLPort                = "wblPort"
+	prefsminimumVoltageWideband = "minimumVoltageWideband"
+	prefsmaximumVoltageWideband = "maximumVoltageWideband"
+	prefslowAFR                 = "lowAFR"
+	prefshighAFR                = "highAFR"
 )
 
 type SettingsWidget struct {
@@ -42,27 +50,60 @@ type SettingsWidget struct {
 	realtimeBars          *widget.Check
 	logFormat             *widget.Select
 	logPath               *widget.Label
-	lambdaSource          *widget.Select
+	wblSource             *widget.Select
 	useMPH                *widget.Check
 	swapRPMandSpeed       *widget.Check
 	plotResolution        *widget.Select
-	container             *container.Split
+	container             *container.AppTabs
+
+	// WBL Specific
+	wblPortSelect               *widget.Select
+	wblPortRefreshButton        *widget.Button
+	minimumVoltageWidebandEntry *widget.Entry
+	maximumVoltageWidebandEntry *widget.Entry
+	lowAFREntry                 *widget.Entry
+	highAFREntry                *widget.Entry
+	minimumVoltageWideband      float64
+	maximumVoltageWideband      float64
+	lowAFR                      float64
+	highAFR                     float64
+
 	widget.BaseWidget
 }
 
-func (sw *SettingsWidget) GetLambdaSource() string {
-	return sw.lambdaSource.Selected
+func (sw *SettingsWidget) GetWidebandType() string {
+	return sw.wblSource.Selected
 }
 
-func (sw *SettingsWidget) GetLambdaSymbolName() string {
-	switch sw.lambdaSource.Selected {
+func (sw *SettingsWidget) GetWidebandSymbolName() string {
+	switch sw.wblSource.Selected {
 	case "ECU":
 		return "DisplProt.LambdaScanner"
-	case ecumaster.ProductString:
+	case ecumaster.ProductString, innovate.ProductString:
 		return datalogger.EXTERNALWBLSYM
 	default:
-		return "DisplProt.LambdaScanner"
+		return "None"
 	}
+}
+
+func (sw *SettingsWidget) GetWidebandPort() string {
+	return sw.wblPortSelect.Selected
+}
+
+func (sw *SettingsWidget) GetMinimumVoltageWideband() float64 {
+	return sw.minimumVoltageWideband
+}
+
+func (sw *SettingsWidget) GetMaximumVoltageWideband() float64 {
+	return sw.maximumVoltageWideband
+}
+
+func (sw *SettingsWidget) GetLowAFR() float64 {
+	return sw.lowAFR
+}
+
+func (sw *SettingsWidget) GetHighAFR() float64 {
+	return sw.highAFR
 }
 
 func (sw *SettingsWidget) GetFreq() int {
@@ -140,125 +181,218 @@ func NewSettingsWidget() *SettingsWidget {
 	sw.logFormat = sw.newLogFormat()
 	sw.logPath = widget.NewLabel("")
 
-	lambdaSel := sw.newLambdaSelector()
 	sw.useMPH = sw.newUserMPH()
 	sw.swapRPMandSpeed = sw.newSwapRPMandSpeed()
 
 	sw.plotResolution = sw.newPlotResolution()
 
-	sw.CanSettings = NewCanSettingsWidget(fyne.CurrentApp())
+	app := fyne.CurrentApp()
 
-	left := container.NewVBox(
-		container.NewBorder(
-			nil,
-			nil,
-			widget.NewIcon(theme.InfoIcon()),
-			nil,
-			sw.autoLoad,
-		),
-		container.NewBorder(
-			nil,
-			nil,
-			widget.NewIcon(theme.WarningIcon()),
-			nil,
-			sw.autoSave,
-		),
-		container.NewBorder(
-			nil,
-			nil,
-			widget.NewIcon(theme.MoveUpIcon()),
-			nil,
-			sw.cursorFollowCrosshair,
-		),
-		container.NewBorder(
-			nil,
-			nil,
-			widget.NewIcon(theme.SearchIcon()),
-			nil,
-			container.NewVBox(
-				sw.livePreview,
-				sw.realtimeBars,
-				lambdaSel,
+	sw.CanSettings = NewCanSettingsWidget(app)
+
+	sw.wblPortSelect = widget.NewSelect(sw.CanSettings.listPorts(), func(s string) {
+		app.Preferences().SetString(prefsWBLPort, s)
+	})
+
+	sw.wblPortRefreshButton = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
+		sw.wblPortSelect.Options = sw.CanSettings.listPorts()
+		sw.wblPortSelect.Refresh()
+	})
+
+	sw.minimumVoltageWidebandEntry = widget.NewEntry()
+	sw.minimumVoltageWidebandEntry.Validator = func(s string) error {
+		val, err := positiveFloatValidator(s)
+		if err != nil {
+			return err
+		}
+		fyne.CurrentApp().Preferences().SetString(prefsminimumVoltageWideband, s)
+		sw.minimumVoltageWideband = val
+		return nil
+	}
+
+	sw.maximumVoltageWidebandEntry = widget.NewEntry()
+	sw.maximumVoltageWidebandEntry.Validator = func(s string) error {
+		val, err := positiveFloatValidator(s)
+		if err != nil {
+			return err
+		}
+		fyne.CurrentApp().Preferences().SetString(prefsmaximumVoltageWideband, s)
+		sw.maximumVoltageWideband = val
+		return nil
+	}
+
+	sw.lowAFREntry = widget.NewEntry()
+	sw.lowAFREntry.Validator = func(s string) error {
+		val, err := positiveFloatValidator(s)
+		if err != nil {
+			return err
+		}
+		fyne.CurrentApp().Preferences().SetString(prefslowAFR, s)
+		sw.lowAFR = val
+		return nil
+	}
+
+	sw.highAFREntry = widget.NewEntry()
+	sw.highAFREntry.Validator = func(s string) error {
+		val, err := positiveFloatValidator(s)
+		if err != nil {
+			return err
+		}
+		fyne.CurrentApp().Preferences().SetString(prefshighAFR, s)
+		sw.highAFR = val
+		return nil
+	}
+
+	tabs := container.NewAppTabs()
+	tabs.Append(container.NewTabItem("General", container.NewHSplit(
+		container.NewVBox(
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewIcon(theme.InfoIcon()),
+				nil,
+				sw.autoLoad,
+			),
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewIcon(theme.WarningIcon()),
+				nil,
+				sw.autoSave,
+			),
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewIcon(theme.MoveUpIcon()),
+				nil,
+				sw.cursorFollowCrosshair,
+			),
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewIcon(theme.SearchIcon()),
+				nil,
+				container.NewVBox(
+					sw.livePreview,
+					sw.realtimeBars,
+				),
+			),
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewIcon(theme.ViewFullScreenIcon()),
+				nil,
+				sw.meshView,
+			),
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewIcon(theme.InfoIcon()),
+				nil,
+				sw.useMPH,
+			),
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewIcon(theme.InfoIcon()),
+				nil,
+				sw.swapRPMandSpeed,
+			),
+			container.NewBorder(
+				nil,
+				nil,
+				//widget.NewIcon(theme.ZoomFitIcon()),
+				widget.NewLabel("Plot resolution"),
+				nil,
+				sw.plotResolution,
 			),
 		),
-		container.NewBorder(
-			nil,
-			nil,
-			widget.NewIcon(theme.ViewFullScreenIcon()),
-			nil,
-			sw.meshView,
-		),
-		container.NewBorder(
-			nil,
-			nil,
-			widget.NewIcon(theme.InfoIcon()),
-			nil,
-			sw.useMPH,
-		),
-		container.NewBorder(
-			nil,
-			nil,
-			widget.NewIcon(theme.InfoIcon()),
-			nil,
-			sw.swapRPMandSpeed,
-		),
-		container.NewBorder(
-			nil,
-			nil,
-			//widget.NewIcon(theme.ZoomFitIcon()),
-			widget.NewLabel("Plot resolution"),
-			nil,
-			sw.plotResolution,
-		),
-	)
-
-	right := container.NewVBox(
-		sw.CanSettings,
-		container.NewBorder(
-			nil,
-			nil,
-			widget.NewLabel("Logging rate (Hz)"),
-			sw.freqValue,
-			sw.freqSlider,
-		),
-		widget.NewSeparator(),
-		container.NewBorder(
-			nil,
-			nil,
-			widget.NewLabel("Log format"),
-			nil,
-			sw.logFormat,
-		),
-		container.NewBorder(
-			nil,
-			nil,
-			widget.NewLabel("Log folder"),
-			container.NewGridWithColumns(2,
-				widget.NewButtonWithIcon("Reset", theme.ContentClearIcon(), func() {
-					sw.logPath.SetText(datalogger.LOGPATH)
-					fyne.CurrentApp().Preferences().SetString(prefsLogPath, datalogger.LOGPATH)
-				}),
-				widget.NewButtonWithIcon("Browse", theme.FileIcon(), func() {
-					dir, err := sdialog.Directory().Title("Select log folder").Browse()
-					if err != nil {
-						if errors.Is(err, sdialog.ErrCancelled) {
+		container.NewVBox(
+			sw.CanSettings,
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewLabel("Logging rate (Hz)"),
+				sw.freqValue,
+				sw.freqSlider,
+			),
+			widget.NewSeparator(),
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewLabel("Log format"),
+				nil,
+				sw.logFormat,
+			),
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewLabel("Log folder"),
+				container.NewGridWithColumns(2,
+					widget.NewButtonWithIcon("Reset", theme.ContentClearIcon(), func() {
+						sw.logPath.SetText(datalogger.LOGPATH)
+						fyne.CurrentApp().Preferences().SetString(prefsLogPath, datalogger.LOGPATH)
+					}),
+					widget.NewButtonWithIcon("Browse", theme.FileIcon(), func() {
+						dir, err := sdialog.Directory().Title("Select log folder").Browse()
+						if err != nil {
+							if errors.Is(err, sdialog.ErrCancelled) {
+								return
+							}
+							log.Println(err)
 							return
 						}
-						log.Println(err)
-						return
-					}
-					sw.logPath.SetText(dir)
-					fyne.CurrentApp().Preferences().SetString(prefsLogPath, dir)
-				}),
+						sw.logPath.SetText(dir)
+						fyne.CurrentApp().Preferences().SetString(prefsLogPath, dir)
+					}),
+				),
+				sw.logPath,
 			),
-			sw.logPath,
 		),
-	)
+	)))
 
-	sw.container = container.NewHSplit(
-		left,
-		right,
-	)
+	wblSel := sw.newWBLSelector()
+
+	tabs.Append(container.NewTabItem("WBL", container.NewVBox(
+		wblSel,
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewLabel("WBL Port"),
+			sw.wblPortRefreshButton,
+			sw.wblPortSelect,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewLabel("Minimum voltage"),
+			nil,
+			sw.minimumVoltageWidebandEntry,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewLabel("Maximum voltage"),
+			nil,
+			sw.maximumVoltageWidebandEntry,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewLabel("Low AFR"),
+			nil,
+			sw.lowAFREntry,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewLabel("High AFR"),
+			nil,
+			sw.highAFREntry,
+		),
+	)))
+
+	sw.container = tabs
 
 	sw.loadPrefs()
 	return sw
@@ -270,16 +404,22 @@ func (sw *SettingsWidget) newLogFormat() *widget.Select {
 	})
 }
 
-func (sw *SettingsWidget) newLambdaSelector() *fyne.Container {
-	sw.lambdaSource = widget.NewSelect([]string{"None", "ECU", ecumaster.ProductString}, func(s string) {
+func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
+	sw.wblSource = widget.NewSelect([]string{
+		"None",
+		"ECU",
+		ecumaster.ProductString,
+		innovate.ProductString,
+	}, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsLambdaSource, s)
+		fyne.CurrentApp().Preferences().SetString(prefsWidebandSymbolName, sw.GetWidebandSymbolName())
 	})
 	return container.NewBorder(
 		nil,
 		nil,
-		widget.NewLabel("WBL"),
+		widget.NewLabel("Source"),
 		nil,
-		sw.lambdaSource,
+		sw.wblSource,
 	)
 }
 
@@ -291,7 +431,6 @@ func (sw *SettingsWidget) newFreqSlider() *widget.Slider {
 	slider.OnChangeEnded = func(f float64) {
 		fyne.CurrentApp().Preferences().SetInt(prefsFreq, int(f))
 	}
-
 	return slider
 }
 
@@ -360,13 +499,32 @@ func (sw *SettingsWidget) loadPrefs() {
 	sw.realtimeBars.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsRealtimeBars, true))
 	sw.logFormat.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogFormat, "TXL"))
 	sw.logPath.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogPath, datalogger.LOGPATH))
-	sw.lambdaSource.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLambdaSource, "None"))
+	sw.wblSource.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLambdaSource, "None"))
 	sw.useMPH.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsUseMPH, false))
 	sw.swapRPMandSpeed.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsSwapRPMandSpeed, false))
 	sw.plotResolution.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsPlotResolution, "Full"))
+	sw.wblPortSelect.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsWBLPort, ""))
+	sw.minimumVoltageWidebandEntry.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefsminimumVoltageWideband, "0.0"))
+	sw.maximumVoltageWidebandEntry.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefsmaximumVoltageWideband, "5.0"))
+	sw.lowAFREntry.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefslowAFR, "0.5"))
+	sw.highAFREntry.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefshighAFR, "1.5"))
 
 }
 
 func (sw *SettingsWidget) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(sw.container)
+}
+
+func positiveFloatValidator(s string) (float64, error) {
+	s = strings.ReplaceAll(s, ",", ".")
+	s = strings.TrimSuffix(s, ".")
+
+	val, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, errors.New("invalid number")
+	}
+	if val < 0 {
+		return 0, errors.New("must be positive")
+	}
+	return val, nil
 }

@@ -46,7 +46,7 @@ func NewLambdaToCAN(c *gocan.Client) *LambdaToCAN {
 	return &LambdaToCAN{c: c}
 }
 
-func (l *LambdaToCAN) Start(ctx context.Context) {
+func (l *LambdaToCAN) Start(ctx context.Context) error {
 	l.running = true
 	sub := l.c.Subscribe(ctx, 0x664, 0x665)
 	go func() {
@@ -65,6 +65,7 @@ func (l *LambdaToCAN) Start(ctx context.Context) {
 			}
 		}
 	}()
+	return nil
 }
 
 func (l *LambdaToCAN) Stop() {
@@ -126,7 +127,7 @@ type LambdaToCANStatus struct {
 }
 
 // PrettyPrint outputs the data in LambdaToCAN664 in a human-readable format.
-func (l *LambdaToCAN) PrettyPrint() string {
+func (l *LambdaToCAN) String() string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	var out strings.Builder

@@ -17,6 +17,7 @@ import (
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ecumaster"
+	"github.com/roffe/txlogger/pkg/innovate"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -79,7 +80,7 @@ type T8Client struct {
 	Config
 }
 
-func NewT8(cfg Config, lw LogWriter) (Provider, error) {
+func NewT8(cfg Config, lw LogWriter) (IClient, error) {
 	return &T8Client{
 		Config:     cfg,
 		symbolChan: make(chan []*symbol.Symbol, 1),
@@ -152,10 +153,19 @@ func (c *T8Client) Start() error {
 	// sort order
 	sort.StringSlice(order).Sort()
 
-	switch c.Config.Lambda {
+	switch c.Config.WidebandConfig.Type {
 	case "ECU":
 	case ecumaster.ProductString:
 		c.lamb = ecumaster.NewLambdaToCAN(cl)
+		c.lamb.Start(ctx)
+		defer c.lamb.Stop()
+		order = append(order, EXTERNALWBLSYM)
+	case innovate.ProductString:
+		wblClient, err := innovate.NewISP2Client(c.Config.WidebandConfig.Port, c.Config.OnMessage)
+		if err != nil {
+			return err
+		}
+		c.lamb = wblClient
 		c.lamb.Start(ctx)
 		defer c.lamb.Stop()
 		order = append(order, EXTERNALWBLSYM)

@@ -105,6 +105,14 @@ func (l *CSVLogfile) parseCSVLogfile(filename string) error {
 			if err != nil {
 				return err
 			}
+
+			//if records[0][j] == "Lambda.External" {
+			//	if val > 1.5 {
+			//		val = 1.5
+			//	} else if val < 0.5 {
+			//		val = 0.5
+			//	}
+			//}
 			rec.SetValue(records[0][j], val)
 		}
 

@@ -1,8 +1,6 @@
 package plotter
 
 import (
-	"log"
-
 	"fyne.io/fyne/v2"
 )
 
@@ -25,7 +23,7 @@ func (r *plotterRenderer) Layout(size fyne.Size) {
 	}
 	r.size = size
 
-	log.Println("plotter.Layout", size.Width, size.Height)
+	// log.Println("plotter.Layout", size.Width, size.Height)
 	r.p.container.Resize(size)
 	pl := r.p.canvasImage.Size()
 	r.p.plotResolution = fyne.NewSize(pl.Width*r.p.plotResolutionFactor, pl.Height*r.p.plotResolutionFactor)

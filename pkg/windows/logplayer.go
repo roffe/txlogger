@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -97,6 +98,15 @@ type LogPlayer struct {
 	fyne.Window
 }
 
+func loadSettingStringFloat64(app fyne.App, key string, def float64) float64 {
+	raw := app.Preferences().String(key)
+	val, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return def
+	}
+	return val
+}
+
 func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) *LogPlayer {
 	w := a.NewWindow("LogPlayer " + filename)
 	w.Resize(fyne.NewSize(1024, 530))
@@ -108,6 +118,9 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 		LogBtn:          nil,
 		UseMPH:          a.Preferences().BoolWithFallback("useMPH", false),
 		SwapRPMandSpeed: a.Preferences().BoolWithFallback("swapRPMandSpeed", false),
+		HighAFR:         loadSettingStringFloat64(a, "highAFR", 1.5),
+		LowAFR:          loadSettingStringFloat64(a, "lowAFR", 0.5),
+		WidebandSymbol:  a.Preferences().StringWithFallback("widebandSymbolName", "DisplProt.LambdaScanner"),
 	}
 
 	lp := &LogPlayer{
@@ -122,7 +135,8 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 
 		closed: false,
 
-		lambSymbolName: "DisplProt.LambdaScanner",
+		//lambSymbolName: fyne.CurrentApp().Preferences().StringWithFallback("lambdaSource", "DisplProt.LambdaScanner"),
+		lambSymbolName: "Lambda.External",
 
 		Window: w,
 
@@ -194,13 +208,13 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 
 	//lp.currLine = binding.NewFloat()
 
-	start := time.Now()
+	//start := time.Now()
 	logz, err := logfile.Open(filename)
 	if err != nil {
 		log.Println(err)
 		return lp
 	}
-	log.Printf("Parsed %d records in %s", logz.Len(), time.Since(start))
+	//log.Printf("Parsed %d records in %s", logz.Len(), time.Since(start))
 
 	playing := false
 	lp.toggleBtn = &widget.Button{

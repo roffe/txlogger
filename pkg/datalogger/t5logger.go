@@ -29,7 +29,7 @@ type T5Client struct {
 	errPerSecond int
 }
 
-func NewT5(cfg Config, lw LogWriter) (Provider, error) {
+func NewT5(cfg Config, lw LogWriter) (IClient, error) {
 	return &T5Client{
 		Config:     cfg,
 		lw:         lw,
@@ -90,7 +90,7 @@ func (c *T5Client) Start() error {
 	cps := 0
 	t5 := t5can.NewClient(cl)
 	count := 0
-	vars := NewThreadSafeMap()
+	sysvars := NewThreadSafeMap()
 	order := make([]string, len(c.Symbols))
 	for n, s := range c.Symbols {
 		log.Println(s.String())
@@ -131,8 +131,8 @@ func (c *T5Client) Start() error {
 					if err := sym.Read(r); err != nil {
 						return err
 					}
-					val := converto(sym.Name, sym.Bytes())
-					vars.Set(sym.Name, val)
+					val := c.converto(sym.Name, sym.Bytes())
+					sysvars.Set(sym.Name, val)
 					if err := ebus.Publish(sym.Name, val); err != nil {
 						c.onError(err)
 					}
@@ -142,7 +142,7 @@ func (c *T5Client) Start() error {
 				if count%15 == 0 {
 					c.CaptureCounter.Set(count)
 				}
-				if err := c.lw.Write(vars, []*symbol.Symbol{}, ts, order); err != nil {
+				if err := c.lw.Write(sysvars, []*symbol.Symbol{}, ts, order); err != nil {
 					return err
 				}
 			}
@@ -166,8 +166,11 @@ func (c *T5Client) onError(err error) {
 	c.OnMessage(err.Error())
 }
 
-func converto(name string, data []byte) float64 {
-	correctionForMapsensor := 1.0
+const (
+	correctionForMapsensor = 1.0
+)
+
+func (c *T5Client) converto(name string, data []byte) float64 {
 	switch name {
 	case "P_medel", "P_Manifold10", "P_Manifold", "Max_tryck", "Regl_tryck":
 		// inlet manifold pressure
@@ -188,14 +191,22 @@ func converto(name string, data []byte) float64 {
 		// fix
 		// retval = ConvertToAFR(retval)
 	case "AD_EGR":
-		return ConvertByteStringToDouble(data)
+		value := ConvertByteStringToDouble(data)
+		voltage := (value / 255) * (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
+		voltage = clamp(voltage, c.WidebandConfig.MinimumVoltageWideband, c.WidebandConfig.MaximumVoltageWideband)
+		steepness := (c.WidebandConfig.HighAFR - c.WidebandConfig.LowAFR) / (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
+		return c.WidebandConfig.LowAFR + (steepness * (voltage - c.WidebandConfig.MinimumVoltageWideband))
+		// return ((lambAt5v-lambAt0v)/255)*ConvertByteStringToDouble(data) + lambAt0v
 	case "Pgm_status":
 		// now what, just pass it on in a seperate structure
 		// fix
 		// retval = ConvertByteStringToDoubleStatus(data)
 		return 0
 	case "Insptid_ms10":
-		return ConvertByteStringToDouble(data) / 10
+		// return value using multiplication instead of division
+		return ConvertByteStringToDouble(data) * 0.1
+		//return ConvertByteStringToDouble(data) / 10
+
 	case "Lacc_mangd", "Acc_mangd", "Lret_mangd", "Ret_mangd":
 		// 4 values in one variable, one for each cylinder
 		return ConvertByteStringToDouble(data)
@@ -237,6 +248,16 @@ func converto(name string, data []byte) float64 {
 	default:
 		return ConvertByteStringToDouble(data)
 	}
+}
+
+func clamp(value, min, max float64) float64 {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }
 
 func ConvertByteStringToDouble(ecudata []byte) float64 {

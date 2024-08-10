@@ -15,6 +15,7 @@ import (
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecumaster"
+	"github.com/roffe/txlogger/pkg/innovate"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
@@ -38,7 +39,7 @@ type T7Client struct {
 	Config
 }
 
-func NewT7(cfg Config, lw LogWriter) (Provider, error) {
+func NewT7(cfg Config, lw LogWriter) (IClient, error) {
 	return &T7Client{
 		Config:     cfg,
 		symbolChan: make(chan []*symbol.Symbol, 1),
@@ -166,10 +167,19 @@ func (c *T7Client) Start() error {
 		bcancel()
 	}
 
-	switch c.Config.Lambda {
+	switch c.Config.WidebandConfig.Type {
 	case "ECU":
 	case ecumaster.ProductString:
 		c.lamb = ecumaster.NewLambdaToCAN(cl)
+		c.lamb.Start(ctx)
+		defer c.lamb.Stop()
+		order = append(order, EXTERNALWBLSYM)
+	case innovate.ProductString:
+		wblClient, err := innovate.NewISP2Client(c.Config.WidebandConfig.Port, c.Config.OnMessage)
+		if err != nil {
+			return err
+		}
+		c.lamb = wblClient
 		c.lamb.Start(ctx)
 		defer c.lamb.Stop()
 		order = append(order, EXTERNALWBLSYM)
@@ -177,7 +187,7 @@ func (c *T7Client) Start() error {
 
 	for _, sym := range c.Symbols {
 		if c.sysvars.Exists(sym.Name) {
-			log.Println("Skipping", sym.Name)
+			//			log.Println("Skipping", sym.Name)
 			sym.Skip = true
 		}
 	}
@@ -221,7 +231,7 @@ func (c *T7Client) Start() error {
 			if sym.Skip {
 				continue
 			}
-			log.Println("Defining", sym.Name, dpos)
+			//			log.Println("Defining", sym.Name, dpos)
 			if err := kwp.DynamicallyDefineLocalIdRequest(ctx, dpos, sym); err != nil {
 				return err
 			}
@@ -336,6 +346,16 @@ func (c *T7Client) Start() error {
 						c.onError(err)
 						break
 					}
+					if va.Name == "DisplProt.AD_Scanner" {
+						value := va.Float64()
+						voltage := (value / 1023) * (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
+						voltage = clamp(voltage, c.WidebandConfig.MinimumVoltageWideband, c.WidebandConfig.MaximumVoltageWideband)
+						steepness := (c.WidebandConfig.HighAFR - c.WidebandConfig.LowAFR) / (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
+						afr := c.WidebandConfig.LowAFR + (steepness * (voltage - c.WidebandConfig.MinimumVoltageWideband))
+						ebus.Publish(va.Name, afr)
+						continue
+					}
+
 					ebus.Publish(va.Name, va.Float64())
 				}
 
@@ -344,8 +364,9 @@ func (c *T7Client) Start() error {
 				}
 
 				if c.lamb != nil {
-					ebus.Publish(EXTERNALWBLSYM, c.lamb.GetLambda())
-					c.sysvars.Set(EXTERNALWBLSYM, c.lamb.GetLambda())
+					lambda := c.lamb.GetLambda()
+					c.sysvars.Set(EXTERNALWBLSYM, lambda)
+					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
 				//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)

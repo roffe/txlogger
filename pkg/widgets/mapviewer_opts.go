@@ -143,7 +143,7 @@ func WithEditable(editable bool) MapViewerOption {
 	}
 }
 
-func WithLambdaSymbolName(lambdaName string) MapViewerOption {
+func WithWidebandSymbolName(lambdaName string) MapViewerOption {
 	return func(mv *MapViewer) error {
 		mv.lambdaName = lambdaName
 		return nil
