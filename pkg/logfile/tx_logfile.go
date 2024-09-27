@@ -88,6 +88,7 @@ var timeFormats = []string{
 	`2006/01/02 15:04:05.999`,
 	`02-01-2006 15:04:05.999`,
 	`2006-01-02 15:04:05.999`,
+	`02.01.2006 15:04:05.999`,
 }
 
 func detectTimeFormat(text string) (string, error) {

@@ -16,13 +16,13 @@ import (
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/capture"
+	"github.com/roffe/txlogger/pkg/dashboard"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/eventbus"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/mainmenu"
 	"github.com/roffe/txlogger/pkg/plotter"
-	"github.com/roffe/txlogger/pkg/widgets"
 )
 
 const TIME_FORMAT = "02-01-2006 15:04:05.999"
@@ -76,7 +76,7 @@ type LogPlayer struct {
 
 	slider *slider
 
-	db          *widgets.Dashboard
+	db          *dashboard.Dashboard
 	controlChan chan *controlMsg
 
 	symbols symbol.SymbolCollection
@@ -111,7 +111,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 	w := a.NewWindow("LogPlayer " + filename)
 	w.Resize(fyne.NewSize(1024, 530))
 
-	dbCfg := &widgets.DashboardConfig{
+	dbCfg := &dashboard.DashboardConfig{
 		App:             a,
 		Mw:              w,
 		Logplayer:       true,
@@ -125,7 +125,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 
 	lp := &LogPlayer{
 		app: a,
-		db:  widgets.NewDashboard(dbCfg),
+		db:  dashboard.NewDashboard(dbCfg),
 
 		controlChan: make(chan *controlMsg, 10),
 
@@ -165,6 +165,8 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 		if strings.Contains(l, "AirMassMast.m_Request") {
 			lp.logType = "T8"
 			dbCfg.AirDemToString = datalogger.AirDemToStringT8
+		} else if strings.Contains(l, "Lufttemp") {
+			lp.logType = "T5"
 		} else {
 			lp.logType = "T7"
 			dbCfg.AirDemToString = datalogger.AirDemToStringT7
@@ -296,7 +298,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 }
 
 func (lp *LogPlayer) setupPlot(logz logfile.Logfile) {
-	start := time.Now()
+	//start := time.Now()
 	values := make(map[string][]float64)
 	order := make([]string, 0)
 	first := true
@@ -337,7 +339,7 @@ func (lp *LogPlayer) setupPlot(logz logfile.Logfile) {
 		plotterOpts...,
 	)
 	lp.plotter.Logplayer = true
-	log.Println("creating plotter took", time.Since(start))
+	//	log.Println("creating plotter took", time.Since(start))
 }
 
 func (lp *LogPlayer) render() fyne.CanvasObject {
@@ -409,7 +411,7 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 			case OpNext:
 				playonce = true
 			case OpExit:
-				log.Println("exiting logplayer playback controller")
+				//				log.Println("exiting logplayer playback controller")
 				return
 			}
 		}
@@ -442,7 +444,7 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 			}
 		}
 	}
-	log.Println("Exiting logplayer playback")
+	//	log.Println("Exiting logplayer playback")
 }
 
 func currentTimeFormatted(t time.Time) string {

@@ -14,6 +14,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/assets"
+	"github.com/roffe/txlogger/pkg/common"
 )
 
 type Dashboard struct {
@@ -26,7 +27,7 @@ type Dashboard struct {
 	nblambda, wblambda              *CBar
 	pressure, airmass               *DualDial
 	ioff, activeAirDem, ign, cruise *canvas.Text
-	idc                             *canvas.Text
+	idc, amul                       *canvas.Text
 	checkEngine                     *canvas.Image
 	limpMode                        *canvas.Image
 	knockIcon                       *Icon
@@ -101,6 +102,7 @@ type DashboardConfig struct {
 	LogBtn          *widget.Button
 	OnClose         func()
 	AirDemToString  func(float64) string
+	FCutToString    func(float64) string
 	UseMPH          bool
 	SwapRPMandSpeed bool
 	HighAFR         float64
@@ -181,15 +183,15 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 			DisplayString: "λ %.3f",
 		}),
 		nblambda: NewCBar(&CBarConfig{
-			Title:           "",
-			Min:             -25,
-			Center:          0,
-			Max:             25,
-			Steps:           40,
-			Minsize:         fyne.NewSize(100, 45),
-			DisplayString:   "%.2f%%",
-			DisplayTextSize: 40,
-			TextPosition:    TextAtBottom,
+			Title:         "",
+			Min:           -25,
+			Center:        0,
+			Max:           25,
+			Steps:         40,
+			Minsize:       fyne.NewSize(100, 45),
+			DisplayString: "%.2f%%",
+			//DisplayTextSize: 40,
+			TextPosition: TextAtBottom,
 		}),
 		cruise: &canvas.Text{
 			Text:      "Cruise",
@@ -218,6 +220,12 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 			Alignment: fyne.TextAlignLeading,
 			TextSize:  44,
 			Color:     color.RGBA{R: 0, G: 255, B: 0, A: 255},
+		},
+		amul: &canvas.Text{
+			Text:      "Amul: 0%",
+			Alignment: fyne.TextAlignLeading,
+			TextSize:  28,
+			Color:     color.RGBA{R: 255, G: 255, B: 255, A: 255},
 		},
 		airmass: NewDualDial(DualDialConfig{
 			Title: "mg/c",
@@ -285,6 +293,7 @@ func (db *Dashboard) render() *fyne.Container {
 		db.ign,
 		db.ioff,
 		db.idc,
+		db.amul,
 
 		db.activeAirDem,
 
@@ -426,6 +435,13 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		}
 	}
 
+	amulSetter := func(obj *canvas.Text, text string) func(float64) {
+		return func(value float64) {
+			obj.Text = text + ": " + strconv.FormatFloat(value, 'f', 2, 64) + "%"
+			obj.Refresh()
+		}
+	}
+
 	ioff := func(value float64) {
 		db.ioff.Text = "Ioff: " + strconv.FormatFloat(value, 'f', 1, 64)
 		switch {
@@ -527,6 +543,8 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 
 		"Out.PWM_BoostCntrl": db.pwm.SetValue, // t7 & t8
 		"PWM_ut10":           db.pwm.SetValue, // t5
+
+		"AdpFuelProt.MulFuelAdapt": amulSetter(db.amul, "Amul"), // t7
 
 		// Wideband lambda
 		//"DisplProt.LambdaScanner": db.wblambda.SetValue, // t7 & t8
@@ -754,7 +772,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 
 	db := dr.db
 
-	var sixthWidth float32 = space.Width * oneSixth
+	var sixthWidth float32 = space.Width * common.OneSixth
 	var thirdHeight float32 = (space.Height - 50) * .33
 	var halfHeight float32 = (space.Height - 50) * .5
 
@@ -765,13 +783,13 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 		db.rpm.Move(fyne.NewPos(0, 5))
 
 		// Center dial
-		db.speed.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth*oneThird*2)-20, space.Height-115))
+		db.speed.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth*common.OneThird*2)-20, space.Height-115))
 		db.speed.Move(fyne.NewPos(space.Width*.5-db.speed.Size().Width*.5, space.Height*.5-db.speed.Size().Height*.5+25))
 	} else {
 		db.speed.Resize(fyne.NewSize(sixthWidth, thirdHeight))
 		db.speed.Move(fyne.NewPos(0, 5))
 		// Center dial
-		db.rpm.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth*oneThird*2)-20, space.Height-115))
+		db.rpm.Resize(fyne.NewSize(space.Width-sixthWidth*2-(sixthWidth*common.OneThird*2)-20, space.Height-115))
 		db.rpm.Move(fyne.NewPos(space.Width*.5-db.rpm.Size().Width*.5, space.Height*.5-db.rpm.Size().Height*.5+25))
 	}
 
@@ -789,11 +807,11 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 
 	// Vbar
 	pwm := db.pwm
-	pwm.Resize(fyne.NewSize(sixthWidth*oneThird, space.Height-125))
+	pwm.Resize(fyne.NewSize(sixthWidth*common.OneThird, space.Height-125))
 	pwm.Move(fyne.NewPos(sixthWidth+8, 25))
 
 	tps := db.throttle
-	tps.Resize(fyne.NewSize(sixthWidth*oneThird, space.Height-125))
+	tps.Resize(fyne.NewSize(sixthWidth*common.OneThird, space.Height-125))
 	tps.Move(fyne.NewPos(space.Width-sixthWidth-tps.Size().Width-8, 25))
 
 	// Cbar
@@ -802,6 +820,9 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 
 	db.wblambda.Resize(fyne.NewSize((sixthWidth * 3), 65))
 	db.wblambda.Move(fyne.NewPos(sixthWidth*1.5, space.Height-65))
+
+	//db.amul.Resize(fyne.NewSize(sixthWidth, space.Height-thirdHeight))
+	db.amul.Move(fyne.NewPos(sixthWidth*1.5, space.Height-(db.wblambda.Size().Height*1.6)))
 
 	// Icons
 	db.limpMode.Resize(fyne.NewSize(sixthWidth, thirdHeight))
@@ -820,19 +841,19 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	if !db.logplayer {
 		if space.Width < 1000 {
 			db.fullscreenBtn.SetText("(F)")
-			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth*oneHalfOne, 55))
+			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth*common.OneHalfOne, 55))
 		} else if space.Width < 1300 {
 			db.fullscreenBtn.SetText("Fullscrn")
-			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth*oneOneEight, 55))
+			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth*common.OneOneEight, 55))
 		} else {
 			db.fullscreenBtn.SetText("Fullscreen")
-			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth*oneOneFive, 55))
+			db.fullscreenBtn.Resize(fyne.NewSize(sixthWidth*common.OneOneFive, 55))
 		}
 
 		db.logBtn.Resize(fyne.NewSize(db.wblambda.Position().X-db.fullscreenBtn.Size().Width-14, 55))
 		db.logBtn.Move(fyne.NewPos(db.fullscreenBtn.Size().Width+5, space.Height-55))
 	} else {
-		db.time.Move(fyne.NewPos(space.Width*.5-100, space.Height*oneHalfSix))
+		db.time.Move(fyne.NewPos(space.Width*.5-100, space.Height*common.OneHalfSix))
 	}
 	db.fullscreenBtn.Move(fyne.NewPos(0, space.Height-55))
 
@@ -848,7 +869,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	//db.idc.TextSize = textSize
 	db.idc.Move(fyne.NewPos((db.nblambda.Position().X+db.nblambda.Size().Width)-db.idc.MinSize().Width, db.nblambda.Size().Height-14))
 
-	db.activeAirDem.TextSize = min(space.Width*oneTwentyFifth, 45)
+	db.activeAirDem.TextSize = min(space.Width*common.OneTwentyFifth, 45)
 	db.activeAirDem.Move(fyne.NewPos(space.Width*.5, thirdHeight))
 
 	db.cruise.Move(fyne.NewPos(sixthWidth*1.45, space.Height-(db.checkEngine.Size().Height*.6)-db.wblambda.Size().Height))

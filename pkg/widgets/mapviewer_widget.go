@@ -16,6 +16,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/layout"
 )
@@ -163,13 +164,14 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 	mv.grid = NewGrid(mv.numColumns, mv.numRows)
 
 	mv.innerView.Add(mv.valueRects)
-	mv.innerView.Add(container.NewWithoutLayout(
+	mv.innerView.Add(
 		mv.crosshair,
-		mv.cursor,
-	))
+		// mv.cursor,
+	)
 
 	mv.innerView.Add(mv.grid)
 	mv.innerView.Add(mv.valueTexts)
+	mv.innerView.Add(mv.cursor)
 
 	if mv.showWBL {
 		mv.lamb = NewCBar(&CBarConfig{
@@ -405,7 +407,7 @@ func (mv *MapViewer) resize(size fyne.Size) {
 }
 
 func calculateOptimalTextSize(cellwidth float32) float32 {
-	return max(min(float32(cellwidth*oneFifth), 21), 12)
+	return max(min(float32(cellwidth*common.OneFifth), 21), 12)
 }
 
 func (mv *MapViewer) resizeCursor() {
@@ -440,15 +442,15 @@ func (mv *MapViewer) resizeCursor() {
 			topLeftY := float32(mv.numRows-1-maxY) * mv.heightFactor
 			width := float32(maxX-minX+1) * mv.widthFactor
 			height := float32(maxY-minY+1) * mv.heightFactor
-			mv.cursor.Resize(fyne.NewSize(width, height))
-			mv.cursor.Move(fyne.NewPos(topLeftX, topLeftY))
+			mv.cursor.Resize(fyne.NewSize(width+1, height+1))
+			mv.cursor.Move(fyne.NewPos(topLeftX-1, topLeftY-1))
 
 		} else {
-			mv.cursor.Resize(fyne.NewSize(mv.widthFactor, mv.heightFactor))
+			mv.cursor.Resize(fyne.NewSize(mv.widthFactor+1, mv.heightFactor+1))
 			mv.cursor.Move(
 				fyne.NewPos(
-					float32(mv.selectedX)*mv.widthFactor,
-					float32(mv.numRows-1-mv.SelectedY)*mv.heightFactor,
+					(float32(mv.selectedX)*mv.widthFactor)-1,
+					(float32(mv.numRows-1-mv.SelectedY)*mv.heightFactor)-1,
 				),
 			)
 		}

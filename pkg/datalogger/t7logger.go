@@ -135,6 +135,10 @@ func (c *T7Client) onError(err error) {
 func (c *T7Client) Start() error {
 	defer c.lw.Close()
 
+	var txbridge bool
+	if c.Config.Device.Name() == "txbridge" {
+		txbridge = true
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -183,6 +187,19 @@ func (c *T7Client) Start() error {
 		c.lamb.Start(ctx)
 		defer c.lamb.Stop()
 		order = append(order, EXTERNALWBLSYM)
+
+		if txbridge {
+			wblSub := cl.Subscribe(ctx, 0x124)
+			defer wblSub.Close()
+			go func() {
+				for msg := range wblSub.C() {
+					if msg.Identifier() == 0x124 {
+						wblClient.SetData(msg.Data())
+					}
+				}
+			}()
+		}
+
 	}
 
 	for _, sym := range c.Symbols {
@@ -266,6 +283,17 @@ func (c *T7Client) Start() error {
 			}
 		}
 
+		tx := cl.Subscribe(ctx, 0x123)
+		defer tx.Close()
+
+		if txbridge {
+			log.Println("stopped timer, using txbridge")
+			t.Stop()
+			if err := cl.SendFrame(0x123, []byte("r"), gocan.Outgoing); err != nil {
+				return err
+			}
+		}
+
 		//buf := bytes.NewBuffer(nil)
 		var databuff []byte
 		for {
@@ -306,16 +334,48 @@ func (c *T7Client) Start() error {
 					c.OnMessage("Configured dynamic register")
 				}
 			case read := <-c.readChan:
-				log.Printf("Reading %X %d", read.Address, read.Length)
+				if txbridge {
+					if err := cl.SendFrame(0x123, []byte("s"), gocan.Outgoing); err != nil {
+						c.onError(err)
+						continue
+					}
+					time.Sleep(42 * time.Millisecond)
+				}
+				// log.Printf("Reading %X %d", read.Address, read.Length)
 				data, err := kwp.ReadMemoryByAddress(ctx, int(read.Address), int(read.Length))
 				if err != nil {
 					read.Complete(err)
+					if txbridge {
+						if err := cl.SendFrame(0x123, []byte("r"), gocan.Outgoing); err != nil {
+							c.onError(err)
+							continue
+						}
+					}
 					continue
 				}
 				read.Data = data
+				if txbridge {
+					if err := cl.SendFrame(0x123, []byte("r"), gocan.Outgoing); err != nil {
+						c.onError(err)
+						continue
+					}
+				}
 				read.Complete(nil)
 			case upd := <-c.updateChan:
+				if txbridge {
+					if err := cl.SendFrame(0x123, []byte("s"), gocan.Outgoing); err != nil {
+						c.onError(err)
+						continue
+					}
+					time.Sleep(42 * time.Millisecond)
+				}
 				upd.Complete(kwp.WriteDataByAddress(ctx, upd.Address, upd.Data))
+				if txbridge {
+					if err := cl.SendFrame(0x123, []byte("r"), gocan.Outgoing); err != nil {
+						c.onError(err)
+						continue
+					}
+				}
 			case <-t.C:
 				timeStamp = time.Now()
 				if len(c.Symbols) == 0 {
@@ -331,6 +391,59 @@ func (c *T7Client) Start() error {
 
 				if len(databuff) != int(expectedPayloadSize) {
 					c.onError(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
+					continue
+					//return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
+				}
+
+				r := bytes.NewReader(databuff)
+				for _, va := range c.Symbols {
+					if va.Skip {
+						ebus.Publish(va.Name, c.sysvars.Get(va.Name))
+						continue
+					}
+					if err := va.Read(r); err != nil {
+						log.Printf("data ex %d %X len %d", expectedPayloadSize, databuff, len(databuff))
+						c.onError(err)
+						break
+					}
+					if va.Name == "DisplProt.AD_Scanner" {
+						value := va.Float64()
+						voltage := (value / 1023) * (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
+						voltage = clamp(voltage, c.WidebandConfig.MinimumVoltageWideband, c.WidebandConfig.MaximumVoltageWideband)
+						steepness := (c.WidebandConfig.HighAFR - c.WidebandConfig.LowAFR) / (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
+						afr := c.WidebandConfig.LowAFR + (steepness * (voltage - c.WidebandConfig.MinimumVoltageWideband))
+						ebus.Publish(va.Name, afr)
+						continue
+					}
+
+					ebus.Publish(va.Name, va.Float64())
+				}
+
+				if r.Len() > 0 {
+					c.OnMessage(fmt.Sprintf("%d leftover bytes!", r.Len()))
+				}
+
+				if c.lamb != nil {
+					lambda := c.lamb.GetLambda()
+					c.sysvars.Set(EXTERNALWBLSYM, lambda)
+					ebus.Publish(EXTERNALWBLSYM, lambda)
+				}
+
+				//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
+				if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
+					c.onError(fmt.Errorf("failed to write log: %w", err))
+				}
+				count++
+				cps++
+				if count%15 == 0 {
+					c.CaptureCounter.Set(count)
+				}
+			case msg := <-tx.C():
+				timeStamp = time.Now()
+				databuff = msg.Data()
+				if len(databuff) != int(expectedPayloadSize) {
+					c.onError(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
+					log.Printf("%02X", databuff)
 					continue
 					//return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
 				}
@@ -459,6 +572,45 @@ func AirDemToStringT7(v float64) string {
 		return "Cold engine temp"
 	case 81:
 		return "Overheating"
+	default:
+		return "Unknown"
+	}
+}
+
+func FCutToStringT7(value float64) string {
+	switch value {
+	case 0:
+		return "No fuelcut"
+	case 1:
+		return "Ignition key turned off"
+	case 2:
+		return "Accelerator pedal pressed during start"
+	case 3:
+		return "RPM limiter (engine speed guard)"
+	case 4:
+		return "Throttle block adaption active 1st time"
+	case 5, 6:
+		return "Airmass limit (pressure guard)"
+	case 7:
+		return "Immobilizer code incorrect"
+	case 8:
+		return "Current to h-bridge to high during throttle limphome"
+	case 9:
+		return "Torque to high during throttle limphome"
+	case 11:
+		return "Tampering protection of throttle"
+	case 12:
+		return "Error on all ignition trigger outputs"
+	case 13:
+		return "ECU not correctly programmed"
+	case 14:
+		return "To high rpm in throttle limp home, pedal potentiometer fault"
+	case 15:
+		return "Torque master fuel cut request"
+	case 16:
+		return "TCM requests fuelcut to smoothen gear shift"
+	case 20:
+		return "Application conditions for fuel cut"
 	default:
 		return "Unknown"
 	}

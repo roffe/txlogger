@@ -19,7 +19,7 @@ require (
 )
 
 require (
-	fyne.io/fyne/v2 v2.5.1-0.20240802121801-7c90880f2c60
+	fyne.io/fyne/v2 v2.5.2-0.20240905160134-367ea0ae8f9a
 	fyne.io/systray v1.11.0 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
@@ -61,7 +61,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-require github.com/roffe/ecusymbol v0.0.0-20240804171754-0380a1bdee5e
+require github.com/roffe/ecusymbol v0.0.0-20240817185823-f14fd497976a
 
 require fyne.io/x/fyne v0.0.0-20240216160529-61d0ff41acd7
 
@@ -71,7 +71,7 @@ require (
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/jeandeaual/go-locale v0.0.0-20240223122105-ce5225dcaa49 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.4.0 // indirect
-	github.com/rymdport/portal v0.2.2 // indirect
+	github.com/rymdport/portal v0.2.6 // indirect
 )
 
 require (
@@ -85,6 +85,6 @@ require (
 	tinygo.org/x/bluetooth v0.8.1-0.20240221113924-0087e0549b0b // indirect
 )
 
-// replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
+replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
 
 // replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol

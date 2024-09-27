@@ -5,6 +5,8 @@
 - Fixed bugg where IDC did not change color on threshold values
 - Tweaked border around wbl, nbl, turbo pwm and tps gauges
 - Added support for serial logging of Innovate wideband controllers
+- Added AMUL to Trionic 7 preset and dashboard
+- Added support for txbridge
 
 # 1.0.17
 

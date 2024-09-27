@@ -18,6 +18,7 @@ import (
 	xwidget "fyne.io/x/fyne/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/capture"
+	"github.com/roffe/txlogger/pkg/dashboard"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ecu"
@@ -82,7 +83,7 @@ type MainWindow struct {
 	fw         symbol.SymbolCollection
 
 	dlc       datalogger.IClient
-	dashboard *widgets.Dashboard
+	dashboard *dashboard.Dashboard
 	plotter   *plotter.Plotter
 
 	buttonsDisabled bool

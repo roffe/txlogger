@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/common"
 )
 
 type HBar struct {
@@ -104,19 +105,19 @@ func (dr *HBarRenderer) Layout(space fyne.Size) {
 	middle := height * .5
 	s.widthFactor = float32(diameter) / float32(s.cfg.Max)
 	stepsFactor := float32(diameter) / float32(s.cfg.Steps)
-	s.eightHeight = space.Height * oneEight
+	s.eightHeight = space.Height * common.OneEight
 	s.height = space.Height - (s.eightHeight * 2)
 	s.face.Resize(space)
 	s.titleText.Move(fyne.NewPos(diameter*.5-s.titleText.Size().Width*.5, height-30))
 	s.barRect.Move(fyne.NewPos(space.Width-float32(s.value), 0))
 	for i, line := range s.bars {
 		if i%2 == 0 {
-			line.Position1 = fyne.NewPos(float32(i)*stepsFactor, middle-height*oneThird)
-			line.Position2 = fyne.NewPos(float32(i)*stepsFactor, middle+height*oneThird)
+			line.Position1 = fyne.NewPos(float32(i)*stepsFactor, middle-height*common.OneThird)
+			line.Position2 = fyne.NewPos(float32(i)*stepsFactor, middle+height*common.OneThird)
 			continue
 		}
-		line.Position1 = fyne.NewPos(float32(i)*stepsFactor, middle-height*oneSeventh)
-		line.Position2 = fyne.NewPos(float32(i)*stepsFactor, middle+height*oneSeventh)
+		line.Position1 = fyne.NewPos(float32(i)*stepsFactor, middle-height*common.OneSeventh)
+		line.Position2 = fyne.NewPos(float32(i)*stepsFactor, middle+height*common.OneSeventh)
 	}
 	s.SetValue(s.value)
 }

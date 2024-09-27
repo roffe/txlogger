@@ -10,6 +10,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/common"
 )
 
 type Vertex struct {
@@ -38,10 +39,7 @@ type Meshgrid struct {
 	cellWidth  float32
 	cellHeight float32
 
-	cx, cy, cz float64
-	ax, ay, az float64
-	sx, sy, sz float64
-	px, py     float64
+	px, py float64
 }
 
 // NewMeshgrid creates a new Meshgrid given width, height, depth and spacing.
@@ -55,48 +53,34 @@ func NewMeshgrid(values []float64, cols, rows int) (*Meshgrid, error) {
 
 	m := &Meshgrid{
 		values: values,
-
 		zmin:   minZ,
 		zmax:   maxZ,
 		zrange: rangeZ,
-
-		rows: rows,
-		cols: cols,
-
+		rows:   rows,
+		cols:   cols,
 		// Set up the cell size based on the space available and desired spacing
 		cellWidth:  32,
 		cellHeight: 32,
 		depth:      400,
-
-		cx: 0, // Center of the meshgrid X
-		cy: 0, // Center of the meshgrid Y
-		cz: 0, // Center of the meshgrid Z
-
-		ax: 69, // Rotation angles X
-		ay: 15, // Rotation angles Y
-		az: 0,  // Rotation angles Z
-
-		sx: .2, // Scale factors X
-		sy: .2, // Scale factors Y
-		sz: .2, // Scale factors Z
-
-		px: 60, // Camera position X
-		py: 50, // Camera position Y
-
-		size: fyne.NewSize(200, 200),
+		px:         60, // Camera position X
+		py:         50, // Camera position Y
+		size:       fyne.NewSize(200, 200),
 	}
 
+	m.createVertices(400, 400)
+
+	m.scaleMeshgrid(0.4)
+
 	if cols == 1 {
-		m.ax = 90
-		m.ay = 90
-		m.az = 0
 		m.px = 0
 		m.py = 40
+		m.rotateMeshgrid(90, 90, 0)
+	} else {
+		m.rotateMeshgrid(69, 15, 0)
+
 	}
 
 	m.ExtendBaseWidget(m)
-
-	m.createVertices(400, 400)
 
 	// Generate the initial image and set it to the window content.
 	m.image = canvas.NewImageFromImage(image.NewRGBA(image.Rect(0, 0, 0, 0)))
@@ -133,81 +117,60 @@ func (m *Meshgrid) createVertices(width, height float32) {
 	m.vertices = vertices
 }
 
-func (m *Meshgrid) RotateMeshgrid(ax, ay, az float64) {
-	m.ax = ax
-	m.ay = ay
-	m.az = az
-	m.Refresh()
-}
-
-func (m *Meshgrid) scaleMeshgrid() {
-	//	log.Println("Scaling meshgrid", m.sx, m.sy, m.sz)
-	cz := m.depth * .5
-	xmax := 0.0
-	ymax := 0.0
+func (m *Meshgrid) scaleMeshgrid(factor float64) {
 	for i, row := range m.vertices {
-		for j, vertex := range row {
-			// Translate point to origin (or cx, cy, cz for scaling about a point)
-			x, y, z := vertex.Ox-m.cx, vertex.Oy-m.cy, vertex.Oz-cz
-			// Apply scaling & Translate point back
+		for j := range row {
 
-			nx := x*m.sx + m.cx
-			ny := y*m.sy + m.cy
-			nz := z*m.sz + cz
-
-			m.vertices[i][j].X = nx
-			m.vertices[i][j].Y = ny
-			m.vertices[i][j].Z = nz
-			if nx > xmax {
-				xmax = nx
-			}
-			if ny > ymax {
-				ymax = ny
-			}
+			m.vertices[i][j].X = m.vertices[i][j].X * factor
+			m.vertices[i][j].Y = m.vertices[i][j].Y * factor
+			m.vertices[i][j].Z = m.vertices[i][j].Z * factor
 		}
 	}
-	m.cx = xmax * .5
-	m.cy = ymax * .5
-	m.cz = m.depth * .5
-	// m.cx = m.vertices[len(m.vertices)-1][m.cols-1].X / 2
-	// m.cy = m.vertices[len(m.vertices)-1][m.cols-1].Y / 2
 }
 
-func (m *Meshgrid) rotateMeshgrid(ax, ay, az float64) {
+func (m *Meshgrid) rotateMeshgrid(x, y, z float64) {
 	// Convert angles to radians
-	ax = ax * piDiv180
-	ay = ay * piDiv180
-	az = az * piDiv180
+	xRad := x * common.PiDiv180
+	yRad := y * common.PiDiv180
+	zRad := z * common.PiDiv180
 
-	// Calculate sine and cosine of the angles
-	sinAx, cosAx := math.Sin(ax), math.Cos(ax)
-	sinAy, cosAy := math.Sin(ay), math.Cos(ay)
-	sinAz, cosAz := math.Sin(az), math.Cos(az)
+	// Calculate sine and cosine of the angles once
+	sinAx, cosAx := math.Sin(xRad), math.Cos(xRad)
+	sinAy, cosAy := math.Sin(yRad), math.Cos(yRad)
+	sinAz, cosAz := math.Sin(zRad), math.Cos(zRad)
 
-	cz := m.depth * 0.5 // This assumes your z-values range symmetrically around zero.
+	// Calculate the center of the mesh
+	centerX := (m.vertices[0][0].X + m.vertices[m.rows-1][m.cols-1].X) / 2
+	centerY := (m.vertices[0][0].Y + m.vertices[m.rows-1][m.cols-1].Y) / 2
+	centerZ := (m.vertices[0][0].Z + m.vertices[m.rows-1][m.cols-1].Z) / 2
 
 	// Iterate over each vertex and apply rotation
 	for i := range m.vertices {
 		for j := range m.vertices[i] {
-			// Translate point to origin for rotation
-			x, y, z := m.vertices[i][j].X-m.cx, m.vertices[i][j].Y-m.cy, m.vertices[i][j].Z-cz
+			vx := m.vertices[i][j].X - centerX
+			vy := m.vertices[i][j].Y - centerY
+			vz := m.vertices[i][j].Z - centerZ
 
-			// Rotate around x-axis
-			newY, newZ := cosAx*y-sinAx*z, sinAx*y+cosAx*z
-			// Rotate around y-axis
-			newX, newZ := cosAy*x+sinAy*newZ, -sinAy*x+cosAy*newZ
-			// Rotate around z-axis
-			newX, newY = cosAz*newX-sinAz*newY, sinAz*newX+cosAz*newY
+			// Apply rotation in a single pass
+			newX := cosAy*cosAz*vx - cosAy*sinAz*vy + sinAy*vz
+			newY := (cosAx*sinAz+sinAx*sinAy*cosAz)*vx + (cosAx*cosAz-sinAx*sinAy*sinAz)*vy - sinAx*cosAy*vz
+			newZ := (sinAx*sinAz-cosAx*sinAy*cosAz)*vx + (sinAx*cosAz+cosAx*sinAy*sinAz)*vy + cosAx*cosAy*vz
 
-			// Translate point back from origin after rotation
-			m.vertices[i][j].X = newX + m.cx
-			m.vertices[i][j].Y = newY + m.cy
-			m.vertices[i][j].Z = newZ + cz
+			m.vertices[i][j].X = newX + centerX
+			m.vertices[i][j].Y = newY + centerY
+			m.vertices[i][j].Z = newZ + centerZ
 		}
 	}
 }
 
 func (m *Meshgrid) SetFloat64(idx int, value float64) {
+	m.values[idx] = value
+	m.zmin, m.zmax, m.zrange = findMinMaxRange(m.values)
+	m.vertices[idx/m.cols][idx%m.cols].Z = ((value - m.zmin) / m.zrange) * m.depth // Normalize to [0, 1]
+	m.Refresh()                                                                    // Refresh without recreating all vertices
+}
+
+func (m *Meshgrid) SetFloat642(idx int, value float64) {
 	m.values[idx] = value
 	m.zmin, m.zmax, m.zrange = findMinMaxRange(m.values)
 	m.vertices[idx/m.cols][idx%m.cols].Z = ((value - m.zmin) / m.zrange) * m.depth // Normalize to [0, 1]
@@ -263,8 +226,6 @@ func (m *Meshgrid) project(v Vertex) (int, int) {
 }
 
 func (m *Meshgrid) Refresh() {
-	m.scaleMeshgrid()
-	m.rotateMeshgrid(m.ax, m.ay, m.az)
 	m.image.Image = m.drawMeshgridLines()
 	m.image.Refresh()
 }
@@ -274,7 +235,6 @@ func (m *Meshgrid) Layout(size fyne.Size) {
 	//m.size.Width = size.Width
 	m.container.Resize(size)
 	m.Refresh()
-
 	//m.image.Resize(size)
 }
 
@@ -314,11 +274,9 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 			x1, y1 := m.project(vertice)
 			lineColor := m.getColorInterpolation(value)
 
-			// Enhance line color based on value (assuming higher values are closer or more significant)
+			// Cache the color instead of calling getColorInterpolation multiple times
 			enhancedLineColor := enhanceLineColor(lineColor, value)
 
-			// Neighboring vertices to connect
-			//			neighbors := []struct{ di, dj int }{{1, 0}, {0, 1}, {1, 1}, {1, -1}}
 			neighbors := []struct{ di, dj int }{{1, 0}, {0, 1}, {1, -1}}
 			for _, n := range neighbors {
 				ni, nj := i+n.di, j+n.dj
@@ -326,10 +284,8 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 					neighborVertice := m.vertices[ni][nj]
 					neighborValue := m.values[ni*m.cols+nj]
 					x2, y2 := m.project(neighborVertice)
-					neighborColor := m.getColorInterpolation(neighborValue)
-					enhancedNeighborColor := enhanceLineColor(neighborColor, neighborValue)
-					// Draw line with interpolated color between current and neighbor
-					m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, enhancedLineColor, enhancedNeighborColor)
+					neighborColor := enhanceLineColor(m.getColorInterpolation(neighborValue), neighborValue)
+					m.drawLine(img, image.Point{x1, y1}, image.Point{x2, y2}, 0, 0, enhancedLineColor, neighborColor)
 				}
 			}
 		}

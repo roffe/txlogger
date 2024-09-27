@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/common"
 )
 
 type VBar struct {
@@ -111,7 +112,7 @@ func (vr *vbarRenderer) Layout(space fyne.Size) {
 	vr.vbar.size = space
 	vr.vbar.canvas.Resize(space)
 	vr.vbar.middle = space.Width * .5
-	vr.vbar.diameterEight = space.Width * oneEight
+	vr.vbar.diameterEight = space.Width * common.OneEight
 	vr.vbar.twoEight = vr.vbar.diameterEight * 2
 	stepFactor := float32(space.Height) / float32(vr.vbar.cfg.Steps)
 	vr.vbar.heightFactor = float32(space.Height) / float32(vr.vbar.cfg.Max)
@@ -129,12 +130,12 @@ func (vr *vbarRenderer) Layout(space fyne.Size) {
 	for i, line := range s.bars {
 		stepFactor := float32(i) * stepFactor
 		if i%2 == 0 {
-			line.Position1 = fyne.NewPos(s.middle-space.Width*oneThird, stepFactor)
-			line.Position2 = fyne.NewPos(s.middle+space.Width*oneThird, stepFactor)
+			line.Position1 = fyne.NewPos(s.middle-space.Width*common.OneThird, stepFactor)
+			line.Position2 = fyne.NewPos(s.middle+space.Width*common.OneThird, stepFactor)
 			continue
 		}
-		line.Position1 = fyne.NewPos(s.middle-space.Width*oneSeventh, stepFactor)
-		line.Position2 = fyne.NewPos(s.middle+space.Width*oneSeventh, stepFactor)
+		line.Position1 = fyne.NewPos(s.middle-space.Width*common.OneSeventh, stepFactor)
+		line.Position2 = fyne.NewPos(s.middle+space.Width*common.OneSeventh, stepFactor)
 	}
 
 	vr.vbar.SetValue(vr.vbar.value)

@@ -190,12 +190,12 @@ func NewSettingsWidget() *SettingsWidget {
 
 	sw.CanSettings = NewCanSettingsWidget(app)
 
-	sw.wblPortSelect = widget.NewSelect(sw.CanSettings.listPorts(), func(s string) {
+	sw.wblPortSelect = widget.NewSelect(append([]string{"txbridge"}, sw.CanSettings.listPorts()...), func(s string) {
 		app.Preferences().SetString(prefsWBLPort, s)
 	})
 
 	sw.wblPortRefreshButton = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
-		sw.wblPortSelect.Options = sw.CanSettings.listPorts()
+		sw.wblPortSelect.Options = append([]string{"txbridge"}, sw.CanSettings.listPorts()...)
 		sw.wblPortSelect.Refresh()
 	})
 

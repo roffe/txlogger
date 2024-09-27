@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/common"
 )
 
 type CBar struct {
@@ -140,7 +141,7 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 	// log.Println("cbar.Layout", dr.d.displayText.Text, space.Width, space.Height)
 	s := dr.d
 	s.size = space
-	s.eightHeight = s.size.Height * oneEight
+	s.eightHeight = s.size.Height * common.OneEight
 	diameter := space.Width
 	s.center = diameter * .5
 	height := space.Height
@@ -168,12 +169,12 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 
 	for i, line := range s.bars {
 		if i%2 == 0 {
-			line.Position1 = fyne.NewPos(float32(i)*stepFactor, middle-height*oneThird)
-			line.Position2 = fyne.NewPos(float32(i)*stepFactor, middle+height*oneThird)
+			line.Position1 = fyne.NewPos(float32(i)*stepFactor, middle-height*common.OneThird)
+			line.Position2 = fyne.NewPos(float32(i)*stepFactor, middle+height*common.OneThird)
 			continue
 		}
-		line.Position1 = fyne.NewPos(float32(i)*stepFactor, middle-height*oneSeventh)
-		line.Position2 = fyne.NewPos(float32(i)*stepFactor, middle+height*oneSeventh)
+		line.Position1 = fyne.NewPos(float32(i)*stepFactor, middle-height*common.OneSeventh)
+		line.Position2 = fyne.NewPos(float32(i)*stepFactor, middle+height*common.OneSeventh)
 	}
 	s.refresh()
 }
