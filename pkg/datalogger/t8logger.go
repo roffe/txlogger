@@ -8,6 +8,7 @@ import (
 	"log"
 	"math"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -77,6 +78,7 @@ type T8Client struct {
 	errCount     int
 	errPerSecond int
 
+	closeOnce sync.Once
 	Config
 }
 
@@ -93,8 +95,10 @@ func NewT8(cfg Config, lw LogWriter) (IClient, error) {
 }
 
 func (c *T8Client) Close() {
-	close(c.quitChan)
-	time.Sleep(150 * time.Millisecond)
+	c.closeOnce.Do(func() {
+		close(c.quitChan)
+		time.Sleep(150 * time.Millisecond)
+	})
 }
 
 func (c *T8Client) SetSymbols(symbols []*symbol.Symbol) error {
@@ -136,6 +140,11 @@ func (c *T8Client) onError(err error) {
 func (c *T8Client) Start() error {
 	defer c.lw.Close()
 
+	var txbridge bool
+	if c.Config.Device.Name() == "txbridge" {
+		txbridge = true
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -169,6 +178,19 @@ func (c *T8Client) Start() error {
 		c.lamb.Start(ctx)
 		defer c.lamb.Stop()
 		order = append(order, EXTERNALWBLSYM)
+
+		if txbridge {
+			wblSub := cl.Subscribe(ctx, 0x124)
+			defer wblSub.Close()
+			go func() {
+				for msg := range wblSub.C() {
+					if msg.Identifier() == 0x124 {
+						wblClient.SetData(msg.Data())
+					}
+				}
+			}()
+		}
+
 	}
 
 	c.ErrorCounter.Set(c.errCount)
@@ -179,6 +201,10 @@ func (c *T8Client) Start() error {
 	cps := 0
 	count := 0
 	retries := 0
+
+	if err := cl.SendFrame(0x123, []byte("8"), gocan.Outgoing); err != nil {
+		return err
+	}
 
 	err = retry.Do(func() error {
 		gm := gmlan.New(cl, 0x7e0, 0x7e8)
@@ -245,8 +271,19 @@ func (c *T8Client) Start() error {
 					lastPresent = time.Now()
 				}
 			}
-			buf := bytes.NewBuffer(nil)
 
+			tx := cl.Subscribe(ctx, 0x123)
+			defer tx.Close()
+
+			if txbridge {
+				log.Println("stopped timer, using txbridge")
+				t.Stop()
+				if err := cl.SendFrame(0x123, []byte("r"), gocan.Outgoing); err != nil {
+					return err
+				}
+			}
+
+			buf := bytes.NewBuffer(nil)
 		outer:
 			for {
 				select {
@@ -326,6 +363,45 @@ func (c *T8Client) Start() error {
 						c.onError(fmt.Errorf("failed to read data: %w", err))
 						continue
 					}
+					if len(databuff) != int(expectedPayloadSize) {
+						return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
+					}
+					r := bytes.NewReader(databuff)
+
+					for _, va := range c.Symbols {
+						buf.Reset()
+						buf.Write(va.Bytes())
+						if err := va.Read(r); err != nil {
+							c.onError(fmt.Errorf("failed to set data: %w", err))
+							break
+						}
+						if !bytes.Equal(va.Bytes(), buf.Bytes()) {
+							ebus.Publish(va.Name, va.Float64())
+						}
+					}
+
+					if r.Len() > 0 {
+						c.OnMessage(fmt.Sprintf("%d leftover bytes!", r.Len()))
+					}
+
+					if c.lamb != nil {
+						ebus.Publish(EXTERNALWBLSYM, c.lamb.GetLambda())
+						c.sysvars.Set(EXTERNALWBLSYM, c.lamb.GetLambda())
+					}
+
+					//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
+					if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
+						c.onError(fmt.Errorf("failed to write log: %w", err))
+					}
+					cps++
+					count++
+					if count%10 == 0 {
+						c.CaptureCounter.Set(count)
+					}
+					testerPresent()
+				case msg := <-tx.C():
+					timeStamp = time.Now()
+					databuff := msg.Data()
 					if len(databuff) != int(expectedPayloadSize) {
 						return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
 					}

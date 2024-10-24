@@ -212,6 +212,10 @@ func (c *T7Client) Start() error {
 	count := 0
 	retries := 0
 
+	if err := cl.SendFrame(0x123, []byte("7"), gocan.Outgoing); err != nil {
+		return err
+	}
+
 	kwp := kwp2000.New(cl)
 	err = retry.Do(func() error {
 		if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {

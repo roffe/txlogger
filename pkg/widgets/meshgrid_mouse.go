@@ -32,51 +32,57 @@ func (m *Meshgrid) DragEnd() {
 */
 
 func (m *Meshgrid) MouseMoved(event *desktop.MouseEvent) {
-	dx := float64(event.Position.X - m.lastMouseX) // Change in X position
-	dy := float64(event.Position.Y - m.lastMouseY) // Change in Y position
+	dx := float64(event.Position.X - m.lastMouseX)
+	dy := float64(event.Position.Y - m.lastMouseY)
+
+	// Scale factors to make movements less sensitive
+	const (
+		rotationScale = 0.5 // Reduce rotation speed
+		rollScale     = 0.3 // Reduce roll speed
+	)
 
 	if m.isDragging {
 		if event.Button&desktop.MouseButtonPrimary == desktop.MouseButtonPrimary {
-			m.rotateMeshgrid(dy, -dx, 0)
+			// Left mouse: Rotate mesh
+			// Invert dx for more intuitive rotation (moving mouse right rotates mesh right)
+			// dx controls rotation around Y axis, dy controls rotation around X axis
+			m.rotateMeshgrid(0, -dy*rotationScale, -dx*rotationScale)
 		}
 		if event.Button&desktop.MouseButtonSecondary == desktop.MouseButtonSecondary {
-			m.px -= dx
-			m.py -= dy
-		}
-		if event.Button&desktop.MouseButtonTertiary == desktop.MouseButtonTertiary {
-			m.rotateMeshgrid(0, 0, dx)
+			// Right mouse: Roll mesh around Z axis
+			roll := (dx + dy) * rollScale
+			m.rotateMeshgrid(roll, 0, 0)
 		}
 
-		m.Refresh() // Update the rendered view after modifying rotation/translation
+		m.Refresh()
+	}
+
+	m.lastMouseX = event.Position.X
+	m.lastMouseY = event.Position.Y
+}
+
+// MouseDown is called when a mouse button is pressed
+func (m *Meshgrid) MouseDown(event *desktop.MouseEvent) {
+	if event.Button&desktop.MouseButtonPrimary == desktop.MouseButtonPrimary ||
+		event.Button&desktop.MouseButtonSecondary == desktop.MouseButtonSecondary ||
+		event.Button&desktop.MouseButtonTertiary == desktop.MouseButtonTertiary {
+		m.isDragging = true
 	}
 	m.lastMouseX = event.Position.X
 	m.lastMouseY = event.Position.Y
 }
 
-// MouseDown is called when a mouse button is pressed over the map viewer.
-func (m *Meshgrid) MouseDown(event *desktop.MouseEvent) {
-	if event.Button&desktop.MouseButtonPrimary == desktop.MouseButtonPrimary ||
-		event.Button&desktop.MouseButtonSecondary == desktop.MouseButtonSecondary ||
-		event.Button&desktop.MouseButtonTertiary == desktop.MouseButtonTertiary {
-		// When the primary button is pressed, start dragging
-		m.isDragging = true
-		m.lastMouseX = event.Position.X
-		m.lastMouseY = event.Position.Y
-	}
-
-}
-
-// MouseUp is called when a mouse button is released over the map viewer.
+// MouseUp is called when a mouse button is released
 func (m *Meshgrid) MouseUp(event *desktop.MouseEvent) {
-	// When any mouse button is released, stop dragging
 	m.isDragging = false
 }
 
 func (m *Meshgrid) Scrolled(event *fyne.ScrollEvent) {
+	// Add smoother zoom with reduced sensitivity
 	if event.Scrolled.DY > 0 {
-		m.scaleMeshgrid(1.03)
+		m.scaleMeshgrid(1.1) // Zoom in slightly less aggressively
 	} else {
-		m.scaleMeshgrid(0.97)
+		m.scaleMeshgrid(0.9) // Zoom out slightly less aggressively
 	}
 	m.Refresh()
 }

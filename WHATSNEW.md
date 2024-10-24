@@ -7,6 +7,8 @@
 - Added support for serial logging of Innovate wideband controllers
 - Added AMUL to Trionic 7 preset and dashboard
 - Added support for txbridge
+- Switched from TDM-GCC to MingW64 for building
+- Greatly reworked mesh viewer
 
 # 1.0.17
 

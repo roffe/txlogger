@@ -458,7 +458,6 @@ func (mv *MapViewer) resizeCursor() {
 }
 
 func (mv *MapViewer) Refresh() {
-	log.Println("MapViewer Refresh")
 	mv.min, mv.max = findMinMax(mv.zData)
 	for i, tv := range mv.zData {
 		mv.SetCellText(i, tv)
