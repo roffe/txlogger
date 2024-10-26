@@ -51,9 +51,11 @@ type MapViewer struct {
 
 	min, max int
 
-	xAxisLabels, yAxisLabels *fyne.Container
-	xAxisTexts, yAxisTexts   []*canvas.Text
-	zDataRects               []*canvas.Rectangle
+	xAxisLabel, yAxisLabel, zAxisLabel string
+
+	xAxisLabelContainer, yAxisLabelContainer *fyne.Container
+	xAxisTexts, yAxisTexts                   []*canvas.Text
+	zDataRects                               []*canvas.Rectangle
 
 	content               fyne.CanvasObject
 	innerView             *fyne.Container
@@ -68,9 +70,7 @@ type MapViewer struct {
 	valueRects *fyne.Container
 	valueTexts *fyne.Container
 
-	//setChan chan xyUpdate
-
-	xIdx, yIdx           float64
+	xIndex, yIndex       float64
 	selectedX, SelectedY int
 
 	meshView bool
@@ -137,14 +137,14 @@ func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 
 func (mv *MapViewer) render() fyne.CanvasObject {
 	// y must be created before x as it's width is used to calculate x's offset
-	mv.yAxisLabels = mv.createYAxis()
-	mv.xAxisLabels = mv.createXAxis()
+	mv.yAxisLabelContainer = mv.createYAxis()
+	mv.xAxisLabelContainer = mv.createXAxis()
 	mv.zDataRects = mv.createZdata()
 
 	mv.crosshair = NewCrosshair(color.RGBA{0xCE, 0xA2, 0xFD, 255}, 3)
 
 	mv.cursor = NewRectangle(color.RGBA{0x30, 0x70, 0xB3, 235}, 3)
-	mv.selectedX = -1
+
 	mv.cursor.Resize(fyne.NewSize(1, 1))
 
 	mv.textValues = createTextValues(mv.zData, mv.zCorrFac)
@@ -231,9 +231,9 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 			nil,
 			nil,
 			container.NewBorder(
-				mv.xAxisLabels,
+				mv.xAxisLabelContainer,
 				nil,
-				mv.yAxisLabels,
+				mv.yAxisLabelContainer,
 				nil,
 				mv.innerView,
 			),
@@ -255,16 +255,23 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 	}
 
 	mapview := container.NewBorder(
-		mv.xAxisLabels,
+		mv.xAxisLabelContainer,
 		mid,
-		mv.yAxisLabels,
+		mv.yAxisLabelContainer,
 		nil,
 		mv.innerView,
 	)
 
 	if mv.meshView {
 		var err error
-		mv.mesh, err = NewMeshgrid(mv.symbol.Float64s(), mv.numColumns, mv.numRows)
+		mv.mesh, err = NewMeshgrid(
+			mv.xAxisLabel,
+			mv.yAxisLabel,
+			mv.zAxisLabel,
+			mv.symbol.Float64s(),
+			mv.numColumns,
+			mv.numRows,
+		)
 		if err == nil {
 			return container.NewBorder(
 				mapview,
@@ -372,8 +379,8 @@ func (mv *MapViewer) resize(size fyne.Size) {
 	mv.crosshair.Resize(fyne.NewSize(mv.widthFactor, mv.heightFactor))
 	mv.crosshair.Move(
 		fyne.NewPos(
-			float32(mv.xIdx)*mv.widthFactor,
-			float32(float64(mv.numRows)-1-mv.yIdx)*mv.heightFactor,
+			float32(mv.xIndex)*mv.widthFactor,
+			float32(float64(mv.numRows)-1-mv.yIndex)*mv.heightFactor,
 		),
 	)
 
@@ -513,7 +520,7 @@ func createTextValues(zData []int, corrFac float64) []*canvas.Text {
 }
 
 func (mv *MapViewer) createXAxis() *fyne.Container {
-	labels := container.New(&layout.Horizontal{Offset: mv.yAxisLabels})
+	labels := container.New(&layout.Horizontal{Offset: mv.yAxisLabelContainer})
 	if mv.numColumns >= 1 {
 		for i := 0; i < mv.numColumns; i++ {
 			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.xData[i])*mv.xCorrFac, 'f', getPrecission(mv.xCorrFac), 64), TextSize: 13}
@@ -573,8 +580,8 @@ func (mv *MapViewer) setXY(xValue, yValue int) error {
 	} else if xIdx > float64(mv.numColumns-1) {
 		xIdx = float64(mv.numColumns - 1)
 	}
-	mv.xIdx = xIdx
-	mv.yIdx = yIdx
+	mv.xIndex = xIdx
+	mv.yIndex = yIdx
 
 	mv.crosshair.Move(
 		fyne.NewPos(

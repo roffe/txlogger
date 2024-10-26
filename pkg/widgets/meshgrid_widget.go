@@ -13,8 +13,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-type Matrix3x3 [3][3]float64
-
 type Vertex struct {
 	Ox, Oy, Oz float64 // Original coordinates
 	X, Y, Z    float64 // Transformed coordinates for rendering
@@ -44,75 +42,14 @@ type Meshgrid struct {
 	rotationMatrix Matrix3x3
 	scale          float64
 
-	px, py float64
-}
+	mousePosition image.Point
+	showCrosshair bool
 
-func NewMatrix3x3() Matrix3x3 {
-	return Matrix3x3{
-		{1, 0, 0},
-		{0, 1, 0},
-		{0, 0, 1},
-	}
-}
-
-func (m Matrix3x3) Multiply(other Matrix3x3) Matrix3x3 {
-	var result Matrix3x3
-	for i := 0; i < 3; i++ {
-		for j := 0; j < 3; j++ {
-			sum := 0.0
-			for k := 0; k < 3; k++ {
-				sum += m[i][k] * other[k][j]
-			}
-			result[i][j] = sum
-		}
-	}
-	return result
-}
-
-func (m Matrix3x3) MultiplyVector(v [3]float64) [3]float64 {
-	var result [3]float64
-	for i := 0; i < 3; i++ {
-		sum := 0.0
-		for j := 0; j < 3; j++ {
-			sum += m[i][j] * v[j]
-		}
-		result[i] = sum
-	}
-	return result
-}
-
-func RotationMatrixX(angle float64) Matrix3x3 {
-	rad := angle * math.Pi / 180
-	sin, cos := math.Sin(rad), math.Cos(rad)
-	return Matrix3x3{
-		{1, 0, 0},
-		{0, cos, -sin},
-		{0, sin, cos},
-	}
-}
-
-func RotationMatrixY(angle float64) Matrix3x3 {
-	rad := angle * math.Pi / 180
-	sin, cos := math.Sin(rad), math.Cos(rad)
-	return Matrix3x3{
-		{cos, 0, sin},
-		{0, 1, 0},
-		{-sin, 0, cos},
-	}
-}
-
-func RotationMatrixZ(angle float64) Matrix3x3 {
-	rad := angle * math.Pi / 180
-	sin, cos := math.Sin(rad), math.Cos(rad)
-	return Matrix3x3{
-		{cos, -sin, 0},
-		{sin, cos, 0},
-		{0, 0, 1},
-	}
+	xlabel, ylabel, zlabel string
 }
 
 // NewMeshgrid creates a new Meshgrid given width, height, depth and spacing.
-func NewMeshgrid(values []float64, cols, rows int) (*Meshgrid, error) {
+func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int) (*Meshgrid, error) {
 	// Check if the provided values slice has the correct number of elements
 	if len(values) != cols*rows {
 		return nil, fmt.Errorf("the number of Z values does not match the meshgrid dimensions")
@@ -131,20 +68,20 @@ func NewMeshgrid(values []float64, cols, rows int) (*Meshgrid, error) {
 		cellWidth:      32,
 		cellHeight:     32,
 		depth:          400,
-		px:             60, // Camera position X
-		py:             50, // Camera position Y
 		size:           fyne.NewSize(200, 200),
 		scale:          1,
 		rotationMatrix: NewMatrix3x3(), // Initialize identity matrix
+
+		xlabel: xlabel,
+		ylabel: ylabel,
+		zlabel: zlabel,
 	}
 
 	m.createVertices(400, 400)
 
-	m.scaleMeshgrid(0.4)
+	m.scaleMeshgrid(0.3)
 
 	if cols == 1 {
-		m.px = 0
-		m.py = 40
 		m.rotateMeshgrid(0, 90, 0)
 	} else {
 		m.rotateMeshgrid(60, 0, -30)
@@ -251,84 +188,6 @@ func (m *Meshgrid) rotateMeshgrid(x, y, z float64) {
 	//log.Println(m.rotationMatrix[2])
 }
 
-/*
-func (m *Meshgrid) rotateMeshgrid(x, y, z float64) {
-	log.Println("rotateMeshgrid", m.rotationX, m.rotationY, m.rotationZ, x, y, z)
-
-	m.rotationX += x
-	m.rotationY += y
-	m.rotationZ += z
-
-	// Convert angles to radians
-	xRad := x * common.PiDiv180
-	yRad := y * common.PiDiv180
-	zRad := z * common.PiDiv180
-
-	// Calculate sine and cosine of the angles once
-	sinAx, cosAx := math.Sin(xRad), math.Cos(xRad)
-	sinAy, cosAy := math.Sin(yRad), math.Cos(yRad)
-	sinAz, cosAz := math.Sin(zRad), math.Cos(zRad)
-
-	// Calculate the center of the mesh
-	centerX := (m.vertices[0][0].X + m.vertices[m.rows-1][m.cols-1].X) / 2
-	centerY := (m.vertices[0][0].Y + m.vertices[m.rows-1][m.cols-1].Y) / 2
-	centerZ := (m.vertices[0][0].Z + m.vertices[m.rows-1][m.cols-1].Z) / 2
-
-	// Iterate over each vertex and apply rotation
-	for i := range m.vertices {
-		for j := range m.vertices[i] {
-			vx := m.vertices[i][j].X - centerX
-			vy := m.vertices[i][j].Y - centerY
-			vz := m.vertices[i][j].Z - centerZ
-
-			// Apply rotation in a single pass
-			newX := cosAy*cosAz*vx - cosAy*sinAz*vy + sinAy*vz
-			newY := (cosAx*sinAz+sinAx*sinAy*cosAz)*vx + (cosAx*cosAz-sinAx*sinAy*sinAz)*vy - sinAx*cosAy*vz
-			newZ := (sinAx*sinAz-cosAx*sinAy*cosAz)*vx + (sinAx*cosAz+cosAx*sinAy*sinAz)*vy + cosAx*cosAy*vz
-			m.vertices[i][j].X = newX + centerX
-			m.vertices[i][j].Y = newY + centerY
-			m.vertices[i][j].Z = newZ + centerZ
-		}
-	}
-}
-
-func (m *Meshgrid) rotateMeshgrid2(x, y, z float64) {
-	log.Println("rotateMeshgrid2", x, y, z)
-
-	// Convert angles to radians
-	xRad := x * common.PiDiv180
-	yRad := y * common.PiDiv180
-	zRad := z * common.PiDiv180
-
-	// Calculate sine and cosine of the angles once
-	sinAx, cosAx := math.Sin(xRad), math.Cos(xRad)
-	sinAy, cosAy := math.Sin(yRad), math.Cos(yRad)
-	sinAz, cosAz := math.Sin(zRad), math.Cos(zRad)
-
-	// Calculate the center of the mesh
-	centerX := (m.vertices[0][0].X + m.vertices[m.rows-1][m.cols-1].X) / 2
-	centerY := (m.vertices[0][0].Y + m.vertices[m.rows-1][m.cols-1].Y) / 2
-	centerZ := (m.vertices[0][0].Z + m.vertices[m.rows-1][m.cols-1].Z) / 2
-
-	// Iterate over each vertex and apply rotation
-	for i := range m.vertices {
-		for j := range m.vertices[i] {
-			vx := m.vertices[i][j].X - centerX
-			vy := m.vertices[i][j].Y - centerY
-			vz := m.vertices[i][j].Z - centerZ
-
-			// Apply rotation in a single pass
-			newX := cosAy*cosAz*vx - cosAy*sinAz*vy + sinAy*vz
-			newY := (cosAx*sinAz+sinAx*sinAy*cosAz)*vx + (cosAx*cosAz-sinAx*sinAy*sinAz)*vy - sinAx*cosAy*vz
-			newZ := (sinAx*sinAz-cosAx*sinAy*cosAz)*vx + (sinAx*cosAz+cosAx*sinAy*sinAz)*vy + cosAx*cosAy*vz
-			m.vertices[i][j].X = newX + centerX
-			m.vertices[i][j].Y = newY + centerY
-			m.vertices[i][j].Z = newZ + centerZ
-		}
-	}
-}
-*/
-
 func (m *Meshgrid) SetFloat64(idx int, value float64) {
 	log.Println("SetFloat64", idx, value)
 	m.values[idx] = value
@@ -405,27 +264,6 @@ func (m *Meshgrid) LoadFloat64s(floats []float64) {
 
 	m.Refresh()
 }
-
-/*
-func (m *Meshgrid) LoadFloat64s(floats []float64) {
-	m.values = floats
-	if len(floats) == 0 {
-		return
-	}
-	for i, f := range floats {
-		normalizedZ := (f - m.zmin) / m.zrange // Normalize to [0, 1]
-		m.vertices[i/m.cols][i%m.cols].Z = normalizedZ * m.depth
-	}
-	m.createVertices(400, 400)
-	m.scaleMeshgrid2(m.scale)
-	log.Println("scale", m.scale)
-	m.rotateMeshgrid2(m.rotationX, 0, 0)
-	m.rotateMeshgrid2(0, m.rotationY, 0)
-	m.rotateMeshgrid2(0, 0, m.rotationZ)
-	log.Println("rotation", m.rotationX, m.rotationY, m.rotationZ)
-	m.Refresh()
-}
-*/
 
 // returns the min, max and range across the data
 func findMinMaxRange(values []float64) (float64, float64, float64) {
@@ -541,31 +379,53 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 		}
 	}
 
+	// Draw crosshair if needed
+	if m.showCrosshair {
+		// Draw horizontal and vertical lines
+		crosshairSize := 10
+		crosshairColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
+
+		// Get and display the value at cursor position
+		if value, found := m.findValueAtPosition(m.mousePosition); found {
+			valueText := fmt.Sprintf("%.3f", value)
+			textColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
+
+			// Draw background box for better readability
+			boxWidth := (len(valueText) * 7) + 3 // Approximate width based on font size
+			boxHeight := 15
+			for y := -3; y <= boxHeight; y++ {
+				for x := 3; x <= boxWidth; x++ {
+					if m.mousePosition.X+x >= 0 && m.mousePosition.X+x < int(m.size.Width) &&
+						m.mousePosition.Y-boxHeight+y >= 0 && m.mousePosition.Y-boxHeight+y < int(m.size.Height) {
+						img.Set(m.mousePosition.X+x, m.mousePosition.Y-boxHeight+y, color.RGBA{0, 0, 0, 192})
+					}
+				}
+			}
+
+			// Draw the value text
+			m.drawText(img, valueText,
+				m.mousePosition.X+3, m.mousePosition.Y-2-boxHeight+12,
+				textColor)
+		}
+
+		// Horizontal line
+		m.drawLine(img,
+			image.Point{m.mousePosition.X - crosshairSize, m.mousePosition.Y},
+			image.Point{m.mousePosition.X + crosshairSize, m.mousePosition.Y},
+			0, 0, crosshairColor, crosshairColor)
+
+		// Vertical line
+		m.drawLine(img,
+			image.Point{m.mousePosition.X, m.mousePosition.Y - crosshairSize},
+			image.Point{m.mousePosition.X, m.mousePosition.Y + crosshairSize},
+			0, 0, crosshairColor, crosshairColor)
+
+	}
+
 	// Draw the axis indicator after the mesh
 	m.drawAxisIndicator(img)
 
 	return img
-}
-
-func (m *Meshgrid) enhanceLineColor(baseColor color.RGBA, depthFactor float64) color.RGBA {
-	// Adjust brightness based on depth
-	// depthFactor ranges from 0 (furthest) to 1 (nearest)
-
-	// Create stronger contrast by applying a non-linear transform to depthFactor
-	adjustedDepthFactor := math.Pow(depthFactor, 1.5) // Emphasize differences in depth
-
-	// Scale factor ranges from 0.4 (dim/far) to 1.0 (bright/near)
-	scaleFactor := 0.4 + (adjustedDepthFactor * 0.6)
-
-	// Add slight atmospheric perspective (distant objects appear slightly cooler)
-	coolTint := uint8((1 - adjustedDepthFactor) * 20) // Max blue tint for distant objects
-
-	return color.RGBA{
-		R: uint8(float64(baseColor.R) * scaleFactor),
-		G: uint8(float64(baseColor.G) * scaleFactor),
-		B: uint8(math.Min(255, float64(baseColor.B)*scaleFactor+float64(coolTint))),
-		A: baseColor.A,
-	}
 }
 
 func (m *Meshgrid) drawLine(img *image.RGBA, p1, p2 image.Point, startThickness, endThickness int, startColor, endColor color.RGBA) {
@@ -611,21 +471,69 @@ func lerp(a, b, t float64) float64 {
 
 func (m *Meshgrid) getColorInterpolation(value float64) color.RGBA {
 	t := (value - m.zmin) / (m.zmax - m.zmin)
-	divider := .5
+
 	var r, g, b float64
-	if t < divider { // Green to Yellow interpolation
-		r = lerp(0, 1, t/divider)
-		g = 1
-	} else { // Yellow to Red interpolation
-		r = 1
-		g = lerp(1, 0, (t-divider)/(1-divider))
+
+	// Three-part interpolation: green -> yellow -> red
+	if t < 0.4 { // Green to Yellow transition (0-40%)
+		r = lerp(0, 1, t/0.4) // Red increases
+		g = 1.0               // Green stays max
+		b = 0                 // Blue stays zero
+	} else if t < 0.6 { // Hold Yellow (40-60%)
+		r = 1.0
+		g = 1.0
+		b = 0
+	} else { // Yellow to Red transition (60-100%)
+		r = 1.0                     // Red stays max
+		g = lerp(1, 0, (t-0.6)/0.4) // Green decreases
+		b = 0                       // Blue stays zero
 	}
-	b = 0
+
+	// Enhance saturation for yellow region
+	if t > 0.35 && t < 0.65 {
+		// Boost both red and green components slightly in yellow region
+		boost := 1.2 // Increase brightness of yellow
+		r = math.Min(1.0, r*boost)
+		g = math.Min(1.0, g*boost)
+	}
+
 	// Convert from 0-1 range to 0-255 for color.RGBA
 	return color.RGBA{
 		R: uint8(r * 255),
 		G: uint8(g * 255),
 		B: uint8(b * 255),
 		A: 255,
+	}
+}
+
+// enhanceLineColor modified to preserve yellow better
+func (m *Meshgrid) enhanceLineColor(baseColor color.RGBA, depthFactor float64) color.RGBA {
+	// Adjust brightness based on depth while preserving color ratios
+	adjustedDepthFactor := math.Pow(depthFactor, 1.5)
+
+	// Scale factor now has a higher minimum to prevent colors from getting too dark
+	scaleFactor := 0.6 + (adjustedDepthFactor * 0.4)
+
+	// Reduced atmospheric perspective effect to maintain color clarity
+	coolTint := uint8((1 - adjustedDepthFactor) * 15)
+
+	// Calculate the color components while preserving ratios
+	r := uint8(float64(baseColor.R) * scaleFactor)
+	g := uint8(float64(baseColor.G) * scaleFactor)
+	b := uint8(math.Min(255, float64(baseColor.B)*scaleFactor+float64(coolTint)))
+
+	// Special handling for yellow regions to preserve distinctness
+	if baseColor.R > 200 && baseColor.G > 200 && baseColor.B < 50 {
+		// Boost yellow while maintaining ratio
+		boost := 1.1
+		r = uint8(math.Min(255, float64(r)*boost))
+		g = uint8(math.Min(255, float64(g)*boost))
+	}
+
+	return color.RGBA{
+		R: r,
+		G: g,
+		B: b,
+		A: baseColor.A,
 	}
 }

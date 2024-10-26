@@ -93,6 +93,7 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 			widgets.WithWidebandSymbolName(lp.lambSymbolName),
 			widgets.WithWBL(true),
 			//widgets.WithFollowCrosshair(lp.app.Preferences().BoolWithFallback("cursorFollowCrosshair", false)),
+			widgets.WithAxisLabels(axis.XDescription, axis.YDescription, axis.ZDescription),
 		)
 		if err != nil {
 			dialog.ShowError(fmt.Errorf("x: %s y: %s z: %s err: %w", axis.X, axis.Y, axis.Z, err), lp.Window)

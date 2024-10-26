@@ -92,8 +92,8 @@ func (mv *MapViewer) calculateCellDimensions() (float32, float32) {
 // calculateSelectionBounds computes the bounding box of the selection area.
 func (mv *MapViewer) calculateSelectionBounds(eventPos fyne.Position) (int, int) {
 	cellWidth, cellHeight := mv.calculateCellDimensions()
-	xAxisOffset := mv.yAxisLabels.Size().Width + (theme.Padding() * 2)
-	yAxisOffset := mv.xAxisLabels.Size().Height + (theme.Padding() * 2)
+	xAxisOffset := mv.yAxisLabelContainer.Size().Width + (theme.Padding() * 2)
+	yAxisOffset := mv.xAxisLabelContainer.Size().Height + (theme.Padding() * 2)
 
 	nselectedX := max(0, min(int(eventPos.X-xAxisOffset)/int(cellWidth), mv.numColumns-1))
 	nSelectedY := max(0, min(mv.numRows-int(eventPos.Y-yAxisOffset)/int(cellHeight)-1, mv.numRows-1))

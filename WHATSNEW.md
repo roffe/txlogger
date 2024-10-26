@@ -4,11 +4,11 @@
 - Add settings to configure WBL when reading AD values
 - Fixed bugg where IDC did not change color on threshold values
 - Tweaked border around wbl, nbl, turbo pwm and tps gauges
-- Added support for serial logging of Innovate wideband controllers
+- Added support for serial logging of Innovate wideband controllers (MTX-L & LC-2) with usb <-> serial adapter
 - Added AMUL to Trionic 7 preset and dashboard
-- Added support for txbridge
+- Initial support for txbridge
 - Switched from TDM-GCC to MingW64 for building
-- Greatly reworked mesh viewer
+- Greatly reworked the 3d mesh viewer for maps
 
 # 1.0.17
 

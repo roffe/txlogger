@@ -19,7 +19,7 @@ require (
 )
 
 require (
-	fyne.io/fyne/v2 v2.5.3-0.20241019185922-e88cc1f3d438
+	fyne.io/fyne/v2 v2.5.3-0.20241021131836-de361f6407a8
 	fyne.io/systray v1.11.0 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
