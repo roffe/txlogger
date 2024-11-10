@@ -14,11 +14,10 @@ import (
 	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/adapter"
 	"github.com/roffe/gocan/pkg/gmlan"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu"
-	"github.com/roffe/txlogger/pkg/ecumaster"
-	"github.com/roffe/txlogger/pkg/innovate"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -41,7 +40,7 @@ func AirDemToStringT8(v float64) string {
 	case 24:
 		return "Stall Limit (Automatic)"
 	case 25:
-		return "Special Mode"
+		return "Hardcoded Limit"
 	case 26:
 		return "Reverse Limit (Automatic)"
 	case 27:
@@ -159,39 +158,28 @@ func (c *T8Client) Start() error {
 
 	order := c.sysvars.Keys()
 
+	// Wideband lambda setup
+	cfg := &WBLConfig{
+		WBLType:  c.Config.WidebandConfig.Type,
+		Port:     c.Config.WidebandConfig.Port,
+		Log:      c.OnMessage,
+		Txbridge: txbridge,
+	}
+
+	c.lamb, err = NewWBL(ctx, cl, cfg)
+	if err != nil {
+		return err
+	}
+
+	if c.lamb != nil {
+		order = append(order, EXTERNALWBLSYM)
+	}
+
+	defer c.lamb.Stop()
+	//--------
+
 	// sort order
 	sort.StringSlice(order).Sort()
-
-	switch c.Config.WidebandConfig.Type {
-	case "ECU":
-	case ecumaster.ProductString:
-		c.lamb = ecumaster.NewLambdaToCAN(cl)
-		c.lamb.Start(ctx)
-		defer c.lamb.Stop()
-		order = append(order, EXTERNALWBLSYM)
-	case innovate.ProductString:
-		wblClient, err := innovate.NewISP2Client(c.Config.WidebandConfig.Port, c.Config.OnMessage)
-		if err != nil {
-			return err
-		}
-		c.lamb = wblClient
-		c.lamb.Start(ctx)
-		defer c.lamb.Stop()
-		order = append(order, EXTERNALWBLSYM)
-
-		if txbridge {
-			wblSub := cl.Subscribe(ctx, 0x124)
-			defer wblSub.Close()
-			go func() {
-				for msg := range wblSub.C() {
-					if msg.Identifier() == 0x124 {
-						wblClient.SetData(msg.Data())
-					}
-				}
-			}()
-		}
-
-	}
 
 	c.ErrorCounter.Set(c.errCount)
 
@@ -202,7 +190,7 @@ func (c *T8Client) Start() error {
 	count := 0
 	retries := 0
 
-	if err := cl.SendFrame(0x123, []byte("8"), gocan.Outgoing); err != nil {
+	if err := cl.SendFrame(adapter.SystemMsg, []byte("8"), gocan.Outgoing); err != nil {
 		return err
 	}
 
@@ -272,13 +260,13 @@ func (c *T8Client) Start() error {
 				}
 			}
 
-			tx := cl.Subscribe(ctx, 0x123)
+			tx := cl.Subscribe(ctx, adapter.SystemMsgDataResponse, adapter.SystemMsgError)
 			defer tx.Close()
 
 			if txbridge {
-				log.Println("stopped timer, using txbridge")
+				//log.Println("stopped timer, using txbridge")
 				t.Stop()
-				if err := cl.SendFrame(0x123, []byte("r"), gocan.Outgoing); err != nil {
+				if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
 					return err
 				}
 			}
@@ -329,14 +317,14 @@ func (c *T8Client) Start() error {
 					}
 					if read.left > 0 {
 						go func() {
-							//time.Sleep(2 * time.Millisecond)
+							// time.Sleep(2 * time.Millisecond)
 							c.readChan <- read
 						}()
 					} else {
 						read.Complete(nil)
 					}
 				case upd := <-c.updateChan:
-					//					log.Printf("Updating RAM 0x%X", upd.Address)
+					// log.Printf("Updating RAM 0x%X", upd.Address)
 					chunkSize = uint32(math.Min(float64(upd.left), 0x06))
 					if err := gm.WriteDataByAddress(ctx, upd.Address, upd.Data[:chunkSize]); err != nil {
 						c.onError(fmt.Errorf("failed to write data: %w", err))
@@ -400,6 +388,10 @@ func (c *T8Client) Start() error {
 					}
 					testerPresent()
 				case msg := <-tx.C():
+					if msg.Identifier() == adapter.SystemMsgError {
+						c.onError(errors.New("read timeout"))
+						continue
+					}
 					timeStamp = time.Now()
 					databuff := msg.Data()
 					if len(databuff) != int(expectedPayloadSize) {

@@ -27,7 +27,7 @@ if (-not (Test-Path "setup.exe")) {
 
 $winRarPath = "C:\Program Files\WinRAR\WinRAR.exe"
 
-$filesToAdd = "libusb-1.0.dll", "txlogger.exe"
+$filesToAdd = "debug.bat", "libusb-1.0.dll", "txlogger.exe"
 $outputZip = "txlogger.zip"
 $winRarArgs = "a -m5 -afzip $outputZip $filesToAdd"
 
@@ -41,4 +41,4 @@ Start-Process -FilePath $winRarPath -ArgumentList $winRarArgs -NoNewWindow -Wait
 
 Write-Host "Zip files created successfully."
 
-Invoke-Expression "scp libusb-1.0.dll txlogger.exe txlogger.zip setup.zip roffe@roffe.nu:/webroot/roffe/public_html/txlogger"
+Invoke-Expression "scp debug.bat libusb-1.0.dll txlogger.exe txlogger.zip setup.zip roffe@roffe.nu:/webroot/roffe/public_html/txlogger"

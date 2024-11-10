@@ -1,6 +1,7 @@
 package widgets
 
 import (
+	"bytes"
 	"fmt"
 	"image/color"
 	"math"
@@ -60,6 +61,7 @@ type DualDial struct {
 	needleOffset, needleLength float32
 	needleRotConst             float64
 	lineRotConst               float64
+	buf1, buf2                 bytes.Buffer
 }
 
 func NewDualDial(cfg DualDialConfig) *DualDial {
@@ -85,10 +87,8 @@ func NewDualDial(cfg DualDialConfig) *DualDial {
 	}
 
 	s.factor = s.max / s.steps
-	s.needleRotConst = common.Pi15 / (s.steps * s.factor)
-	s.lineRotConst = common.Pi15 / s.steps
 
-	s.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 255}, StrokeWidth: 2}
+	s.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0xFF}, StrokeWidth: 3}
 	s.cover = &canvas.Rectangle{FillColor: theme.Color(theme.ColorNameBackground)}
 	s.center = &canvas.Circle{FillColor: color.RGBA{R: 0x01, G: 0x0B, B: 0x13, A: 0xFF}}
 	s.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 2}
@@ -118,14 +118,21 @@ func NewDualDial(cfg DualDialConfig) *DualDial {
 
 	dial.Objects = append(dial.Objects, s.face, s.cover, s.titleText, s.center, s.needle2, s.needle, s.displayText, s.displayText2)
 	s.container = dial
+
+	totalRange := s.max - s.min
+	s.needleRotConst = common.Pi15 / (s.steps * (totalRange / s.steps))
+	s.lineRotConst = common.Pi15 / s.steps
+
 	return s
 }
 
 func (c *DualDial) rotateNeedle(hand *canvas.Line, facePosition float64) {
-	if facePosition < 0 {
-		facePosition = 0
+	// Normalize the value to start from 0 regardless of minimum value
+	normalizedPosition := facePosition - c.min
+	if normalizedPosition < 0 {
+		normalizedPosition = 0
 	}
-	c.rotate(hand, c.needleRotConst*facePosition-common.Pi43, c.needleOffset, c.needleLength)
+	c.rotate(hand, c.needleRotConst*normalizedPosition-common.Pi43, c.needleOffset, c.needleLength)
 }
 
 func (c *DualDial) rotateLines(hand *canvas.Line, facePosition float64, offset, length float32) {
@@ -147,16 +154,26 @@ func (c *DualDial) rotate(hand *canvas.Line, rotation float64, offset, length fl
 }
 
 func (c *DualDial) SetValue(value float64) {
+	if value == c.value {
+		return
+	}
 	c.value = value
 	c.rotateNeedle(c.needle, value)
-	c.displayText.Text = fmt.Sprintf(c.displayString, value)
+	c.buf1.Reset()
+	fmt.Fprintf(&c.buf1, c.displayString, value)
+	c.displayText.Text = c.buf1.String()
 	c.displayText.Refresh()
 }
 
 func (c *DualDial) SetValue2(value float64) {
+	if value == c.value2 {
+		return
+	}
 	c.value2 = value
 	c.rotateNeedle(c.needle2, value)
-	c.displayText2.Text = fmt.Sprintf(c.displayString, value)
+	c.buf2.Reset()
+	fmt.Fprintf(&c.buf2, c.displayString, value)
+	c.displayText2.Text = c.buf2.String()
 	c.displayText2.Refresh()
 }
 
@@ -229,7 +246,7 @@ func (dr *DualDialRenderer) Layout(space fyne.Size) {
 	c.rotateNeedle(c.needle, c.value)
 	c.rotateNeedle(c.needle2, c.value2)
 
-	c.face.StrokeWidth = smallStroke
+	//c.face.StrokeWidth = smallStroke
 	c.face.Move(topleft)
 	c.face.Resize(size)
 
@@ -242,11 +259,11 @@ func (dr *DualDialRenderer) Layout(space fyne.Size) {
 
 	for i, p := range c.pips {
 		if i%2 == 0 {
-			p.StrokeWidth = midStroke
-			c.rotateLines(p, float64(i), radius43, fourthRadius)
+			p.StrokeWidth = max(2.0, midStroke)
+			c.rotateLines(p, float64(i), radius43, fourthRadius-1)
 		} else {
-			p.StrokeWidth = smallStroke
-			c.rotateLines(p, float64(i), radius87, eightRadius)
+			p.StrokeWidth = max(2.0, smallStroke)
+			c.rotateLines(p, float64(i), radius87, eightRadius-1)
 		}
 	}
 

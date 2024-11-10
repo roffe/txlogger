@@ -1,6 +1,7 @@
 package widgets
 
 import (
+	"bytes"
 	"fmt"
 	"image/color"
 	"math"
@@ -54,6 +55,8 @@ type Dial struct {
 	needleOffset, needleLength float32
 	needleRotConst             float64
 	lineRotConst               float64
+
+	buf bytes.Buffer
 }
 
 func NewDial(cfg DialConfig) *Dial {
@@ -81,11 +84,8 @@ func NewDial(cfg DialConfig) *Dial {
 
 	c.factor = c.max / c.steps
 
-	c.needleRotConst = common.Pi15 / (c.steps * c.factor)
-	c.lineRotConst = common.Pi15 / c.steps
-
-	c.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 255}, StrokeWidth: 2}
-	c.cover = &canvas.Rectangle{FillColor: theme.BackgroundColor()}
+	c.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 255}, StrokeWidth: 3}
+	c.cover = &canvas.Rectangle{FillColor: theme.Color(theme.ColorNameBackground)}
 	c.center = &canvas.Circle{FillColor: color.RGBA{R: 0x01, G: 0x0B, B: 0x13, A: 0xFF}}
 	c.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 3}
 	//c.highestObservedMarker = &canvas.Line{StrokeColor: color.RGBA{R: 216, G: 250, B: 8, A: 0xFF}, StrokeWidth: 4}
@@ -109,14 +109,20 @@ func NewDial(cfg DialConfig) *Dial {
 	}
 	c.container.Objects = append(c.container.Objects, c.face, c.cover, c.titleText, c.center /*, c.highestObservedMarker*/, c.needle, c.displayText)
 
+	totalRange := c.max - c.min
+	c.needleRotConst = common.Pi15 / (c.steps * (totalRange / c.steps))
+	c.lineRotConst = common.Pi15 / c.steps
+
 	return c
 }
 
 func (c *Dial) rotateNeedle(hand *canvas.Line, facePosition float64, offset, length float32) {
-	if facePosition < 0 {
-		facePosition = 0
+	// Normalize the value to start from 0 regardless of minimum value
+	normalizedPosition := facePosition - c.min
+	if normalizedPosition < 0 {
+		normalizedPosition = 0
 	}
-	c.rotate(hand, c.needleRotConst*facePosition-common.Pi43, offset, length)
+	c.rotate(hand, c.needleRotConst*normalizedPosition-common.Pi43, offset, length)
 }
 
 func (c *Dial) rotateLines(hand *canvas.Line, facePosition float64, offset, length float32) {
@@ -139,9 +145,14 @@ func (c *Dial) rotate(hand *canvas.Line, rotation float64, offset, length float3
 }
 
 func (c *Dial) SetValue(value float64) {
+	if value == c.value {
+		return
+	}
 	c.value = value
 	c.rotateNeedle(c.needle, value, c.needleOffset, c.needleLength)
-	c.displayText.Text = fmt.Sprintf(c.displayString, value)
+	c.buf.Reset()
+	fmt.Fprintf(&c.buf, c.displayString, value)
+	c.displayText.Text = c.buf.String()
 	c.displayText.Refresh()
 	/*
 		if value > c.highestObserved || time.Since(c.lastHighestObserved) > 10*time.Second {
@@ -207,7 +218,7 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 	c.needle.StrokeWidth = stroke
 	c.rotateNeedle(c.needle, c.value, c.needleOffset, c.needleLength)
 
-	c.face.StrokeWidth = smallStroke
+	//c.face.StrokeWidth = smallStroke
 	c.face.Move(topleft)
 	c.face.Resize(size)
 
@@ -220,11 +231,11 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 
 	for i, p := range c.pips {
 		if i%2 == 0 {
-			p.StrokeWidth = midStroke
-			c.rotateLines(p, float64(i), radius43, fourthRadius)
+			p.StrokeWidth = max(2.0, midStroke)
+			c.rotateLines(p, float64(i), radius43, fourthRadius-1)
 		} else {
-			p.StrokeWidth = smallStroke
-			c.rotateLines(p, float64(i), radius87, eightRadius)
+			p.StrokeWidth = max(2.0, smallStroke)
+			c.rotateLines(p, float64(i), radius87, eightRadius-1)
 		}
 	}
 	//c.rotateNeedle(c.highestObservedMarker, c.highestObserved, c.radius, c.eightRadius*0.5)

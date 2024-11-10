@@ -69,7 +69,7 @@ func NewCBar(cfg *CBarConfig) *CBar {
 
 	s.valueRange = s.cfg.Max - s.cfg.Min
 
-	s.face = &canvas.Rectangle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0x80}, FillColor: color.RGBA{0x00, 0x00, 0x00, 0x00}, StrokeWidth: 3}
+	s.face = &canvas.Rectangle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0xFF}, FillColor: color.RGBA{0x00, 0x00, 0x00, 0x00}, StrokeWidth: 3}
 	s.bar = &canvas.Rectangle{FillColor: color.RGBA{0x2C, 0xA5, 0x00, 0x80}}
 
 	s.titleText = &canvas.Text{Text: s.cfg.Title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
@@ -80,17 +80,20 @@ func NewCBar(cfg *CBarConfig) *CBar {
 	s.displayText.TextStyle.Monospace = true
 	s.displayText.Alignment = fyne.TextAlignLeading
 
-	s.container = container.NewWithoutLayout(s.face)
+	s.container = container.NewWithoutLayout()
 	for i := 0; i < int(s.cfg.Steps+1); i++ {
 		line := &canvas.Line{StrokeColor: color.RGBA{0x00, 0xE5, 0x00, 0xFF}, StrokeWidth: 2}
 		s.bars = append(s.bars, line)
 		s.container.Add(line)
 	}
-	s.container.Objects = append(s.container.Objects, s.bar, s.titleText, s.displayText)
+	s.container.Objects = append(s.container.Objects, s.bar, s.face, s.titleText, s.displayText)
 	return s
 }
 
 func (s *CBar) SetValue(value float64) {
+	if value == s.value {
+		return
+	}
 	if value > s.cfg.Max {
 		value = s.cfg.Max
 	}

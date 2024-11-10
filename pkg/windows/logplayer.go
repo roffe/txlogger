@@ -131,6 +131,33 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 		WidebandSymbol:  a.Preferences().StringWithFallback("widebandSymbolName", "DisplProt.LambdaScanner"),
 	}
 
+	l, err := readFirstLine(filename)
+	if err != nil {
+		log.Println(err)
+	}
+
+	var logType string
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".csv":
+		if strings.Contains(l, "AirMassMast.m_Request") {
+			logType = "T8"
+			dbCfg.AirDemToString = datalogger.AirDemToStringT8
+		} else if strings.Contains(l, "Lufttemp") {
+			logType = "T5"
+		} else {
+			logType = "T7"
+			dbCfg.AirDemToString = datalogger.AirDemToStringT7
+		}
+	case ".t5l":
+		logType = "T5"
+	case ".t7l":
+		logType = "T7"
+		dbCfg.AirDemToString = datalogger.AirDemToStringT7
+	case ".t8l":
+		logType = "T8"
+		dbCfg.AirDemToString = datalogger.AirDemToStringT8
+	}
+
 	lp := &LogPlayer{
 		app: a,
 		db:  dashboard.NewDashboard(dbCfg),
@@ -153,6 +180,8 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 
 		frameBuffer: make(chan *logfile.Record, 100), // Buffered channel for frames
 		bufferSize:  100,
+
+		logType: logType,
 	}
 	cancelFuncs := make([]func(), 0)
 	for _, name := range lp.db.GetMetricNames() {
@@ -162,34 +191,8 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 		cancelFuncs = append(cancelFuncs, cancel)
 	}
 
-	l, err := readFirstLine(filename)
-	if err != nil {
-		log.Println(err)
-	}
-
 	if strings.Contains(l, datalogger.EXTERNALWBLSYM) {
 		lp.lambSymbolName = datalogger.EXTERNALWBLSYM
-	}
-
-	switch strings.ToLower(filepath.Ext(filename)) {
-	case ".csv":
-		if strings.Contains(l, "AirMassMast.m_Request") {
-			lp.logType = "T8"
-			dbCfg.AirDemToString = datalogger.AirDemToStringT8
-		} else if strings.Contains(l, "Lufttemp") {
-			lp.logType = "T5"
-		} else {
-			lp.logType = "T7"
-			dbCfg.AirDemToString = datalogger.AirDemToStringT7
-		}
-	case ".t5l":
-		lp.logType = "T5"
-	case ".t7l":
-		lp.logType = "T7"
-		dbCfg.AirDemToString = datalogger.AirDemToStringT7
-	case ".t8l":
-		lp.logType = "T8"
-		dbCfg.AirDemToString = datalogger.AirDemToStringT8
 	}
 
 	otherFunc := func(s string) {

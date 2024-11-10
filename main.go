@@ -31,10 +31,14 @@ func init() {
 }
 
 func main() {
-	mainz(os.Args)
-}
-
-func mainz(args []string) {
+	//if err := wn.TimeBeginPeriod(1); err != nil {
+	//	log.Println(err)
+	//}
+	//defer func() {
+	//	if err := wn.TimeEndPeriod(1); err != nil {
+	//		log.Println(err)
+	//	}
+	//}()
 	a := app.NewWithID("com.roffe.txlogger")
 	a.Settings().SetTheme(&txTheme{})
 
@@ -44,12 +48,11 @@ func mainz(args []string) {
 
 	meta := a.Metadata()
 	debug.Log(fmt.Sprintf("starting txlogger v%s build %d", meta.Version, meta.Build))
+	log.Printf("starting txlogger v%s build %d", meta.Version, meta.Build)
 
 	var mw *windows.MainWindow
-
-	if len(args) == 2 {
-		filename := args[1]
-
+	if len(os.Args) == 2 {
+		filename := os.Args[1]
 		switch strings.ToLower(path.Ext(filename)) {
 		case ".bin":
 			mw = windows.NewMainWindow(a, filename)

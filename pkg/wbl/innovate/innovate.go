@@ -73,8 +73,7 @@ func (c *ISP2Client) Start(ctx context.Context) error {
 	if c.port != "txbridge" {
 		c.log("Starting ISP2 client")
 		mode := &serial.Mode{
-			BaudRate: 19200,
-			//BaudRate: 115200,
+			BaudRate: 9600,
 		}
 		sp, err := serial.Open(c.port, mode)
 		if err != nil {

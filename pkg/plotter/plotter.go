@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/colors"
 )
 
 type PlotterControl interface {
@@ -154,14 +155,6 @@ func (p *Plotter) Seek(pos int) {
 	p.RefreshImage()
 }
 
-func (p *Plotter) updateCursor2() {
-	x := float32(p.cursorPos-max(p.plotStartPos, 0)) * p.widthFactor
-	xOffset := p.zoom.Size().Width + x
-	p.cursor.Position1 = fyne.NewPos(xOffset, 0)
-	p.cursor.Position2 = fyne.NewPos(xOffset+2, p.canvasImage.Size().Height)
-	p.cursor.Refresh()
-}
-
 func (p *Plotter) updateCursor() {
 	var x float32
 	halfDataPointsToShow := int(float64(p.dataPointsToShow) * .5)
@@ -189,47 +182,100 @@ func (p *Plotter) updateLegend() {
 	p.legend.Refresh()
 }
 
-/* func (p *Plotter) RefreshImages(size fyne.Size) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	//startx := time.Now()
-	var wg sync.WaitGroup
-	for n, obj := range p.plotImages {
-		if !p.texts[n].enabled {
-			continue
-		}
-		p.semChan <- struct{}{}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() {
-				<-p.semChan
-			}()
-			obj.Image = p.ts[n].Plot(p.values, p.start, p.dataPointsToShow, int(size.Width/2), int(size.Height/2))
-		}()
-	}
-	wg.Wait()
-	p.plotContainer.Refresh()
-	//log.Println("RefreshImages took", time.Since(startx))
-} */
-
 func (p *Plotter) RefreshImage() {
-	//p.mu.Lock()
-	//defer p.mu.Unlock()
-	//startx := time.Now()
 	img := image.NewRGBA(image.Rect(0, 0, int(p.plotResolution.Width), int(p.plotResolution.Height)))
+
 	for n := range len(p.ts) {
 		if !p.ts[n].Enabled {
 			continue
 		}
 		p.ts[n].PlotImage(img, p.values, p.plotStartPos, p.dataPointsToShow)
-		//p.ts[n].PlotImage(p.canvasImage.Image.(*image.RGBA), p.values, p.startPos, p.dataPointsToShow)
 	}
 	p.canvasImage.Image = img
 	p.canvasImage.Refresh()
-	//log.Println("RefreshImage took", time.Since(startx).Nanoseconds())
 }
 
 func (p *Plotter) CreateRenderer() fyne.WidgetRenderer {
 	return &plotterRenderer{p: p}
+}
+
+type TimeSeries struct {
+	Name       string
+	Min        float64
+	Max        float64
+	valueRange float64
+	Color      color.RGBA
+	Enabled    bool
+}
+
+func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
+	ts := &TimeSeries{
+		Name:    name,
+		Color:   colors.GetColor(name),
+		Enabled: true,
+	}
+
+	data, ok := values[name]
+	if !ok {
+		log.Println("Time series", name, "not found")
+		return ts
+	}
+
+	switch name {
+	case "m_Request", "MAF.m_AirInlet", "AirMassMast.m_Request":
+		ts.Min, _ = findMinMaxFloat64(data)
+		ts.Max = 2200
+	case "ActualIn.p_AirInlet", "In.p_AirInlet", "In.p_AirBefThrottle":
+		ts.Min, _ = findMinMaxFloat64(data)
+		ts.Max = 3.0
+	default:
+		ts.Min, ts.Max = findMinMaxFloat64(data)
+	}
+	ts.valueRange = ts.Max - ts.Min
+
+	return ts
+}
+
+func (ts *TimeSeries) PlotImage(img *image.RGBA, values map[string][]float64, start, numPoints int) {
+	dl := len(values[ts.Name]) - 1
+	startN, endN := min(max(start, 0), dl), min(start+numPoints, dl)
+
+	s := img.Bounds().Size()
+	w := s.X
+	h := s.Y
+
+	//log.Println("Plotting", ts.Name, "from", start, "to", numPoints, "width", w, "height", h)
+	hh := h - 1
+	dataLen := endN - startN
+	heightFactor := float64(hh) / ts.valueRange
+	widthFactor := float64(w) / float64(dataLen)
+
+	// start at 1 since we need to draw a line from the previous point
+	data := values[ts.Name][startN:endN]
+	dle := dataLen - 1
+
+	for x := 1; x < dataLen; x++ {
+		fx := float64(x)
+		x0 := int(((fx - 1) * widthFactor))
+		y0 := int(float64(hh) - (data[x-1]-ts.Min)*heightFactor)
+		x1 := (int(fx * widthFactor))
+		if x == dle {
+			x1 = w
+		}
+		y1 := int(float64(hh) - (data[x]-ts.Min)*heightFactor)
+		Bresenham(img, x0, y0, x1, y1, ts.Color)
+	}
+}
+
+func findMinMaxFloat64(data []float64) (float64, float64) {
+	min, max := data[0], data[0]
+	for _, v := range data {
+		if v < min {
+			min = v
+		}
+		if v > max {
+			max = v
+		}
+	}
+	return min, max
 }

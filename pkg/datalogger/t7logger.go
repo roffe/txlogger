@@ -13,9 +13,8 @@ import (
 	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/adapter"
 	"github.com/roffe/txlogger/pkg/ebus"
-	"github.com/roffe/txlogger/pkg/ecumaster"
-	"github.com/roffe/txlogger/pkg/innovate"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
@@ -162,7 +161,7 @@ func (c *T7Client) Start() error {
 	go c.startBroadcastListener(bctx, cl)
 
 	c.OnMessage("Watching for broadcast messages")
-	<-time.After(300 * time.Millisecond)
+	<-time.After(350 * time.Millisecond)
 	order := c.sysvars.Keys()
 	sort.StringSlice(order).Sort()
 	c.OnMessage(fmt.Sprintf("Found %s", order))
@@ -171,35 +170,22 @@ func (c *T7Client) Start() error {
 		bcancel()
 	}
 
-	switch c.Config.WidebandConfig.Type {
-	case "ECU":
-	case ecumaster.ProductString:
-		c.lamb = ecumaster.NewLambdaToCAN(cl)
-		c.lamb.Start(ctx)
+	// Wideband lambda
+	cfg := &WBLConfig{
+		WBLType:  c.Config.WidebandConfig.Type,
+		Port:     c.Config.WidebandConfig.Port,
+		Log:      c.OnMessage,
+		Txbridge: txbridge,
+	}
+
+	c.lamb, err = NewWBL(ctx, cl, cfg)
+	if err != nil {
+		return err
+	}
+
+	if c.lamb != nil {
 		defer c.lamb.Stop()
 		order = append(order, EXTERNALWBLSYM)
-	case innovate.ProductString:
-		wblClient, err := innovate.NewISP2Client(c.Config.WidebandConfig.Port, c.Config.OnMessage)
-		if err != nil {
-			return err
-		}
-		c.lamb = wblClient
-		c.lamb.Start(ctx)
-		defer c.lamb.Stop()
-		order = append(order, EXTERNALWBLSYM)
-
-		if txbridge {
-			wblSub := cl.Subscribe(ctx, 0x124)
-			defer wblSub.Close()
-			go func() {
-				for msg := range wblSub.C() {
-					if msg.Identifier() == 0x124 {
-						wblClient.SetData(msg.Data())
-					}
-				}
-			}()
-		}
-
 	}
 
 	for _, sym := range c.Symbols {
@@ -212,8 +198,10 @@ func (c *T7Client) Start() error {
 	count := 0
 	retries := 0
 
-	if err := cl.SendFrame(0x123, []byte("7"), gocan.Outgoing); err != nil {
-		return err
+	if txbridge {
+		if err := cl.SendFrame(adapter.SystemMsg, []byte("7"), gocan.Outgoing); err != nil {
+			return err
+		}
 	}
 
 	kwp := kwp2000.New(cl)
@@ -257,7 +245,7 @@ func (c *T7Client) Start() error {
 				return err
 			}
 			dpos++
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(12 * time.Millisecond)
 		}
 		c.OnMessage("Configured dynamic register")
 
@@ -287,18 +275,20 @@ func (c *T7Client) Start() error {
 			}
 		}
 
-		tx := cl.Subscribe(ctx, 0x123)
+		tx := cl.Subscribe(ctx, adapter.SystemMsgDataResponse, adapter.SystemMsgError)
 		defer tx.Close()
 
 		if txbridge {
-			log.Println("stopped timer, using txbridge")
+			//			log.Println("stopped timer, using txbridge")
 			t.Stop()
-			if err := cl.SendFrame(0x123, []byte("r"), gocan.Outgoing); err != nil {
+			if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
 				return err
 			}
 		}
 
 		//buf := bytes.NewBuffer(nil)
+		var firstTime time.Time
+		var firstTimestamp uint32
 		var databuff []byte
 		for {
 			select {
@@ -339,18 +329,18 @@ func (c *T7Client) Start() error {
 				}
 			case read := <-c.readChan:
 				if txbridge {
-					if err := cl.SendFrame(0x123, []byte("s"), gocan.Outgoing); err != nil {
+					if err := cl.SendFrame(adapter.SystemMsg, []byte("s"), gocan.Outgoing); err != nil {
 						c.onError(err)
 						continue
 					}
-					time.Sleep(42 * time.Millisecond)
+					time.Sleep(45 * time.Millisecond)
 				}
 				// log.Printf("Reading %X %d", read.Address, read.Length)
 				data, err := kwp.ReadMemoryByAddress(ctx, int(read.Address), int(read.Length))
 				if err != nil {
 					read.Complete(err)
 					if txbridge {
-						if err := cl.SendFrame(0x123, []byte("r"), gocan.Outgoing); err != nil {
+						if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
 							c.onError(err)
 							continue
 						}
@@ -359,15 +349,16 @@ func (c *T7Client) Start() error {
 				}
 				read.Data = data
 				if txbridge {
-					if err := cl.SendFrame(0x123, []byte("r"), gocan.Outgoing); err != nil {
+					if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
 						c.onError(err)
 						continue
 					}
+					time.Sleep(20 * time.Millisecond)
 				}
 				read.Complete(nil)
 			case upd := <-c.updateChan:
 				if txbridge {
-					if err := cl.SendFrame(0x123, []byte("s"), gocan.Outgoing); err != nil {
+					if err := cl.SendFrame(adapter.SystemMsg, []byte("s"), gocan.Outgoing); err != nil {
 						c.onError(err)
 						continue
 					}
@@ -375,7 +366,7 @@ func (c *T7Client) Start() error {
 				}
 				upd.Complete(kwp.WriteDataByAddress(ctx, upd.Address, upd.Data))
 				if txbridge {
-					if err := cl.SendFrame(0x123, []byte("r"), gocan.Outgoing); err != nil {
+					if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
 						c.onError(err)
 						continue
 					}
@@ -443,16 +434,35 @@ func (c *T7Client) Start() error {
 					c.CaptureCounter.Set(count)
 				}
 			case msg := <-tx.C():
-				timeStamp = time.Now()
+				if msg.Identifier() == adapter.SystemMsgError {
+					data := msg.Data()
+					switch data[0] {
+					case 0x31:
+						c.onError(fmt.Errorf("read timeout"))
+					case 0x06:
+						c.onError(fmt.Errorf("invalid sequence"))
+					}
+					continue
+				}
+
 				databuff = msg.Data()
-				if len(databuff) != int(expectedPayloadSize) {
-					c.onError(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
-					log.Printf("%02X", databuff)
+				if len(databuff) != int(expectedPayloadSize+4) {
+					c.onError(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize+4, len(databuff)))
 					continue
 					//return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
 				}
 
+				var currtimestamp uint32
 				r := bytes.NewReader(databuff)
+				binary.Read(r, binary.BigEndian, &currtimestamp)
+
+				if firstTime.IsZero() {
+					firstTime = time.Now()
+					firstTimestamp = currtimestamp
+				}
+
+				timeStamp := calculateCompensatedTimestamp(firstTime, firstTimestamp, currtimestamp)
+
 				for _, va := range c.Symbols {
 					if va.Skip {
 						ebus.Publish(va.Name, c.sysvars.Get(va.Name))
@@ -618,4 +628,33 @@ func FCutToStringT7(value float64) string {
 	default:
 		return "Unknown"
 	}
+}
+
+func calculateCompensatedTimestamp(firstTime time.Time, firstTimestamp, currentTimestamp uint32) time.Time {
+	return firstTime.Add(time.Duration(currentTimestamp-firstTimestamp) * time.Millisecond)
+}
+
+func calculateCompensatedTimestampZ(firstTime time.Time, firstTimestamp, currentTimestamp uint32) time.Time {
+	// Calculate elapsed milliseconds since the first reading
+	elapsedMs := currentTimestamp - firstTimestamp
+
+	// Calculate the compensated timestamp
+	compensatedTime := firstTime.Add(time.Duration(elapsedMs) * time.Millisecond)
+
+	// Calculate drift between actual system time and compensated time
+	actualTime := time.Now()
+	driftDuration := actualTime.Sub(compensatedTime)
+
+	// Convert drift to milliseconds for easier reading
+	driftMs := float64(driftDuration.Nanoseconds()) / float64(time.Millisecond)
+
+	// Log if drift is more than 100ms
+
+	log.Printf("Timestamp drift: %.2fms (System: %v, Compensated: %v, ECU elapsed: %dms)",
+		driftMs,
+		actualTime.Format("15:04:05.000"),
+		compensatedTime.Format("15:04:05.000"),
+		elapsedMs)
+
+	return compensatedTime
 }

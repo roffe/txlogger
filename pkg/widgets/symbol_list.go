@@ -84,6 +84,9 @@ func (s *SymbolListWidget) UpdateBars(enabled bool) {
 func (s *SymbolListWidget) SetValue(name string, value float64) {
 	val, found := s.entryMap[name]
 	if found {
+		if value == val.value {
+			return
+		}
 		val.value = value
 		if value < val.min {
 			val.min = value

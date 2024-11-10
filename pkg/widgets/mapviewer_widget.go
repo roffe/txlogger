@@ -182,7 +182,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 			Steps:           20,
 			Minsize:         fyne.NewSize(100, 25),
 			TextPosition:    TextAtCenter,
-			DisplayString:   "λ %.2f",
+			DisplayString:   "λ %.3f",
 			DisplayTextSize: 25,
 		})
 	}

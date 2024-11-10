@@ -41,6 +41,7 @@ type Meshgrid struct {
 
 	rotationMatrix Matrix3x3
 	scale          float64
+	panX, panY     float64 // Add pan offset tracking
 
 	mousePosition image.Point
 	showCrosshair bool
@@ -134,14 +135,11 @@ func (m *Meshgrid) scaleMeshgrid(factor float64) {
 		}
 	}
 }
-
 func (m *Meshgrid) rotateMeshgrid(x, y, z float64) {
-	// Create rotation matrices for each axis
 	rotX := RotationMatrixX(x)
 	rotY := RotationMatrixY(y)
 	rotZ := RotationMatrixZ(z)
 
-	// Combine rotations
 	newRotation := rotX.Multiply(rotY).Multiply(rotZ)
 	m.rotationMatrix = m.rotationMatrix.Multiply(newRotation)
 
@@ -163,7 +161,7 @@ func (m *Meshgrid) rotateMeshgrid(x, y, z float64) {
 	// Apply rotation to all vertices around the calculated center
 	for i := range m.vertices {
 		for j := range m.vertices[i] {
-			// First scale the original coordinates
+			// Scale the original coordinates
 			vx := m.vertices[i][j].Ox * m.scale
 			vy := m.vertices[i][j].Oy * m.scale
 			vz := m.vertices[i][j].Oz * m.scale
@@ -176,16 +174,12 @@ func (m *Meshgrid) rotateMeshgrid(x, y, z float64) {
 			// Apply rotation matrix
 			rotated := m.rotationMatrix.MultiplyVector([3]float64{vx, vy, vz})
 
-			// Translate back (add scaled center)
-			m.vertices[i][j].X = rotated[0] + centerX*m.scale
-			m.vertices[i][j].Y = rotated[1] + centerY*m.scale
+			// Translate back (add scaled center) and add pan offset
+			m.vertices[i][j].X = rotated[0] + centerX*m.scale + m.panX
+			m.vertices[i][j].Y = rotated[1] + centerY*m.scale + m.panY
 			m.vertices[i][j].Z = rotated[2] + centerZ*m.scale
 		}
 	}
-
-	//log.Println(m.rotationMatrix[0])
-	//log.Println(m.rotationMatrix[1])
-	//log.Println(m.rotationMatrix[2])
 }
 
 func (m *Meshgrid) SetFloat64(idx int, value float64) {
@@ -214,12 +208,15 @@ func (m *Meshgrid) SetMax(max float64) {
 	m.zrange = m.zmax - m.zmin
 }
 
-// Update LoadFloat64s to maintain consistent rotation around center
 func (m *Meshgrid) LoadFloat64s(floats []float64) {
 	m.values = floats
 	if len(floats) == 0 {
 		return
 	}
+
+	// Store current pan values
+	oldPanX := m.panX
+	oldPanY := m.panY
 
 	// Reset vertices with new values
 	m.createVertices(400, 400)
@@ -239,7 +236,7 @@ func (m *Meshgrid) LoadFloat64s(floats []float64) {
 	centerY := sumY / float64(count)
 	centerZ := sumZ / float64(count)
 
-	// Apply scale and current rotation matrix
+	// Apply scale, current rotation matrix, and restore pan
 	for i := range m.vertices {
 		for j := range m.vertices[i] {
 			// First scale the original coordinates
@@ -255,12 +252,16 @@ func (m *Meshgrid) LoadFloat64s(floats []float64) {
 			// Apply current rotation matrix
 			rotated := m.rotationMatrix.MultiplyVector([3]float64{vx, vy, vz})
 
-			// Translate back (add scaled center)
-			m.vertices[i][j].X = rotated[0] + centerX*m.scale
-			m.vertices[i][j].Y = rotated[1] + centerY*m.scale
+			// Translate back (add scaled center) and restore pan offset
+			m.vertices[i][j].X = rotated[0] + centerX*m.scale + oldPanX
+			m.vertices[i][j].Y = rotated[1] + centerY*m.scale + oldPanY
 			m.vertices[i][j].Z = rotated[2] + centerZ*m.scale
 		}
 	}
+
+	// Restore the pan values
+	m.panX = oldPanX
+	m.panY = oldPanY
 
 	m.Refresh()
 }
