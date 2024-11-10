@@ -182,14 +182,15 @@ func (cs *CanSettingsWidget) GetAdapter(ecuType string, logger func(string)) (go
 		if strings.HasPrefix(cs.adapterSelector.Selected, "STN") || strings.HasPrefix(cs.adapterSelector.Selected, "OBDLink") || strings.HasSuffix(cs.adapterSelector.Selected, "Wifi") {
 			canFilter = []uint32{0x238, 0x258, 0x270}
 		} else {
-			canFilter = []uint32{0x1A0, 0x238, 0x258, 0x270, 0x280, 0x3A0, 0x664, 0x665}
+			canFilter = []uint32{0x180, 0x1A0, 0x238, 0x258, 0x270, 0x280, 0x3A0, 0x664, 0x665}
 		}
+
 		canRate = 500
 	case "T8":
 		if strings.HasPrefix(cs.adapterSelector.Selected, "STN") || strings.HasPrefix(cs.adapterSelector.Selected, "OBDLink") {
 			canFilter = []uint32{0x7e8}
 		} else {
-			canFilter = []uint32{0x7e8, 0x664, 0x665}
+			canFilter = []uint32{0x180, 0x7e8, 0x664, 0x665}
 		}
 		canRate = 500
 	}

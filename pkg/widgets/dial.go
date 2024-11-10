@@ -1,6 +1,7 @@
 package widgets
 
 import (
+	"bytes"
 	"fmt"
 	"image/color"
 	"math"
@@ -10,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/common"
 )
 
 type DialConfig struct {
@@ -53,6 +55,8 @@ type Dial struct {
 	needleOffset, needleLength float32
 	needleRotConst             float64
 	lineRotConst               float64
+
+	buf bytes.Buffer
 }
 
 func NewDial(cfg DialConfig) *Dial {
@@ -62,7 +66,7 @@ func NewDial(cfg DialConfig) *Dial {
 		max:           cfg.Max,
 		steps:         30,
 		displayString: "%.0f",
-		minsize:       fyne.NewSize(150, 150),
+		minsize:       fyne.NewSize(100, 100),
 	}
 	c.ExtendBaseWidget(c)
 
@@ -80,11 +84,8 @@ func NewDial(cfg DialConfig) *Dial {
 
 	c.factor = c.max / c.steps
 
-	c.needleRotConst = pi15 / (c.steps * c.factor)
-	c.lineRotConst = pi15 / c.steps
-
-	c.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 255}, StrokeWidth: 2}
-	c.cover = &canvas.Rectangle{FillColor: theme.BackgroundColor()}
+	c.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 255}, StrokeWidth: 3}
+	c.cover = &canvas.Rectangle{FillColor: theme.Color(theme.ColorNameBackground)}
 	c.center = &canvas.Circle{FillColor: color.RGBA{R: 0x01, G: 0x0B, B: 0x13, A: 0xFF}}
 	c.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 3}
 	//c.highestObservedMarker = &canvas.Line{StrokeColor: color.RGBA{R: 216, G: 250, B: 8, A: 0xFF}, StrokeWidth: 4}
@@ -108,18 +109,24 @@ func NewDial(cfg DialConfig) *Dial {
 	}
 	c.container.Objects = append(c.container.Objects, c.face, c.cover, c.titleText, c.center /*, c.highestObservedMarker*/, c.needle, c.displayText)
 
+	totalRange := c.max - c.min
+	c.needleRotConst = common.Pi15 / (c.steps * (totalRange / c.steps))
+	c.lineRotConst = common.Pi15 / c.steps
+
 	return c
 }
 
 func (c *Dial) rotateNeedle(hand *canvas.Line, facePosition float64, offset, length float32) {
-	if facePosition < 0 {
-		facePosition = 0
+	// Normalize the value to start from 0 regardless of minimum value
+	normalizedPosition := facePosition - c.min
+	if normalizedPosition < 0 {
+		normalizedPosition = 0
 	}
-	c.rotate(hand, c.needleRotConst*facePosition-pi43, offset, length)
+	c.rotate(hand, c.needleRotConst*normalizedPosition-common.Pi43, offset, length)
 }
 
 func (c *Dial) rotateLines(hand *canvas.Line, facePosition float64, offset, length float32) {
-	c.rotate(hand, c.lineRotConst*facePosition-pi43, offset, length)
+	c.rotate(hand, c.lineRotConst*facePosition-common.Pi43, offset, length)
 }
 
 func (c *Dial) rotate(hand *canvas.Line, rotation float64, offset, length float32) {
@@ -138,9 +145,14 @@ func (c *Dial) rotate(hand *canvas.Line, rotation float64, offset, length float3
 }
 
 func (c *Dial) SetValue(value float64) {
+	if value == c.value {
+		return
+	}
 	c.value = value
 	c.rotateNeedle(c.needle, value, c.needleOffset, c.needleLength)
-	c.displayText.Text = fmt.Sprintf(c.displayString, value)
+	c.buf.Reset()
+	fmt.Fprintf(&c.buf, c.displayString, value)
+	c.displayText.Text = c.buf.String()
 	c.displayText.Refresh()
 	/*
 		if value > c.highestObserved || time.Since(c.lastHighestObserved) > 10*time.Second {
@@ -171,59 +183,59 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 	//dr.d.container.Resize(space)
 	c := dr.d
 	c.diameter = fyne.Min(space.Width, space.Height)
-	c.radius = c.diameter * oneHalf
-	c.middle = fyne.NewPos(space.Width*oneHalf, space.Height*oneHalf)
+	c.radius = c.diameter * common.OneHalf
+	c.middle = fyne.NewPos(space.Width*common.OneHalf, space.Height*common.OneHalf)
 	c.needleOffset = -c.radius * .15
 	c.needleLength = c.radius * 1.14
 
 	// Pre-calculate stroke sizes
-	stroke := c.diameter * oneSixthieth
-	midStroke := c.diameter * oneEighthieth
-	smallStroke := c.diameter * oneTwohundredth
+	stroke := c.diameter * common.OneSixthieth
+	midStroke := c.diameter * common.OneEighthieth
+	smallStroke := c.diameter * common.OneTwohundredth
 
 	size := fyne.NewSize(c.diameter, c.diameter)
 
 	topleft := fyne.NewPos(c.middle.X-c.radius, c.middle.Y-c.radius)
 
-	c.titleText.TextSize = c.radius * oneFourth
-	c.titleText.Move(c.middle.Add(fyne.NewPos(0, c.diameter*oneFourth)))
+	c.titleText.TextSize = c.radius * common.OneFourth
+	c.titleText.Move(c.middle.Add(fyne.NewPos(0, c.diameter*common.OneFourth)))
 	c.titleText.Refresh()
 
 	// Calculate the size of the center component directly
-	center := c.radius * oneFourth
+	center := c.radius * common.OneFourth
 
-	c.center.Move(c.middle.SubtractXY(center*oneHalf, center*oneHalf))
+	c.center.Move(c.middle.SubtractXY(center*common.OneHalf, center*common.OneHalf))
 	c.center.Resize(fyne.NewSize(center, center))
 
-	c.cover.Move(fyne.NewPos(0, c.middle.Y+c.radius*oneSeventh*5))
-	c.cover.Resize(fyne.NewSize(space.Width, size.Height*oneSixth))
+	c.cover.Move(fyne.NewPos(0, c.middle.Y+c.radius*common.OneSeventh*5))
+	c.cover.Resize(fyne.NewSize(space.Width, size.Height*common.OneSixth))
 
-	c.displayText.TextSize = c.radius * oneHalf
+	c.displayText.TextSize = c.radius * common.OneHalf
 	c.displayText.Text = fmt.Sprintf(c.displayString, c.value)
-	c.displayText.Move(topleft.AddXY(0, c.diameter*oneSixth))
+	c.displayText.Move(topleft.AddXY(0, c.diameter*common.OneSixth))
 	c.displayText.Resize(size)
 
 	c.needle.StrokeWidth = stroke
 	c.rotateNeedle(c.needle, c.value, c.needleOffset, c.needleLength)
 
-	c.face.StrokeWidth = smallStroke
+	//c.face.StrokeWidth = smallStroke
 	c.face.Move(topleft)
 	c.face.Resize(size)
 
-	fourthRadius := c.radius * oneFourth
-	eightRadius := c.radius * oneEight
+	fourthRadius := c.radius * common.OneFourth
+	eightRadius := c.radius * common.OneEight
 
 	// Optimize pip rotation and styling
-	radius43 := c.radius * oneFourth * 3
-	radius87 := c.radius * oneEight * 7
+	radius43 := c.radius * common.OneFourth * 3
+	radius87 := c.radius * common.OneEight * 7
 
 	for i, p := range c.pips {
 		if i%2 == 0 {
-			p.StrokeWidth = midStroke
-			c.rotateLines(p, float64(i), radius43, fourthRadius)
+			p.StrokeWidth = max(2.0, midStroke)
+			c.rotateLines(p, float64(i), radius43, fourthRadius-1)
 		} else {
-			p.StrokeWidth = smallStroke
-			c.rotateLines(p, float64(i), radius87, eightRadius)
+			p.StrokeWidth = max(2.0, smallStroke)
+			c.rotateLines(p, float64(i), radius87, eightRadius-1)
 		}
 	}
 	//c.rotateNeedle(c.highestObservedMarker, c.highestObserved, c.radius, c.eightRadius*0.5)

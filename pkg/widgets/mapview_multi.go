@@ -36,6 +36,7 @@ func NewMapViewerMulti(typ symbol.ECUType, symbols symbol.SymbolCollection, mapN
 			WithYFrom(axis.YFrom),
 			WithInterPolFunc(interpolate.Interpolate),
 			WithButtons(false),
+			WithAxisLabels(axis.XDescription, axis.YDescription, axis.ZDescription),
 		)
 		if err != nil {
 			return nil, err

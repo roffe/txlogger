@@ -12,7 +12,8 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ecumaster"
-	"github.com/roffe/txlogger/pkg/innovate"
+	"github.com/roffe/txlogger/pkg/wbl/aem"
+	"github.com/roffe/txlogger/pkg/wbl/innovate"
 	sdialog "github.com/sqweek/dialog"
 )
 
@@ -79,7 +80,7 @@ func (sw *SettingsWidget) GetWidebandSymbolName() string {
 	switch sw.wblSource.Selected {
 	case "ECU":
 		return "DisplProt.LambdaScanner"
-	case ecumaster.ProductString, innovate.ProductString:
+	case ecumaster.ProductString, innovate.ProductString, aem.ProductString:
 		return datalogger.EXTERNALWBLSYM
 	default:
 		return "None"
@@ -190,12 +191,12 @@ func NewSettingsWidget() *SettingsWidget {
 
 	sw.CanSettings = NewCanSettingsWidget(app)
 
-	sw.wblPortSelect = widget.NewSelect(sw.CanSettings.listPorts(), func(s string) {
+	sw.wblPortSelect = widget.NewSelect(append([]string{"txbridge", "CAN"}, sw.CanSettings.listPorts()...), func(s string) {
 		app.Preferences().SetString(prefsWBLPort, s)
 	})
 
 	sw.wblPortRefreshButton = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
-		sw.wblPortSelect.Options = sw.CanSettings.listPorts()
+		sw.wblPortSelect.Options = append([]string{"txbridge", "CAN"}, sw.CanSettings.listPorts()...)
 		sw.wblPortSelect.Refresh()
 	})
 
@@ -410,6 +411,7 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 		"ECU",
 		ecumaster.ProductString,
 		innovate.ProductString,
+		aem.ProductString,
 	}, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsLambdaSource, s)
 		fyne.CurrentApp().Preferences().SetString(prefsWidebandSymbolName, sw.GetWidebandSymbolName())

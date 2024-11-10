@@ -1,10 +1,20 @@
 # 1.0.18
 
-- Add code to convert AD_EGR value to lambda 0.5 - 1.5
-- Add settings to configure WBL when reading AD values
+- Add code to convert T5 AD_EGR value to lambda 0.5 - 1.5
+- Add settings to configure WBL when reading AD values from T7
 - Fixed bugg where IDC did not change color on threshold values
 - Tweaked border around wbl, nbl, turbo pwm and tps gauges
-- Added support for serial logging of Innovate wideband controllers
+- Tweaks to the dashboard widgets to use less cpu
+- Adjusted minimum line width in the gauges in the dashboard
+- Added support for serial logging of Innovate wideband controllers (MTX-L & LC-2) & AEM Uego with usb <-> serial adapter
+- Added support for CAN logging of AEM Uego Wideband controllers
+- Added AMUL to Trionic 7 preset and dashboard
+- Initial support for txbridge
+- Switched from TDM-GCC to MingW64 for building
+- Greatly reworked the 3d mesh viewer for maps (camera controlls still isn't great, but better)
+- Solved problem with no console output when launched from terminal in Windows
+  this will greatly help debugging and troubleshooting. If you have problems with crashes
+  start txlogger with the debug.bat file and create a issue on Github or forum post on TrionicTuning.
 
 # 1.0.17
 

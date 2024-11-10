@@ -20,13 +20,19 @@ type T5Client struct {
 	symbolChan chan []*symbol.Symbol
 	updateChan chan *RamUpdate
 	readChan   chan *ReadRequest
-	quitChan   chan struct{}
-	closeOnce  sync.Once
-	lw         LogWriter
-	Config
+
+	quitChan chan struct{}
+
+	closeOnce sync.Once
+
+	lamb LambdaProvider
+
+	lw LogWriter
 
 	errCount     int
 	errPerSecond int
+
+	Config
 }
 
 func NewT5(cfg Config, lw LogWriter) (IClient, error) {
@@ -70,6 +76,11 @@ func (c *T5Client) SetSymbols(symbols []*symbol.Symbol) error {
 func (c *T5Client) Start() error {
 	defer c.lw.Close()
 
+	var txbridge bool
+	if c.Config.Device.Name() == "txbridge" {
+		txbridge = true
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -96,6 +107,23 @@ func (c *T5Client) Start() error {
 		log.Println(s.String())
 		order[n] = s.Name
 		s.Correctionfactor = 0.1
+	}
+	// Wideband lambda
+	cfg := &WBLConfig{
+		WBLType:  c.Config.WidebandConfig.Type,
+		Port:     c.Config.WidebandConfig.Port,
+		Log:      c.OnMessage,
+		Txbridge: txbridge,
+	}
+
+	c.lamb, err = NewWBL(ctx, cl, cfg)
+	if err != nil {
+		return err
+	}
+
+	if c.lamb != nil {
+		defer c.lamb.Stop()
+		order = append(order, EXTERNALWBLSYM)
 	}
 
 	err = retry.Do(func() error {
@@ -137,13 +165,20 @@ func (c *T5Client) Start() error {
 						c.onError(err)
 					}
 				}
+
+				if c.lamb != nil {
+					lambda := c.lamb.GetLambda()
+					sysvars.Set(EXTERNALWBLSYM, lambda)
+					ebus.Publish(EXTERNALWBLSYM, lambda)
+				}
+
+				if err := c.lw.Write(sysvars, []*symbol.Symbol{}, ts, order); err != nil {
+					return err
+				}
 				count++
 				cps++
 				if count%15 == 0 {
 					c.CaptureCounter.Set(count)
-				}
-				if err := c.lw.Write(sysvars, []*symbol.Symbol{}, ts, order); err != nil {
-					return err
 				}
 			}
 		}

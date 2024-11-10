@@ -59,6 +59,15 @@ func WithZData(zData []int) MapViewerOption {
 	}
 }
 
+func WithAxisLabels(x, y, z string) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.xAxisLabel = x
+		mv.yAxisLabel = y
+		mv.zAxisLabel = z
+		return nil
+	}
+}
+
 func WithXCorrFac(xCorrFac float64) MapViewerOption {
 	return func(mv *MapViewer) error {
 		mv.xCorrFac = xCorrFac

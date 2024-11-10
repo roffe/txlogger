@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -52,11 +51,10 @@ type ISP2Client struct {
 
 	status    uint8
 	wordIndex uint8
-	wordBytes []byte
 
 	wordLength uint8
 
-	skipOneByte bool
+	syncBuffer []byte // New field for synchronization
 
 	mu sync.Mutex
 
@@ -65,10 +63,9 @@ type ISP2Client struct {
 
 func NewISP2Client(port string, logFunc func(string)) (*ISP2Client, error) {
 	return &ISP2Client{
-		port:      port,
-		wordBytes: make([]byte, 2),
-		buff:      bytes.NewBuffer(nil),
-		log:       logFunc,
+		port: port,
+		buff: bytes.NewBuffer(nil),
+		log:  logFunc,
 	}, nil
 }
 
@@ -84,6 +81,8 @@ func (c *ISP2Client) Start(ctx context.Context) error {
 	c.sp = sp
 
 	c.sp.SetReadTimeout(20 * time.Millisecond)
+
+	c.syncBuffer = make([]byte, 4) // Initialize syncBuffer
 
 	go c.run(ctx)
 
@@ -163,9 +162,10 @@ func lambdaStatus(input uint8) string {
 }
 
 func (c *ISP2Client) run(ctx context.Context) {
+	buf := make([]byte, 16)
+
 	for {
 		// read from serial
-		buf := make([]byte, 16)
 		n, err := c.sp.Read(buf)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -178,68 +178,66 @@ func (c *ISP2Client) run(ctx context.Context) {
 			continue
 		}
 
-		n1, err := c.buff.Write(buf[:n])
-		if err != nil {
-			c.log("isp2: " + err.Error())
-			return
-		}
+		// Process the received bytes
+		c.processBytes(buf[:n])
+	}
+}
 
-		if n1 != n {
-			c.log("isp2: n1 != n")
-			return
-		}
+func (c *ISP2Client) processBytes(data []byte) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-		if c.buff.Len() >= 2 {
-			if err := c.process(); err != nil {
-				c.log("isp2: " + err.Error())
+	// Append new data to the sync buffer
+	c.syncBuffer = append(c.syncBuffer, data...)
+
+	// Try to find the header and process data
+	for len(c.syncBuffer) >= 2 {
+		headerWord := binary.BigEndian.Uint16(c.syncBuffer)
+		if headerWord&ISP2_HEADER_BITS == ISP2_HEADER_BITS {
+			// Found a valid header
+			if len(c.syncBuffer) < 4 {
+				// Not enough data to process a complete message, wait for more
+				return
 			}
+
+			c.wordLength = c.syncBuffer[0]&0x01<<7 | c.syncBuffer[1]&0x7F
+			totalLength := 2 * (int(c.wordLength) + 1) // +1 for the header word
+
+			if len(c.syncBuffer) < totalLength {
+				// Not enough data for the complete message, wait for more
+				return
+			}
+
+			// Process the complete message
+			c.processMessage(c.syncBuffer[:totalLength])
+
+			// Remove the processed message from the buffer
+			c.syncBuffer = c.syncBuffer[totalLength:]
+			c.wordIndex = 0
+		} else {
+			// Invalid header, remove the first byte and continue searching
+			c.syncBuffer = c.syncBuffer[1:]
 		}
 	}
 }
 
-func (c *ISP2Client) process() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	var headerWord uint16
-
-	_, err := c.buff.Read(c.wordBytes)
-	if err != nil {
-		return err
-	}
-	switch c.wordIndex {
-	case ISP2_WORD_HEADER:
-		log.Println("check header")
-		headerWord = binary.BigEndian.Uint16(c.wordBytes)
-		if headerWord&ISP2_HEADER_BITS != ISP2_HEADER_BITS {
-			//c.buff.ReadByte() // take one byte off the buffer if we managed to start reading in the middle of a word
-			return nil
+func (c *ISP2Client) processMessage(message []byte) {
+	for i := 0; i < len(message); i += 2 {
+		word := message[i : i+2]
+		switch c.wordIndex {
+		case ISP2_WORD_HEADER:
+			// Header already verified, skip
+		case ISP2_WORD_STATUS:
+			c.status = word[0] >> 2 & 0x07
+			c.afrMultiplier = getAFRMultiplier(word)
+		case ISP2_WORD_LAMBDA:
+			c.lambda = getLambda(word)
+			c.afr = c.lambda * c.afrMultiplier
+		case ISP2_BATTERY_VOLTAGE:
+			// Process battery voltage if needed
 		}
-		c.wordLength = c.wordBytes[0]&0x01<<7 | c.wordBytes[1]&0x7F
-	case ISP2_WORD_STATUS:
-		log.Println("status")
-		c.status = c.wordBytes[0] >> 2 & 0x07 // bits 2-4 in first byte 0 indexed
-		c.afrMultiplier = getAFRMultiplier(c.wordBytes)
-	case ISP2_WORD_LAMBDA:
-		log.Println("lambda")
-		c.lambda = getLambda(c.wordBytes)
-		c.afr = c.lambda * c.afrMultiplier
-	case ISP2_BATTERY_VOLTAGE:
-		//bv := c.wordBytes[0]&0x07<<7 | c.wordBytes[1]&0x7F
-		//mb := c.wordBytes[0] & 0x38 >> 3
-		//voltage := float64(bv) * 5 * float64(mb) / 1023
-		//log.Println("Battery voltage:", voltage)
-	default:
-		return fmt.Errorf("unknown word index")
-	}
-
-	if c.wordIndex == c.wordLength {
-		c.wordIndex = 0
-	} else {
 		c.wordIndex++
 	}
-
-	return nil
 }
 
 func getLambda(data []byte) float64 {

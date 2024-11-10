@@ -48,6 +48,7 @@ var T7SymbolsTuning = map[string][]string{
 	"Fuel": {
 		"BFuelCal.Map",
 		"BFuelCal.StartMap / E85 Map|BFuelCal.StartMap",
+		"KnkFuelCal.EnrichmentMap",
 		"StartCal.EnrFacE85Tab",
 		"StartCal.EnrFacTab",
 	},

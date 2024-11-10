@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -16,13 +17,13 @@ import (
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/capture"
+	"github.com/roffe/txlogger/pkg/dashboard"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/eventbus"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/mainmenu"
 	"github.com/roffe/txlogger/pkg/plotter"
-	"github.com/roffe/txlogger/pkg/widgets"
 )
 
 const TIME_FORMAT = "02-01-2006 15:04:05.999"
@@ -76,7 +77,7 @@ type LogPlayer struct {
 
 	slider *slider
 
-	db          *widgets.Dashboard
+	db          *dashboard.Dashboard
 	controlChan chan *controlMsg
 
 	symbols symbol.SymbolCollection
@@ -95,6 +96,13 @@ type LogPlayer struct {
 
 	plotter *plotter.Plotter
 
+	// Add buffer for smoother playback
+	frameBuffer chan *logfile.Record
+	bufferSize  int
+
+	// Add mutex for thread safety
+	mu sync.Mutex
+
 	fyne.Window
 }
 
@@ -111,7 +119,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 	w := a.NewWindow("LogPlayer " + filename)
 	w.Resize(fyne.NewSize(1024, 530))
 
-	dbCfg := &widgets.DashboardConfig{
+	dbCfg := &dashboard.DashboardConfig{
 		App:             a,
 		Mw:              w,
 		Logplayer:       true,
@@ -123,9 +131,36 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 		WidebandSymbol:  a.Preferences().StringWithFallback("widebandSymbolName", "DisplProt.LambdaScanner"),
 	}
 
+	l, err := readFirstLine(filename)
+	if err != nil {
+		log.Println(err)
+	}
+
+	var logType string
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".csv":
+		if strings.Contains(l, "AirMassMast.m_Request") {
+			logType = "T8"
+			dbCfg.AirDemToString = datalogger.AirDemToStringT8
+		} else if strings.Contains(l, "Lufttemp") {
+			logType = "T5"
+		} else {
+			logType = "T7"
+			dbCfg.AirDemToString = datalogger.AirDemToStringT7
+		}
+	case ".t5l":
+		logType = "T5"
+	case ".t7l":
+		logType = "T7"
+		dbCfg.AirDemToString = datalogger.AirDemToStringT7
+	case ".t8l":
+		logType = "T8"
+		dbCfg.AirDemToString = datalogger.AirDemToStringT8
+	}
+
 	lp := &LogPlayer{
 		app: a,
-		db:  widgets.NewDashboard(dbCfg),
+		db:  dashboard.NewDashboard(dbCfg),
 
 		controlChan: make(chan *controlMsg, 10),
 
@@ -142,6 +177,11 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 
 		slider:   NewSlider(),
 		posLabel: widget.NewLabel(""),
+
+		frameBuffer: make(chan *logfile.Record, 100), // Buffered channel for frames
+		bufferSize:  100,
+
+		logType: logType,
 	}
 	cancelFuncs := make([]func(), 0)
 	for _, name := range lp.db.GetMetricNames() {
@@ -151,32 +191,8 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 		cancelFuncs = append(cancelFuncs, cancel)
 	}
 
-	l, err := readFirstLine(filename)
-	if err != nil {
-		log.Println(err)
-	}
-
 	if strings.Contains(l, datalogger.EXTERNALWBLSYM) {
 		lp.lambSymbolName = datalogger.EXTERNALWBLSYM
-	}
-
-	switch strings.ToLower(filepath.Ext(filename)) {
-	case ".csv":
-		if strings.Contains(l, "AirMassMast.m_Request") {
-			lp.logType = "T8"
-			dbCfg.AirDemToString = datalogger.AirDemToStringT8
-		} else {
-			lp.logType = "T7"
-			dbCfg.AirDemToString = datalogger.AirDemToStringT7
-		}
-	case ".t5l":
-		lp.logType = "T5"
-	case ".t7l":
-		lp.logType = "T7"
-		dbCfg.AirDemToString = datalogger.AirDemToStringT7
-	case ".t8l":
-		lp.logType = "T8"
-		dbCfg.AirDemToString = datalogger.AirDemToStringT8
 	}
 
 	otherFunc := func(s string) {
@@ -296,7 +312,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 }
 
 func (lp *LogPlayer) setupPlot(logz logfile.Logfile) {
-	start := time.Now()
+	//start := time.Now()
 	values := make(map[string][]float64)
 	order := make([]string, 0)
 	first := true
@@ -337,7 +353,7 @@ func (lp *LogPlayer) setupPlot(logz logfile.Logfile) {
 		plotterOpts...,
 	)
 	lp.plotter.Logplayer = true
-	log.Println("creating plotter took", time.Since(start))
+	//	log.Println("creating plotter took", time.Since(start))
 }
 
 func (lp *LogPlayer) render() fyne.CanvasObject {
@@ -374,8 +390,6 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 	return split
 }
 
-var ddd = 500 * time.Microsecond
-
 func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 	play := true
 	if play {
@@ -385,11 +399,9 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 	var playonce bool
 	speedMultiplier := 1.0
 
-	//var nextFrame int64
-
+	// Control channel handler
 	go func() {
 		for op := range lp.controlChan {
-			//currentMillis := time.Now().UnixMilli()
 			switch op.Op {
 			case OpPlaybackSpeed:
 				speedMultiplier = op.Rate
@@ -405,44 +417,60 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 				}
 				playonce = true
 				logz.Seek(pos)
-				//nextFrame = currentMillis
 			case OpNext:
 				playonce = true
 			case OpExit:
-				log.Println("exiting logplayer playback controller")
 				return
 			}
 		}
 	}()
 
+	// Playback loop with precise timing
+	targetFrameTime := time.Now()
+
 	for !lp.closed {
 		if logz.Pos() >= logz.Len() || (!play && !playonce) {
 			time.Sleep(10 * time.Millisecond)
 			continue
-		} else {
-			if rec := logz.Next(); !rec.EOF {
-				for k, v := range rec.Values {
-					lp.ebus.Publish(k, v)
-				}
-				currPos := logz.Pos()
-				if lp.plotter != nil {
-					lp.plotter.Seek(currPos)
-				}
-				delayTilNext := int64(float64(rec.DelayTillNext) * speedMultiplier)
-				if delayTilNext > 1000 {
-					delayTilNext = 100
-				}
-				lp.db.SetTime(rec.Time)
-				lp.slider.Value = float64(currPos)
-				lp.slider.Refresh()
-				time.Sleep(time.Duration(delayTilNext)*time.Millisecond - ddd)
+		}
+
+		if rec := logz.Next(); !rec.EOF {
+			// Calculate when this frame should be displayed
+			delayTilNext := time.Duration(float64(rec.DelayTillNext)*speedMultiplier) * time.Millisecond
+
+			// Wait until it's time to display this frame
+			now := time.Now()
+			if now.Before(targetFrameTime) {
+				time.Sleep(targetFrameTime.Sub(now))
 			}
-			if playonce {
-				playonce = false
+
+			// Update target time for next frame
+			targetFrameTime = targetFrameTime.Add(delayTilNext)
+
+			// Update all values atomically
+			for k, v := range rec.Values {
+				lp.ebus.Publish(k, v)
+			}
+
+			currPos := logz.Pos()
+			if lp.plotter != nil {
+				lp.plotter.Seek(currPos)
+			}
+
+			lp.db.SetTime(rec.Time)
+			lp.slider.Value = float64(currPos)
+			lp.slider.Refresh()
+
+			// Reset target time if we're getting too far behind
+			if time.Now().Sub(targetFrameTime) > 100*time.Millisecond {
+				targetFrameTime = time.Now()
 			}
 		}
+
+		if playonce {
+			playonce = false
+		}
 	}
-	log.Println("Exiting logplayer playback")
 }
 
 func currentTimeFormatted(t time.Time) string {
@@ -523,4 +551,19 @@ func readFirstLine(filename string) (string, error) {
 
 	// If the file is empty, return an empty string with no error.
 	return "", nil
+}
+
+// New method to fill the frame buffer
+func (lp *LogPlayer) fillBuffer(logz logfile.Logfile) {
+	for !lp.closed {
+		if len(lp.frameBuffer) < lp.bufferSize {
+			if rec := logz.Next(); !rec.EOF {
+				lp.frameBuffer <- &rec
+			} else {
+				time.Sleep(10 * time.Millisecond)
+			}
+		} else {
+			time.Sleep(time.Millisecond)
+		}
+	}
 }

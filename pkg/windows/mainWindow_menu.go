@@ -275,6 +275,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		widgets.WithButtons(true),
 		widgets.WithWBL(mw.settings.GetWidebandType() != "None"),
 		widgets.WithFollowCrosshair(mw.settings.GetCursorFollowCrosshair()),
+		widgets.WithAxisLabels(axis.XDescription, axis.YDescription, axis.ZDescription),
 	)
 	if err != nil {
 		mw.Log(err.Error())

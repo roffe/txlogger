@@ -8,10 +8,10 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
+	"github.com/roffe/txlogger/pkg/dashboard"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/plotter"
-	"github.com/roffe/txlogger/pkg/widgets"
 	sdialog "github.com/sqweek/dialog"
 )
 
@@ -97,7 +97,7 @@ func (mw *MainWindow) createButtons() {
 			mw.SetCloseIntercept(mw.CloseIntercept)
 		}
 
-		dbcfg := &widgets.DashboardConfig{
+		dbcfg := &dashboard.DashboardConfig{
 			App:             mw.app,
 			Mw:              mw,
 			Logplayer:       false,
@@ -117,7 +117,7 @@ func (mw *MainWindow) createButtons() {
 			dbcfg.AirDemToString = datalogger.AirDemToStringT8
 		}
 
-		mw.dashboard = widgets.NewDashboard(dbcfg)
+		mw.dashboard = dashboard.NewDashboard(dbcfg)
 
 		for _, s := range mw.symbolList.Symbols() {
 			mw.dashboard.SetValue(s.Name, s.Float64())
@@ -183,7 +183,7 @@ func (mw *MainWindow) createButtons() {
 		go NewLogPlayer(mw.app, filename, mw.fw)
 	})
 
-	mw.logBtn = widget.NewButtonWithIcon("Start logging", theme.MediaPlayIcon(), func() {
+	mw.logBtn = widget.NewButtonWithIcon("Start", theme.MediaPlayIcon(), func() {
 		if mw.loggingRunning {
 			if mw.dlc != nil {
 				mw.dlc.Close()
@@ -235,7 +235,7 @@ func (mw *MainWindow) startLogging() {
 	mw.loggingRunning = true
 
 	mw.logBtn.SetIcon(theme.MediaStopIcon())
-	mw.logBtn.SetText("Stop logging")
+	mw.logBtn.SetText("Stop")
 	mw.Disable()
 
 	//var cancel func()
@@ -264,7 +264,7 @@ func (mw *MainWindow) startLogging() {
 		mw.dlc = nil
 		mw.loggingRunning = false
 		mw.logBtn.SetIcon(theme.MediaPlayIcon())
-		mw.logBtn.SetText("Start logging")
+		mw.logBtn.SetText("Start")
 	}()
 }
 

@@ -285,8 +285,8 @@ func (mv *MapViewer) updateCursor() {
 	yPosFactor := float32(float64(mv.numRows-1) - float64(mv.SelectedY))
 	xPos := xPosFactor * mv.widthFactor
 	yPos := yPosFactor * mv.heightFactor
-	mv.cursor.Resize(fyne.NewSize(mv.cursorWidth, mv.cursorHeight))
-	mv.cursor.Move(fyne.NewPos(xPos, yPos))
+	mv.cursor.Resize(fyne.NewSize(mv.cursorWidth+1, mv.cursorHeight+1))
+	mv.cursor.Move(fyne.NewPos(xPos-1, yPos-1))
 }
 
 type updateBlock struct {

@@ -92,8 +92,8 @@ func (mv *MapViewer) calculateCellDimensions() (float32, float32) {
 // calculateSelectionBounds computes the bounding box of the selection area.
 func (mv *MapViewer) calculateSelectionBounds(eventPos fyne.Position) (int, int) {
 	cellWidth, cellHeight := mv.calculateCellDimensions()
-	xAxisOffset := mv.yAxisLabels.Size().Width + (theme.Padding() * 2)
-	yAxisOffset := mv.xAxisLabels.Size().Height + (theme.Padding() * 2)
+	xAxisOffset := mv.yAxisLabelContainer.Size().Width + (theme.Padding() * 2)
+	yAxisOffset := mv.xAxisLabelContainer.Size().Height + (theme.Padding() * 2)
 
 	nselectedX := max(0, min(int(eventPos.X-xAxisOffset)/int(cellWidth), mv.numColumns-1))
 	nSelectedY := max(0, min(mv.numRows-int(eventPos.Y-yAxisOffset)/int(cellHeight)-1, mv.numRows-1))
@@ -115,8 +115,8 @@ func (mv *MapViewer) updateSelection(nselectedX, nSelectedY int) {
 
 // updateCursorPositionAndSize updates the cursor's position and size on the screen.
 func (mv *MapViewer) updateCursorPositionAndSize(topLeftX, topLeftY, width, height float32) {
-	mv.cursor.Resize(fyne.NewSize(width, height))
-	mv.cursor.Move(fyne.NewPos(topLeftX, topLeftY))
+	mv.cursor.Resize(fyne.NewSize(width+2, height+1))
+	mv.cursor.Move(fyne.NewPos(topLeftX-1, topLeftY-1))
 }
 
 // handleFocusAndInputBuffer focuses the MapViewer and clears the input buffer if necessary.

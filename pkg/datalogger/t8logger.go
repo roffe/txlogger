@@ -8,16 +8,16 @@ import (
 	"log"
 	"math"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/adapter"
 	"github.com/roffe/gocan/pkg/gmlan"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu"
-	"github.com/roffe/txlogger/pkg/ecumaster"
-	"github.com/roffe/txlogger/pkg/innovate"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -40,7 +40,7 @@ func AirDemToStringT8(v float64) string {
 	case 24:
 		return "Stall Limit (Automatic)"
 	case 25:
-		return "Special Mode"
+		return "Hardcoded Limit"
 	case 26:
 		return "Reverse Limit (Automatic)"
 	case 27:
@@ -77,6 +77,7 @@ type T8Client struct {
 	errCount     int
 	errPerSecond int
 
+	closeOnce sync.Once
 	Config
 }
 
@@ -93,8 +94,10 @@ func NewT8(cfg Config, lw LogWriter) (IClient, error) {
 }
 
 func (c *T8Client) Close() {
-	close(c.quitChan)
-	time.Sleep(150 * time.Millisecond)
+	c.closeOnce.Do(func() {
+		close(c.quitChan)
+		time.Sleep(150 * time.Millisecond)
+	})
 }
 
 func (c *T8Client) SetSymbols(symbols []*symbol.Symbol) error {
@@ -136,6 +139,11 @@ func (c *T8Client) onError(err error) {
 func (c *T8Client) Start() error {
 	defer c.lw.Close()
 
+	var txbridge bool
+	if c.Config.Device.Name() == "txbridge" {
+		txbridge = true
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -150,26 +158,28 @@ func (c *T8Client) Start() error {
 
 	order := c.sysvars.Keys()
 
-	// sort order
-	sort.StringSlice(order).Sort()
+	// Wideband lambda setup
+	cfg := &WBLConfig{
+		WBLType:  c.Config.WidebandConfig.Type,
+		Port:     c.Config.WidebandConfig.Port,
+		Log:      c.OnMessage,
+		Txbridge: txbridge,
+	}
 
-	switch c.Config.WidebandConfig.Type {
-	case "ECU":
-	case ecumaster.ProductString:
-		c.lamb = ecumaster.NewLambdaToCAN(cl)
-		c.lamb.Start(ctx)
-		defer c.lamb.Stop()
-		order = append(order, EXTERNALWBLSYM)
-	case innovate.ProductString:
-		wblClient, err := innovate.NewISP2Client(c.Config.WidebandConfig.Port, c.Config.OnMessage)
-		if err != nil {
-			return err
-		}
-		c.lamb = wblClient
-		c.lamb.Start(ctx)
-		defer c.lamb.Stop()
+	c.lamb, err = NewWBL(ctx, cl, cfg)
+	if err != nil {
+		return err
+	}
+
+	if c.lamb != nil {
 		order = append(order, EXTERNALWBLSYM)
 	}
+
+	defer c.lamb.Stop()
+	//--------
+
+	// sort order
+	sort.StringSlice(order).Sort()
 
 	c.ErrorCounter.Set(c.errCount)
 
@@ -179,6 +189,10 @@ func (c *T8Client) Start() error {
 	cps := 0
 	count := 0
 	retries := 0
+
+	if err := cl.SendFrame(adapter.SystemMsg, []byte("8"), gocan.Outgoing); err != nil {
+		return err
+	}
 
 	err = retry.Do(func() error {
 		gm := gmlan.New(cl, 0x7e0, 0x7e8)
@@ -245,8 +259,19 @@ func (c *T8Client) Start() error {
 					lastPresent = time.Now()
 				}
 			}
-			buf := bytes.NewBuffer(nil)
 
+			tx := cl.Subscribe(ctx, adapter.SystemMsgDataResponse, adapter.SystemMsgError)
+			defer tx.Close()
+
+			if txbridge {
+				//log.Println("stopped timer, using txbridge")
+				t.Stop()
+				if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
+					return err
+				}
+			}
+
+			buf := bytes.NewBuffer(nil)
 		outer:
 			for {
 				select {
@@ -292,14 +317,14 @@ func (c *T8Client) Start() error {
 					}
 					if read.left > 0 {
 						go func() {
-							//time.Sleep(2 * time.Millisecond)
+							// time.Sleep(2 * time.Millisecond)
 							c.readChan <- read
 						}()
 					} else {
 						read.Complete(nil)
 					}
 				case upd := <-c.updateChan:
-					//					log.Printf("Updating RAM 0x%X", upd.Address)
+					// log.Printf("Updating RAM 0x%X", upd.Address)
 					chunkSize = uint32(math.Min(float64(upd.left), 0x06))
 					if err := gm.WriteDataByAddress(ctx, upd.Address, upd.Data[:chunkSize]); err != nil {
 						c.onError(fmt.Errorf("failed to write data: %w", err))
@@ -326,6 +351,49 @@ func (c *T8Client) Start() error {
 						c.onError(fmt.Errorf("failed to read data: %w", err))
 						continue
 					}
+					if len(databuff) != int(expectedPayloadSize) {
+						return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
+					}
+					r := bytes.NewReader(databuff)
+
+					for _, va := range c.Symbols {
+						buf.Reset()
+						buf.Write(va.Bytes())
+						if err := va.Read(r); err != nil {
+							c.onError(fmt.Errorf("failed to set data: %w", err))
+							break
+						}
+						if !bytes.Equal(va.Bytes(), buf.Bytes()) {
+							ebus.Publish(va.Name, va.Float64())
+						}
+					}
+
+					if r.Len() > 0 {
+						c.OnMessage(fmt.Sprintf("%d leftover bytes!", r.Len()))
+					}
+
+					if c.lamb != nil {
+						ebus.Publish(EXTERNALWBLSYM, c.lamb.GetLambda())
+						c.sysvars.Set(EXTERNALWBLSYM, c.lamb.GetLambda())
+					}
+
+					//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
+					if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
+						c.onError(fmt.Errorf("failed to write log: %w", err))
+					}
+					cps++
+					count++
+					if count%10 == 0 {
+						c.CaptureCounter.Set(count)
+					}
+					testerPresent()
+				case msg := <-tx.C():
+					if msg.Identifier() == adapter.SystemMsgError {
+						c.onError(errors.New("read timeout"))
+						continue
+					}
+					timeStamp = time.Now()
+					databuff := msg.Data()
 					if len(databuff) != int(expectedPayloadSize) {
 						return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
 					}
