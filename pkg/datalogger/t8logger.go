@@ -172,10 +172,10 @@ func (c *T8Client) Start() error {
 	}
 
 	if c.lamb != nil {
+		defer c.lamb.Stop()
 		order = append(order, EXTERNALWBLSYM)
 	}
 
-	defer c.lamb.Stop()
 	//--------
 
 	// sort order
