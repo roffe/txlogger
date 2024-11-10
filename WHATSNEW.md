@@ -4,6 +4,7 @@
 - Add settings to configure WBL when reading AD values from T7
 - Fixed bugg where IDC did not change color on threshold values
 - Tweaked border around wbl, nbl, turbo pwm and tps gauges
+- Tweaks to the dashboard widgets to use less cpu
 - Adjusted minimum line width in the gauges in the dashboard
 - Added support for serial logging of Innovate wideband controllers (MTX-L & LC-2) & AEM Uego with usb <-> serial adapter
 - Added support for CAN logging of AEM Uego Wideband controllers
