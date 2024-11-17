@@ -36,7 +36,6 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
-	github.com/google/gousb v1.1.3 // indirect
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
@@ -65,7 +64,10 @@ require github.com/roffe/ecusymbol v0.0.0-20241110171648-2482c3ba2d0c
 
 require fyne.io/x/fyne v0.0.0-20240803204126-8b5b5bfe65ef
 
-require github.com/jellydator/ttlcache/v3 v3.3.0
+require (
+	github.com/google/gousb v1.1.3
+	github.com/jellydator/ttlcache/v3 v3.3.0
+)
 
 require (
 	github.com/BurntSushi/toml v1.4.0 // indirect
@@ -89,6 +91,6 @@ require (
 	tinygo.org/x/bluetooth v0.10.0 // indirect
 )
 
-// replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
+replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
 
-// replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
+replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol

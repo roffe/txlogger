@@ -291,10 +291,6 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/posener/complete v1.1.1/go.mod h1:em0nMJCgc9GFtwrmVmEMR/ZL6WyhyjMBndrE9hABlRI=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
-github.com/roffe/ecusymbol v0.0.0-20241110171648-2482c3ba2d0c h1:gkhPwwk/wZt5mgmMfaK7klhnrGn7txeBxg063t6x1kE=
-github.com/roffe/ecusymbol v0.0.0-20241110171648-2482c3ba2d0c/go.mod h1:0nrbfx99ecWTXVjNbaqA9iZYlLlLdXWLE//Hb5hCajQ=
-github.com/roffe/gocan v0.0.0-20241110172025-2ca5f49e8bf1 h1:1v0S5eg2jFtMbk28xlZuZ8ehftkHli51TyKTM3A1jiE=
-github.com/roffe/gocan v0.0.0-20241110172025-2ca5f49e8bf1/go.mod h1:gUIMUpKKwnmoYFhEKPoRydhlQ3t98W2ZJucW6G7Zg3E=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/rogpeppe/go-internal v1.6.1/go.mod h1:xXDCJY+GAPziupqXw64V24skbSoqbTEfhy4qGm1nDQc=

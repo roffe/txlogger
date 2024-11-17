@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -99,9 +98,6 @@ type LogPlayer struct {
 	// Add buffer for smoother playback
 	frameBuffer chan *logfile.Record
 	bufferSize  int
-
-	// Add mutex for thread safety
-	mu sync.Mutex
 
 	fyne.Window
 }
@@ -306,7 +302,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 	w.SetContent(lp.render())
 	w.Show()
 
-	go lp.PlayLog(logz)
+	go lp.PlayLog(logz, posFactor)
 
 	return lp
 }
@@ -390,7 +386,7 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 	return split
 }
 
-func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
+func (lp *LogPlayer) PlayLog(logz logfile.Logfile, posFactor float64) {
 	play := true
 	if play {
 		lp.toggleBtn.SetIcon(theme.MediaPauseIcon())
@@ -458,11 +454,15 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 			}
 
 			lp.db.SetTime(rec.Time)
-			lp.slider.Value = float64(currPos)
+			currPosF := float64(currPos)
+			lp.slider.Value = currPosF
 			lp.slider.Refresh()
+			currPct := currPosF * posFactor * 100
+
+			lp.posLabel.SetText(strconv.FormatFloat(currPct, 'f', 2, 64) + "%")
 
 			// Reset target time if we're getting too far behind
-			if time.Now().Sub(targetFrameTime) > 100*time.Millisecond {
+			if time.Since(targetFrameTime) > 100*time.Millisecond {
 				targetFrameTime = time.Now()
 			}
 		}
@@ -471,10 +471,6 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile) {
 			playonce = false
 		}
 	}
-}
-
-func currentTimeFormatted(t time.Time) string {
-	return fmt.Sprintf("%02d:%02d:%02d.%03d", t.Hour(), t.Minute(), t.Second(), t.Nanosecond()/1e6)
 }
 
 func keyHandler(w fyne.Window, controlChan chan *controlMsg, slider *slider, tb *widget.Button, sel *widget.Select) func(ev *fyne.KeyEvent) {
@@ -551,19 +547,4 @@ func readFirstLine(filename string) (string, error) {
 
 	// If the file is empty, return an empty string with no error.
 	return "", nil
-}
-
-// New method to fill the frame buffer
-func (lp *LogPlayer) fillBuffer(logz logfile.Logfile) {
-	for !lp.closed {
-		if len(lp.frameBuffer) < lp.bufferSize {
-			if rec := logz.Next(); !rec.EOF {
-				lp.frameBuffer <- &rec
-			} else {
-				time.Sleep(10 * time.Millisecond)
-			}
-		} else {
-			time.Sleep(time.Millisecond)
-		}
-	}
 }

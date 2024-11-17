@@ -43,6 +43,8 @@ type Plotter struct {
 	widthFactor          float32
 	plotResolution       fyne.Size
 	plotResolutionFactor float32
+
+	textBuffer []byte
 }
 
 type PlotterOpt func(*Plotter)
@@ -177,7 +179,11 @@ func (p *Plotter) updateLegend() {
 	for i, v := range p.valueOrder {
 		valueIndex := min(p.dataLength, p.cursorPos)
 		obj := p.texts[i]
-		obj.text.Text = v + ": " + strconv.FormatFloat(p.values[v][valueIndex], 'f', 2, 64)
+		p.textBuffer = p.textBuffer[:0]
+		p.textBuffer = append(p.textBuffer, v+" "...)
+		p.textBuffer = strconv.AppendFloat(p.textBuffer, p.values[v][valueIndex], 'f', 2, 64)
+		obj.text.Text = string(p.textBuffer)
+		//obj.text.Text = v + ": " + strconv.FormatFloat(p.values[v][valueIndex], 'f', 2, 64)
 	}
 	p.legend.Refresh()
 }
@@ -225,8 +231,8 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 	case "m_Request", "MAF.m_AirInlet", "AirMassMast.m_Request":
 		ts.Min, _ = findMinMaxFloat64(data)
 		ts.Max = 2200
-	case "ActualIn.p_AirInlet", "In.p_AirInlet", "In.p_AirBefThrottle":
-		ts.Min, _ = findMinMaxFloat64(data)
+	case "ActualIn.p_AirInlet", "In.p_AirInlet", "ActualIn.p_AirBefThrottle", "In.p_AirBefThrottle":
+		ts.Min = -1.0
 		ts.Max = 3.0
 	default:
 		ts.Min, ts.Max = findMinMaxFloat64(data)

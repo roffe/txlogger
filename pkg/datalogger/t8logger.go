@@ -3,6 +3,7 @@ package datalogger
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -125,7 +126,7 @@ func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
 	return req.Data, req.Wait()
 }
 
-const T8ChunkSize = 0x10
+const T8ChunkSize = 0x40
 
 const lastPresentInterval = 3500 * time.Millisecond
 
@@ -190,14 +191,21 @@ func (c *T8Client) Start() error {
 	count := 0
 	retries := 0
 
-	if err := cl.SendFrame(adapter.SystemMsg, []byte("8"), gocan.Outgoing); err != nil {
-		return err
+	if txbridge {
+		if err := cl.SendFrame(adapter.SystemMsg, []byte("8"), gocan.Outgoing); err != nil {
+			return err
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 
 	err = retry.Do(func() error {
 		gm := gmlan.New(cl, 0x7e0, 0x7e8)
 
-		if err := gm.RequestSecurityAccess(ctx, 0xFD, 0, ecu.CalculateT8AccessKey); err != nil {
+		if err := gm.InitiateDiagnosticOperation(ctx, 0x02); err != nil {
+			return err
+		}
+
+		if err := gm.RequestSecurityAccess(ctx, 0xFD, 1, ecu.CalculateT8AccessKey); err != nil {
 			return err
 		}
 
@@ -271,7 +279,9 @@ func (c *T8Client) Start() error {
 				}
 			}
 
-			buf := bytes.NewBuffer(nil)
+			var firstTime time.Time
+			var firstTimestamp uint32
+			var currtimestamp uint32
 		outer:
 			for {
 				select {
@@ -300,46 +310,86 @@ func (c *T8Client) Start() error {
 						c.OnMessage("Configured dynamic register")
 					}
 				case read := <-c.readChan:
-					chunkSize = uint32(math.Min(float64(read.left), T8ChunkSize))
-					log.Printf("Reading RAM 0x%X %d", read.Address, chunkSize)
-					data, err := gm.ReadMemoryByAddress(ctx, read.Address, chunkSize)
-					if err != nil {
-						c.onError(fmt.Errorf("failed to read memory: %w", err))
-						read.Complete(err)
-						continue outer
+					if txbridge {
+						if err := cl.SendFrame(adapter.SystemMsg, []byte("s"), gocan.Outgoing); err != nil {
+							c.onError(err)
+							continue
+						}
+						time.Sleep(45 * time.Millisecond)
 					}
-					read.Data = append(read.Data, data...)
-					read.left -= chunkSize
-					read.Address += chunkSize
-					if time.Since(lastPresent) > lastPresentInterval {
-						gm.TesterPresentNoResponseAllowed()
-						lastPresent = time.Now()
-					}
-					if read.left > 0 {
-						go func() {
-							// time.Sleep(2 * time.Millisecond)
-							c.readChan <- read
-						}()
-					} else {
+				inner:
+					for read.left > 0 {
+						chunkSize = uint32(math.Min(float64(read.left), T8ChunkSize))
+						log.Printf("Reading RAM 0x%X %d", read.Address, chunkSize)
+						data, err := gm.ReadMemoryByAddress(ctx, read.Address, chunkSize)
+						if err != nil {
+							c.onError(fmt.Errorf("failed to read memory: %w", err))
+							read.Complete(err)
+							if txbridge {
+								if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
+									c.onError(err)
+								}
+							}
+							continue outer
+						}
+						read.Data = append(read.Data, data...)
+						read.left -= chunkSize
+						read.Address += chunkSize
+
+						testerPresent()
+
+						if read.left > 0 {
+							//go func() {
+							//	// time.Sleep(2 * time.Millisecond)
+							//	c.readChan <- read
+							//}()
+							continue inner
+						}
+						if txbridge {
+							if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
+								c.onError(err)
+								continue
+							}
+							time.Sleep(20 * time.Millisecond)
+						}
 						read.Complete(nil)
+						continue outer
 					}
 				case upd := <-c.updateChan:
-					// log.Printf("Updating RAM 0x%X", upd.Address)
-					chunkSize = uint32(math.Min(float64(upd.left), 0x06))
-					if err := gm.WriteDataByAddress(ctx, upd.Address, upd.Data[:chunkSize]); err != nil {
-						c.onError(fmt.Errorf("failed to write data: %w", err))
-						upd.Complete(err)
-						continue outer
+
+					if txbridge {
+						if err := cl.SendFrame(adapter.SystemMsg, []byte("s"), gocan.Outgoing); err != nil {
+							c.onError(err)
+							continue
+						}
+						time.Sleep(45 * time.Millisecond)
 					}
-					upd.left -= chunkSize
-					upd.Address += chunkSize
-					upd.Data = upd.Data[chunkSize:]
-					testerPresent()
-					if upd.left > 0 {
-						c.updateChan <- upd
-						continue outer
+
+				innerupd:
+					for upd.left > 0 {
+						chunkSize = uint32(math.Min(float64(upd.left), 0x40))
+						log.Printf("Updating RAM 0x%X %d", upd.Address, chunkSize)
+						if err := gm.WriteDataByAddress(ctx, upd.Address, upd.Data[:chunkSize]); err != nil {
+							c.onError(fmt.Errorf("failed to write data: %w", err))
+							upd.Complete(err)
+							continue outer
+						}
+						upd.left -= chunkSize
+						upd.Address += chunkSize
+						upd.Data = upd.Data[chunkSize:]
+						testerPresent()
+						if upd.left > 0 {
+							//c.updateChan <- upd
+							continue innerupd
+						}
+						upd.Complete(nil)
+						if txbridge {
+							if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
+								c.onError(err)
+							}
+							time.Sleep(20 * time.Millisecond)
+						}
 					}
-					upd.Complete(nil)
 				case <-t.C:
 					timeStamp = time.Now()
 					if len(c.Symbols) == 0 {
@@ -357,14 +407,12 @@ func (c *T8Client) Start() error {
 					r := bytes.NewReader(databuff)
 
 					for _, va := range c.Symbols {
-						buf.Reset()
-						buf.Write(va.Bytes())
 						if err := va.Read(r); err != nil {
 							c.onError(fmt.Errorf("failed to set data: %w", err))
 							break
 						}
-						if !bytes.Equal(va.Bytes(), buf.Bytes()) {
-							ebus.Publish(va.Name, va.Float64())
+						if err := ebus.Publish(va.Name, va.Float64()); err != nil {
+							c.onError(err)
 						}
 					}
 
@@ -388,26 +436,36 @@ func (c *T8Client) Start() error {
 					}
 					testerPresent()
 				case msg := <-tx.C():
+					if msg == nil {
+						return retry.Unrecoverable(errors.New("nil message received"))
+					}
 					if msg.Identifier() == adapter.SystemMsgError {
 						c.onError(errors.New("read timeout"))
 						continue
 					}
-					timeStamp = time.Now()
+
 					databuff := msg.Data()
-					if len(databuff) != int(expectedPayloadSize) {
-						return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
+					if len(databuff) != int(expectedPayloadSize+4) {
+						return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize+4, len(databuff)))
 					}
+
 					r := bytes.NewReader(databuff)
+					binary.Read(r, binary.LittleEndian, &currtimestamp)
+
+					if firstTime.IsZero() {
+						firstTime = time.Now()
+						firstTimestamp = currtimestamp
+					}
+
+					timeStamp := calculateCompensatedTimestamp(firstTime, firstTimestamp, currtimestamp)
 
 					for _, va := range c.Symbols {
-						buf.Reset()
-						buf.Write(va.Bytes())
 						if err := va.Read(r); err != nil {
 							c.onError(fmt.Errorf("failed to set data: %w", err))
 							break
 						}
-						if !bytes.Equal(va.Bytes(), buf.Bytes()) {
-							ebus.Publish(va.Name, va.Float64())
+						if err := ebus.Publish(va.Name, va.Float64()); err != nil {
+							c.onError(fmt.Errorf("failed to publish data: %w", err))
 						}
 					}
 

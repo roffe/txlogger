@@ -1,3 +1,9 @@
+# 1.0.19
+
+- Added E85.X_EthAct_Tech2 to Trionic 7 Calibration shortcuts
+- Added T5 support for txbridge
+- Improved txbridge T8 support
+
 # 1.0.18
 
 - Add code to convert T5 AD_EGR value to lambda 0.5 - 1.5

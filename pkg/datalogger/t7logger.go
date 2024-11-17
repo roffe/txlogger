@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"log"
 	"sort"
@@ -88,7 +89,6 @@ func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client)
 		<-c.quitChan
 		sub.Close()
 	}()
-
 	for msg := range sub.C() {
 		switch msg.Identifier() {
 		case 0x1A0:
@@ -290,6 +290,7 @@ func (c *T7Client) Start() error {
 		var firstTime time.Time
 		var firstTimestamp uint32
 		var databuff []byte
+		var currtimestamp uint32
 		for {
 			select {
 			case <-c.quitChan:
@@ -342,7 +343,6 @@ func (c *T7Client) Start() error {
 					if txbridge {
 						if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
 							c.onError(err)
-							continue
 						}
 					}
 					continue
@@ -434,6 +434,9 @@ func (c *T7Client) Start() error {
 					c.CaptureCounter.Set(count)
 				}
 			case msg := <-tx.C():
+				if msg == nil {
+					return retry.Unrecoverable(errors.New("nil message received"))
+				}
 				if msg.Identifier() == adapter.SystemMsgError {
 					data := msg.Data()
 					switch data[0] {
@@ -452,9 +455,9 @@ func (c *T7Client) Start() error {
 					//return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
 				}
 
-				var currtimestamp uint32
 				r := bytes.NewReader(databuff)
-				binary.Read(r, binary.BigEndian, &currtimestamp)
+
+				binary.Read(r, binary.LittleEndian, &currtimestamp)
 
 				if firstTime.IsZero() {
 					firstTime = time.Now()
@@ -483,7 +486,9 @@ func (c *T7Client) Start() error {
 						continue
 					}
 
-					ebus.Publish(va.Name, va.Float64())
+					if err := ebus.Publish(va.Name, va.Float64()); err != nil {
+						c.onError(err)
+					}
 				}
 
 				if r.Len() > 0 {
