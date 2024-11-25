@@ -3,6 +3,8 @@
 - Added E85.X_EthAct_Tech2 to Trionic 7 Calibration shortcuts
 - Added T5 support for txbridge
 - Improved txbridge T8 support
+- Added OTA firmware update for txbridge
+- Added support for offloading read by memory address in Trionic 7 to txbridge
 
 # 1.0.18
 

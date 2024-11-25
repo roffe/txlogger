@@ -46,6 +46,17 @@ func (mw *MainWindow) setupMenu() {
 			fyne.NewMenuItem("Export", mw.exportPreset),
 			fyne.NewMenuItem("Delete", mw.deletePreset),
 		),
+		fyne.NewMenu("Other",
+			fyne.NewMenuItem("Update txbridge firmware", func() {
+				w := mw.app.NewWindow("txbridge firmware updater")
+				w.SetContent(
+					widgets.NewTxUpdater(
+						mw.settings.CanSettings.GetSerialPort(),
+					),
+				)
+				w.Show()
+			}),
+		),
 	}
 	mw.menu = mainmenu.New(mw, menus, mw.openMap, mw.openMapz, otherFunc)
 }
