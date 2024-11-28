@@ -480,11 +480,10 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		"AdpFuelProt.MulFuelAdapt": textSetter(db.text.amul, "Amul", "%", 2), // t7
 
 		// Wideband lambda
+		//"AD_EGR": db.gauges.wblambda.SetValue, // t5
 		//"DisplProt.LambdaScanner": db.wblambda.SetValue, // t7 & t8
 		//"Lambda.External":     db.wblambda.SetValue,
 		db.cfg.WidebandSymbol: db.gauges.wblambda.SetValue, // Wideband lambda
-
-		"AD_EGR": db.gauges.wblambda.SetValue, // t5
 
 		// NB lambda
 		"Lambda.LambdaInt": db.gauges.nblambda.SetValue, // t7 & t8

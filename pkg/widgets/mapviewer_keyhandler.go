@@ -56,14 +56,14 @@ func (mv *MapViewer) copy() {
 		}
 		copyString.WriteString(fmt.Sprintf("%d:%d:%d:"+copyPasteSeparator, x, y, mv.zData[cell]))
 	}
-	fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(copyString.String())
+	fyne.CurrentApp().Clipboard().SetContent(copyString.String())
 }
 
 func (mv *MapViewer) paste() {
 	if !mv.editable {
 		return
 	}
-	cb := fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().Content()
+	cb := fyne.CurrentApp().Clipboard().Content()
 	split := strings.Split(cb, copyPasteSeparator)
 	for i, part := range split {
 		if len(part) < 3 {
@@ -201,6 +201,10 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 					mv.zData[cell] = int(num * 128)
 				case oneThousandTwentyfourth:
 					mv.zData[cell] = int(num * 1024)
+				case 0.00390625:
+					mv.zData[cell] = int(num * 256)
+				case 0.004:
+					mv.zData[cell] = int(num * 250)
 				default:
 					fyne.LogError("unknown zCorrFac", fmt.Errorf("%f", mv.zCorrFac))
 					debug.Log(fmt.Sprintf("%s unknown zCorrFac: %f", mv.symbol.Name, mv.zCorrFac))

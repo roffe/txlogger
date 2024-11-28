@@ -349,7 +349,7 @@ func (c *T7Client) Start() error {
 						continue
 					}
 					frame := gocan.NewFrame(adapter.SystemMsg, payload, gocan.Outgoing)
-					resp, err := cl.SendAndPoll(ctx, frame, 1*time.Second, adapter.SystemMsgDataRequest)
+					resp, err := cl.SendAndPoll(ctx, frame, 3*time.Second, adapter.SystemMsgDataRequest)
 					if err != nil {
 						read.Complete(err)
 						continue
@@ -375,21 +375,55 @@ func (c *T7Client) Start() error {
 				}
 				read.Data = data
 				read.Complete(nil)
-			case upd := <-c.updateChan:
+			case write := <-c.updateChan:
 				if txbridge {
-					if err := cl.SendFrame(adapter.SystemMsg, []byte("s"), gocan.Outgoing); err != nil {
-						c.onError(err)
+					toRead := min(235, write.left)
+					cmd := gocan.SerialCommand{
+						Command: 'W',
+						Data: []byte{
+							byte(write.Address),
+							byte(write.Address >> 8),
+							byte(write.Address >> 16),
+							byte(write.Address >> 24),
+							byte(toRead),
+						},
+					}
+					cmd.Data = append(cmd.Data, write.Data[:toRead]...)
+
+					write.Data = write.Data[toRead:] // remove the data we just sent
+					write.Address += uint32(toRead)
+					write.left -= toRead
+
+					payload, err := cmd.MarshalBinary()
+					if err != nil {
+						write.Complete(err)
 						continue
 					}
-					time.Sleep(42 * time.Millisecond)
-				}
-				upd.Complete(kwp.WriteDataByAddress(ctx, upd.Address, upd.Data))
-				if txbridge {
-					if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
-						c.onError(err)
+
+					frame := gocan.NewFrame(adapter.SystemMsg, payload, gocan.Outgoing)
+
+					resp, err := cl.SendAndPoll(ctx, frame, 1*time.Second, adapter.SystemMsgWriteResponse, adapter.SystemMsgError)
+					if err != nil {
+						write.Complete(err)
 						continue
 					}
+
+					if resp.Identifier() == adapter.SystemMsgError {
+						write.Complete(fmt.Errorf("error response"))
+						continue
+					}
+
+					if write.left > 0 {
+						c.updateChan <- write
+						continue
+					}
+
+					write.Complete(nil)
+					continue
 				}
+
+				write.Complete(kwp.WriteDataByAddress(ctx, write.Address, write.Data))
+
 			case <-t.C:
 				timeStamp = time.Now()
 				if len(c.Symbols) == 0 {

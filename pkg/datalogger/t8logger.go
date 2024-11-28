@@ -126,7 +126,7 @@ func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
 	return req.Data, req.Wait()
 }
 
-const T8ChunkSize = 0x40
+const T8ChunkSize = 0x80
 
 const lastPresentInterval = 3500 * time.Millisecond
 

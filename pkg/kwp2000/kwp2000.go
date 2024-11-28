@@ -967,7 +967,7 @@ func (t *Client) sendLong(ctx context.Context, data []byte) error {
 			if err != nil {
 				return err
 			}
-			//	log.Println(resp.String())
+			log.Println(resp.String())
 			if err := checkErr(resp); err != nil {
 				return err
 			}
@@ -979,7 +979,7 @@ func (t *Client) sendLong(ctx context.Context, data []byte) error {
 			if err := checkErr(resp); err != nil {
 				return err
 			}
-			//	log.Println(resp.String())
+			log.Println(resp.String())
 		}
 	}
 	return nil

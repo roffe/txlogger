@@ -139,6 +139,8 @@ func (c *T5Client) Start() error {
 			symbollist = binary.LittleEndian.AppendUint32(symbollist, sym.SramOffset)
 			symbollist = binary.LittleEndian.AppendUint16(symbollist, sym.Length)
 			expectedPayloadSize += sym.Length
+
+			// deletelog.Printf("Symbol: %s, offset: %X, length: %d\n", sym.Name, sym.SramOffset, sym.Length)
 		}
 		cmd := &gocan.SerialCommand{
 			Command: 'd',
@@ -186,9 +188,9 @@ func (c *T5Client) Start() error {
 			case symbols := <-c.symbolChan:
 				_ = symbols
 			case read := <-c.readChan:
-				_ = read
+				read.Complete(fmt.Errorf("not implemented"))
 			case upd := <-c.updateChan:
-				_ = upd
+				upd.Complete(fmt.Errorf("not implemented"))
 			case <-t.C:
 				ts := time.Now()
 				for _, sym := range c.Symbols {

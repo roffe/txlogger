@@ -265,6 +265,11 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		mw.Log(fmt.Sprintf("Saved %s", axis.Z))
 	}
 
+	if axis.X == "Pwm_ind_trot!" {
+		xData = xData[:8]
+
+	}
+
 	mv, err = widgets.NewMapViewer(
 		widgets.WithSymbol(symZ),
 		widgets.WithXData(xData),
@@ -273,6 +278,9 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		widgets.WithXCorrFac(xCorrFac),
 		widgets.WithYCorrFac(yCorrFac),
 		widgets.WithZCorrFac(zCorrFac),
+		widgets.WithXOffset(symbol.T5Offsets[axis.X]),
+		widgets.WithYOffset(symbol.T5Offsets[axis.Y]),
+		widgets.WithZOffset(symbol.T5Offsets[axis.Z]),
 		widgets.WithXFrom(axis.XFrom),
 		widgets.WithYFrom(axis.YFrom),
 		widgets.WithInterPolFunc(interpolate.Interpolate),

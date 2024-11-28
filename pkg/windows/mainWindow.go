@@ -110,10 +110,10 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		fpsCounter:     binding.NewInt(),
 
 		openMaps: make(map[string]fyne.Window),
-		settings: widgets.NewSettingsWidget(),
 
 		statusText: widget.NewLabel("Harder, Better, Faster, Stronger"),
 	}
+
 	mw.Resize(fyne.NewSize(1024, 768))
 
 	updateSymbols := func(syms []*symbol.Symbol) {
@@ -191,6 +191,10 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 	mw.ecuSelect = widget.NewSelect([]string{"T5", "T7", "T8"}, func(s string) {
 		mw.app.Preferences().SetString(prefsSelectedECU, s)
 		mw.SetMainMenu(mw.menu.GetMenu(s))
+	})
+
+	mw.settings = widgets.NewSettingsWidget(widgets.CanSettingsWidgetConfig{
+		EcuSelect: mw.ecuSelect,
 	})
 
 	mw.setupTabs()

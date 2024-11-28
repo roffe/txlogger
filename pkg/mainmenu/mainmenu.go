@@ -7,6 +7,25 @@ import (
 	symbol "github.com/roffe/ecusymbol"
 )
 
+var T5SymbolsTuningOrder = []string{
+	"Injectors",
+	"Fuel",
+	"Boost",
+}
+
+var T5SymbolsTuning = map[string][]string{
+	"Injectors": {
+		"Inj_konst!",
+		"Batt_korr_tab!",
+	},
+	"Fuel": {
+		"Insp_mat!",
+	},
+	"Boost": {
+		"Tryck_mat!",
+	},
+}
+
 var T7SymbolsTuningOrder = []string{
 	"Diagnostics",
 	"Calibration",
@@ -165,6 +184,10 @@ func (mw *MainMenu) GetMenu(name string) *fyne.MainMenu {
 	var typ symbol.ECUType
 
 	switch name {
+	case "T5":
+		order = T5SymbolsTuningOrder
+		ecuM = T5SymbolsTuning
+		typ = symbol.ECU_T5
 	case "T7":
 		order = T7SymbolsTuningOrder
 		ecuM = T7SymbolsTuning

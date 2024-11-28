@@ -45,9 +45,10 @@ type MapViewer struct {
 
 	xValue, yValue int
 
-	xCorrFac, yCorrFac, zCorrFac float64
-	xFrom, yFrom                 string
-	numColumns, numRows, numData int
+	xCorrFac, yCorrFac, zCorrFac          float64
+	xCorrOffset, yCorrOffset, zCorrOffset float64
+	xFrom, yFrom                          string
+	numColumns, numRows, numData          int
 
 	min, max int
 
@@ -147,7 +148,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 
 	mv.cursor.Resize(fyne.NewSize(1, 1))
 
-	mv.textValues = createTextValues(mv.zData, mv.zCorrFac)
+	mv.textValues = createTextValues(mv.zData, mv.zCorrFac, mv.zCorrOffset)
 
 	mv.innerView = container.NewStack()
 
@@ -344,12 +345,14 @@ func (mv *MapViewer) SetCellText(idx int, value int) {
 		precission = 3
 	case 0.1:
 		precission = 1
-	case 0.01:
+	case 0.01, 0.00390625, 0.004:
 		precission = 2
 	case 0.001:
 		precission = 3
+	default:
+		precission = 2
 	}
-	textValue := strconv.FormatFloat(float64(value)*mv.zCorrFac, 'f', precission, 64)
+	textValue := strconv.FormatFloat((float64(value)*mv.zCorrFac)+mv.zCorrOffset, 'f', precission, 64)
 	if mv.textValues[idx].Text != textValue {
 		mv.textValues[idx].Text = textValue
 		mv.textValues[idx].Refresh()
@@ -470,7 +473,10 @@ func (mv *MapViewer) Refresh() {
 		mv.SetCellText(i, tv)
 	}
 	for idx, r := range mv.zDataRects {
-		col := GetColorInterpolation(float64(mv.min)*mv.zCorrFac, float64(mv.max)*mv.zCorrFac, float64(mv.zData[idx])*mv.zCorrFac)
+		col := GetColorInterpolation((float64(mv.min)*mv.zCorrFac)+mv.zCorrOffset,
+			(float64(mv.max)*mv.zCorrFac)+mv.zCorrOffset,
+			(float64(mv.zData[idx])*mv.zCorrFac)+mv.zCorrOffset,
+		)
 		if col != r.FillColor {
 			r.FillColor = col
 			r.Refresh()
@@ -478,11 +484,11 @@ func (mv *MapViewer) Refresh() {
 	}
 
 	if mv.mesh != nil {
-		mv.mesh.SetMin(float64(mv.min) * mv.zCorrFac)
-		mv.mesh.SetMax(float64(mv.max) * mv.zCorrFac)
+		mv.mesh.SetMin((float64(mv.min) * mv.zCorrFac) + mv.zCorrOffset)
+		mv.mesh.SetMax((float64(mv.max) * mv.zCorrFac) + mv.zCorrOffset)
 		var values []float64
 		for _, v := range mv.zData {
-			values = append(values, float64(v)*mv.zCorrFac)
+			values = append(values, (float64(v)*mv.zCorrFac)+mv.zCorrOffset)
 		}
 		mv.mesh.LoadFloat64s(values)
 	}
@@ -501,15 +507,17 @@ func getPrecission(corrFac float64) int {
 		precission = 4
 	case oneHundredTwentyeighth:
 		precission = 3
+	case 0.00390625, 0.004:
+		precission = 2
 	}
 	return precission
 }
 
-func createTextValues(zData []int, corrFac float64) []*canvas.Text {
+func createTextValues(zData []int, corrFac, offset float64) []*canvas.Text {
 	var values []*canvas.Text
 	for _, v := range zData {
 		text := &canvas.Text{
-			Text:      strconv.FormatFloat(float64(v)*corrFac, 'f', getPrecission(corrFac), 64),
+			Text:      strconv.FormatFloat((float64(v)*corrFac)+offset, 'f', getPrecission(corrFac), 64),
 			TextSize:  13,
 			Color:     color.Black,
 			TextStyle: fyne.TextStyle{Monospace: false},
@@ -523,7 +531,11 @@ func (mv *MapViewer) createXAxis() *fyne.Container {
 	labels := container.New(&layout.Horizontal{Offset: mv.yAxisLabelContainer})
 	if mv.numColumns >= 1 {
 		for i := 0; i < mv.numColumns; i++ {
-			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.xData[i])*mv.xCorrFac, 'f', getPrecission(mv.xCorrFac), 64), TextSize: 13}
+			text := &canvas.Text{
+				Alignment: fyne.TextAlignCenter,
+				Text:      strconv.FormatFloat((float64(mv.xData[i])*mv.xCorrFac)+mv.xCorrOffset, 'f', getPrecission(mv.xCorrFac), 64),
+				TextSize:  13,
+			}
 			mv.xAxisTexts = append(mv.xAxisTexts, text)
 			labels.Add(text)
 		}
@@ -535,7 +547,12 @@ func (mv *MapViewer) createYAxis() *fyne.Container {
 	labels := container.New(&layout.Vertical{})
 	if mv.numRows >= 1 {
 		for i := mv.numRows - 1; i >= 0; i-- {
-			text := &canvas.Text{Alignment: fyne.TextAlignCenter, Text: strconv.FormatFloat(float64(mv.yData[i])*mv.yCorrFac, 'f', getPrecission(mv.yCorrFac), 64), TextSize: 13}
+			text := &canvas.Text{
+				Alignment: fyne.TextAlignCenter,
+				Text:      strconv.FormatFloat((float64(mv.yData[i])*mv.yCorrFac)+mv.xCorrOffset, 'f', getPrecission(mv.yCorrFac), 64),
+				TextSize:  13,
+			}
+
 			mv.yAxisTexts = append(mv.yAxisTexts, text)
 			labels.Add(text)
 		}
@@ -545,13 +562,13 @@ func (mv *MapViewer) createYAxis() *fyne.Container {
 
 func (mv *MapViewer) createZdata() []*canvas.Rectangle {
 	var rects []*canvas.Rectangle
-	minCorrected := float64(mv.min) * mv.zCorrFac
-	maxCorrected := float64(mv.max) * mv.zCorrFac
+	minCorrected := (float64(mv.min) * mv.zCorrFac) + mv.zCorrOffset
+	maxCorrected := (float64(mv.max) * mv.zCorrFac) + mv.zCorrOffset
 	// Calculate the colors for each cell based on data
 	for y := 0; y < mv.numRows; y++ {
 		for x := 0; x < mv.numColumns; x++ {
 			index := y*mv.numColumns + x
-			value := float64(mv.zData[index]) * mv.zCorrFac
+			value := (float64(mv.zData[index]) * mv.zCorrFac) + mv.zCorrOffset
 			color := GetColorInterpolation(minCorrected, maxCorrected, value)
 			rect := &canvas.Rectangle{FillColor: color}
 			rects = append(rects, rect)
