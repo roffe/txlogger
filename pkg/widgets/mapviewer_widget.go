@@ -337,22 +337,7 @@ const (
 )
 
 func (mv *MapViewer) SetCellText(idx int, value int) {
-	precission := 0
-	switch mv.zCorrFac {
-	case oneThousandTwentyfourth:
-		precission = 4
-	case oneHundredTwentyeighth:
-		precission = 3
-	case 0.1:
-		precission = 1
-	case 0.01, 0.00390625, 0.004:
-		precission = 2
-	case 0.001:
-		precission = 3
-	default:
-		precission = 2
-	}
-	textValue := strconv.FormatFloat((float64(value)*mv.zCorrFac)+mv.zCorrOffset, 'f', precission, 64)
+	textValue := strconv.FormatFloat((float64(value)*mv.zCorrFac)+mv.zCorrOffset, 'f', getPrecission(mv.zCorrFac), 64)
 	if mv.textValues[idx].Text != textValue {
 		mv.textValues[idx].Text = textValue
 		mv.textValues[idx].Refresh()
@@ -499,7 +484,7 @@ func getPrecission(corrFac float64) int {
 	switch corrFac {
 	case 0.1:
 		precission = 1
-	case 0.01:
+	case 0.01, 0.00390625, 0.004:
 		precission = 2
 	case 0.001:
 		precission = 3
@@ -507,8 +492,6 @@ func getPrecission(corrFac float64) int {
 		precission = 4
 	case oneHundredTwentyeighth:
 		precission = 3
-	case 0.00390625, 0.004:
-		precission = 2
 	}
 	return precission
 }

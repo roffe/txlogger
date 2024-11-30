@@ -37,8 +37,10 @@ cloud.google.com/go/storage v1.6.0/go.mod h1:N7U0C8pVQ/+NIKOBQyamJIeKQKkZ+mxpohl
 cloud.google.com/go/storage v1.8.0/go.mod h1:Wv1Oy7z6Yz3DshWRJFhqM/UCfaWIRTdp0RXyy7KQOVs=
 cloud.google.com/go/storage v1.10.0/go.mod h1:FLPqc6j+Ki4BU591ie1oL6qBQGu2Bl/tZ9ullr3+Kg0=
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
-fyne.io/fyne/v2 v2.5.3-0.20241123213253-af084f173acb h1:yMGjyemMH1zKKfQ8c1Y2YFRL1s98anvkxSKV5PJ7s/8=
-fyne.io/fyne/v2 v2.5.3-0.20241123213253-af084f173acb/go.mod h1:80CNasjfcKqqCWxHsHJqXxCDofgAV5OJTaCPhFFHUrw=
+fyne.io/fyne/v2 v2.5.3-0.20241129194352-b665464a76b4 h1:FaErh+b9dvG5ToPrLSYAjIHW+6VlOUAmBljH0pw9yoQ=
+fyne.io/fyne/v2 v2.5.3-0.20241129194352-b665464a76b4/go.mod h1:0GOXKqyvNwk3DLmsFu9v0oYM0ZcD1ysGnlHCerKoAmo=
+fyne.io/fyne/v2 v2.5.3-0.20241129201013-e8be3f613756 h1:5Ua2bDDj8TFxcrk1mtlZqTeqvqIZfti7BtuPA7GT2c8=
+fyne.io/fyne/v2 v2.5.3-0.20241129201013-e8be3f613756/go.mod h1:0GOXKqyvNwk3DLmsFu9v0oYM0ZcD1ysGnlHCerKoAmo=
 fyne.io/systray v1.11.0 h1:D9HISlxSkx+jHSniMBR6fCFOUjk1x/OOOJLa9lJYAKg=
 fyne.io/systray v1.11.0/go.mod h1:RVwqP9nYMo7h5zViCBHri2FgjXF7H2cub7MAq4NSoLs=
 fyne.io/x/fyne v0.0.0-20240803204126-8b5b5bfe65ef h1:5qFhIzsvwmIybR4GlmENHHjOkQB5XsRZ6ujO0ktnsl4=
@@ -98,8 +100,8 @@ github.com/fsnotify/fsnotify v1.8.0 h1:dAwr6QBTBZIkG8roQaJjGof0pp0EeF+tNV7YBP3F/
 github.com/fsnotify/fsnotify v1.8.0/go.mod h1:8jBTzvmWwFyi3Pb8djgCCO5IBqzKJ/Jwo8TRcHyHii0=
 github.com/fyne-io/gl-js v0.0.0-20230506162202-1fdaa286a934 h1:dZC5aKobSN07hf71oMivxUmAofFja5GrfPK2rBlttX4=
 github.com/fyne-io/gl-js v0.0.0-20230506162202-1fdaa286a934/go.mod h1:d4clgH0/GrRwWjRzJJQXxT/h1TyuNSfF/X64zb/3Ggg=
-github.com/fyne-io/glfw-js v0.0.0-20240101223322-6e1efdc71b7a h1:ybgRdYvAHTn93HW79bLiBiJwVL4jVeyGQRZMgImoeWs=
-github.com/fyne-io/glfw-js v0.0.0-20240101223322-6e1efdc71b7a/go.mod h1:gsGA2dotD4v0SR6PmPCYvS9JuOeMwAtmfvDE7mbYXMY=
+github.com/fyne-io/glfw-js v0.0.0-20241126112943-313d8a0fe1d0 h1:/1YRWFv9bAWkoo3SuxpFfzpXH0D/bQnTjNXyF4ih7Os=
+github.com/fyne-io/glfw-js v0.0.0-20241126112943-313d8a0fe1d0/go.mod h1:gsGA2dotD4v0SR6PmPCYvS9JuOeMwAtmfvDE7mbYXMY=
 github.com/fyne-io/image v0.0.0-20240417123036-dc0ee9e7c964 h1:0pTELtjlVAVGSazfwRNcqTVzqmkWb1GsNozCmmZfdZA=
 github.com/fyne-io/image v0.0.0-20240417123036-dc0ee9e7c964/go.mod h1:J9Uunu842kOcTjzQj4Eq8XIDmF55szvT1PTS1cUb1UE=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=

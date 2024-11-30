@@ -157,31 +157,31 @@ func (r *ReadRequest) Wait() error {
 	}
 }
 
-type RamUpdate struct {
+type WriteRequest struct {
 	Address  uint32
 	Data     []byte
-	left     uint32
+	Length   uint32
 	respChan chan error
 }
 
-func NewRamUpdate(address uint32, data []byte) *RamUpdate {
-	return &RamUpdate{
+func NewRamUpdate(address uint32, data []byte) *WriteRequest {
+	return &WriteRequest{
 		Address:  address,
 		Data:     data,
-		left:     uint32(len(data)),
+		Length:   uint32(len(data)),
 		respChan: make(chan error, 1),
 	}
 }
 
-func (r *RamUpdate) String() string {
+func (r *WriteRequest) String() string {
 	return fmt.Sprintf("%08X: % X", r.Address, r.Data)
 }
 
-func (r *RamUpdate) Len() int {
+func (r *WriteRequest) Len() int {
 	return len(r.Data)
 }
 
-func (r *RamUpdate) Complete(err error) {
+func (r *WriteRequest) Complete(err error) {
 	select {
 	case r.respChan <- err:
 	default:
@@ -190,7 +190,7 @@ func (r *RamUpdate) Complete(err error) {
 	close(r.respChan)
 }
 
-func (r *RamUpdate) Wait() error {
+func (r *WriteRequest) Wait() error {
 	if r.respChan == nil {
 		return fmt.Errorf("respChan is nil")
 	}

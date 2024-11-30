@@ -46,11 +46,10 @@ func (mw *MainWindow) newOutputList() {
 	mw.output = widget.NewListWithData(
 		mw.outputData,
 		func() fyne.CanvasObject {
-			return &widget.Label{
-				Alignment:  fyne.TextAlignLeading,
-				Truncation: fyne.TextTruncateEllipsis,
-			}
-
+			w := widget.NewLabel("")
+			w.Alignment = fyne.TextAlignLeading
+			w.Truncation = fyne.TextTruncateEllipsis
+			return w
 		},
 		func(item binding.DataItem, obj fyne.CanvasObject) {
 			i := item.(binding.String)

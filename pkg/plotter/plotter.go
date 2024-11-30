@@ -6,6 +6,7 @@ import (
 	"log"
 	"sort"
 	"strconv"
+	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -23,8 +24,9 @@ type Plotter struct {
 
 	cursor      *canvas.Line
 	canvasImage *canvas.Image
-	container   *fyne.Container
+	container   *container.Split
 	canvas      fyne.CanvasObject
+	//canvasImageContainer *fyne.Container
 
 	texts  []*TappableText
 	legend *fyne.Container
@@ -45,6 +47,12 @@ type Plotter struct {
 	plotResolutionFactor float32
 
 	textBuffer []byte
+
+	r *plotterRenderer
+
+	mu sync.Mutex
+
+	hilightLine int
 }
 
 type PlotterOpt func(*Plotter)
@@ -67,14 +75,14 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		dataPointsToShow:     0,
 		legend:               container.NewVBox(),
 		zoom:                 widget.NewSlider(1, 100),
-		canvasImage:          canvas.NewImageFromImage(image.NewRGBA(image.Rect(0, 0, 500, 200))),
+		canvasImage:          canvas.NewImageFromImage(image.NewRGBA(image.Rect(0, 0, 400, 200))),
 		cursor:               canvas.NewLine(color.White),
 		ts:                   make([]*TimeSeries, len(values)),
 		plotResolutionFactor: 1.0,
 	}
 
-	p.canvasImage.FillMode = canvas.ImageFillOriginal
-	p.canvasImage.ScaleMode = canvas.ImageScalePixels
+	p.canvasImage.FillMode = canvas.ImageFillStretch
+	p.canvasImage.ScaleMode = canvas.ImageScaleFastest
 	//p.canvasImage.Translucency = 0.2
 
 	p.zoom.Orientation = widget.Vertical
@@ -118,7 +126,23 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 			p.RefreshImage()
 		}
 
-		legendLabel := NewTappableText(k, p.ts[n].Color, onTapped, onColorUpdate)
+		//var oldColor color.RGBA
+		onHover := func(hover bool) {
+			if hover {
+				//oldColor = p.ts[n].Color
+				//p.ts[n].Color = color.RGBA{255, 0, 0, 255}
+				p.hilightLine = n
+				p.texts[n].text.TextStyle.Bold = true
+				p.RefreshImage()
+			} else {
+				//p.ts[n].Color = oldColor
+				p.texts[n].text.TextStyle.Bold = false
+				p.hilightLine = -1
+				p.RefreshImage()
+			}
+		}
+
+		legendLabel := NewTappableText(k, p.ts[n].Color, onTapped, onColorUpdate, onHover)
 		legendLabel.SetTextSize(11)
 		p.texts = append(p.texts, legendLabel)
 		p.legend.Add(legendLabel)
@@ -127,13 +151,17 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 
 	p.dataPointsToShow = min(p.dataLength, 250.0)
 
-	p.container = container.NewBorder(
+	canvasImage := container.New(&testL{p: p}, p.canvasImage)
+
+	leading := container.NewBorder(
 		nil,
 		nil,
 		p.zoom,
-		container.NewVScroll(p.legend),
-		p.canvasImage,
+		nil,
+		canvasImage,
 	)
+	p.container = container.NewHSplit(leading, container.NewVScroll(p.legend))
+	p.container.Offset = 0.83
 
 	p.canvas = container.NewWithoutLayout(
 		p.container,
@@ -141,6 +169,35 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 	)
 	return p
 }
+
+type testL struct {
+	p       *Plotter
+	oldSize fyne.Size
+}
+
+func (t *testL) Layout(_ []fyne.CanvasObject, plotSize fyne.Size) {
+	if t.oldSize == plotSize {
+		return
+	}
+	t.oldSize = plotSize
+
+	t.p.canvasImage.Resize(plotSize) // Calculate new plot dimensions
+	t.p.plotResolution = fyne.NewSize(plotSize.Width*t.p.plotResolutionFactor, plotSize.Height*t.p.plotResolutionFactor)
+	// Update width factor based on the new size
+	t.p.widthFactor = plotSize.Width / float32(t.p.dataPointsToShow)
+	// Refresh the image and cursor
+	t.p.RefreshImage()
+	t.p.updateCursor()
+}
+
+func (t *testL) MinSize([]fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(400, 100)
+}
+
+//func (p *Plotter) Resize(size fyne.Size) {
+//	log.Println("Resize", size)
+//	p.r.Layout(size)
+//}
 
 func (p *Plotter) Seek(pos int) {
 	halfDataPointsToShow := int(float64(p.dataPointsToShow) * .5)
@@ -157,24 +214,6 @@ func (p *Plotter) Seek(pos int) {
 	p.RefreshImage()
 }
 
-func (p *Plotter) updateCursor() {
-	var x float32
-	halfDataPointsToShow := int(float64(p.dataPointsToShow) * .5)
-	if p.cursorPos >= p.dataLength-halfDataPointsToShow {
-		// If cursor position is at or beyond the end of data
-		x = float32(p.dataLength-p.cursorPos) * p.widthFactor
-		x = p.canvasImage.Size().Width - x
-	} else {
-		// Calculate x position based on plotStartPos
-		x = float32(p.cursorPos-max(p.plotStartPos, 0)) * p.widthFactor
-	}
-
-	xOffset := p.zoom.Size().Width + x
-	p.cursor.Position1 = fyne.NewPos(xOffset, 0)
-	p.cursor.Position2 = fyne.NewPos(xOffset+1, p.canvasImage.Size().Height)
-	p.cursor.Refresh()
-}
-
 func (p *Plotter) updateLegend() {
 	for i, v := range p.valueOrder {
 		valueIndex := min(p.dataLength, p.cursorPos)
@@ -184,25 +223,36 @@ func (p *Plotter) updateLegend() {
 		p.textBuffer = strconv.AppendFloat(p.textBuffer, p.values[v][valueIndex], 'f', 2, 64)
 		obj.text.Text = string(p.textBuffer)
 		//obj.text.Text = v + ": " + strconv.FormatFloat(p.values[v][valueIndex], 'f', 2, 64)
+		p.texts[i].Refresh()
 	}
-	p.legend.Refresh()
+
 }
 
 func (p *Plotter) RefreshImage() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	//log.Println("RefreshImage", p.plotResolution.Width, p.plotResolution.Height)
 	img := image.NewRGBA(image.Rect(0, 0, int(p.plotResolution.Width), int(p.plotResolution.Height)))
-
 	for n := range len(p.ts) {
 		if !p.ts[n].Enabled {
 			continue
 		}
-		p.ts[n].PlotImage(img, p.values, p.plotStartPos, p.dataPointsToShow)
+		if p.hilightLine == n {
+			continue
+		}
+		p.ts[n].PlotImage(img, p.values, p.plotStartPos, p.dataPointsToShow, 1)
 	}
+	if p.hilightLine >= 0 && p.ts[p.hilightLine].Enabled {
+		p.ts[p.hilightLine].PlotImage(img, p.values, p.plotStartPos, p.dataPointsToShow, 4)
+	}
+
 	p.canvasImage.Image = img
 	p.canvasImage.Refresh()
 }
 
 func (p *Plotter) CreateRenderer() fyne.WidgetRenderer {
-	return &plotterRenderer{p: p}
+	p.r = &plotterRenderer{p: p}
+	return p.r
 }
 
 type TimeSeries struct {
@@ -242,7 +292,7 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 	return ts
 }
 
-func (ts *TimeSeries) PlotImage(img *image.RGBA, values map[string][]float64, start, numPoints int) {
+func (ts *TimeSeries) PlotImage(img *image.RGBA, values map[string][]float64, start, numPoints, thickness int) {
 	dl := len(values[ts.Name]) - 1
 	startN, endN := min(max(start, 0), dl), min(start+numPoints, dl)
 
@@ -269,8 +319,9 @@ func (ts *TimeSeries) PlotImage(img *image.RGBA, values map[string][]float64, st
 			x1 = w
 		}
 		y1 := int(float64(hh) - (data[x]-ts.Min)*heightFactor)
-		Bresenham(img, x0, y0, x1, y1, ts.Color)
+		BresenhamThick(img, x0, y0, x1, y1, thickness, ts.Color)
 	}
+
 }
 
 func findMinMaxFloat64(data []float64) (float64, float64) {

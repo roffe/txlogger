@@ -55,6 +55,14 @@ func NewCBar(cfg *CBarConfig) *CBar {
 	s := &CBar{
 		cfg: cfg,
 	}
+
+	if s.cfg.Minsize.Width == 0 {
+		s.cfg.Minsize.Width = 50
+	}
+	if s.cfg.Minsize.Height == 0 {
+		s.cfg.Minsize.Height = 50
+	}
+
 	s.ExtendBaseWidget(s)
 	s.value = cfg.Center
 	if s.cfg.Steps == 0 {
@@ -125,6 +133,22 @@ func (s *CBar) refresh() {
 		s.bar.Move(fyne.NewPos(barPosition, s.eightHeight))
 		s.bar.Resize(fyne.NewSize(6, s.barHeight))
 	}
+
+	var y float32
+
+	switch s.cfg.TextPosition {
+	case TextAtTop:
+		y = -s.bar.MinSize().Height - s.displayText.MinSize().Height
+	case TextAtBottom:
+		y = s.size.Height
+	case TextAtCenter:
+		//y = (s.bar.Size().Height - s.displayText.MinSize().Height) / 2
+
+	}
+	diameter := s.size.Width
+	height := s.size.Height
+	s.titleText.Move(fyne.NewPos(diameter*.5-s.titleText.MinSize().Width*.5, height-30))
+	s.displayText.Move(fyne.NewPos(diameter*.5-s.displayText.MinSize().Width*.5, y))
 }
 
 func (s *CBar) CreateRenderer() fyne.WidgetRenderer {
@@ -144,6 +168,7 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 	// log.Println("cbar.Layout", dr.d.displayText.Text, space.Width, space.Height)
 	s := dr.d
 	s.size = space
+	s.container.Resize(space)
 	s.eightHeight = s.size.Height * common.OneEight
 	diameter := space.Width
 	s.center = diameter * .5
@@ -154,21 +179,6 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 	s.barHeight = s.size.Height - (s.eightHeight * 2)
 	s.face.Move(fyne.NewPos(-2, 0))
 	s.face.Resize(space.AddWidthHeight(3, 0))
-
-	var y float32
-
-	switch s.cfg.TextPosition {
-	case TextAtTop:
-		y = -s.bar.Size().Height * .47
-	case TextAtBottom:
-		y = s.bar.Size().Height * 0.85
-	case TextAtCenter:
-		//y = (s.bar.Size().Height - s.displayText.MinSize().Height) / 2
-
-	}
-
-	s.titleText.Move(fyne.NewPos(diameter*.5-s.titleText.Size().Width*.5, height-30))
-	s.displayText.Move(fyne.NewPos(diameter*.5-s.displayText.MinSize().Width*.5, y))
 
 	for i, line := range s.bars {
 		if i%2 == 0 {
@@ -183,7 +193,7 @@ func (dr *CBarRenderer) Layout(space fyne.Size) {
 }
 
 func (dr *CBarRenderer) MinSize() fyne.Size {
-	return dr.d.container.MinSize()
+	return dr.d.cfg.Minsize
 }
 
 func (dr *CBarRenderer) Refresh() {

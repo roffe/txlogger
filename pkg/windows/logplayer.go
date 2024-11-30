@@ -113,7 +113,7 @@ func loadSettingStringFloat64(app fyne.App, key string, def float64) float64 {
 
 func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) *LogPlayer {
 	w := a.NewWindow("LogPlayer " + filename)
-	w.Resize(fyne.NewSize(1024, 530))
+	w.Resize(fyne.NewSize(1024, 730))
 
 	dbCfg := &dashboard.DashboardConfig{
 		App:             a,

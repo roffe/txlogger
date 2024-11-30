@@ -222,25 +222,25 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 		mv.inputBuffer.Reset()
 	case fyne.KeyPageUp, "S":
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] += int((mv.zCorrFac * 10) * (1.0 / mv.zCorrFac))
+			mv.zData[cell] += int((mv.zCorrFac*10)*(1.0/mv.zCorrFac) + mv.zCorrOffset)
 		}
 		mv.updateCells()
 		refresh = true
 	case fyne.KeyPageDown, "X":
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] -= int((mv.zCorrFac * 10) * (1.0 / mv.zCorrFac))
+			mv.zData[cell] -= int((mv.zCorrFac*10)*(1.0/mv.zCorrFac) + mv.zCorrOffset)
 		}
 		mv.updateCells()
 		refresh = true
 	case "+", "A":
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] += int(mv.zCorrFac * (1.0 / mv.zCorrFac))
+			mv.zData[cell] += int(mv.zCorrFac*(1.0/mv.zCorrFac) + mv.zCorrOffset)
 		}
 		mv.updateCells()
 		refresh = true
 	case "-", "Z":
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] -= int(mv.zCorrFac * (1.0 / mv.zCorrFac))
+			mv.zData[cell] -= int(mv.zCorrFac*(1.0/mv.zCorrFac) + mv.zCorrOffset)
 		}
 		mv.updateCells()
 		refresh = true

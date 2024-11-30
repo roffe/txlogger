@@ -65,7 +65,7 @@ func AirDemToStringT8(v float64) string {
 
 type T8Client struct {
 	symbolChan chan []*symbol.Symbol
-	updateChan chan *RamUpdate
+	writeChan  chan *WriteRequest
 	readChan   chan *ReadRequest
 
 	quitChan chan struct{}
@@ -86,8 +86,8 @@ func NewT8(cfg Config, lw LogWriter) (IClient, error) {
 	return &T8Client{
 		Config:     cfg,
 		symbolChan: make(chan []*symbol.Symbol, 1),
-		updateChan: make(chan *RamUpdate, 1),
-		readChan:   make(chan *ReadRequest),
+		writeChan:  make(chan *WriteRequest, 1),
+		readChan:   make(chan *ReadRequest, 1),
 		quitChan:   make(chan struct{}, 2),
 		sysvars:    NewThreadSafeMap(),
 		lw:         lw,
@@ -112,7 +112,7 @@ func (c *T8Client) SetSymbols(symbols []*symbol.Symbol) error {
 
 func (c *T8Client) SetRAM(address uint32, data []byte) error {
 	upd := NewRamUpdate(address, data)
-	c.updateChan <- upd
+	c.writeChan <- upd
 	return upd.Wait()
 }
 
@@ -126,7 +126,7 @@ func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
 	return req.Data, req.Wait()
 }
 
-const T8ChunkSize = 0x80
+const T8ChunkSize = 235
 
 const lastPresentInterval = 3500 * time.Millisecond
 
@@ -282,7 +282,6 @@ func (c *T8Client) Start() error {
 			var firstTime time.Time
 			var firstTimestamp uint32
 			var currtimestamp uint32
-		outer:
 			for {
 				select {
 				case <-c.quitChan:
@@ -311,85 +310,53 @@ func (c *T8Client) Start() error {
 					}
 				case read := <-c.readChan:
 					if txbridge {
-						if err := cl.SendFrame(adapter.SystemMsg, []byte("s"), gocan.Outgoing); err != nil {
-							c.onError(err)
-							continue
-						}
-						time.Sleep(45 * time.Millisecond)
-					}
-				inner:
-					for read.left > 0 {
-						chunkSize = uint32(math.Min(float64(read.left), T8ChunkSize))
-						log.Printf("Reading RAM 0x%X %d", read.Address, chunkSize)
-						data, err := gm.ReadMemoryByAddress(ctx, read.Address, chunkSize)
-						if err != nil {
-							c.onError(fmt.Errorf("failed to read memory: %w", err))
+						if err := c.handleReadTxbridge(ctx, cl, read); err != nil {
 							read.Complete(err)
-							if txbridge {
-								if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
-									c.onError(err)
-								}
-							}
-							continue outer
 						}
-						read.Data = append(read.Data, data...)
-						read.left -= chunkSize
-						read.Address += chunkSize
-
-						testerPresent()
-
-						if read.left > 0 {
-							//go func() {
-							//	// time.Sleep(2 * time.Millisecond)
-							//	c.readChan <- read
-							//}()
-							continue inner
-						}
-						if txbridge {
-							if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
-								c.onError(err)
-								continue
-							}
-							time.Sleep(20 * time.Millisecond)
-						}
-						read.Complete(nil)
-						continue outer
+						continue
 					}
-				case upd := <-c.updateChan:
 
+					chunkSize = uint32(math.Min(float64(read.left), T8ChunkSize))
+					log.Printf("Reading RAM 0x%X %d", read.Address, chunkSize)
+					data, err := gm.ReadMemoryByAddress(ctx, read.Address, chunkSize)
+					if err != nil {
+						read.Complete(err)
+						continue
+					}
+					read.Data = append(read.Data, data...)
+					read.left -= chunkSize
+					read.Address += chunkSize
+					if read.left > 0 {
+						c.readChan <- read
+						continue
+					}
+					read.Complete(nil)
+					time.Sleep(12 * time.Millisecond)
+				case upd := <-c.writeChan:
 					if txbridge {
-						if err := cl.SendFrame(adapter.SystemMsg, []byte("s"), gocan.Outgoing); err != nil {
-							c.onError(err)
-							continue
+						if err := c.handleWriteTxbridge(ctx, cl, upd); err != nil {
+							upd.Complete(err)
 						}
-						time.Sleep(45 * time.Millisecond)
+						continue
+					}
+					chunkSize = uint32(math.Min(float64(upd.Length), T8ChunkSize))
+					log.Printf("Updating RAM 0x%X %d", upd.Address, chunkSize)
+					if err := gm.WriteDataByAddress(ctx, upd.Address, upd.Data[:chunkSize]); err != nil {
+						upd.Complete(err)
+						continue
 					}
 
-				innerupd:
-					for upd.left > 0 {
-						chunkSize = uint32(math.Min(float64(upd.left), 0x40))
-						log.Printf("Updating RAM 0x%X %d", upd.Address, chunkSize)
-						if err := gm.WriteDataByAddress(ctx, upd.Address, upd.Data[:chunkSize]); err != nil {
-							c.onError(fmt.Errorf("failed to write data: %w", err))
-							upd.Complete(err)
-							continue outer
-						}
-						upd.left -= chunkSize
-						upd.Address += chunkSize
-						upd.Data = upd.Data[chunkSize:]
-						testerPresent()
-						if upd.left > 0 {
-							//c.updateChan <- upd
-							continue innerupd
-						}
-						upd.Complete(nil)
-						if txbridge {
-							if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
-								c.onError(err)
-							}
-							time.Sleep(20 * time.Millisecond)
-						}
+					upd.Length -= chunkSize
+					upd.Address += chunkSize
+					upd.Data = upd.Data[chunkSize:]
+
+					if upd.Length > 0 {
+						c.writeChan <- upd
+						continue
 					}
+					upd.Complete(nil)
+					time.Sleep(12 * time.Millisecond)
+
 				case <-t.C:
 					timeStamp = time.Now()
 					if len(c.Symbols) == 0 {
@@ -439,6 +406,7 @@ func (c *T8Client) Start() error {
 					if msg == nil {
 						return retry.Unrecoverable(errors.New("nil message received"))
 					}
+
 					if msg.Identifier() == adapter.SystemMsgError {
 						c.onError(errors.New("read timeout"))
 						continue
@@ -478,7 +446,6 @@ func (c *T8Client) Start() error {
 						c.sysvars.Set(EXTERNALWBLSYM, c.lamb.GetLambda())
 					}
 
-					//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
 					if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
 						c.onError(fmt.Errorf("failed to write log: %w", err))
 					}
@@ -491,11 +458,7 @@ func (c *T8Client) Start() error {
 				}
 			}
 		})
-
-		//c.OnMessage(fmt.Sprintf("Live logging at %d fps", c.Rate))
-
 		return errg.Wait()
-
 	},
 		retry.DelayType(retry.FixedDelay),
 		retry.Delay(1500*time.Millisecond),
@@ -507,6 +470,80 @@ func (c *T8Client) Start() error {
 		}),
 	)
 	return err
+}
+
+func (c *T8Client) handleWriteTxbridge(ctx context.Context, cl *gocan.Client, write *WriteRequest) error {
+	toRead := min(write.Length, T8ChunkSize)
+	log.Printf("Writing RAM $%X:%d", write.Address, toRead)
+	cmd := gocan.SerialCommand{
+		Command: 'W',
+		Data: []byte{
+			byte(write.Address),
+			byte(write.Address >> 8),
+			byte(write.Address >> 16),
+			byte(write.Address >> 24),
+			byte(toRead),
+		},
+	}
+
+	cmd.Data = append(cmd.Data, write.Data[:toRead]...)
+
+	payload, err := cmd.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	frame := gocan.NewFrame(adapter.SystemMsg, payload, gocan.Outgoing)
+	resp, err := cl.SendAndPoll(ctx, frame, 1*time.Second, adapter.SystemMsgWriteResponse, adapter.SystemMsgError)
+	if err != nil {
+		return err
+	}
+	if resp.Identifier() == adapter.SystemMsgError {
+		return fmt.Errorf("error: %X", resp.Data())
+	}
+	write.Address += uint32(toRead)
+	write.Length -= toRead
+	write.Data = write.Data[toRead:]
+
+	if write.Length > 0 {
+		c.writeChan <- write
+	} else {
+		write.Complete(nil)
+	}
+	return nil
+}
+
+func (c *T8Client) handleReadTxbridge(ctx context.Context, cl *gocan.Client, read *ReadRequest) error {
+	toRead := min(T8ChunkSize, read.Length)
+	log.Printf("Reading RAM $%X:%d", read.Address, toRead)
+	cmd := gocan.SerialCommand{
+		Command: 'R',
+		Data: []byte{
+			byte(read.Address),
+			byte(read.Address >> 8),
+			byte(read.Address >> 16),
+			byte(read.Address >> 24),
+			byte(toRead),
+		},
+	}
+	payload, err := cmd.MarshalBinary()
+	if err != nil {
+		return err
+	}
+
+	frame := gocan.NewFrame(adapter.SystemMsg, payload, gocan.Outgoing)
+	resp, err := cl.SendAndPoll(ctx, frame, 4*time.Second, adapter.SystemMsgDataRequest)
+	if err != nil {
+		return err
+	}
+	read.Address += uint32(toRead)
+	read.Length -= toRead
+	read.Data = append(read.Data, resp.Data()...)
+	if read.Length > 0 {
+		c.readChan <- read
+	} else {
+		read.Complete(nil)
+	}
+	return nil
 }
 
 func clearDynamicallyDefinedRegister(ctx context.Context, gm *gmlan.Client) error {

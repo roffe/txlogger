@@ -21,7 +21,7 @@ import (
 
 type T7Client struct {
 	symbolChan chan []*symbol.Symbol
-	updateChan chan *RamUpdate
+	updateChan chan *WriteRequest
 	readChan   chan *ReadRequest
 
 	quitChan chan struct{}
@@ -43,7 +43,7 @@ func NewT7(cfg Config, lw LogWriter) (IClient, error) {
 	return &T7Client{
 		Config:     cfg,
 		symbolChan: make(chan []*symbol.Symbol, 1),
-		updateChan: make(chan *RamUpdate, 1),
+		updateChan: make(chan *WriteRequest, 1),
 		readChan:   make(chan *ReadRequest, 1),
 		quitChan:   make(chan struct{}),
 		sysvars:    NewThreadSafeMap(),
@@ -377,7 +377,7 @@ func (c *T7Client) Start() error {
 				read.Complete(nil)
 			case write := <-c.updateChan:
 				if txbridge {
-					toRead := min(235, write.left)
+					toRead := min(235, write.Length)
 					cmd := gocan.SerialCommand{
 						Command: 'W',
 						Data: []byte{
@@ -392,7 +392,7 @@ func (c *T7Client) Start() error {
 
 					write.Data = write.Data[toRead:] // remove the data we just sent
 					write.Address += uint32(toRead)
-					write.left -= toRead
+					write.Length -= toRead
 
 					payload, err := cmd.MarshalBinary()
 					if err != nil {
@@ -413,7 +413,7 @@ func (c *T7Client) Start() error {
 						continue
 					}
 
-					if write.left > 0 {
+					if write.Length > 0 {
 						c.updateChan <- write
 						continue
 					}

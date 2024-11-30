@@ -319,12 +319,13 @@ func (mw *MainWindow) setupTabs() {
 
 func (mw *MainWindow) Log(s string) {
 	debug.Log(s)
-	mw.outputData.Prepend(s)
+	mw.outputData.Append(s)
+	mw.output.ScrollToBottom()
 }
 
 func (mw *MainWindow) SyncSymbols() {
 	if mw.fw == nil {
-		mw.Log("Load bin to sync symbols")
+		//mw.Log("Load bin to sync symbols")
 		return
 	}
 	cnt := 0

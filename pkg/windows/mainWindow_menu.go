@@ -18,8 +18,6 @@ import (
 	sdialog "github.com/sqweek/dialog"
 )
 
-const chunkSize = 128
-
 func (mw *MainWindow) setupMenu() {
 	otherFunc := func(str string) {
 		switch str {
@@ -189,7 +187,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			if err := mw.dlc.SetRAM(addr+uint32(idx*dataLen), buff.Bytes()); err != nil {
 				mw.Log(err.Error())
 			}
-			mw.Log(fmt.Sprintf("set %s idx: %d took %s", axis.Z, idx, time.Since(start)))
+			mw.Log(fmt.Sprintf("set %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 		}
 	}
 
@@ -199,6 +197,8 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			var addr uint32
 
 			switch mw.ecuSelect.Selected {
+			case "T5":
+				addr = symZ.SramOffset
 			case "T7":
 				addr = symZ.Address
 			case "T8":
@@ -212,7 +212,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			}
 			ints := symZ.BytesToInts(data)
 			mv.SetZ(ints)
-			mw.Log(fmt.Sprintf("load %s took %s", axis.Z, time.Since(start)))
+			mw.Log(fmt.Sprintf("load %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 		}
 	}
 
@@ -230,22 +230,13 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			startPos = symZ.Address + symZ.SramOffset
 		}
 
-		for buff.Len() > 0 {
-			if buff.Len() > chunkSize {
-				if err := mw.dlc.SetRAM(startPos, buff.Next(chunkSize)); err != nil {
-					mw.Log(err.Error())
-					return
-				}
-			} else {
-				if err := mw.dlc.SetRAM(startPos, buff.Bytes()); err != nil {
-					mw.Log(err.Error())
-					return
-				}
-				buff.Reset()
-			}
-			startPos += chunkSize
+		if err := mw.dlc.SetRAM(startPos, buff.Bytes()); err != nil {
+			mw.Log(err.Error())
+			return
 		}
-		mw.Log(fmt.Sprintf("save %s took %s", axis.Z, time.Since(start)))
+		buff.Reset()
+
+		mw.Log(fmt.Sprintf("save %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 	}
 
 	saveFileFunc := func(data []int) {

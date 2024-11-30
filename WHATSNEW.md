@@ -4,7 +4,9 @@
 - Added T5 support for txbridge
 - Improved txbridge T8 support
 - Added OTA firmware update for txbridge
-- Added support for offloading read by memory address in Trionic 7 to txbridge
+- Trionic 7 & 8: Added support for offloading read & write by memory address to txbridge
+- When hovering symbols in the legend for the plotter the symbol will be highlighted in the plot
+- Plot series now hilight when mouseover legend in logplayer
 
 # 1.0.18
 

@@ -20,7 +20,7 @@ import (
 
 type T5Client struct {
 	symbolChan chan []*symbol.Symbol
-	updateChan chan *RamUpdate
+	updateChan chan *WriteRequest
 	readChan   chan *ReadRequest
 
 	quitChan chan struct{}
@@ -42,7 +42,7 @@ func NewT5(cfg Config, lw LogWriter) (IClient, error) {
 		Config:     cfg,
 		lw:         lw,
 		symbolChan: make(chan []*symbol.Symbol, 1),
-		updateChan: make(chan *RamUpdate, 1),
+		updateChan: make(chan *WriteRequest, 1),
 		readChan:   make(chan *ReadRequest, 1),
 		quitChan:   make(chan struct{}),
 	}, nil
