@@ -37,6 +37,12 @@ func CalculateT8AccessKey(seed []byte, level byte) (byte, byte) {
 }
 
 func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) (symbol.SymbolCollection, error) {
+	// Some day I will make this work with txbridge natively for faster speed
+	// var txbridge bool
+	// if dev.Name() == "txbridge" {
+	// 	txbridge = true
+	// }
+
 	cl, err := gocan.New(context.TODO(), dev)
 	if err != nil {
 		return nil, err

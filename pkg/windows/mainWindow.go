@@ -16,6 +16,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	xwidget "fyne.io/x/fyne/widget"
+	"github.com/ebitengine/oto/v3"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/capture"
 	"github.com/roffe/txlogger/pkg/dashboard"
@@ -97,9 +98,31 @@ type MainWindow struct {
 	tab *container.AppTabs
 	//doctab *container.DocTabs
 	statusText *widget.Label
+
+	otoCtx *oto.Context
 }
 
 func NewMainWindow(a fyne.App, filename string) *MainWindow {
+
+	op := &oto.NewContextOptions{}
+
+	// Usually 44100 or 48000. Other values might cause distortions in Oto
+	op.SampleRate = 44100
+
+	// Number of channels (aka locations) to play sounds from. Either 1 or 2.
+	// 1 is mono sound, and 2 is stereo (most speakers are stereo).
+	op.ChannelCount = 2
+
+	// Format of the source. go-mp3's format is signed 16bit integers.
+	op.Format = oto.FormatSignedInt16LE
+
+	// Remember that you should **not** create more than one context
+	otoCtx, readyChan, err := oto.NewContext(op)
+	if err != nil {
+		panic("oto.NewContext failed: " + err.Error())
+	}
+	// It might take a bit for the hardware audio devices to be ready, so we wait on the channel.
+	<-readyChan
 
 	mw := &MainWindow{
 		Window:         a.NewWindow("txlogger"),
@@ -112,6 +135,8 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		openMaps: make(map[string]fyne.Window),
 
 		statusText: widget.NewLabel("Harder, Better, Faster, Stronger"),
+
+		otoCtx: otoCtx,
 	}
 
 	mw.Resize(fyne.NewSize(1024, 768))

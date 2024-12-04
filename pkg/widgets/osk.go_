@@ -1,0 +1,45 @@
+package widgets
+
+import (
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/touchkeyboard"
+)
+
+type OSKEntry struct {
+	*widget.Entry
+}
+
+func NewOSKEntry() *OSKEntry {
+	o := &OSKEntry{
+		&widget.Entry{Wrapping: fyne.TextWrap(fyne.TextTruncateClip)},
+	}
+	o.ExtendBaseWidget(o)
+	return o
+}
+
+func (o *OSKEntry) FocusGained() {
+	open, err := touchkeyboard.IsInputPaneOpen()
+	if err != nil {
+		fyne.LogError("failed to check if keyboard is open", err)
+	}
+	if !open {
+		if err := touchkeyboard.Toggle(); err != nil {
+			fyne.LogError("failed to toggle keyboard", err)
+		}
+	}
+	o.Entry.FocusGained()
+}
+
+func (o *OSKEntry) FocusLost() {
+	open, err := touchkeyboard.IsInputPaneOpen()
+	if err != nil {
+		fyne.LogError("failed to check if keyboard is open", err)
+	}
+	if open {
+		if err := touchkeyboard.Toggle(); err != nil {
+			fyne.LogError("failed to toggle keyboard", err)
+		}
+	}
+	o.Entry.FocusLost()
+}

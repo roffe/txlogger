@@ -19,7 +19,7 @@ require (
 )
 
 require (
-	fyne.io/fyne/v2 v2.5.3-0.20241129201013-e8be3f613756
+	fyne.io/fyne/v2 v2.5.3-0.20241203062820-28c43f47fd89
 	fyne.io/systray v1.11.0 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
@@ -71,6 +71,9 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.4.0 // indirect
+	github.com/ebitengine/oto/v3 v3.3.1 // indirect
+	github.com/ebitengine/purego v0.8.0 // indirect
+	github.com/hajimehoshi/go-mp3 v0.3.4 // indirect
 	github.com/jeandeaual/go-locale v0.0.0-20240223122105-ce5225dcaa49 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.4.1 // indirect
 	github.com/rymdport/portal v0.3.0 // indirect

@@ -20,12 +20,12 @@ import (
 const rpmIDCconstant = 1.0 / 1200.0
 
 type Dashboard struct {
-	cfg          *DashboardConfig
+	cfg          *Config
 	metricRouter map[string]func(float64)
 	container    *fyne.Container
 
 	text   Texts
-	gauges DasboardGauges
+	gauges Gauges
 
 	checkEngine *canvas.Image
 	limpMode    *canvas.Image
@@ -51,7 +51,7 @@ type Texts struct {
 	time                            *canvas.Text
 }
 
-type DasboardGauges struct {
+type Gauges struct {
 	rpm, speed, iat    *widgets.Dial
 	throttle, pwm      *widgets.VBar
 	engineTemp         *widgets.Dial
@@ -59,7 +59,7 @@ type DasboardGauges struct {
 	pressure, airmass  *widgets.DualDial
 }
 
-type DashboardConfig struct {
+type Config struct {
 	App             fyne.App
 	Mw              fyne.Window
 	Logplayer       bool
@@ -76,7 +76,7 @@ type DashboardConfig struct {
 }
 
 // func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.Button, onClose func()) *Dashboard {
-func NewDashboard(cfg *DashboardConfig) *Dashboard {
+func NewDashboard(cfg *Config) *Dashboard {
 	if cfg.AirDemToString == nil {
 		cfg.AirDemToString = func(f float64) string {
 			return "Undefined"
@@ -92,7 +92,7 @@ func NewDashboard(cfg *DashboardConfig) *Dashboard {
 		cfg:       cfg,
 		logBtn:    cfg.LogBtn,
 		logplayer: cfg.Logplayer,
-		gauges: DasboardGauges{
+		gauges: Gauges{
 			airmass: widgets.NewDualDial(widgets.DualDialConfig{
 				Title:   "mg/c",
 				Min:     0,
@@ -498,8 +498,8 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		"m_Request":             db.gauges.airmass.SetValue2, // t7
 		"AirMassMast.m_Request": db.gauges.airmass.SetValue2, // t8
 
-		"Out.fi_Ignition": textSetter(db.text.ign, "Ign", "°", 1),
-		"Ign_angle":       textSetter(db.text.ign, "Ign", "°", 1),
+		"Out.fi_Ignition": textSetter(db.text.ign, "Ign", "", 1),
+		"Ign_angle":       textSetter(db.text.ign, "Ign", "", 1),
 
 		"ECMStat.ST_ActiveAirDem": activeAirDem, // t7 & t8
 
@@ -729,9 +729,8 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 		centerY:     space.Height * 0.5,
 		bottomY:     space.Height - 55,
 
-		textSize: min(min(space.Height, space.Width)*0.11, 60),
+		//textSize: max(min(space.Height, space.Width)*0.07, 20),
 	}
-	dims.smallTextSize = dims.textSize * 0.5
 
 	// Layout main dials
 	layoutMainDials(dr.db, space, dims)
@@ -751,6 +750,9 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	// Layout buttons
 	layoutButtons(dr.db, space, dims)
 
+	dims.textSize = dr.db.gauges.nblambda.Size().Height
+	dims.smallTextSize = dims.textSize * 0.5
+
 	// Layout text elements
 	layoutTexts(dr.db, space, dims)
 }
@@ -758,11 +760,11 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 func layoutMainDials(db *Dashboard, space fyne.Size, dims *dims) {
 	centerDialSize := fyne.NewSize(
 		space.Width-dims.sixthWidth*2-(dims.sixthWidth*common.OneThird*2)-20,
-		space.Height-115,
+		space.Height-125,
 	)
 	centerDialPos := fyne.NewPos(
 		dims.centerX-centerDialSize.Width*0.5,
-		dims.centerY-centerDialSize.Height*0.5+25,
+		dims.centerY-centerDialSize.Height*0.5,
 	)
 
 	if !db.cfg.SwapRPMandSpeed {
@@ -881,7 +883,7 @@ func layoutTexts(db *Dashboard, space fyne.Size, dims *dims) {
 	db.text.ign.TextSize = dims.textSize
 	db.text.ign.Move(fyne.NewPos(
 		db.gauges.nblambda.Position().X,
-		db.gauges.nblambda.MinSize().Height,
+		db.gauges.nblambda.Size().Height,
 	))
 
 	// IOFF text
@@ -895,7 +897,7 @@ func layoutTexts(db *Dashboard, space fyne.Size, dims *dims) {
 	db.text.idc.TextSize = dims.textSize
 	db.text.idc.Move(fyne.NewPos(
 		db.gauges.nblambda.Position().X+db.gauges.nblambda.Size().Width-db.text.idc.MinSize().Width,
-		db.gauges.nblambda.MinSize().Height,
+		db.gauges.nblambda.Size().Height,
 	))
 
 	// Active air demand text
@@ -915,7 +917,7 @@ func layoutTexts(db *Dashboard, space fyne.Size, dims *dims) {
 }
 
 func (dr *DashboardRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(500, 300)
+	return fyne.NewSize(400, 250)
 }
 
 func (dr *DashboardRenderer) Refresh() {

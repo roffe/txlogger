@@ -15,14 +15,11 @@ type MapViewerRenderer struct {
 }
 
 func (vr *MapViewerRenderer) Layout(size fyne.Size) {
-	vr.mv.resize(size)
+	vr.mv.content.Resize(size)
 }
 
 func (vr *MapViewerRenderer) MinSize() fyne.Size {
-	wm := max(80, float32(vr.mv.numColumns)*40)
-	hm := max(50, float32(vr.mv.numRows)*25)
-	min := fyne.NewSize(wm, hm)
-	return min.Max(vr.mv.content.MinSize())
+	return vr.mv.content.MinSize()
 }
 
 func (vr *MapViewerRenderer) Refresh() {

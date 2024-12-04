@@ -25,6 +25,7 @@ type Plotter struct {
 	cursor      *canvas.Line
 	canvasImage *canvas.Image
 	container   *container.Split
+	overlayText *canvas.Text
 	canvas      fyne.CanvasObject
 	//canvasImageContainer *fyne.Container
 
@@ -122,28 +123,30 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		onColorUpdate := func(col color.Color) {
 			r, g, b, a := col.RGBA()
 			p.ts[n].Color = color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)}
-			log.Printf("\"%s\": {%d, %d, %d, %d},", k, uint8(r), uint8(g), uint8(b), uint8(a))
+			// log.Printf("\"%s\": {%d, %d, %d, %d},", k, uint8(r), uint8(g), uint8(b), uint8(a))
 			p.RefreshImage()
 		}
-
 		//var oldColor color.RGBA
 		onHover := func(hover bool) {
 			if hover {
 				//oldColor = p.ts[n].Color
 				//p.ts[n].Color = color.RGBA{255, 0, 0, 255}
+				p.overlayText.Text = k
+				p.overlayText.Color = p.ts[n].Color
 				p.hilightLine = n
 				p.texts[n].text.TextStyle.Bold = true
 				p.RefreshImage()
 			} else {
 				//p.ts[n].Color = oldColor
 				p.texts[n].text.TextStyle.Bold = false
+				p.overlayText.Text = ""
 				p.hilightLine = -1
 				p.RefreshImage()
 			}
 		}
 
 		legendLabel := NewTappableText(k, p.ts[n].Color, onTapped, onColorUpdate, onHover)
-		legendLabel.SetTextSize(11)
+		legendLabel.SetTextSize(14)
 		p.texts = append(p.texts, legendLabel)
 		p.legend.Add(legendLabel)
 
@@ -163,8 +166,12 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 	p.container = container.NewHSplit(leading, container.NewVScroll(p.legend))
 	p.container.Offset = 0.83
 
+	p.overlayText = canvas.NewText("", color.White)
+	p.overlayText.TextSize = 20
+
 	p.canvas = container.NewWithoutLayout(
 		p.container,
+		p.overlayText,
 		p.cursor,
 	)
 	return p
@@ -180,6 +187,8 @@ func (t *testL) Layout(_ []fyne.CanvasObject, plotSize fyne.Size) {
 		return
 	}
 	t.oldSize = plotSize
+
+	t.p.overlayText.Move(fyne.NewPos(t.p.zoom.Size().Width, 20))
 
 	t.p.canvasImage.Resize(plotSize) // Calculate new plot dimensions
 	t.p.plotResolution = fyne.NewSize(plotSize.Width*t.p.plotResolutionFactor, plotSize.Height*t.p.plotResolutionFactor)
@@ -244,6 +253,7 @@ func (p *Plotter) RefreshImage() {
 	}
 	if p.hilightLine >= 0 && p.ts[p.hilightLine].Enabled {
 		p.ts[p.hilightLine].PlotImage(img, p.values, p.plotStartPos, p.dataPointsToShow, 4)
+		// write the text of the current value in the top left corner of the image
 	}
 
 	p.canvasImage.Image = img
