@@ -53,6 +53,7 @@ type DualDial struct {
 
 	container *fyne.Container
 
+	size    fyne.Size
 	minsize fyne.Size
 
 	diameter                   float32
@@ -177,24 +178,17 @@ func (c *DualDial) SetValue2(value float64) {
 	c.displayText2.Refresh()
 }
 
-func (c *DualDial) CreateRenderer() fyne.WidgetRenderer {
-	return &DualDialRenderer{
-		d: c,
-	}
+func (c *DualDial) Size() fyne.Size {
+	return c.cover.Size()
 }
 
-type DualDialRenderer struct {
-	d    *DualDial
-	size fyne.Size
-}
-
-func (dr *DualDialRenderer) Layout(space fyne.Size) {
-	if dr.size.Width == space.Width && dr.size.Height == space.Height {
+func (c *DualDial) Resize(space fyne.Size) {
+	if c.size == space {
 		return
 	}
-	dr.size = space
+	c.size = space
 	//	log.Println("dual_dial.Layout", dr.d.title, space.Width, space.Height)
-	c := dr.d
+
 	c.container.Resize(space)
 	c.diameter = fyne.Min(space.Width, space.Height)
 	c.radius = c.diameter * common.OneHalf
@@ -266,19 +260,8 @@ func (dr *DualDialRenderer) Layout(space fyne.Size) {
 			c.rotateLines(p, float64(i), radius87, eightRadius-1)
 		}
 	}
-
 }
 
-func (dr *DualDialRenderer) MinSize() fyne.Size {
-	return dr.d.minsize
-}
-
-func (dr *DualDialRenderer) Refresh() {
-}
-
-func (dr *DualDialRenderer) Destroy() {
-}
-
-func (dr *DualDialRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{dr.d.container}
+func (c *DualDial) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(c.container)
 }

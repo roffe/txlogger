@@ -40,6 +40,8 @@ const (
 )
 
 type SettingsWidget struct {
+	cfg CanSettingsWidgetConfig
+
 	CanSettings           *CanSettingsWidget
 	freqSlider            *widget.Slider
 	freqValue             *widget.Label
@@ -79,7 +81,14 @@ func (sw *SettingsWidget) GetWidebandType() string {
 func (sw *SettingsWidget) GetWidebandSymbolName() string {
 	switch sw.wblSource.Selected {
 	case "ECU":
-		return "DisplProt.LambdaScanner"
+		switch sw.cfg.EcuSelect.Selected {
+		case "T5":
+			return "AD_EGR"
+		case "T7", "T8":
+			return "DisplProt.LambdaScanner"
+		default:
+			return "None"
+		}
 	case ecumaster.ProductString, innovate.ProductString, aem.ProductString:
 		return datalogger.EXTERNALWBLSYM
 	default:
@@ -164,8 +173,14 @@ func (sw *SettingsWidget) GetCursorFollowCrosshair() bool {
 	return sw.cursorFollowCrosshair.Checked
 }
 
-func NewSettingsWidget() *SettingsWidget {
-	sw := &SettingsWidget{}
+type CanSettingsWidgetConfig struct {
+	EcuSelect *widget.Select
+}
+
+func NewSettingsWidget(cfg CanSettingsWidgetConfig) *SettingsWidget {
+	sw := &SettingsWidget{
+		cfg: cfg,
+	}
 	sw.ExtendBaseWidget(sw)
 
 	sw.freqSlider = sw.newFreqSlider()

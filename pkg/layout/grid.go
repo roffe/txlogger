@@ -5,15 +5,22 @@ import (
 )
 
 type Grid struct {
-	Cols, Rows   int
-	Text         bool
-	widthFactor  float32
-	heightFactor float32
+	Cols, Rows  int
+	Text        bool
+	MinimumSize fyne.Size
+
+	lastSize fyne.Size
 }
 
 func (g *Grid) Layout(objects []fyne.CanvasObject, size fyne.Size) {
-	g.widthFactor = size.Width / float32(g.Cols)
-	g.heightFactor = size.Height / float32(g.Rows)
+	if size == g.lastSize {
+		return
+	}
+	g.lastSize = size
+
+	cellWidth := size.Width / float32(g.Cols)
+	cellHeight := size.Height / float32(g.Rows)
+
 	for i := 0; i < g.Rows; i++ {
 		for j := 0; j < g.Cols; j++ {
 			idx := (i * g.Cols) + j
@@ -21,24 +28,24 @@ func (g *Grid) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 				return
 			}
 			obj := objects[idx]
-			xPosition := float32(j) * g.widthFactor
+			xPosition := float32(j) * cellWidth
 			// Adjust y-position to start from the top of the grid and invert the y-axis
-			yPosition := size.Height - (float32(i+1) * g.heightFactor)
+			yPosition := size.Height - (float32(i+1) * cellHeight)
 			if g.Text {
 				// Center the object within its grid cell if it's text
 				obj.Move(fyne.NewPos(
-					xPosition+(g.widthFactor*.5)-(obj.MinSize().Width*.5),
-					yPosition,
+					xPosition+(cellWidth*.5)-(obj.MinSize().Width*.5),
+					yPosition+(cellHeight*.5)-(obj.MinSize().Height*.5),
 				))
 			} else {
 				// Position the object at the top-left corner of its grid cell, adjusted for inverted y-axis
 				obj.Move(fyne.NewPos(xPosition, yPosition))
+				obj.Resize(fyne.NewSize(cellWidth, cellHeight))
 			}
-			obj.Resize(fyne.NewSize(g.widthFactor, g.heightFactor))
 		}
 	}
 }
 
-func (g *Grid) MinSize(objects []fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(float32(g.Cols*20), float32(g.Rows*11))
+func (g *Grid) MinSize(_ []fyne.CanvasObject) fyne.Size {
+	return g.MinimumSize
 }

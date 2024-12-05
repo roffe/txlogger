@@ -123,6 +123,10 @@ func (c *CanSettingsWidget) Enable() {
 	}
 }
 
+func (cs *CanSettingsWidget) GetSerialPort() string {
+	return cs.portSelector.Selected
+}
+
 func (cs *CanSettingsWidget) loadPrefs() {
 	if adapter := cs.app.Preferences().String(prefsAdapter); adapter != "" {
 		cs.adapterSelector.SetSelected(adapter)

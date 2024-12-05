@@ -18,6 +18,7 @@ const (
 	OneSixth        = 1.0 / 6.0    // 0.16666666666666666
 	OneSeventh      = 1.0 / 7.0    // 0.14285714285714285
 	OneEight        = 1.0 / 8.0    // 0.125
+	OneTwentieth    = 1.0 / 20.0   // 0.05
 	OneTwentyFifth  = 1.0 / 25.0   // 0.04
 	OneSixthieth    = 1.0 / 60.0   // 0.016666666666666666
 	OneEighthieth   = 1.0 / 80.0   // 0.0125

@@ -2,6 +2,7 @@ package windows
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"fyne.io/fyne/v2/dialog"
@@ -12,143 +13,41 @@ import (
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/plotter"
+	"github.com/roffe/txlogger/pkg/snd"
 	sdialog "github.com/sqweek/dialog"
 )
 
 func (mw *MainWindow) createButtons() {
-	mw.addSymbolBtn = widget.NewButtonWithIcon("", theme.ContentAddIcon(), func() {
+	mw.addSymbolBtn = mw.addSymbolBtnFunc()
+	mw.loadSymbolsFileBtn = mw.loadSymbolsFileBtnFunc()
+	mw.loadSymbolsEcuBtn = mw.loadSymbolsEcuBtnFunc()
+	mw.helpBtn = widget.NewButtonWithIcon("Help", theme.HelpIcon(), func() {
+		Help(mw.app)
+	})
+	mw.syncSymbolsBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), mw.SyncSymbols)
+	mw.dashboardBtn = mw.newDashboardBtn()
+	mw.plotterBtn = mw.newPlotterBtn()
+	mw.logplayerBtn = mw.newLogplayerBtn()
+	mw.logBtn = mw.newLogBtn()
+	mw.settingsBtn = mw.newSettingsBtn()
+}
+
+func (mw *MainWindow) addSymbolBtnFunc() *widget.Button {
+	return widget.NewButtonWithIcon("", theme.ContentAddIcon(), func() {
 		sym := mw.fw.GetByName(mw.symbolLookup.Text)
 		if sym == nil {
 			dialog.ShowError(fmt.Errorf("%q not found", mw.symbolLookup.Text), mw)
 			return
 		}
-
 		mw.symbolList.Add(sym)
-		//mw.SaveSymbolList()
-		//log.Printf("Name: %s, Method: %d, Value: %d, Type: %X", s.Name, s.Method, s.Value, s.Type)
 	})
+}
 
-	mw.loadSymbolsFileBtn = widget.NewButtonWithIcon("Load binary", theme.FileIcon(), func() {
-		// d := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
-		// 	if err != nil {
-		// 		// dialog.ShowError(err, mw)
-		// 		mw.Log(err.Error())
-		// 		return
-		// 	}
-		// 	if reader == nil {
-		// 		return
-		// 	}
-		// 	defer reader.Close()
-		// 	log.Println("lol")
-		// }, mw)
-		// d.SetFilter(storage.NewExtensionFileFilter([]string{".bin"}))
-		// d.Resize(mw.Window.Canvas().Size())
-		// d.Show()
-		// return
-
-		filename, err := sdialog.File().Filter("Binary file", "bin").Load()
-		if err != nil {
-			if err.Error() == "Cancelled" {
-				return
-			}
-			// dialog.ShowError(err, mw)
-			mw.Log(err.Error())
-			return
-		}
-		if err := mw.LoadSymbolsFromFile(filename); err != nil {
-			// dialog.ShowError(err, mw)
-			mw.Log(err.Error())
-			return
-		}
-		mw.app.Preferences().SetString(prefsLastBinFile, filename)
-		mw.filename = filename
-	})
-
-	mw.loadSymbolsEcuBtn = widget.NewButtonWithIcon("Load from ECU", theme.DownloadIcon(), func() {
-		mw.Disable()
-		go func() {
-			defer mw.Enable()
-			if err := mw.LoadSymbolsFromECU(); err != nil {
-				mw.Log(err.Error())
-				return
-			}
-		}()
-	})
-
-	mw.helpBtn = widget.NewButtonWithIcon("Help", theme.HelpIcon(), func() {
-		Help(mw.app)
-	})
-
-	mw.syncSymbolsBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), mw.SyncSymbols)
-
-	mw.dashboardBtn = widget.NewButtonWithIcon("Dashboard", theme.InfoIcon(), func() {
-		var cancelFuncs []func()
-
-		onClose := func() {
-			for _, f := range cancelFuncs {
-				f()
-			}
-			if mw.dashboard != nil {
-				mw.dashboard.Close()
-			}
-			mw.dashboard = nil
-			mw.SetFullScreen(false)
-			mw.SetContent(mw.tab)
-			mw.SetCloseIntercept(mw.CloseIntercept)
-		}
-
-		dbcfg := &dashboard.DashboardConfig{
-			App:             mw.app,
-			Mw:              mw,
-			Logplayer:       false,
-			LogBtn:          mw.logBtn,
-			OnClose:         onClose,
-			UseMPH:          mw.settings.GetUseMPH(),
-			SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
-			HighAFR:         mw.settings.GetHighAFR(),
-			LowAFR:          mw.settings.GetLowAFR(),
-			WidebandSymbol:  mw.settings.GetWidebandSymbolName(),
-		}
-
-		switch mw.ecuSelect.Selected {
-		case "T7":
-			dbcfg.AirDemToString = datalogger.AirDemToStringT7
-		case "T8":
-			dbcfg.AirDemToString = datalogger.AirDemToStringT8
-		}
-
-		mw.dashboard = dashboard.NewDashboard(dbcfg)
-
-		for _, s := range mw.symbolList.Symbols() {
-			mw.dashboard.SetValue(s.Name, s.Float64())
-		}
-
-		mw.SetCloseIntercept(func() {
-			onClose()
-		})
-
-		mw.SetContent(mw.dashboard)
-
-		for _, m := range mw.dashboard.GetMetricNames() {
-			cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(m, func(f float64) {
-				mw.dashboard.SetValue(m, f)
-			}))
-		}
-	})
-
-	mw.plotterBtn = widget.NewButtonWithIcon("Plotter", theme.VisibilityIcon(), func() {
-		//var unsubDB func()
-
+func (mw *MainWindow) newPlotterBtn() *widget.Button {
+	return widget.NewButtonWithIcon("Plotter", theme.VisibilityIcon(), func() {
 		quit := make(chan struct{})
-
 		onClose := func() {
-			//if unsubDB != nil {
-			//	unsubDB()
-			//}
 			close(quit)
-			//if mw.plotter != nil {
-			//	//mw.plotter.Close()
-			//}
 			mw.plotter = nil
 			mw.SetFullScreen(false)
 			mw.SetContent(mw.tab)
@@ -168,22 +67,57 @@ func (mw *MainWindow) createButtons() {
 
 		mw.SetContent(mw.plotter)
 	})
+}
 
-	mw.logplayerBtn = widget.NewButtonWithIcon("Log Player", theme.MediaFastForwardIcon(), func() {
+func (mw *MainWindow) loadSymbolsFileBtnFunc() *widget.Button {
+	return widget.NewButtonWithIcon("Load binary", theme.FileIcon(), func() {
+		filename, err := sdialog.File().Filter("Binary file", "bin").Load()
+		if err != nil {
+			if err.Error() == "Cancelled" {
+				return
+			}
+			mw.Log(err.Error())
+			return
+		}
+		if err := mw.LoadSymbolsFromFile(filename); err != nil {
+			mw.Log(err.Error())
+			return
+		}
+		mw.app.Preferences().SetString(prefsLastBinFile, filename)
+		mw.filename = filename
+	})
+}
+
+func (mw *MainWindow) loadSymbolsEcuBtnFunc() *widget.Button {
+	return widget.NewButtonWithIcon("Load from ECU", theme.DownloadIcon(), func() {
+		mw.Disable()
+		go func() {
+			defer mw.Enable()
+			if err := mw.LoadSymbolsFromECU(); err != nil {
+				mw.Log(err.Error())
+				return
+			}
+		}()
+	})
+}
+
+func (mw *MainWindow) newLogplayerBtn() *widget.Button {
+	return widget.NewButtonWithIcon("Log Player", theme.MediaFastForwardIcon(), func() {
 		filename, err := sdialog.File().Filter("logfile", "t5l", "t7l", "t8l", "csv").SetStartDir(mw.settings.GetLogPath()).Load()
 		if err != nil {
 			if err.Error() == "Cancelled" {
 				return
 			}
-			// dialog.ShowError(err, mw)
 			mw.Log(err.Error())
 			return
 		}
 
 		go NewLogPlayer(mw.app, filename, mw.fw)
 	})
+}
 
-	mw.logBtn = widget.NewButtonWithIcon("Start", theme.MediaPlayIcon(), func() {
+func (mw *MainWindow) newLogBtn() *widget.Button {
+	return widget.NewButtonWithIcon("Start", theme.MediaPlayIcon(), func() {
 		if mw.loggingRunning {
 			if mw.dlc != nil {
 				mw.dlc.Close()
@@ -205,7 +139,80 @@ func (mw *MainWindow) createButtons() {
 		mw.startLogging()
 		mw.symbolList.UpdateBars(mw.settings.GetRealtimeBars())
 	})
-	mw.settingsBtn = mw.newSettingsBtn()
+}
+
+func (mw *MainWindow) newDashboardBtn() *widget.Button {
+	return widget.NewButtonWithIcon("Dashboard", theme.InfoIcon(), func() {
+		var cancelFuncs []func()
+
+		onClose := func() {
+			for _, f := range cancelFuncs {
+				f()
+			}
+			if mw.dashboard != nil {
+				mw.dashboard.Close()
+			}
+			mw.dashboard = nil
+			mw.SetFullScreen(false)
+			mw.SetContent(mw.tab)
+			mw.SetCloseIntercept(mw.CloseIntercept)
+		}
+
+		dbcfg := &dashboard.Config{
+			App:             mw.app,
+			Mw:              mw,
+			Logplayer:       false,
+			LogBtn:          mw.logBtn,
+			OnClose:         onClose,
+			UseMPH:          mw.settings.GetUseMPH(),
+			SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
+			HighAFR:         mw.settings.GetHighAFR(),
+			LowAFR:          mw.settings.GetLowAFR(),
+			WidebandSymbol:  mw.settings.GetWidebandSymbolName(),
+		}
+
+		switch mw.ecuSelect.Selected {
+		case "T7":
+			dbcfg.AirDemToString = datalogger.AirDemToStringT7
+		case "T8":
+			dbcfg.AirDemToString = datalogger.AirDemToStringT8
+		}
+
+		mw.dashboard = dashboard.NewDashboard(dbcfg)
+
+		//for _, s := range mw.symbolList.Symbols() {
+		//	mw.dashboard.SetValue(s.Name, s.Float64())
+		//}
+
+		mw.SetCloseIntercept(func() {
+			onClose()
+		})
+
+		for _, m := range mw.dashboard.GetMetricNames() {
+			if m == "MAF.m_AirInlet" {
+				var once sync.Once
+				cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(m, func(f float64) {
+					if f >= 1800 {
+						once.Do(func() {
+							if mw.otoCtx != nil {
+								if err := snd.Pedro(mw.otoCtx); err != nil {
+									mw.Log("Pedro failed: " + err.Error())
+								}
+							}
+						})
+					}
+					mw.dashboard.SetValue(m, f)
+				}))
+				continue
+			}
+
+			cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(m, func(f float64) {
+				mw.dashboard.SetValue(m, f)
+			}))
+		}
+
+		mw.SetContent(mw.dashboard)
+	})
 }
 
 func (mw *MainWindow) newSettingsBtn() *widget.Button {

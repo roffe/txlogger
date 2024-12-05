@@ -2,6 +2,7 @@ package eventbus
 
 import (
 	"errors"
+	"log"
 	"sync"
 	"time"
 
@@ -78,7 +79,11 @@ func (e *Controller) run() {
 			e.subs[sub.topic] = append(e.subs[sub.topic], sub.resp)
 			if itm := e.cache.Get(sub.topic); itm != nil {
 				//				log.Println("Cache hit", sub.topic, itm.Value())
-				sub.resp <- itm.Value()
+				select {
+				case sub.resp <- itm.Value():
+				default:
+					log.Println("Cache hit but channel full", sub.topic, itm.Value())
+				}
 			}
 		case unsub := <-e.unsub:
 		outer:

@@ -12,15 +12,18 @@ type Test struct {
 	minsize fyne.Size
 	value   float64
 
-	text string
+	text      *widget.Label
+	container *fyne.Container
 }
 
 func NewTest(minSize fyne.Size) *Test {
 	t := &Test{
 		minsize: minSize,
-		text:    "hejsan!",
+		text:    widget.NewLabel("test"),
 	}
 	t.ExtendBaseWidget(t)
+
+	t.container = container.NewWithoutLayout(t.text)
 	return t.render()
 }
 
@@ -30,14 +33,8 @@ func (t *Test) render() *Test {
 }
 
 func (t *Test) CreateRenderer() fyne.WidgetRenderer {
-	text := widget.NewLabel(t.text)
-
-	con := container.NewWithoutLayout(text)
-
 	return &TestRenderer{
-		container: con,
-		text:      text,
-		t:         t,
+		t: t,
 	}
 }
 
@@ -46,13 +43,12 @@ func (t *Test) SetValue(value float64) {
 }
 
 type TestRenderer struct {
-	t         *Test
-	text      *widget.Label
-	container *fyne.Container
+	t *Test
 }
 
 func (tr *TestRenderer) Layout(space fyne.Size) {
-
+	tr.t.container.Resize(space)
+	// do stuff
 }
 
 func (tr *TestRenderer) MinSize() fyne.Size {
@@ -64,7 +60,7 @@ func (tr *TestRenderer) Refresh() {
 }
 
 func (tr *TestRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{tr.container}
+	return []fyne.CanvasObject{tr.t.container}
 }
 
 func (tr *TestRenderer) Destroy() {

@@ -957,7 +957,7 @@ func (t *Client) RequestUpload(ctx context.Context, address, length uint32) erro
 func (t *Client) sendLong(ctx context.Context, data []byte) error {
 	messages := t.splitRequest(data, true)
 	for i, msg := range messages {
-		//log.Println(msg.String())
+		log.Println(msg.String())
 		if i == len(messages)-1 {
 			//if err := t.c.Send(msg); err != nil {
 			//	return err
@@ -967,7 +967,7 @@ func (t *Client) sendLong(ctx context.Context, data []byte) error {
 			if err != nil {
 				return err
 			}
-			//	log.Println(resp.String())
+			log.Println(resp.String())
 			if err := checkErr(resp); err != nil {
 				return err
 			}
@@ -979,7 +979,7 @@ func (t *Client) sendLong(ctx context.Context, data []byte) error {
 			if err := checkErr(resp); err != nil {
 				return err
 			}
-			//	log.Println(resp.String())
+			log.Println(resp.String())
 		}
 	}
 	return nil

@@ -33,8 +33,15 @@ func (mv *MapViewer) MouseMoved(event *desktop.MouseEvent) {
 
 // MouseDown is called when a mouse button is pressed.
 func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
+	if event.Position.Y > mv.xAxisLabelContainer.Size().Height+mv.innerView.Size().Height {
+		return
+	}
 	// Handle focusing and input buffer reset
 	mv.handleFocusAndInputBuffer()
+
+	//if event.Position.Y > mv.innerView.Size().Height {
+	//	return
+	//}
 
 	switch {
 	case event.Button == desktop.MouseButtonPrimary && event.Modifier == 0:
@@ -53,6 +60,7 @@ func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
 
 // MouseUp is called when a mouse button is released.
 func (mv *MapViewer) MouseUp(event *desktop.MouseEvent) {
+
 	if event.Button == desktop.MouseButtonPrimary && mv.selecting {
 		mv.finalizeSelection(event.Position)
 	}
@@ -116,14 +124,14 @@ func (mv *MapViewer) updateSelection(nselectedX, nSelectedY int) {
 // updateCursorPositionAndSize updates the cursor's position and size on the screen.
 func (mv *MapViewer) updateCursorPositionAndSize(topLeftX, topLeftY, width, height float32) {
 	mv.cursor.Resize(fyne.NewSize(width+2, height+1))
-	mv.cursor.Move(fyne.NewPos(topLeftX-1, topLeftY-1))
+	mv.cursor.Move(fyne.NewPos(topLeftX-1, topLeftY))
 }
 
 // handleFocusAndInputBuffer focuses the MapViewer and clears the input buffer if necessary.
 func (mv *MapViewer) handleFocusAndInputBuffer() {
-	if c := fyne.CurrentApp().Driver().CanvasForObject(mv); c != nil {
-		c.Focus(mv)
-	}
+	//if c := fyne.CurrentApp().Driver().CanvasForObject(mv); c != nil {
+	//	c.Focus(mv)
+	//}
 	if mv.inputBuffer.Len() > 0 {
 		mv.inputBuffer.Reset()
 		mv.restoreSelectedValues()
