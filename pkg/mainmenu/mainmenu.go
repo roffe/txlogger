@@ -8,9 +8,9 @@ import (
 )
 
 var T5SymbolsTuningOrder = []string{
-	"Injectors",
-	"Fuel",
-	"Boost",
+	// "Injectors",
+	// "Fuel",
+	// "Boost",
 }
 
 var T5SymbolsTuning = map[string][]string{

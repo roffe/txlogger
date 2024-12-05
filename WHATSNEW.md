@@ -7,8 +7,11 @@
 - Trionic 7 & 8: Added support for offloading read & write by memory address to txbridge
 - When hovering symbols in the legend for the plotter the symbol will be highlighted in the plot
 - Plot series now hilight when mouseover legend in logplayer
-- Hovering labels in the log player plotter will make then bold and make the series drawn line thicker
+- Hovering labels in the log player plotter will make them bold and make the series drawn line thicker
 - Hovered label wil also be shown in large text to the left on the plotter
+- A ton of performance optimizations
+- Reworked most widgets in the dashboard so they can scale a lot smaller
+- Made logplayer plotter resizable even on low resolution monitors
 
 # 1.0.18
 
