@@ -190,7 +190,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 
 	mv.textValues = createTextValues(mv.zData, mv.zCorrFac, mv.zCorrOffset)
 
-	minSize := fyne.NewSize(float32(mv.numColumns*40), float32(mv.numRows*13))
+	minSize := fyne.NewSize(float32(mv.numColumns*40), float32(mv.numRows*14))
 
 	mv.innerView = container.New(&mapLayout{mv: mv, minSize: minSize})
 
@@ -336,15 +336,6 @@ func (mv *MapViewer) Info() MapViewerInfo {
 }
 
 func (mv *MapViewer) SetValue(name string, value float64) {
-	//defer func() {
-	//	if r := recover(); r != nil {
-	//		log.Println(r)
-	//	}
-	//}()
-	if name == mv.lambdaName {
-		mv.lamb.SetValue(value)
-		return
-	}
 	var hit bool
 	if name == mv.xFrom {
 		if name == "IgnProt.fi_Offset" {
@@ -366,6 +357,10 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 	}
 	if hit {
 		mv.setXY(mv.xValue, mv.yValue)
+	}
+
+	if name == mv.lambdaName {
+		mv.lamb.SetValue(value)
 	}
 }
 
@@ -420,18 +415,22 @@ func (mv *MapViewer) resizeCursor() {
 			width := float32(maxX-minX+1) * mv.widthFactor
 			height := float32(maxY-minY+1) * mv.heightFactor
 			mv.cursor.Resize(fyne.NewSize(width+1, height+1))
-			mv.cursor.Move(fyne.NewPos(topLeftX-1, topLeftY-1))
+			mv.cursor.Move(fyne.NewPos(topLeftX-1, topLeftY))
 
 		} else {
 			mv.cursor.Resize(fyne.NewSize(mv.widthFactor+1, mv.heightFactor+1))
 			mv.cursor.Move(
 				fyne.NewPos(
 					(float32(mv.selectedX)*mv.widthFactor)-1,
-					(float32(mv.numRows-1-mv.SelectedY)*mv.heightFactor)-1,
+					(float32(mv.numRows-1-mv.SelectedY) * mv.heightFactor),
 				),
 			)
 		}
 	}
+}
+
+func (mv *MapViewer) Size() fyne.Size {
+	return mv.content.Size()
 }
 
 func (mv *MapViewer) Refresh() {
@@ -459,6 +458,10 @@ func (mv *MapViewer) Refresh() {
 		}
 		mv.mesh.LoadFloat64s(values)
 	}
+}
+
+func (mv *MapViewer) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(mv.content)
 }
 
 func getPrecission(corrFac float64) int {

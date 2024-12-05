@@ -45,6 +45,7 @@ type Dial struct {
 	displayText *canvas.Text
 	titleText   *canvas.Text
 
+	size    fyne.Size
 	minsize fyne.Size
 
 	container *fyne.Container
@@ -163,25 +164,18 @@ func (c *Dial) SetValue(value float64) {
 	*/
 }
 
-func (c *Dial) CreateRenderer() fyne.WidgetRenderer {
-	return &DialRenderer{
-		d: c,
-	}
+func (c *Dial) Size() fyne.Size {
+	return c.cover.Size()
 }
 
-type DialRenderer struct {
-	d    *Dial
-	size fyne.Size
-}
-
-func (dr *DialRenderer) Layout(space fyne.Size) {
-	if dr.size.Width == space.Width && dr.size.Height == space.Height {
+func (c *Dial) Resize(space fyne.Size) {
+	if c.size == space {
 		return
 	}
-	dr.size = space
+	c.size = space
 	//log.Println("dial.Layout", dr.d.title, space.Width, space.Height)
 	//dr.d.container.Resize(space)
-	c := dr.d
+
 	c.diameter = fyne.Min(space.Width, space.Height)
 	c.radius = c.diameter * common.OneHalf
 	c.middle = fyne.NewPos(space.Width*common.OneHalf, space.Height*common.OneHalf)
@@ -241,16 +235,6 @@ func (dr *DialRenderer) Layout(space fyne.Size) {
 	//c.rotateNeedle(c.highestObservedMarker, c.highestObserved, c.radius, c.eightRadius*0.5)
 }
 
-func (dr *DialRenderer) MinSize() fyne.Size {
-	return dr.d.minsize
-}
-
-func (dr *DialRenderer) Refresh() {
-}
-
-func (dr *DialRenderer) Destroy() {
-}
-
-func (dr *DialRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{dr.d.container}
+func (c *Dial) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(c.container)
 }

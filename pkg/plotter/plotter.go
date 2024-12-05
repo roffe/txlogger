@@ -49,7 +49,7 @@ type Plotter struct {
 
 	textBuffer []byte
 
-	r *plotterRenderer
+	size fyne.Size
 
 	mu sync.Mutex
 
@@ -81,10 +81,10 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		ts:                   make([]*TimeSeries, len(values)),
 		plotResolutionFactor: 1.0,
 	}
+	p.ExtendBaseWidget(p)
 
 	p.canvasImage.FillMode = canvas.ImageFillStretch
 	p.canvasImage.ScaleMode = canvas.ImageScaleFastest
-	//p.canvasImage.Translucency = 0.2
 
 	p.zoom.Orientation = widget.Vertical
 	p.zoom.Value = 10
@@ -93,8 +93,6 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 	for _, opt := range opts {
 		opt(p)
 	}
-
-	p.ExtendBaseWidget(p)
 
 	if len(p.valueOrder) == 0 {
 		for k := range values {
@@ -260,9 +258,24 @@ func (p *Plotter) RefreshImage() {
 	p.canvasImage.Refresh()
 }
 
+func (p *Plotter) Size() fyne.Size {
+	return p.container.Size()
+}
+
+func (p *Plotter) Resize(size fyne.Size) {
+	if p.size == size {
+		return
+	}
+	p.size = size
+	// Resize the container first
+	p.container.Resize(size)
+}
+
 func (p *Plotter) CreateRenderer() fyne.WidgetRenderer {
-	p.r = &plotterRenderer{p: p}
-	return p.r
+	return widget.NewSimpleRenderer(p.canvas)
+	//p.r = &plotterRenderer{p: p}
+	//return p.r
+
 }
 
 type TimeSeries struct {
@@ -305,7 +318,6 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 func (ts *TimeSeries) PlotImage(img *image.RGBA, values map[string][]float64, start, numPoints, thickness int) {
 	dl := len(values[ts.Name]) - 1
 	startN, endN := min(max(start, 0), dl), min(start+numPoints, dl)
-
 	s := img.Bounds().Size()
 	w := s.X
 	h := s.Y
@@ -345,4 +357,44 @@ func findMinMaxFloat64(data []float64) (float64, float64) {
 		}
 	}
 	return min, max
+}
+
+// Updated cursor positioning method
+func (p *Plotter) updateCursor() {
+	var x float32
+	halfDataPointsToShow := int(float64(p.dataPointsToShow) * .5)
+	plotSize := p.canvasImage.Size()
+
+	if p.cursorPos >= p.dataLength-halfDataPointsToShow {
+		// Handle cursor position near the end of data
+		x = float32(p.dataLength-p.cursorPos) * p.widthFactor
+		x = plotSize.Width - x
+	} else {
+		// Calculate x position based on current view
+		x = float32(p.cursorPos-max(p.plotStartPos, 0)) * p.widthFactor
+	}
+
+	// Account for zoom slider width and ensure cursor stays within plot bounds
+	xOffset := p.zoom.Size().Width + x
+	xOffset = min32(xOffset, plotSize.Width+p.zoom.Size().Width)
+	xOffset = max32(xOffset, p.zoom.Size().Width)
+
+	p.cursor.Position1 = fyne.NewPos(xOffset, 0)
+	p.cursor.Position2 = fyne.NewPos(xOffset+1, plotSize.Height)
+	p.cursor.Refresh()
+}
+
+// Helper functions
+func min32(a, b float32) float32 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max32(a, b float32) float32 {
+	if a > b {
+		return a
+	}
+	return b
 }

@@ -1,11 +1,10 @@
 package widgets
 
 import (
-	"image/color"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -29,15 +28,19 @@ func NewGrid(cols, rows int) *Grid {
 
 	g.content = container.NewWithoutLayout()
 	totalLines := cols + rows
-	g.lines = make([]*canvas.Line, totalLines)
 
+	g.lines = make([]*canvas.Line, totalLines)
 	for i := 0; i < totalLines; i++ {
-		g.lines[i] = canvas.NewLine(color.Black)
-		g.lines[i].StrokeWidth = 1
+		g.lines[i] = canvas.NewLine(theme.Color(theme.ColorNameBackground))
+		g.lines[i].StrokeWidth = 2
 		g.content.Add(g.lines[i])
 	}
 
 	return g
+}
+
+func (g *Grid) Size() fyne.Size {
+	return g.content.Size()
 }
 
 func (g *Grid) Resize(size fyne.Size) {
@@ -49,6 +52,7 @@ func (g *Grid) Resize(size fyne.Size) {
 	cellWidth := size.Width / float32(g.cols)
 	cellHeight := size.Height / float32(g.rows)
 
+	// update vertical lines
 	for i := 0; i < g.cols; i++ {
 		l := g.lines[i]
 		x := float32(i) * cellWidth
@@ -57,6 +61,7 @@ func (g *Grid) Resize(size fyne.Size) {
 		l.Refresh()
 	}
 
+	// update horizontal lines
 	offset := g.cols
 	for i := 0; i < g.rows; i++ {
 		l := g.lines[offset+i]

@@ -295,11 +295,12 @@ func (m *Meshgrid) Refresh() {
 }
 
 func (m *Meshgrid) Layout(size fyne.Size) {
+	if size == m.size {
+		return
+	}
 	m.size = size
-	//m.size.Width = size.Width
 	m.container.Resize(size)
 	m.Refresh()
-	//m.image.Resize(size)
 }
 
 func (m *Meshgrid) CreateRenderer() fyne.WidgetRenderer {
@@ -328,6 +329,7 @@ func (m *meshgridRenderer) Destroy() {
 func (m *meshgridRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{m.meshgrid.container}
 }
+
 func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 	img := image.NewRGBA(image.Rect(0, 0, int(m.size.Width), int(m.size.Height)))
 

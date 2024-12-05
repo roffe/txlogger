@@ -180,9 +180,9 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 
 		mw.dashboard = dashboard.NewDashboard(dbcfg)
 
-		for _, s := range mw.symbolList.Symbols() {
-			mw.dashboard.SetValue(s.Name, s.Float64())
-		}
+		//for _, s := range mw.symbolList.Symbols() {
+		//	mw.dashboard.SetValue(s.Name, s.Float64())
+		//}
 
 		mw.SetCloseIntercept(func() {
 			onClose()

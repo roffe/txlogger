@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"image/color"
 	"log"
-	"strconv"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -20,9 +19,11 @@ import (
 const rpmIDCconstant = 1.0 / 1200.0
 
 type Dashboard struct {
-	cfg          *Config
+	cfg *Config
+
 	metricRouter map[string]func(float64)
-	container    *fyne.Container
+
+	container *fyne.Container
 
 	text   Texts
 	gauges Gauges
@@ -38,7 +39,6 @@ type Dashboard struct {
 	//dbgBar *fyne.Container
 
 	logplayer bool
-	focused   bool
 
 	timeBuffer []byte
 
@@ -160,7 +160,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				Steps:           20,
 				Minsize:         fyne.NewSize(50, 35),
 				DisplayString:   "λ %.3f",
-				DisplayTextSize: 18,
+				DisplayTextSize: 20,
 				TextPosition:    widgets.TextAtTop,
 			}),
 			nblambda: widgets.NewCBar(&widgets.CBarConfig{
@@ -171,7 +171,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				Steps:           40,
 				Minsize:         fyne.NewSize(50, 35),
 				DisplayString:   "%.2f%%",
-				DisplayTextSize: 18,
+				DisplayTextSize: 20,
 				TextPosition:    widgets.TextAtBottom,
 			}),
 		},
@@ -301,16 +301,6 @@ func (db *Dashboard) GetMetricNames() []string {
 	return names
 }
 
-func (db *Dashboard) FocusGained() {
-	db.focused = true
-}
-func (db *Dashboard) FocusLost() {
-	db.focused = false
-}
-func (db *Dashboard) Focused() bool {
-	return db.focused
-}
-
 func (db *Dashboard) Close() {
 }
 
@@ -322,13 +312,6 @@ func (db *Dashboard) SetTime(t time.Time) {
 		db.text.time.Refresh()
 	}
 }
-
-// func (db *Dashboard) SetTimeText(text string) {
-// 	if db.text.time != nil {
-// 		db.text.time.Text = text
-// 		db.text.time.Refresh()
-// 	}
-// }
 
 func (db *Dashboard) SetValue(key string, value float64) {
 	if setFunc, ok := db.metricRouter[key]; ok {
@@ -377,6 +360,7 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		rpm = value
 		db.gauges.rpm.SetValue(value)
 	}
+
 	idcSetterT5 := func(obj *canvas.Text, text string) func(float64) {
 		idcc := idcSetter(obj, text)
 		return func(value float64) {
@@ -387,48 +371,6 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 	ioff := ioffSetter(db.text.ioff)
 
 	activeAirDem := activeAirDemSetter(db.text.activeAirDem, db.cfg.AirDemToString)
-
-	//activeAirDem := func(value float64) {
-	//	db.text.activeAirDem.Text = db.cfg.AirDemToString(value) + " (" + strconv.FormatFloat(value, 'f', 0, 64) + ")"
-	//	db.text.activeAirDem.Refresh()
-	//}
-
-	showHider := func(obj fyne.CanvasObject) func(float64) {
-		var oldValue float64
-		return func(value float64) {
-			if value == oldValue {
-				return
-			}
-			if value == 1 {
-				obj.Show()
-			} else {
-				obj.Hide()
-			}
-		}
-	}
-
-	knkDet := func(value float64) {
-		if value > 0 {
-			kn := int(value)
-			knockValue := 0
-			if kn&1<<24 == 1<<24 {
-				knockValue += 1000
-			}
-			if kn&1<<16 == 1<<16 {
-				knockValue += 200
-			}
-			if kn&1<<8 == 1<<8 {
-				knockValue += 30
-			}
-			if kn&1 == 1 {
-				knockValue += 4
-			}
-			db.knockIcon.SetText(strconv.Itoa(knockValue))
-			db.knockIcon.Show()
-		} else {
-			db.knockIcon.Hide()
-		}
-	}
 
 	setVehicleSpeed := db.gauges.speed.SetValue
 	if db.cfg.UseMPH {
@@ -510,8 +452,8 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		"CEL":    showHider(db.checkEngine),
 		"LIMP":   showHider(db.limpMode),
 
-		"Knock_offset1234": knkDet,
-		"KnkDet.KnockCyl":  knkDet,
+		"Knock_offset1234": knkDetSetter(db.knockIcon),
+		"KnkDet.KnockCyl":  knkDetSetter(db.knockIcon),
 
 		"Myrtilos.InjectorDutyCycle": idcSetter(db.text.idc, "Idc"),   // t7
 		"Insptid_ms10":               idcSetterT5(db.text.idc, "Idc"), // t5
@@ -544,94 +486,6 @@ func (db *Dashboard) Sweep() {
 	an.Start()
 	time.Sleep(1800 * time.Millisecond)
 	db.checkEngine.Show()
-}
-
-func (db *Dashboard) setValue(value float64) {
-	db.gauges.speed.SetValue(value)
-	db.gauges.rpm.SetValue(value)
-	db.gauges.iat.SetValue(value)
-	db.gauges.engineTemp.SetValue(value)
-	db.gauges.pressure.SetValue(value)
-	db.gauges.throttle.SetValue(value)
-	db.gauges.pwm.SetValue(value)
-	db.gauges.nblambda.SetValue(value)
-	db.gauges.wblambda.SetValue(value)
-	db.gauges.airmass.SetValue(value)
-	db.gauges.airmass.SetValue2(value)
-}
-
-func (db *Dashboard) NewDebugBar() *fyne.Container {
-	var mockValue float64 = 0
-	return container.NewGridWithColumns(13,
-		widget.NewButton("-100", func() {
-			mockValue -= 100
-			db.setValue(mockValue)
-
-		}),
-		widget.NewButton("-10", func() {
-			mockValue -= 10
-			db.setValue(mockValue)
-
-		}),
-		widget.NewButton("-1", func() {
-			mockValue -= 1
-			db.setValue(mockValue)
-
-		}),
-		widget.NewButton("-0.1", func() {
-			mockValue -= 0.1
-			db.setValue(mockValue)
-
-		}),
-		widget.NewButton("-0.01", func() {
-			mockValue -= 0.01
-			db.setValue(mockValue)
-
-		}),
-		widget.NewButton("CEL", func() {
-			if !db.checkEngine.Visible() {
-				db.checkEngine.Show()
-			} else {
-				db.checkEngine.Hide()
-			}
-		}),
-		widget.NewButton("Sweep", func() {
-			db.Sweep()
-		}),
-		widget.NewButton("Mock", func() {
-			db.gauges.speed.SetValue(110)
-			db.gauges.rpm.SetValue(3320)
-			db.gauges.iat.SetValue(30)
-			db.gauges.engineTemp.SetValue(85)
-			db.gauges.pressure.SetValue(1.2)
-			db.gauges.throttle.SetValue(85)
-			db.gauges.pwm.SetValue(47)
-			db.gauges.nblambda.SetValue(2.13)
-			db.gauges.wblambda.SetValue(1.03)
-			db.gauges.airmass.SetValue(1003)
-			db.gauges.airmass.SetValue2(1200)
-		}),
-		widget.NewButton("+0.01", func() {
-			mockValue += 0.01
-			db.setValue(mockValue)
-		}),
-		widget.NewButton("+0.1", func() {
-			mockValue += 0.1
-			db.setValue(mockValue)
-		}),
-		widget.NewButton("+1", func() {
-			mockValue += 1
-			db.setValue(mockValue)
-		}),
-		widget.NewButton("+10", func() {
-			mockValue += 10
-			db.setValue(mockValue)
-		}),
-		widget.NewButton("+100", func() {
-			mockValue += 100
-			db.setValue(mockValue)
-		}),
-	)
 }
 
 /*
@@ -694,11 +548,6 @@ func (db *Dashboard) CreateRenderer() fyne.WidgetRenderer {
 	}
 }
 
-type DashboardRenderer struct {
-	db   *Dashboard
-	size fyne.Size
-}
-
 type dims struct {
 	sixthWidth    float32
 	thirdHeight   float32
@@ -711,55 +560,9 @@ type dims struct {
 	smallTextSize float32
 }
 
-func (dr *DashboardRenderer) Layout(space fyne.Size) {
-	// Skip if size hasn't changed
-	if dr.size.Width == space.Width && dr.size.Height == space.Height {
-		return
-	}
-	dr.size = space
-	dr.db.container.Resize(space)
-
-	// Calculate common dimensions
-	dims := &dims{
-		sixthWidth:  space.Width * common.OneSixth,
-		thirdHeight: (space.Height - 50) * .33,
-		tenthHeight: (space.Height - 50) * .1,
-		halfHeight:  (space.Height - 50) * .5,
-		centerX:     space.Width * 0.5,
-		centerY:     space.Height * 0.5,
-		bottomY:     space.Height - 55,
-
-		//textSize: max(min(space.Height, space.Width)*0.07, 20),
-	}
-
-	// Layout main dials
-	layoutMainDials(dr.db, space, dims)
-
-	// Layout side dials
-	layoutSideDials(dr.db, space, dims)
-
-	// Layout vertical bars
-	layoutVerticalBars(dr.db, space, dims)
-
-	// Layout horizontal bars
-	layoutHorizontalBars(dr.db, space, dims)
-
-	// Layout icons
-	layoutIcons(dr.db, space, dims)
-
-	// Layout buttons
-	layoutButtons(dr.db, space, dims)
-
-	dims.textSize = dr.db.gauges.nblambda.Size().Height
-	dims.smallTextSize = dims.textSize * 0.5
-
-	// Layout text elements
-	layoutTexts(dr.db, space, dims)
-}
-
 func layoutMainDials(db *Dashboard, space fyne.Size, dims *dims) {
 	centerDialSize := fyne.NewSize(
-		space.Width-dims.sixthWidth*2-(dims.sixthWidth*common.OneThird*2)-20,
+		space.Width,
 		space.Height-125,
 	)
 	centerDialPos := fyne.NewPos(
@@ -901,7 +704,7 @@ func layoutTexts(db *Dashboard, space fyne.Size, dims *dims) {
 	))
 
 	// Active air demand text
-	db.text.activeAirDem.TextSize = dims.smallTextSize
+	db.text.activeAirDem.TextSize = dims.textSize
 	db.text.activeAirDem.Move(fyne.NewPos(dims.centerX, dims.thirdHeight))
 
 	// Cruise text
@@ -912,8 +715,62 @@ func layoutTexts(db *Dashboard, space fyne.Size, dims *dims) {
 
 	if db.logplayer {
 		db.text.time.TextSize = dims.smallTextSize
-		db.text.time.Move(fyne.NewPos(dims.centerX-(db.text.time.MinSize().Width*0.5), space.Height*common.OneHalfSix))
+		db.text.time.Move(
+			fyne.NewPos(
+				dims.centerX-(db.text.time.MinSize().Width*0.5),
+				space.Height*common.OneHalfSix,
+			),
+		)
 	}
+}
+
+type DashboardRenderer struct {
+	db   *Dashboard
+	size fyne.Size
+}
+
+func (dr *DashboardRenderer) Layout(space fyne.Size) {
+	if dr.size == space {
+		return
+	}
+	dr.size = space
+	dr.db.container.Resize(space)
+
+	// Calculate common dimensions
+	dims := &dims{
+		sixthWidth:  space.Width * common.OneSixth,
+		thirdHeight: (space.Height - 50) * .33,
+		tenthHeight: (space.Height - 50) * .1,
+		halfHeight:  (space.Height - 50) * .5,
+		centerX:     space.Width * 0.5,
+		centerY:     space.Height * 0.5,
+		bottomY:     space.Height - 55,
+
+		//textSize: max(min(space.Height, space.Width)*0.07, 20),
+	}
+	// Layout horizontal bars
+	layoutHorizontalBars(dr.db, space, dims)
+
+	// Layout main dials
+	layoutMainDials(dr.db, space, dims)
+
+	// Layout side dials
+	layoutSideDials(dr.db, space, dims)
+
+	// Layout vertical bars
+	layoutVerticalBars(dr.db, space, dims)
+
+	// Layout icons
+	layoutIcons(dr.db, space, dims)
+
+	// Layout buttons
+	layoutButtons(dr.db, space, dims)
+
+	dims.textSize = dr.db.gauges.nblambda.Size().Height
+	dims.smallTextSize = dims.textSize * 0.5
+
+	// Layout text elements
+	layoutTexts(dr.db, space, dims)
 }
 
 func (dr *DashboardRenderer) MinSize() fyne.Size {

@@ -35,13 +35,13 @@ func (g *Grid) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 				// Center the object within its grid cell if it's text
 				obj.Move(fyne.NewPos(
 					xPosition+(cellWidth*.5)-(obj.MinSize().Width*.5),
-					yPosition,
+					yPosition+(cellHeight*.5)-(obj.MinSize().Height*.5),
 				))
 			} else {
 				// Position the object at the top-left corner of its grid cell, adjusted for inverted y-axis
 				obj.Move(fyne.NewPos(xPosition, yPosition))
+				obj.Resize(fyne.NewSize(cellWidth, cellHeight))
 			}
-			obj.Resize(fyne.NewSize(cellWidth, cellHeight))
 		}
 	}
 }

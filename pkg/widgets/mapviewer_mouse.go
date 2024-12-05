@@ -124,7 +124,7 @@ func (mv *MapViewer) updateSelection(nselectedX, nSelectedY int) {
 // updateCursorPositionAndSize updates the cursor's position and size on the screen.
 func (mv *MapViewer) updateCursorPositionAndSize(topLeftX, topLeftY, width, height float32) {
 	mv.cursor.Resize(fyne.NewSize(width+2, height+1))
-	mv.cursor.Move(fyne.NewPos(topLeftX-1, topLeftY-1))
+	mv.cursor.Move(fyne.NewPos(topLeftX-1, topLeftY))
 }
 
 // handleFocusAndInputBuffer focuses the MapViewer and clears the input buffer if necessary.
