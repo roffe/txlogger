@@ -3,8 +3,9 @@ package datalogger
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
+	"errors"
 	"fmt"
-	"log"
 	"math"
 	"sync"
 	"time"
@@ -12,13 +13,14 @@ import (
 	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/adapter"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/t5can"
 )
 
 type T5Client struct {
 	symbolChan chan []*symbol.Symbol
-	updateChan chan *RamUpdate
+	updateChan chan *WriteRequest
 	readChan   chan *ReadRequest
 
 	quitChan chan struct{}
@@ -40,7 +42,7 @@ func NewT5(cfg Config, lw LogWriter) (IClient, error) {
 		Config:     cfg,
 		lw:         lw,
 		symbolChan: make(chan []*symbol.Symbol, 1),
-		updateChan: make(chan *RamUpdate, 1),
+		updateChan: make(chan *WriteRequest, 1),
 		readChan:   make(chan *ReadRequest, 1),
 		quitChan:   make(chan struct{}),
 	}, nil
@@ -104,7 +106,7 @@ func (c *T5Client) Start() error {
 	sysvars := NewThreadSafeMap()
 	order := make([]string, len(c.Symbols))
 	for n, s := range c.Symbols {
-		log.Println(s.String())
+		//		log.Println(s.String())
 		order[n] = s.Name
 		s.Correctionfactor = 0.1
 	}
@@ -126,7 +128,50 @@ func (c *T5Client) Start() error {
 		order = append(order, EXTERNALWBLSYM)
 	}
 
+	var expectedPayloadSize uint16
+	if txbridge {
+		if err := cl.SendFrame(adapter.SystemMsg, []byte("5"), gocan.Outgoing); err != nil {
+			return err
+		}
+
+		var symbollist []byte
+		for _, sym := range c.Symbols {
+			symbollist = binary.LittleEndian.AppendUint32(symbollist, sym.SramOffset)
+			symbollist = binary.LittleEndian.AppendUint16(symbollist, sym.Length)
+			expectedPayloadSize += sym.Length
+
+			// deletelog.Printf("Symbol: %s, offset: %X, length: %d\n", sym.Name, sym.SramOffset, sym.Length)
+		}
+		cmd := &gocan.SerialCommand{
+			Command: 'd',
+			Data:    symbollist,
+		}
+		payload, err := cmd.MarshalBinary()
+		if err != nil {
+			return err
+		}
+		if err := cl.SendFrame(adapter.SystemMsg, payload, gocan.Outgoing); err != nil {
+			return err
+		}
+		c.OnMessage("Symbol list configured")
+	}
+
 	err = retry.Do(func() error {
+		tx := cl.Subscribe(ctx, adapter.SystemMsgDataResponse, adapter.SystemMsgError)
+		defer tx.Close()
+
+		if txbridge {
+			t.Stop()
+			if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
+				return err
+			}
+		}
+
+		var firstTime time.Time
+		var firstTimestamp uint32
+		var databuff []byte
+		var currtimestamp uint32
+
 		for {
 			select {
 			case <-c.quitChan:
@@ -143,9 +188,9 @@ func (c *T5Client) Start() error {
 			case symbols := <-c.symbolChan:
 				_ = symbols
 			case read := <-c.readChan:
-				_ = read
+				read.Complete(fmt.Errorf("not implemented"))
 			case upd := <-c.updateChan:
-				_ = upd
+				upd.Complete(fmt.Errorf("not implemented"))
 			case <-t.C:
 				ts := time.Now()
 				for _, sym := range c.Symbols {
@@ -175,6 +220,65 @@ func (c *T5Client) Start() error {
 				if err := c.lw.Write(sysvars, []*symbol.Symbol{}, ts, order); err != nil {
 					return err
 				}
+				count++
+				cps++
+				if count%15 == 0 {
+					c.CaptureCounter.Set(count)
+				}
+			case msg := <-tx.C():
+				if msg == nil {
+					return retry.Unrecoverable(errors.New("nil message received"))
+				}
+				if msg.Identifier() == adapter.SystemMsgError {
+					data := msg.Data()
+					switch data[0] {
+					case 0x31:
+						c.onError(fmt.Errorf("read timeout"))
+					case 0x06:
+						c.onError(fmt.Errorf("invalid sequence"))
+					}
+					continue
+				}
+
+				databuff = msg.Data()
+				if len(databuff) != int(expectedPayloadSize+4) {
+					c.onError(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize+4, len(databuff)))
+					continue
+				}
+
+				r := bytes.NewReader(databuff)
+				binary.Read(r, binary.LittleEndian, &currtimestamp)
+
+				if firstTime.IsZero() {
+					firstTime = time.Now()
+					firstTimestamp = currtimestamp
+				}
+
+				timeStamp := calculateCompensatedTimestamp(firstTime, firstTimestamp, currtimestamp)
+
+				for _, sym := range c.Symbols {
+					if err := sym.Read(r); err != nil {
+						return err
+					}
+					val := c.converto(sym.Name, sym.Bytes())
+					sysvars.Set(sym.Name, val)
+					if err := ebus.Publish(sym.Name, val); err != nil {
+						c.onError(err)
+					}
+				}
+
+				if c.lamb != nil {
+					lambda := c.lamb.GetLambda()
+					sysvars.Set(EXTERNALWBLSYM, lambda)
+					if err := ebus.Publish(EXTERNALWBLSYM, lambda); err != nil {
+						c.onError(err)
+					}
+				}
+
+				if err := c.lw.Write(sysvars, []*symbol.Symbol{}, timeStamp, order); err != nil {
+					return err
+				}
+
 				count++
 				cps++
 				if count%15 == 0 {
@@ -235,8 +339,7 @@ func (c *T5Client) converto(name string, data []byte) float64 {
 	case "Pgm_status":
 		// now what, just pass it on in a seperate structure
 		// fix
-		// retval = ConvertByteStringToDoubleStatus(data)
-		return 0
+		return ConvertByteStringToDoubleStatus(data)
 	case "Insptid_ms10":
 		// return value using multiplication instead of division
 		return ConvertByteStringToDouble(data) * 0.1
@@ -322,5 +425,49 @@ func ConvertByteStringToDoubleStatus(ecudata []byte) float64 {
 		// Multiply the current byte by the appropriate power of 256 and add it to the result
 		retval += float64(ecudata[i]) * math.Pow(256, float64(i))
 	}
+	return retval
+}
+
+func ConvertByteStringToDoubleStatus2(ecudata []byte) float64 {
+	var retval float64 = 0
+
+	switch len(ecudata) {
+	case 4:
+		retval = float64(ecudata[3]) * 256 * 256 * 256
+		retval += float64(ecudata[2]) * 256 * 256
+		retval += float64(ecudata[1]) * 256
+		retval += float64(ecudata[0])
+	case 5:
+		retval = float64(ecudata[4]) * 256 * 256 * 256 * 256
+		retval += float64(ecudata[3]) * 256 * 256 * 256
+		retval += float64(ecudata[2]) * 256 * 256
+		retval += float64(ecudata[1]) * 256
+		retval += float64(ecudata[0])
+	case 6:
+		retval = float64(ecudata[5]) * 256 * 256 * 256 * 256 * 256
+		retval += float64(ecudata[4]) * 256 * 256 * 256 * 256
+		retval += float64(ecudata[3]) * 256 * 256 * 256
+		retval += float64(ecudata[2]) * 256 * 256
+		retval += float64(ecudata[1]) * 256
+		retval += float64(ecudata[0])
+	case 7:
+		retval = float64(ecudata[6]) * 256 * 256 * 256 * 256 * 256 * 256
+		retval += float64(ecudata[5]) * 256 * 256 * 256 * 256 * 256
+		retval += float64(ecudata[4]) * 256 * 256 * 256 * 256
+		retval += float64(ecudata[3]) * 256 * 256 * 256
+		retval += float64(ecudata[2]) * 256 * 256
+		retval += float64(ecudata[1]) * 256
+		retval += float64(ecudata[0])
+	case 8:
+		retval = float64(ecudata[7]) * 256 * 256 * 256 * 256 * 256 * 256 * 256
+		retval += float64(ecudata[6]) * 256 * 256 * 256 * 256 * 256 * 256
+		retval += float64(ecudata[5]) * 256 * 256 * 256 * 256 * 256
+		retval += float64(ecudata[4]) * 256 * 256 * 256 * 256
+		retval += float64(ecudata[3]) * 256 * 256 * 256
+		retval += float64(ecudata[2]) * 256 * 256
+		retval += float64(ecudata[1]) * 256
+		retval += float64(ecudata[0])
+	}
+
 	return retval
 }

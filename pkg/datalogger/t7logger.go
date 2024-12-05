@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"log"
 	"sort"
@@ -20,7 +21,7 @@ import (
 
 type T7Client struct {
 	symbolChan chan []*symbol.Symbol
-	updateChan chan *RamUpdate
+	updateChan chan *WriteRequest
 	readChan   chan *ReadRequest
 
 	quitChan chan struct{}
@@ -42,7 +43,7 @@ func NewT7(cfg Config, lw LogWriter) (IClient, error) {
 	return &T7Client{
 		Config:     cfg,
 		symbolChan: make(chan []*symbol.Symbol, 1),
-		updateChan: make(chan *RamUpdate, 1),
+		updateChan: make(chan *WriteRequest, 1),
 		readChan:   make(chan *ReadRequest, 1),
 		quitChan:   make(chan struct{}),
 		sysvars:    NewThreadSafeMap(),
@@ -88,7 +89,6 @@ func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client)
 		<-c.quitChan
 		sub.Close()
 	}()
-
 	for msg := range sub.C() {
 		switch msg.Identifier() {
 		case 0x1A0:
@@ -290,6 +290,7 @@ func (c *T7Client) Start() error {
 		var firstTime time.Time
 		var firstTimestamp uint32
 		var databuff []byte
+		var currtimestamp uint32
 		for {
 			select {
 			case <-c.quitChan:
@@ -329,48 +330,100 @@ func (c *T7Client) Start() error {
 				}
 			case read := <-c.readChan:
 				if txbridge {
-					if err := cl.SendFrame(adapter.SystemMsg, []byte("s"), gocan.Outgoing); err != nil {
+					toRead := min(235, read.Length)
+					read.Length -= toRead
+					cmd := gocan.SerialCommand{
+						Command: 'R',
+						Data: []byte{
+							byte(read.Address),
+							byte(read.Address >> 8),
+							byte(read.Address >> 16),
+							byte(read.Address >> 24),
+							byte(toRead),
+						},
+					}
+					read.Address += uint32(toRead)
+					payload, err := cmd.MarshalBinary()
+					if err != nil {
 						c.onError(err)
 						continue
 					}
-					time.Sleep(45 * time.Millisecond)
+					frame := gocan.NewFrame(adapter.SystemMsg, payload, gocan.Outgoing)
+					resp, err := cl.SendAndPoll(ctx, frame, 3*time.Second, adapter.SystemMsgDataRequest)
+					if err != nil {
+						read.Complete(err)
+						continue
+					}
+					read.Data = append(read.Data, resp.Data()...)
+					if read.Length > 0 {
+						c.readChan <- read
+					} else {
+						read.Complete(nil)
+					}
+					continue
 				}
-				// log.Printf("Reading %X %d", read.Address, read.Length)
+
 				data, err := kwp.ReadMemoryByAddress(ctx, int(read.Address), int(read.Length))
 				if err != nil {
 					read.Complete(err)
 					if txbridge {
 						if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
 							c.onError(err)
-							continue
 						}
 					}
 					continue
 				}
 				read.Data = data
-				if txbridge {
-					if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
-						c.onError(err)
-						continue
-					}
-					time.Sleep(20 * time.Millisecond)
-				}
 				read.Complete(nil)
-			case upd := <-c.updateChan:
+			case write := <-c.updateChan:
 				if txbridge {
-					if err := cl.SendFrame(adapter.SystemMsg, []byte("s"), gocan.Outgoing); err != nil {
-						c.onError(err)
+					toRead := min(235, write.Length)
+					cmd := gocan.SerialCommand{
+						Command: 'W',
+						Data: []byte{
+							byte(write.Address),
+							byte(write.Address >> 8),
+							byte(write.Address >> 16),
+							byte(write.Address >> 24),
+							byte(toRead),
+						},
+					}
+					cmd.Data = append(cmd.Data, write.Data[:toRead]...)
+
+					write.Data = write.Data[toRead:] // remove the data we just sent
+					write.Address += uint32(toRead)
+					write.Length -= toRead
+
+					payload, err := cmd.MarshalBinary()
+					if err != nil {
+						write.Complete(err)
 						continue
 					}
-					time.Sleep(42 * time.Millisecond)
-				}
-				upd.Complete(kwp.WriteDataByAddress(ctx, upd.Address, upd.Data))
-				if txbridge {
-					if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
-						c.onError(err)
+
+					frame := gocan.NewFrame(adapter.SystemMsg, payload, gocan.Outgoing)
+
+					resp, err := cl.SendAndPoll(ctx, frame, 1*time.Second, adapter.SystemMsgWriteResponse, adapter.SystemMsgError)
+					if err != nil {
+						write.Complete(err)
 						continue
 					}
+
+					if resp.Identifier() == adapter.SystemMsgError {
+						write.Complete(fmt.Errorf("error response"))
+						continue
+					}
+
+					if write.Length > 0 {
+						c.updateChan <- write
+						continue
+					}
+
+					write.Complete(nil)
+					continue
 				}
+
+				write.Complete(kwp.WriteDataByAddress(ctx, write.Address, write.Data))
+
 			case <-t.C:
 				timeStamp = time.Now()
 				if len(c.Symbols) == 0 {
@@ -434,6 +487,9 @@ func (c *T7Client) Start() error {
 					c.CaptureCounter.Set(count)
 				}
 			case msg := <-tx.C():
+				if msg == nil {
+					return retry.Unrecoverable(errors.New("nil message received"))
+				}
 				if msg.Identifier() == adapter.SystemMsgError {
 					data := msg.Data()
 					switch data[0] {
@@ -448,13 +504,14 @@ func (c *T7Client) Start() error {
 				databuff = msg.Data()
 				if len(databuff) != int(expectedPayloadSize+4) {
 					c.onError(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize+4, len(databuff)))
+					log.Printf("unexpected data %X", databuff)
 					continue
 					//return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
 				}
 
-				var currtimestamp uint32
 				r := bytes.NewReader(databuff)
-				binary.Read(r, binary.BigEndian, &currtimestamp)
+
+				binary.Read(r, binary.LittleEndian, &currtimestamp)
 
 				if firstTime.IsZero() {
 					firstTime = time.Now()
@@ -483,7 +540,9 @@ func (c *T7Client) Start() error {
 						continue
 					}
 
-					ebus.Publish(va.Name, va.Float64())
+					if err := ebus.Publish(va.Name, va.Float64()); err != nil {
+						c.onError(err)
+					}
 				}
 
 				if r.Len() > 0 {
@@ -520,6 +579,39 @@ func (c *T7Client) Start() error {
 		retry.LastErrorOnly(true),
 	)
 	return err
+}
+
+func calculateOptimalReadSize(remainingBytes uint32) uint32 {
+	const (
+		maxReadSize          = 235 // Maximum bytes we can request at once
+		singleByteThreshold  = 1
+		multiBytePayloadSize = 6 // Number of bytes per payload for multi-byte reads
+		minEfficientRead     = 7 // Minimum size for an efficient read
+	)
+
+	// If only 1 byte left, just read it directly
+	if remainingBytes <= singleByteThreshold {
+		return remainingBytes
+	}
+
+	// Calculate initial optimal read based on complete payloads
+	maxPayloads := maxReadSize / multiBytePayloadSize
+	optimalSize := uint32(maxPayloads * multiBytePayloadSize)
+
+	if remainingBytes <= optimalSize {
+		return remainingBytes
+	}
+
+	// If reading optimalSize would leave a small inefficient remainder,
+	// reduce this read size to ensure the next read is efficient
+	remainderAfterRead := remainingBytes - optimalSize
+	if remainderAfterRead > 0 && remainderAfterRead < minEfficientRead {
+		// Calculate how many complete payloads we need to shave off
+		payloadsToReduce := (minEfficientRead - remainderAfterRead + multiBytePayloadSize - 1) / multiBytePayloadSize
+		return optimalSize - (payloadsToReduce * multiBytePayloadSize)
+	}
+
+	return optimalSize
 }
 
 func AirDemToStringT7(v float64) string {

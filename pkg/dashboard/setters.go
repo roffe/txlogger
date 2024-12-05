@@ -5,13 +5,57 @@ import (
 	"image/color"
 	"strconv"
 
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"github.com/roffe/txlogger/pkg/widgets"
 )
+
+func knkDetSetter(obj *widgets.Icon) func(float64) {
+	var lastVal float64
+	return func(value float64) {
+		if value == lastVal {
+			return
+		}
+		if value > 0 {
+			kn := int(value)
+			knockValue := 0
+			if kn&1<<24 == 1<<24 {
+				knockValue += 1000
+			}
+			if kn&1<<16 == 1<<16 {
+				knockValue += 200
+			}
+			if kn&1<<8 == 1<<8 {
+				knockValue += 30
+			}
+			if kn&1 == 1 {
+				knockValue += 4
+			}
+			obj.SetText(strconv.Itoa(knockValue))
+			obj.Show()
+		} else {
+			obj.Hide()
+		}
+	}
+}
+
+func showHider(obj fyne.CanvasObject) func(float64) {
+	var oldValue float64
+	return func(value float64) {
+		if value == oldValue {
+			return
+		}
+		if value == 1 {
+			obj.Show()
+		} else {
+			obj.Hide()
+		}
+	}
+}
 
 func ioffSetter(obj *canvas.Text) func(float64) {
 	var buf []byte
 	var lastVal float64
-
 	return func(value float64) {
 		if value == lastVal {
 			return

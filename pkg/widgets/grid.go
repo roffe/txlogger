@@ -1,13 +1,23 @@
 package widgets
 
 import (
-	"image/color"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
+
+type Grid struct {
+	widget.BaseWidget
+	cols, rows int
+
+	lines []*canvas.Line
+
+	content *fyne.Container
+
+	lastSize fyne.Size
+}
 
 func NewGrid(cols, rows int) *Grid {
 	g := &Grid{
@@ -15,72 +25,53 @@ func NewGrid(cols, rows int) *Grid {
 		rows: rows,
 	}
 	g.ExtendBaseWidget(g)
+
+	g.content = container.NewWithoutLayout()
+	totalLines := cols + rows
+
+	g.lines = make([]*canvas.Line, totalLines)
+	for i := 0; i < totalLines; i++ {
+		g.lines[i] = canvas.NewLine(theme.Color(theme.ColorNameBackground))
+		g.lines[i].StrokeWidth = 2
+		g.content.Add(g.lines[i])
+	}
+
 	return g
 }
 
-type Grid struct {
-	widget.BaseWidget
-	cols, rows int
+func (g *Grid) Size() fyne.Size {
+	return g.content.Size()
+}
+
+func (g *Grid) Resize(size fyne.Size) {
+	if size == g.lastSize {
+		return
+	}
+	g.lastSize = size
+
+	cellWidth := size.Width / float32(g.cols)
+	cellHeight := size.Height / float32(g.rows)
+
+	// update vertical lines
+	for i := 0; i < g.cols; i++ {
+		l := g.lines[i]
+		x := float32(i) * cellWidth
+		l.Position1 = fyne.NewPos(x, 0)
+		l.Position2 = fyne.NewPos(x, size.Height)
+		l.Refresh()
+	}
+
+	// update horizontal lines
+	offset := g.cols
+	for i := 0; i < g.rows; i++ {
+		l := g.lines[offset+i]
+		y := float32(i) * cellHeight
+		l.Position1 = fyne.NewPos(0, y)
+		l.Position2 = fyne.NewPos(size.Width, y)
+		l.Refresh()
+	}
 }
 
 func (g *Grid) CreateRenderer() fyne.WidgetRenderer {
-	con := container.NewWithoutLayout()
-	var xlines []*canvas.Line
-	for i := 0; i < g.cols; i++ {
-		line := canvas.NewLine(color.Black)
-		line.StrokeWidth = 1
-		xlines = append(xlines, line)
-		con.Add(line)
-	}
-	var ylines []*canvas.Line
-	for i := 0; i < g.rows; i++ {
-		line := canvas.NewLine(color.Black)
-		line.StrokeWidth = 1
-		ylines = append(ylines, line)
-		con.Add(line)
-	}
-
-	return &GridRenderer{
-		g:         g,
-		container: con,
-		xlines:    xlines,
-		ylines:    ylines,
-	}
-}
-
-type GridRenderer struct {
-	xlines    []*canvas.Line
-	ylines    []*canvas.Line
-	g         *Grid
-	container *fyne.Container
-}
-
-func (gr *GridRenderer) Layout(size fyne.Size) {
-	cw := size.Width / float32(gr.g.cols)  // Use cols from the Grid struct
-	ch := size.Height / float32(gr.g.rows) // Use rows from the Grid struct
-
-	for i, l := range gr.xlines {
-		l.Position1 = fyne.NewPos((float32(i) * cw), 0)
-		l.Position2 = fyne.NewPos((float32(i) * cw), size.Height)
-		l.Refresh()
-	}
-	for i, l := range gr.ylines {
-		l.Position1 = fyne.NewPos(0, (float32(i) * ch))
-		l.Position2 = fyne.NewPos(size.Width, (float32(i) * ch))
-		l.Refresh()
-	}
-}
-
-func (gr *GridRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(100, 100)
-}
-
-func (gr *GridRenderer) Refresh() {
-}
-
-func (gr *GridRenderer) Destroy() {
-}
-
-func (gr *GridRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{gr.container}
+	return widget.NewSimpleRenderer(g.content)
 }

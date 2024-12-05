@@ -6,6 +6,7 @@ $env:CC = "C:\\mingw32\\bin\\gcc.exe"
 $env:CXX = "C:\\mingw32\\bin\\gcc.exe"
 
 Invoke-Expression "rsrc -arch 386 -manifest manifest.xml"
+Invoke-Expression "copy $Env:USERPROFILE\Documents\PlatformIO\Projects\txbridge\.pio\build\esp32dev\firmware.bin .\pkg\ota\"
 Invoke-Expression "go generate ./..."
 Invoke-Expression "fyne package -tags combi --release"
 Remove-Item "rsrc_windows_386.syso" -ErrorAction SilentlyContinue

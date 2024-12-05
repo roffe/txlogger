@@ -13,6 +13,7 @@ $env:CXX = "C:\\mingw32\\bin\i686-w64-mingw32-g++.exe"
 
 Invoke-Expression "rsrc -arch 386 -manifest manifest.xml"
 Write-Host "Building txlogger.exe"
+Invoke-Expression "copy $Env:USERPROFILE\Documents\PlatformIO\Projects\txbridge\.pio\build\esp32dev\firmware.bin .\pkg\ota\"
 Invoke-Expression "fyne package -tags combi --release"
 Remove-Item "rsrc_windows_386.syso" -ErrorAction SilentlyContinue
 

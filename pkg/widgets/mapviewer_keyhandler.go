@@ -56,14 +56,14 @@ func (mv *MapViewer) copy() {
 		}
 		copyString.WriteString(fmt.Sprintf("%d:%d:%d:"+copyPasteSeparator, x, y, mv.zData[cell]))
 	}
-	fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(copyString.String())
+	fyne.CurrentApp().Clipboard().SetContent(copyString.String())
 }
 
 func (mv *MapViewer) paste() {
 	if !mv.editable {
 		return
 	}
-	cb := fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().Content()
+	cb := fyne.CurrentApp().Clipboard().Content()
 	split := strings.Split(cb, copyPasteSeparator)
 	for i, part := range split {
 		if len(part) < 3 {
@@ -201,6 +201,10 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 					mv.zData[cell] = int(num * 128)
 				case oneThousandTwentyfourth:
 					mv.zData[cell] = int(num * 1024)
+				case 0.00390625:
+					mv.zData[cell] = int(num * 256)
+				case 0.004:
+					mv.zData[cell] = int(num * 250)
 				default:
 					fyne.LogError("unknown zCorrFac", fmt.Errorf("%f", mv.zCorrFac))
 					debug.Log(fmt.Sprintf("%s unknown zCorrFac: %f", mv.symbol.Name, mv.zCorrFac))
@@ -218,25 +222,25 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 		mv.inputBuffer.Reset()
 	case fyne.KeyPageUp, "S":
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] += int((mv.zCorrFac * 10) * (1.0 / mv.zCorrFac))
+			mv.zData[cell] += int((mv.zCorrFac*10)*(1.0/mv.zCorrFac) + mv.zCorrOffset)
 		}
 		mv.updateCells()
 		refresh = true
 	case fyne.KeyPageDown, "X":
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] -= int((mv.zCorrFac * 10) * (1.0 / mv.zCorrFac))
+			mv.zData[cell] -= int((mv.zCorrFac*10)*(1.0/mv.zCorrFac) + mv.zCorrOffset)
 		}
 		mv.updateCells()
 		refresh = true
 	case "+", "A":
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] += int(mv.zCorrFac * (1.0 / mv.zCorrFac))
+			mv.zData[cell] += int(mv.zCorrFac*(1.0/mv.zCorrFac) + mv.zCorrOffset)
 		}
 		mv.updateCells()
 		refresh = true
 	case "-", "Z":
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] -= int(mv.zCorrFac * (1.0 / mv.zCorrFac))
+			mv.zData[cell] -= int(mv.zCorrFac*(1.0/mv.zCorrFac) + mv.zCorrOffset)
 		}
 		mv.updateCells()
 		refresh = true
@@ -285,7 +289,7 @@ func (mv *MapViewer) updateCursor() {
 	yPosFactor := float32(float64(mv.numRows-1) - float64(mv.SelectedY))
 	xPos := xPosFactor * mv.widthFactor
 	yPos := yPosFactor * mv.heightFactor
-	mv.cursor.Resize(fyne.NewSize(mv.cursorWidth+1, mv.cursorHeight+1))
+	mv.cursor.Resize(fyne.NewSize(mv.widthFactor+1, mv.heightFactor+1))
 	mv.cursor.Move(fyne.NewPos(xPos-1, yPos-1))
 }
 

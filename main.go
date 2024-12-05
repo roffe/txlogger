@@ -169,7 +169,7 @@ func (m txTheme) Size(name fyne.ThemeSizeName) float32 {
 	case theme.SizeNameLineSpacing:
 		return 4
 	case theme.SizeNamePadding: // 2
-		return 2
+		return 4
 	case theme.SizeNameScrollBar: // 8
 		return 16
 	case theme.SizeNameScrollBarSmall:

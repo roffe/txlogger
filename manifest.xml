@@ -6,7 +6,7 @@
         name="txlogger"
         type="win32"
     />
-    <description>Saab NG9-3 Halogen Check Disabler</description>
+    <description>data logging for automobile use</description>
     <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
         <security>
             <requestedPrivileges>

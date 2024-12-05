@@ -156,7 +156,7 @@ func (s *SymbolListWidget) Add(symbols ...*symbol.Symbol) {
 				}
 			}
 		}
-		entry := NewSymbolWidgetEntry(s.w, sym, deleteFunc)
+		entry := NewSymbolWidgetEntry(sym, deleteFunc)
 		s.symbols = append(s.symbols, sym)
 		s.entries = append(s.entries, entry)
 		s.container.Add(entry)
@@ -201,44 +201,7 @@ func (s *SymbolListWidget) Symbols() []*symbol.Symbol {
 }
 
 func (s *SymbolListWidget) CreateRenderer() fyne.WidgetRenderer {
-	swr := &SymbolListWidgetRenderer{
-		sl: s,
-	}
-	return swr
-}
-
-type SymbolListWidgetRenderer struct {
-	sl *SymbolListWidget
-}
-
-func (sr *SymbolListWidgetRenderer) Layout(size fyne.Size) {
-	sr.sl.border.Resize(size)
-}
-
-func (sr *SymbolListWidgetRenderer) MinSize() fyne.Size {
-	//var width float32
-	//var height float32
-	//for _, en := range sr.sl.entries {
-	//	sz := en.MinSize()
-	//	if sz.Width > width {
-	//		width = sz.Width
-	//	}
-	//	height += sz.Height
-	//}
-	return fyne.NewSize(400, 200)
-}
-
-func (sr *SymbolListWidgetRenderer) Refresh() {
-	//for _, e := range sr.sl.entries {
-	//	e.Refresh()
-	//}
-}
-
-func (sr *SymbolListWidgetRenderer) Destroy() {
-}
-
-func (sr *SymbolListWidgetRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{sr.sl.border}
+	return widget.NewSimpleRenderer(s.border)
 }
 
 type SymbolWidgetEntry struct {
@@ -262,14 +225,14 @@ type SymbolWidgetEntry struct {
 	min, max float64
 }
 
-func NewSymbolWidgetEntry(w fyne.Window, sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry)) *SymbolWidgetEntry {
+func NewSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry)) *SymbolWidgetEntry {
 	sw := &SymbolWidgetEntry{
 		symbol:     sym,
 		deleteFunc: deleteFunc,
 	}
 	sw.ExtendBaseWidget(sw)
 	sw.copyName = widget.NewButtonWithIcon("", theme.ContentCopyIcon(), func() {
-		w.Clipboard().SetContent(sym.Name)
+		fyne.CurrentApp().Clipboard().SetContent(sym.Name)
 	})
 	sw.symbolName = widget.NewLabel(sw.symbol.Name)
 	sw.symbolValue = widget.NewLabel("---")
@@ -333,37 +296,11 @@ func (sw *SymbolWidgetEntry) SetCorrectionFactor(f float64) {
 	}
 }
 
-func (sw *SymbolWidgetEntry) CreateRenderer() fyne.WidgetRenderer {
-	swr := &SymbolWidgetEntryRenderer{
-		sw: sw,
-	}
-	return swr
+func (sw *SymbolWidgetEntry) MinSize() fyne.Size {
+	return fyne.NewSize(300, 38)
 }
 
-type SymbolWidgetEntryRenderer struct {
-	sw *SymbolWidgetEntry
-}
-
-var sz = []float32{
-	.04, // copy
-	.32, // name
-	.18, // value
-	.12, // number
-	.14, // correctionfactor
-	.07, // type
-	.04, // deletebtn
-}
-
-func sumFloat32(a []float32) float32 {
-	var sum float32
-	for _, v := range a {
-		sum += v
-	}
-	return sum
-}
-
-func (sr *SymbolWidgetEntryRenderer) Layout(size fyne.Size) {
-	sw := sr.sw
+func (sw *SymbolWidgetEntry) Resize(size fyne.Size) {
 	padd := size.Width * ((1.0 - sumFloat32(sz)) / float32(len(sz)))
 	sw.copyName.Resize(fyne.NewSize(size.Width*sz[0], size.Height))
 	sw.symbolName.Resize(fyne.NewSize(size.Width*sz[1], size.Height))
@@ -397,27 +334,24 @@ func (sr *SymbolWidgetEntryRenderer) Layout(size fyne.Size) {
 	sw.deleteBTN.Move(fyne.NewPos(x, 0))
 }
 
-func (sr *SymbolWidgetEntryRenderer) MinSize() fyne.Size {
-	//sw := sr.sw
-	//var width float32
-	//var height float32 = sw.symbolName.MinSize().Height
-	//width += sw.copyName.MinSize().Width
-	//width += sw.symbolName.MinSize().Width
-	//width += sw.symbolValue.MinSize().Width
-	//width += sw.symbolNumber.MinSize().Width
-	//width += sw.symbolCorrectionfactor.MinSize().Width
-	//width += sw.deleteBTN.MinSize().Width
-	return fyne.NewSize(400, 38)
+func (sw *SymbolWidgetEntry) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(sw.container)
 }
 
-func (sr *SymbolWidgetEntryRenderer) Refresh() {
-
+var sz = []float32{
+	.04, // copy
+	.32, // name
+	.18, // value
+	.12, // number
+	.14, // correctionfactor
+	.07, // type
+	.04, // deletebtn
 }
 
-func (sr *SymbolWidgetEntryRenderer) Destroy() {
-
-}
-
-func (sr *SymbolWidgetEntryRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{sr.sw.container}
+func sumFloat32(a []float32) float32 {
+	var sum float32
+	for _, v := range a {
+		sum += v
+	}
+	return sum
 }

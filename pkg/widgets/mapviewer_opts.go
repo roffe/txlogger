@@ -89,6 +89,27 @@ func WithZCorrFac(zCorrFac float64) MapViewerOption {
 	}
 }
 
+func WithXOffset(xOffset float64) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.xCorrOffset = xOffset
+		return nil
+	}
+}
+
+func WithYOffset(yOffset float64) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.yCorrOffset = yOffset
+		return nil
+	}
+}
+
+func WithZOffset(zOffset float64) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.zCorrOffset = zOffset
+		return nil
+	}
+}
+
 func WithInterPolFunc(ipf interpolate.InterPolFunc) MapViewerOption {
 	return func(mv *MapViewer) error {
 		mv.ipf = ipf

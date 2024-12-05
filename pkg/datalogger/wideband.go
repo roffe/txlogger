@@ -43,13 +43,11 @@ func NewWBL(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 		if err != nil {
 			return nil, err
 		}
-
 		if cfg.Txbridge {
-			if err := cl.SendFrame(adapter.SystemMsg, []byte("i"), gocan.Outgoing); err != nil {
+			if err := cl.SendFrame(adapter.SystemMsg, []byte{'w', 1, 'i', 'i'}, gocan.Outgoing); err != nil {
 				return nil, err
 			}
 		}
-
 		wblClient.Start(ctx)
 		if cfg.Txbridge {
 			wblSub := cl.Subscribe(ctx, adapter.SystemMsgWBLReading)
@@ -70,7 +68,7 @@ func NewWBL(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 
 		if cfg.Port == "txbridge" {
 			cfg.Log("Starting AEM txbridge client")
-			if err := cl.SendFrame(adapter.SystemMsg, []byte("a"), gocan.Outgoing); err != nil {
+			if err := cl.SendFrame(adapter.SystemMsg, []byte{'w', 1, 'a', 'a'}, gocan.Outgoing); err != nil {
 				return nil, err
 			}
 
