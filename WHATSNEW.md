@@ -1,17 +1,16 @@
 # 1.0.19
 
-- Added E85.X_EthAct_Tech2 to Trionic 7 Calibration shortcuts
-- Added T5 support for txbridge
-- Improved txbridge T8 support
-- Added OTA firmware update for txbridge
-- Trionic 7 & 8: Added support for offloading read & write by memory address to txbridge
-- When hovering symbols in the legend for the plotter the symbol will be highlighted in the plot
-- Plot series now hilight when mouseover legend in logplayer
-- Hovering labels in the log player plotter will make them bold and make the series drawn line thicker
-- Hovered label wil also be shown in large text to the left on the plotter
+- Added E85.X_EthAct_Tech2 to Trionic 7 calibration shortcuts
+- Added T5 support for TXbridge
+- Improved TXbridge T8 support
+- Added OTA firmware update for TXbridge
+- Trionic 7 & 8: Added support for offloading read & write by memory address to TXbridge
+- When hovering over symbols in the legend for the plotter, the symbol will be highlighted in the plot
+- Hovering over labels in the log player plotter will make them bold and make the series' drawn line thicker
+- Hovered labels will also be shown in large text to the left on the plotter
 - A ton of performance optimizations
-- Reworked most widgets in the dashboard so they can scale a lot smaller
-- Made logplayer plotter resizable even on low resolution monitors
+- Reworked most widgets in the dashboard so they can scale much smaller
+- Made log player plotter resizable even on low-resolution monitors
 
 # 1.0.18
 

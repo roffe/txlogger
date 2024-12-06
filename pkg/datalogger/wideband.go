@@ -71,7 +71,6 @@ func NewWBL(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 			if err := cl.SendFrame(adapter.SystemMsg, []byte{'w', 1, 'a', 'a'}, gocan.Outgoing); err != nil {
 				return nil, err
 			}
-
 			wblSub := cl.Subscribe(ctx, adapter.SystemMsgWBLReading)
 			// defer wblSub.Close()
 			go func() {

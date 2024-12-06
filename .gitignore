@@ -8,7 +8,6 @@ tmp2
 *.dif
 /*.json
 *.dat
-*.bin
 *.exe
 *.zip
 debug.log
