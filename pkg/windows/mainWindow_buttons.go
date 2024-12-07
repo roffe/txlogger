@@ -229,7 +229,8 @@ func (mw *MainWindow) newSettingsBtn() *widget.Button {
 func (mw *MainWindow) startLogging() {
 	device, err := mw.settings.CanSettings.GetAdapter(mw.ecuSelect.Selected, mw.Log)
 	if err != nil {
-		mw.Log(err.Error())
+		d := dialog.NewError(err, mw)
+		d.Show()
 		return
 	}
 

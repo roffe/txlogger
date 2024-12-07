@@ -8,7 +8,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/assets"
@@ -22,8 +21,6 @@ type Dashboard struct {
 	cfg *Config
 
 	metricRouter map[string]func(float64)
-
-	container *fyne.Container
 
 	text   Texts
 	gauges Gauges
@@ -251,46 +248,8 @@ func NewDashboard(cfg *Config) *Dashboard {
 	db.limpMode.FillMode = canvas.ImageFillContain
 	db.limpMode.SetMinSize(fyne.NewSize(110, 85))
 	db.limpMode.Resize(fyne.NewSize(110, 85))
-	db.render()
 
 	return db
-}
-
-func (db *Dashboard) render() {
-	db.container = container.NewWithoutLayout(
-		db.limpMode,
-		//db.dbgBar,
-
-		db.gauges.rpm,
-		db.gauges.speed,
-		db.gauges.airmass,
-		db.gauges.pressure,
-		db.gauges.iat,
-		db.gauges.engineTemp,
-
-		db.text.ign,
-		db.text.ioff,
-		db.text.idc,
-		db.text.amul,
-
-		db.text.activeAirDem,
-
-		db.gauges.nblambda,
-		db.gauges.wblambda,
-		db.gauges.throttle,
-		db.gauges.pwm,
-		db.checkEngine,
-		db.text.cruise,
-		db.knockIcon,
-	)
-
-	if !db.logplayer {
-		db.container.Add(db.fullscreenBtn)
-		db.container.Add(db.closeBtn)
-		db.container.Add(db.logBtn)
-	} else {
-		db.container.Add(db.text.time)
-	}
 }
 
 func (db *Dashboard) GetMetricNames() []string {
@@ -734,7 +693,6 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 		return
 	}
 	dr.size = space
-	dr.db.container.Resize(space)
 
 	// Calculate common dimensions
 	dims := &dims{
@@ -784,5 +742,41 @@ func (dr *DashboardRenderer) Destroy() {
 }
 
 func (dr *DashboardRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{dr.db.container}
+
+	cont := []fyne.CanvasObject{
+		dr.db.limpMode,
+		//db.dbgBar,
+
+		dr.db.gauges.rpm,
+		dr.db.gauges.speed,
+		dr.db.gauges.airmass,
+		dr.db.gauges.pressure,
+		dr.db.gauges.iat,
+		dr.db.gauges.engineTemp,
+
+		dr.db.text.ign,
+		dr.db.text.ioff,
+		dr.db.text.idc,
+		dr.db.text.amul,
+
+		dr.db.text.activeAirDem,
+
+		dr.db.gauges.nblambda,
+		dr.db.gauges.wblambda,
+		dr.db.gauges.throttle,
+		dr.db.gauges.pwm,
+		dr.db.checkEngine,
+		dr.db.text.cruise,
+		dr.db.knockIcon,
+	}
+
+	if !dr.db.logplayer {
+		cont = append(cont, dr.db.fullscreenBtn)
+		cont = append(cont, dr.db.closeBtn)
+		cont = append(cont, dr.db.logBtn)
+	} else {
+		cont = append(cont, dr.db.text.time)
+	}
+
+	return cont
 }

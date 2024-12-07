@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -338,6 +339,8 @@ func (lp *LogPlayer) setupPlot(logz logfile.Logfile) {
 	default:
 		factor = 1
 	}
+
+	sort.Strings(order)
 
 	plotterOpts := []plotter.PlotterOpt{
 		plotter.WithPlotResolutionFactor(factor),

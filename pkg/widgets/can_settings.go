@@ -2,6 +2,7 @@ package widgets
 
 import (
 	"errors"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -156,16 +157,16 @@ func (cs *CanSettingsWidget) GetAdapter(ecuType string, logger func(string)) (go
 	baudrate, err := strconv.Atoi(baudstring)
 
 	if cs.adapterSelector.Selected == "" {
-		return nil, errors.New("No adapter selected") //lint:ignore ST1005 This is ok
+		return nil, errors.New("Select CANbus adapter in settings") //lint:ignore ST1005 This is ok
 	}
 
 	if adapter.GetAdapterMap()[cs.adapterSelector.Selected].RequiresSerialPort {
 		if cs.portSelector.Selected == "" {
-			return nil, errors.New("No port selected") //lint:ignore ST1005 This is ok
+			return nil, errors.New("Select port in setings") //lint:ignore ST1005 This is ok
 
 		}
 		if cs.speedSelector.Selected == "" {
-			return nil, errors.New("No speed selected") //lint:ignore ST1005 This is ok
+			return nil, errors.New("Select port speed in settings") //lint:ignore ST1005 This is ok
 		}
 	}
 
@@ -226,6 +227,7 @@ func (cs *CanSettingsWidget) listPorts() []string {
 		//m.output("No serial ports found!")
 		return []string{}
 	}
+
 	for _, port := range ports {
 		//m.output(fmt.Sprintf("Found port: %s", port.Name))
 		//if port.IsUSB {
@@ -234,6 +236,9 @@ func (cs *CanSettingsWidget) listPorts() []string {
 		portsList = append(portsList, port.Name)
 		//}
 	}
+
+	sort.Strings(portsList)
+
 	return portsList
 }
 

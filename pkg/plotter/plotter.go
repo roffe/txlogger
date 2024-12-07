@@ -1,11 +1,10 @@
 package plotter
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"log"
-	"sort"
-	"strconv"
 	"sync"
 
 	"fyne.io/fyne/v2"
@@ -29,9 +28,9 @@ type Plotter struct {
 	canvas      fyne.CanvasObject
 	//canvasImageContainer *fyne.Container
 
-	texts  []*TappableText
-	legend *fyne.Container
-	zoom   *widget.Slider
+	legendTexts []*TappableText
+	legend      *fyne.Container
+	zoom        *widget.Slider
 
 	ts               []*TimeSeries
 	plotStartPos     int
@@ -47,7 +46,7 @@ type Plotter struct {
 	plotResolution       fyne.Size
 	plotResolutionFactor float32
 
-	textBuffer []byte
+	// textBuffer []byte
 
 	size fyne.Size
 
@@ -98,7 +97,7 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		for k := range values {
 			p.valueOrder = append(p.valueOrder, k)
 		}
-		sort.Strings(p.valueOrder)
+		//sort.Strings(p.valueOrder)
 	}
 
 	for n, k := range p.valueOrder {
@@ -132,27 +131,26 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 				p.overlayText.Text = k
 				p.overlayText.Color = p.ts[n].Color
 				p.hilightLine = n
-				p.texts[n].text.TextStyle.Bold = true
+				p.legendTexts[n].text.TextStyle.Bold = true
 				p.RefreshImage()
 			} else {
 				//p.ts[n].Color = oldColor
-				p.texts[n].text.TextStyle.Bold = false
+				p.legendTexts[n].text.TextStyle.Bold = false
 				p.overlayText.Text = ""
 				p.hilightLine = -1
 				p.RefreshImage()
 			}
 		}
 
-		legendLabel := NewTappableText(k, p.ts[n].Color, onTapped, onColorUpdate, onHover)
-		legendLabel.SetTextSize(14)
-		p.texts = append(p.texts, legendLabel)
-		p.legend.Add(legendLabel)
+		labelText := NewTappableText(k, p.ts[n].Color, onTapped, onColorUpdate, onHover)
+		p.legendTexts = append(p.legendTexts, labelText)
+		p.legend.Add(labelText)
 
 	}
 
 	p.dataPointsToShow = min(p.dataLength, 250.0)
 
-	canvasImage := container.New(&testL{p: p}, p.canvasImage)
+	canvasImage := container.New(&plotLayout{p: p}, p.canvasImage)
 
 	leading := container.NewBorder(
 		nil,
@@ -162,10 +160,10 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		canvasImage,
 	)
 	p.container = container.NewHSplit(leading, container.NewVScroll(p.legend))
-	p.container.Offset = 0.83
+	p.container.Offset = 0.90
 
 	p.overlayText = canvas.NewText("", color.White)
-	p.overlayText.TextSize = 20
+	p.overlayText.TextSize = 25
 
 	p.canvas = container.NewWithoutLayout(
 		p.container,
@@ -175,12 +173,12 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 	return p
 }
 
-type testL struct {
+type plotLayout struct {
 	p       *Plotter
 	oldSize fyne.Size
 }
 
-func (t *testL) Layout(_ []fyne.CanvasObject, plotSize fyne.Size) {
+func (t *plotLayout) Layout(_ []fyne.CanvasObject, plotSize fyne.Size) {
 	if t.oldSize == plotSize {
 		return
 	}
@@ -197,7 +195,7 @@ func (t *testL) Layout(_ []fyne.CanvasObject, plotSize fyne.Size) {
 	t.p.updateCursor()
 }
 
-func (t *testL) MinSize([]fyne.CanvasObject) fyne.Size {
+func (t *plotLayout) MinSize([]fyne.CanvasObject) fyne.Size {
 	return fyne.NewSize(400, 100)
 }
 
@@ -224,13 +222,13 @@ func (p *Plotter) Seek(pos int) {
 func (p *Plotter) updateLegend() {
 	for i, v := range p.valueOrder {
 		valueIndex := min(p.dataLength, p.cursorPos)
-		obj := p.texts[i]
-		p.textBuffer = p.textBuffer[:0]
-		p.textBuffer = append(p.textBuffer, v+" "...)
-		p.textBuffer = strconv.AppendFloat(p.textBuffer, p.values[v][valueIndex], 'f', 2, 64)
-		obj.text.Text = string(p.textBuffer)
+		obj := p.legendTexts[i]
+		//p.textBuffer = p.textBuffer[:0]
+		//p.textBuffer = append(p.textBuffer, v+" "...)
+		//obj.Text = string(p.textBuffer)
+		obj.value.Text = fmt.Sprintf("%g", p.values[v][valueIndex])
 		//obj.text.Text = v + ": " + strconv.FormatFloat(p.values[v][valueIndex], 'f', 2, 64)
-		p.texts[i].Refresh()
+		p.legendTexts[i].value.Refresh()
 	}
 
 }

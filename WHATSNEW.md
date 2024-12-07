@@ -1,3 +1,7 @@
+# 1.0.20
+
+  - Reworked legend to have fixed a more "fixed size" and value to the left
+
 # 1.0.19
 
 - Added E85.X_EthAct_Tech2 to Trionic 7 calibration shortcuts
