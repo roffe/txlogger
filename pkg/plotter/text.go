@@ -132,9 +132,7 @@ func (tt *TappableText) TappedSecondary(*fyne.PointEvent) {
 }
 
 func (tt *TappableText) CreateRenderer() fyne.WidgetRenderer {
-	return &TappableTextRenderer{
-		t: tt,
-	}
+	return &TappableTextRenderer{tt}
 }
 
 type TappableTextRenderer struct {
@@ -146,7 +144,6 @@ func (tr *TappableTextRenderer) Layout(size fyne.Size) {
 		return
 	}
 	tr.t.oldSize = size
-
 	tr.t.value.Move(fyne.NewPos(0, 0))
 	tr.t.text.Move(fyne.NewPos(60, 0))
 }

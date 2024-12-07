@@ -742,7 +742,6 @@ func (dr *DashboardRenderer) Destroy() {
 }
 
 func (dr *DashboardRenderer) Objects() []fyne.CanvasObject {
-
 	cont := []fyne.CanvasObject{
 		dr.db.limpMode,
 		//db.dbgBar,
@@ -777,6 +776,5 @@ func (dr *DashboardRenderer) Objects() []fyne.CanvasObject {
 	} else {
 		cont = append(cont, dr.db.text.time)
 	}
-
 	return cont
 }

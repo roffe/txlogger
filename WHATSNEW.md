@@ -1,6 +1,6 @@
 # 1.0.20
 
-  - Reworked legend to have fixed a more "fixed size" and value to the left
+  - Reworked legend to have a more "fixed size" and value moved to the left
 
 # 1.0.19
 
