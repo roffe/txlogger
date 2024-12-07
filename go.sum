@@ -300,8 +300,8 @@ github.com/posener/complete v1.1.1/go.mod h1:em0nMJCgc9GFtwrmVmEMR/ZL6WyhyjMBndr
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/roffe/ecusymbol v0.0.0-20241205203950-46d2204db29e h1:uYxn+1mEhiol7iVg7GzroNGzGEWStA0c4DYOsvmVrhI=
 github.com/roffe/ecusymbol v0.0.0-20241205203950-46d2204db29e/go.mod h1:0nrbfx99ecWTXVjNbaqA9iZYlLlLdXWLE//Hb5hCajQ=
-github.com/roffe/gocan v0.0.0-20241205204101-e141886193e5 h1:GW0bH+q3QhapXp+HQvkQ9fW3YUgGV5uCftY0m1/Ib3Y=
-github.com/roffe/gocan v0.0.0-20241205204101-e141886193e5/go.mod h1:V9kFl4B+XX4dV1aj6nl7FZpOZEisLJZR4ZL6iM1wYWk=
+github.com/roffe/gocan v0.0.0-20241207110253-bc5f0434702d h1:1FhnUbWkoSVpBLUqywqyxJuE5ctX6Mb1VSxjRA14Iqs=
+github.com/roffe/gocan v0.0.0-20241207110253-bc5f0434702d/go.mod h1:V9kFl4B+XX4dV1aj6nl7FZpOZEisLJZR4ZL6iM1wYWk=
 github.com/rogpeppe/fastuuid v1.2.0/go.mod h1:jVj6XXZzXRy/MSR5jhDC/2q6DgLz+nrA6LYCDYWNEvQ=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/rogpeppe/go-internal v1.6.1/go.mod h1:xXDCJY+GAPziupqXw64V24skbSoqbTEfhy4qGm1nDQc=
