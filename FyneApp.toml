@@ -4,5 +4,5 @@ Website = "https://roffe.nu/"
   Icon = "Icon.png"
   Name = "txlogger"
   ID = "com.roffe.txlogger"
-  Version = "1.0.19"
+  Version = "1.0.20"
   Build = 377
