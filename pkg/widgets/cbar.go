@@ -6,7 +6,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/common"
 )
@@ -22,8 +21,8 @@ type CBar struct {
 	cfg *CBarConfig
 
 	// Cached values
-	value       float64
-	container   *fyne.Container
+	value float64
+
 	lastSize    fyne.Size
 	valueRange  float64
 	widthFactor float32
@@ -114,9 +113,7 @@ func (s *CBar) initializeVisualElements() {
 		Alignment: fyne.TextAlignLeading,
 	}
 
-	s.container = container.NewWithoutLayout()
 	s.initializeBars()
-	s.container.Objects = append(s.container.Objects, s.bar, s.face, s.titleText, s.displayText)
 }
 
 func (s *CBar) initializeBars() {
@@ -126,7 +123,6 @@ func (s *CBar) initializeBars() {
 			StrokeWidth: 2,
 		}
 		s.bars = append(s.bars, line)
-		s.container.Add(line)
 	}
 }
 
@@ -186,46 +182,65 @@ func (s *CBar) refresh() {
 	s.displayText.Move(fyne.NewPos(displayX, y))
 }
 
-func (s *CBar) Size() fyne.Size {
-	return s.container.Size()
+func (s *CBar) CreateRenderer() fyne.WidgetRenderer {
+	return &CBarRenderer{s}
 }
 
-func (s *CBar) Resize(space fyne.Size) {
-	if s.lastSize == space {
+type CBarRenderer struct {
+	*CBar
+}
+
+func (r *CBarRenderer) MinSize() fyne.Size {
+	return r.cfg.Minsize
+}
+
+func (r *CBarRenderer) Refresh() {
+}
+
+func (r *CBarRenderer) Destroy() {
+}
+
+func (r *CBarRenderer) Layout(space fyne.Size) {
+	if r.lastSize == space {
 		return
 	}
 
-	s.lastSize = space
-	s.container.Resize(space)
+	r.lastSize = space
 
 	// Cache frequently used calculations
-	s.eightHeight = space.Height * common.OneEight
-	s.center = space.Width * 0.5
-	s.middleHeight = space.Height * 0.5
-	s.heightOneThird = space.Height * common.OneThird
-	s.heightOneSeventh = space.Height * common.OneSeventh
-	s.widthFactor = space.Width / float32(s.valueRange)
-	s.barHeight = space.Height - (s.eightHeight * 2)
-	s.stepFactor = space.Width / float32(s.cfg.Steps)
+	r.eightHeight = space.Height * common.OneEight
+	r.center = space.Width * 0.5
+	r.middleHeight = space.Height * 0.5
+	r.heightOneThird = space.Height * common.OneThird
+	r.heightOneSeventh = space.Height * common.OneSeventh
+	r.widthFactor = space.Width / float32(r.valueRange)
+	r.barHeight = space.Height - (r.eightHeight * 2)
+	r.stepFactor = space.Width / float32(r.cfg.Steps)
 
-	s.face.Move(fyne.NewPos(-2, 0))
-	s.face.Resize(space.AddWidthHeight(3, 0))
+	r.face.Move(fyne.NewPos(-2, 0))
+	r.face.Resize(space.AddWidthHeight(3, 0))
 
 	// Update bar positions
-	for i, line := range s.bars {
-		pos := float32(i) * s.stepFactor
+	for i, line := range r.bars {
+		pos := float32(i) * r.stepFactor
 		if i%2 == 0 {
-			line.Position1 = fyne.NewPos(pos, s.middleHeight-s.heightOneThird)
-			line.Position2 = fyne.NewPos(pos, s.middleHeight+s.heightOneThird)
+			line.Position1 = fyne.NewPos(pos, r.middleHeight-r.heightOneThird)
+			line.Position2 = fyne.NewPos(pos, r.middleHeight+r.heightOneThird)
 		} else {
-			line.Position1 = fyne.NewPos(pos, s.middleHeight-s.heightOneSeventh)
-			line.Position2 = fyne.NewPos(pos, s.middleHeight+s.heightOneSeventh)
+			line.Position1 = fyne.NewPos(pos, r.middleHeight-r.heightOneSeventh)
+			line.Position2 = fyne.NewPos(pos, r.middleHeight+r.heightOneSeventh)
 		}
 	}
 
-	s.refresh()
+	r.refresh()
 }
 
-func (s *CBar) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(s.container)
+func (r *CBarRenderer) Objects() []fyne.CanvasObject {
+	objs := []fyne.CanvasObject{}
+	for _, line := range r.bars {
+		objs = append(objs, line)
+	}
+
+	objs = append(objs, r.bar, r.face, r.titleText, r.displayText)
+	return objs
 }

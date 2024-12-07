@@ -8,7 +8,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/common"
@@ -50,8 +49,6 @@ type DualDial struct {
 
 	steps  float64
 	factor float64
-
-	container *fyne.Container
 
 	size    fyne.Size
 	minsize fyne.Size
@@ -107,18 +104,13 @@ func NewDualDial(cfg DualDialConfig) *DualDial {
 	s.displayText2.TextStyle.Monospace = true
 	s.displayText2.Alignment = fyne.TextAlignCenter
 
-	dial := container.NewWithoutLayout()
 	fac := float64(0xA5) / s.steps
 	for i := 0; i < int(s.steps+1); i++ {
 		col := color.RGBA{byte(float64(i) * fac), 0x00, 0x00, 0xFF}
 		col.G = 0xA5 - col.R
 		pip := &canvas.Line{StrokeColor: col, StrokeWidth: 2}
-		dial.Add(pip)
 		s.pips = append(s.pips, pip)
 	}
-
-	dial.Objects = append(dial.Objects, s.face, s.cover, s.titleText, s.center, s.needle2, s.needle, s.displayText, s.displayText2)
-	s.container = dial
 
 	totalRange := s.max - s.min
 	s.needleRotConst = common.Pi15 / (s.steps * (totalRange / s.steps))
@@ -178,18 +170,21 @@ func (c *DualDial) SetValue2(value float64) {
 	c.displayText2.Refresh()
 }
 
-func (c *DualDial) Size() fyne.Size {
-	return c.cover.Size()
+func (c *DualDial) CreateRenderer() fyne.WidgetRenderer {
+	return &DualDialRenderer{c}
 }
 
-func (c *DualDial) Resize(space fyne.Size) {
+type DualDialRenderer struct {
+	*DualDial
+}
+
+func (c *DualDialRenderer) Layout(space fyne.Size) {
 	if c.size == space {
 		return
 	}
 	c.size = space
 	//	log.Println("dual_dial.Layout", dr.d.title, space.Width, space.Height)
 
-	c.container.Resize(space)
 	c.diameter = fyne.Min(space.Width, space.Height)
 	c.radius = c.diameter * common.OneHalf
 	c.needleOffset = -c.radius * .15
@@ -262,6 +257,21 @@ func (c *DualDial) Resize(space fyne.Size) {
 	}
 }
 
-func (c *DualDial) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(c.container)
+func (c *DualDialRenderer) MinSize() fyne.Size {
+	return c.minsize
+}
+
+func (c *DualDialRenderer) Refresh() {
+}
+
+func (c *DualDialRenderer) Destroy() {
+}
+
+func (c *DualDial) Objects() []fyne.CanvasObject {
+	objs := []fyne.CanvasObject{}
+	for _, p := range c.pips {
+		objs = append(objs, p)
+	}
+	objs = append(objs, c.face, c.cover, c.titleText, c.center, c.needle2, c.needle, c.displayText, c.displayText2)
+	return objs
 }

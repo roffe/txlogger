@@ -52,6 +52,7 @@ func (mw *MainWindow) setupMenu() {
 						mw.settings.CanSettings.GetSerialPort(),
 					),
 				)
+				w.Resize(fyne.NewSize(400, 300))
 				w.Show()
 			}),
 		),

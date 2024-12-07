@@ -107,29 +107,5 @@ func (tu *TxUpdater) render() *TxUpdater {
 }
 
 func (tu *TxUpdater) CreateRenderer() fyne.WidgetRenderer {
-	return &TxUpdaterRenderer{
-		t: tu,
-	}
-}
-
-type TxUpdaterRenderer struct {
-	t *TxUpdater
-}
-
-func (tr *TxUpdaterRenderer) Layout(space fyne.Size) {
-	tr.t.container.Resize(space)
-}
-
-func (tr *TxUpdaterRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(360, 220)
-}
-
-func (tr *TxUpdaterRenderer) Refresh() {
-}
-
-func (tr *TxUpdaterRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{tr.t.container}
-}
-
-func (tr *TxUpdaterRenderer) Destroy() {
+	return widget.NewSimpleRenderer(tu.container)
 }

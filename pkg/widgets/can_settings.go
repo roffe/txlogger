@@ -28,7 +28,6 @@ var portSpeeds = []string{"9600", "19200", "38400", "57600", "115200", "230400",
 type CanSettingsWidget struct {
 	widget.BaseWidget
 	app             fyne.App
-	container       *fyne.Container
 	adapterSelector *widget.Select
 	debugCheckbox   *widget.Check
 	portSelector    *widget.Select
@@ -69,30 +68,6 @@ func NewCanSettingsWidget(app fyne.App) *CanSettingsWidget {
 		csw.portSelector.Options = csw.listPorts()
 		csw.portSelector.Refresh()
 	})
-
-	csw.container = container.NewVBox(
-		container.NewBorder(
-			nil,
-			nil,
-			layout.NewFixedWidth(75, widget.NewLabel("Adapter")),
-			csw.debugCheckbox,
-			csw.adapterSelector,
-		),
-		container.NewBorder(
-			nil,
-			nil,
-			layout.NewFixedWidth(75, widget.NewLabel("Port")),
-			csw.refreshBtn,
-			csw.portSelector,
-		),
-		container.NewBorder(
-			nil,
-			nil,
-			layout.NewFixedWidth(75, widget.NewLabel("Speed")),
-			nil,
-			csw.speedSelector,
-		),
-	)
 
 	csw.loadPrefs()
 	return csw
@@ -243,5 +218,27 @@ func (cs *CanSettingsWidget) listPorts() []string {
 }
 
 func (cs *CanSettingsWidget) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(cs.container)
+	return widget.NewSimpleRenderer(container.NewVBox(
+		container.NewBorder(
+			nil,
+			nil,
+			layout.NewFixedWidth(70, widget.NewLabel("Adapter")),
+			cs.debugCheckbox,
+			cs.adapterSelector,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			layout.NewFixedWidth(70, widget.NewLabel("Port")),
+			cs.refreshBtn,
+			cs.portSelector,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			layout.NewFixedWidth(70, widget.NewLabel("Speed")),
+			nil,
+			cs.speedSelector,
+		),
+	))
 }

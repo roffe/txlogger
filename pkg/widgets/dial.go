@@ -8,7 +8,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/common"
@@ -47,8 +46,6 @@ type Dial struct {
 
 	size    fyne.Size
 	minsize fyne.Size
-
-	container *fyne.Container
 
 	diameter                   float32
 	radius                     float32
@@ -99,16 +96,14 @@ func NewDial(cfg DialConfig) *Dial {
 	c.displayText.TextStyle.Monospace = true
 	c.displayText.Alignment = fyne.TextAlignCenter
 
-	c.container = container.NewWithoutLayout()
 	fac := float64(0xA5) / c.steps
 	for i := 0; i < int(c.steps+1); i++ {
 		col := color.RGBA{byte(float64(i) * fac), 0x00, 0x00, 0xFF}
 		col.G = 0xA5 - col.R
 		pip := &canvas.Line{StrokeColor: col, StrokeWidth: 2}
 		c.pips = append(c.pips, pip)
-		c.container.Add(pip)
+
 	}
-	c.container.Objects = append(c.container.Objects, c.face, c.cover, c.titleText, c.center /*, c.highestObservedMarker*/, c.needle, c.displayText)
 
 	totalRange := c.max - c.min
 	c.needleRotConst = common.Pi15 / (c.steps * (totalRange / c.steps))
@@ -164,11 +159,15 @@ func (c *Dial) SetValue(value float64) {
 	*/
 }
 
-func (c *Dial) Size() fyne.Size {
-	return c.cover.Size()
+func (c *Dial) CreateRenderer() fyne.WidgetRenderer {
+	return &DialRenderer{Dial: c}
 }
 
-func (c *Dial) Resize(space fyne.Size) {
+type DialRenderer struct {
+	*Dial
+}
+
+func (c *DialRenderer) Layout(space fyne.Size) {
 	if c.size == space {
 		return
 	}
@@ -235,6 +234,22 @@ func (c *Dial) Resize(space fyne.Size) {
 	//c.rotateNeedle(c.highestObservedMarker, c.highestObserved, c.radius, c.eightRadius*0.5)
 }
 
-func (c *Dial) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(c.container)
+func (c *DialRenderer) MinSize() fyne.Size {
+	return c.minsize
+}
+
+func (c *DialRenderer) Refresh() {
+}
+
+func (c *DialRenderer) Destroy() {
+}
+
+func (c *DialRenderer) Objects() []fyne.CanvasObject {
+	objs := []fyne.CanvasObject{}
+	for _, v := range c.pips {
+		objs = append(objs, v)
+	}
+
+	objs = append(objs, c.face, c.cover, c.titleText, c.center /*, c.highestObservedMarker*/, c.needle, c.displayText)
+	return objs
 }
