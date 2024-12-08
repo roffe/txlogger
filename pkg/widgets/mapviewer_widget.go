@@ -338,7 +338,7 @@ func (mv *MapViewer) Info() MapViewerInfo {
 func (mv *MapViewer) SetValue(name string, value float64) {
 	var hit bool
 	if name == mv.xFrom {
-		if name == "IgnProt.fi_Offset" {
+		if name == "IgnProt.fi_Offset" || name == "IgnMastProt.fi_Offset" {
 			mv.xValue = int(value * 10)
 		} else {
 			mv.xValue = int(value)
