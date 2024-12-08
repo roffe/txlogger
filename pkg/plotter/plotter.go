@@ -77,6 +77,7 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		cursor:               canvas.NewLine(color.White),
 		ts:                   make([]*TimeSeries, len(values)),
 		plotResolutionFactor: 1.0,
+		hilightLine:          -1,
 	}
 	p.ExtendBaseWidget(p)
 
@@ -130,10 +131,12 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 				p.overlayText.Color = p.ts[n].Color
 				p.hilightLine = n
 				p.legendTexts[n].text.TextStyle.Bold = true
+				p.legendTexts[n].value.TextStyle.Bold = true
 				p.refreshImage()
 			} else {
 				//p.ts[n].Color = oldColor
 				p.legendTexts[n].text.TextStyle.Bold = false
+				p.legendTexts[n].value.TextStyle.Bold = false
 				p.overlayText.Text = ""
 				p.hilightLine = -1
 				p.refreshImage()
