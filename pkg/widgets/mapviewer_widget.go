@@ -98,7 +98,6 @@ type MapViewer struct {
 
 func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 	mv := &MapViewer{
-		//setChan:       make(chan xyUpdate, 10),
 		editable:      true,
 		loadECUFunc:   func() {},
 		saveECUFunc:   func(data []int) {},
