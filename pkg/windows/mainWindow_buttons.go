@@ -29,7 +29,6 @@ func (mw *MainWindow) createButtons() {
 	mw.plotterBtn = mw.newPlotterBtn()
 	mw.logplayerBtn = mw.newLogplayerBtn()
 	mw.logBtn = mw.newLogBtn()
-	mw.settingsBtn = mw.newSettingsBtn()
 }
 
 func (mw *MainWindow) addSymbolBtnFunc() *widget.Button {
@@ -213,17 +212,6 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 
 		mw.SetContent(mw.dashboard)
 	})
-}
-
-func (mw *MainWindow) newSettingsBtn() *widget.Button {
-	btn := widget.NewButtonWithIcon("Settings", theme.SettingsIcon(), func() {
-		mw.SetContent(mw.settings)
-		mw.SetCloseIntercept(func() {
-			mw.SetCloseIntercept(mw.CloseIntercept)
-			mw.SetContent(mw.tab)
-		})
-	})
-	return btn
 }
 
 func (mw *MainWindow) startLogging() {
