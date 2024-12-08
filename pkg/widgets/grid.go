@@ -3,7 +3,6 @@ package widgets
 import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
@@ -13,8 +12,6 @@ type Grid struct {
 	cols, rows int
 
 	lines []*canvas.Line
-
-	content *fyne.Container
 
 	lastSize fyne.Size
 }
@@ -26,24 +23,30 @@ func NewGrid(cols, rows int) *Grid {
 	}
 	g.ExtendBaseWidget(g)
 
-	g.content = container.NewWithoutLayout()
 	totalLines := cols + rows
 
 	g.lines = make([]*canvas.Line, totalLines)
 	for i := 0; i < totalLines; i++ {
 		g.lines[i] = canvas.NewLine(theme.Color(theme.ColorNameBackground))
 		g.lines[i].StrokeWidth = 2
-		g.content.Add(g.lines[i])
 	}
 
 	return g
 }
 
-func (g *Grid) Size() fyne.Size {
-	return g.content.Size()
+func (g *Grid) CreateRenderer() fyne.WidgetRenderer {
+	return &gridRenderer{g}
 }
 
-func (g *Grid) Resize(size fyne.Size) {
+type gridRenderer struct {
+	*Grid
+}
+
+func (g *gridRenderer) MinSize() fyne.Size {
+	return fyne.NewSize(100, 100)
+}
+
+func (g *gridRenderer) Layout(size fyne.Size) {
 	if size == g.lastSize {
 		return
 	}
@@ -72,6 +75,16 @@ func (g *Grid) Resize(size fyne.Size) {
 	}
 }
 
-func (g *Grid) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(g.content)
+func (g *gridRenderer) Refresh() {
+}
+
+func (g *gridRenderer) Destroy() {
+}
+
+func (g *gridRenderer) Objects() []fyne.CanvasObject {
+	objs := make([]fyne.CanvasObject, len(g.lines))
+	for i, l := range g.lines {
+		objs[i] = l
+	}
+	return objs
 }

@@ -23,10 +23,8 @@ type Plotter struct {
 
 	cursor      *canvas.Line
 	canvasImage *canvas.Image
-	container   *container.Split
+	split       *container.Split
 	overlayText *canvas.Text
-	canvas      fyne.CanvasObject
-	//canvasImageContainer *fyne.Container
 
 	legendTexts []*TappableText
 	legend      *fyne.Container
@@ -114,14 +112,14 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 
 		onTapped := func(enabled bool) {
 			p.ts[n].Enabled = enabled
-			p.RefreshImage()
+			p.refreshImage()
 		}
 
 		onColorUpdate := func(col color.Color) {
 			r, g, b, a := col.RGBA()
 			p.ts[n].Color = color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)}
 			// log.Printf("\"%s\": {%d, %d, %d, %d},", k, uint8(r), uint8(g), uint8(b), uint8(a))
-			p.RefreshImage()
+			p.refreshImage()
 		}
 		//var oldColor color.RGBA
 		onHover := func(hover bool) {
@@ -132,13 +130,13 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 				p.overlayText.Color = p.ts[n].Color
 				p.hilightLine = n
 				p.legendTexts[n].text.TextStyle.Bold = true
-				p.RefreshImage()
+				p.refreshImage()
 			} else {
 				//p.ts[n].Color = oldColor
 				p.legendTexts[n].text.TextStyle.Bold = false
 				p.overlayText.Text = ""
 				p.hilightLine = -1
-				p.RefreshImage()
+				p.refreshImage()
 			}
 		}
 
@@ -159,50 +157,14 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		nil,
 		canvasImage,
 	)
-	p.container = container.NewHSplit(leading, container.NewVScroll(p.legend))
-	p.container.Offset = 0.90
+	p.split = container.NewHSplit(leading, container.NewVScroll(p.legend))
+	p.split.Offset = 0.90
 
 	p.overlayText = canvas.NewText("", color.White)
 	p.overlayText.TextSize = 25
 
-	p.canvas = container.NewWithoutLayout(
-		p.container,
-		p.overlayText,
-		p.cursor,
-	)
 	return p
 }
-
-type plotLayout struct {
-	p       *Plotter
-	oldSize fyne.Size
-}
-
-func (t *plotLayout) Layout(_ []fyne.CanvasObject, plotSize fyne.Size) {
-	if t.oldSize == plotSize {
-		return
-	}
-	t.oldSize = plotSize
-
-	t.p.overlayText.Move(fyne.NewPos(t.p.zoom.Size().Width, 20))
-
-	t.p.canvasImage.Resize(plotSize) // Calculate new plot dimensions
-	t.p.plotResolution = fyne.NewSize(plotSize.Width*t.p.plotResolutionFactor, plotSize.Height*t.p.plotResolutionFactor)
-	// Update width factor based on the new size
-	t.p.widthFactor = plotSize.Width / float32(t.p.dataPointsToShow)
-	// Refresh the image and cursor
-	t.p.RefreshImage()
-	t.p.updateCursor()
-}
-
-func (t *plotLayout) MinSize([]fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(400, 100)
-}
-
-//func (p *Plotter) Resize(size fyne.Size) {
-//	log.Println("Resize", size)
-//	p.r.Layout(size)
-//}
 
 func (p *Plotter) Seek(pos int) {
 	halfDataPointsToShow := int(float64(p.dataPointsToShow) * .5)
@@ -216,27 +178,22 @@ func (p *Plotter) Seek(pos int) {
 	p.cursorPos = pos
 	p.updateLegend()
 	p.updateCursor()
-	p.RefreshImage()
+	p.refreshImage()
 }
 
 func (p *Plotter) updateLegend() {
 	for i, v := range p.valueOrder {
 		valueIndex := min(p.dataLength, p.cursorPos)
 		obj := p.legendTexts[i]
-		//p.textBuffer = p.textBuffer[:0]
-		//p.textBuffer = append(p.textBuffer, v+" "...)
-		//obj.Text = string(p.textBuffer)
 		obj.value.Text = fmt.Sprintf("%g", p.values[v][valueIndex])
-		//obj.text.Text = v + ": " + strconv.FormatFloat(p.values[v][valueIndex], 'f', 2, 64)
 		p.legendTexts[i].value.Refresh()
 	}
 
 }
 
-func (p *Plotter) RefreshImage() {
+func (p *Plotter) refreshImage() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	//log.Println("RefreshImage", p.plotResolution.Width, p.plotResolution.Height)
 	img := image.NewRGBA(image.Rect(0, 0, int(p.plotResolution.Width), int(p.plotResolution.Height)))
 	for n := range len(p.ts) {
 		if !p.ts[n].Enabled {
@@ -256,24 +213,8 @@ func (p *Plotter) RefreshImage() {
 	p.canvasImage.Refresh()
 }
 
-func (p *Plotter) Size() fyne.Size {
-	return p.container.Size()
-}
-
-func (p *Plotter) Resize(size fyne.Size) {
-	if p.size == size {
-		return
-	}
-	p.size = size
-	// Resize the container first
-	p.container.Resize(size)
-}
-
 func (p *Plotter) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(p.canvas)
-	//p.r = &plotterRenderer{p: p}
-	//return p.r
-
+	return &plotterRenderer{p}
 }
 
 type TimeSeries struct {

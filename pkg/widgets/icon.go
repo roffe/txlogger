@@ -5,15 +5,13 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 )
 
 type Icon struct {
 	widget.BaseWidget
-	cfg       *IconConfig
-	text      *canvas.Text
-	container *fyne.Container
+	cfg  *IconConfig
+	text *canvas.Text
 }
 
 type IconConfig struct {
@@ -35,7 +33,6 @@ func NewIcon(cfg *IconConfig) *Icon {
 	ic.text.TextSize = 25
 	ic.text.TextStyle.Monospace = true
 	ic.text.Alignment = fyne.TextAlignLeading
-	ic.container = container.NewWithoutLayout(ic.cfg.Image, ic.text)
 	return ic
 }
 
@@ -49,32 +46,30 @@ func (ic *Icon) SetText(text string) {
 }
 
 func (ic *Icon) CreateRenderer() fyne.WidgetRenderer {
-	return &IconRenderer{
-		ic: ic,
-	}
+	return &IconRenderer{ic}
 }
 
 type IconRenderer struct {
-	ic *Icon
+	*Icon
 }
 
-func (icr *IconRenderer) Layout(size fyne.Size) {
-	icr.ic.cfg.Image.Move(fyne.NewPos(0, 0))
-	icr.ic.cfg.Image.Resize(icr.ic.cfg.Minsize)
-	icr.ic.text.Resize(fyne.NewSize(size.Width, 30))
-	icr.ic.text.Move(fyne.NewPos(14, 87))
+func (ic *IconRenderer) Layout(size fyne.Size) {
+	ic.cfg.Image.Move(fyne.NewPos(0, 0))
+	ic.cfg.Image.Resize(ic.cfg.Minsize)
+	ic.text.Resize(fyne.NewSize(size.Width, 30))
+	ic.text.Move(fyne.NewPos(14, 87))
 }
 
-func (icr *IconRenderer) MinSize() fyne.Size {
-	return icr.ic.cfg.Minsize
+func (ic *IconRenderer) MinSize() fyne.Size {
+	return ic.cfg.Minsize
 }
 
-func (icr *IconRenderer) Refresh() {
+func (ic *IconRenderer) Refresh() {
 }
 
-func (icr *IconRenderer) Destroy() {
+func (ic *IconRenderer) Destroy() {
 }
 
-func (icr *IconRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{icr.ic.container}
+func (ic *IconRenderer) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{ic.cfg.Image, ic.text}
 }

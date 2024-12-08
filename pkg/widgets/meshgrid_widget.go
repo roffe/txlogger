@@ -9,7 +9,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -32,9 +31,8 @@ type Meshgrid struct {
 	lastMouseX, lastMouseY float32
 	isDragging             bool
 
-	image     *canvas.Image
-	container *fyne.Container
-	size      fyne.Size
+	image *canvas.Image
+	size  fyne.Size
 
 	cellWidth  float32
 	cellHeight float32
@@ -94,7 +92,6 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 	m.image = canvas.NewImageFromImage(image.NewRGBA(image.Rect(0, 0, 0, 0)))
 	m.image.FillMode = canvas.ImageFillOriginal
 	m.image.ScaleMode = canvas.ImageScaleFastest
-	m.container = container.NewStack(m.image)
 
 	return m, nil
 }
@@ -187,7 +184,7 @@ func (m *Meshgrid) SetFloat64(idx int, value float64) {
 	m.values[idx] = value
 	m.zmin, m.zmax, m.zrange = findMinMaxRange(m.values)
 	m.vertices[idx/m.cols][idx%m.cols].Z = ((value - m.zmin) / m.zrange) * m.depth // Normalize to [0, 1]
-	m.Refresh()                                                                    // Refresh without recreating all vertices
+	m.refresh()                                                                    // Refresh without recreating all vertices
 }
 
 func (m *Meshgrid) SetFloat642(idx int, value float64) {
@@ -195,7 +192,7 @@ func (m *Meshgrid) SetFloat642(idx int, value float64) {
 	m.zmin, m.zmax, m.zrange = findMinMaxRange(m.values)
 	m.vertices[idx/m.cols][idx%m.cols].Z = ((value - m.zmin) / m.zrange) * m.depth // Normalize to [0, 1]
 	m.createVertices(400, 400)
-	m.Refresh()
+	m.refresh()
 }
 
 func (m *Meshgrid) SetMin(min float64) {
@@ -263,7 +260,7 @@ func (m *Meshgrid) LoadFloat64s(floats []float64) {
 	m.panX = oldPanX
 	m.panY = oldPanY
 
-	m.Refresh()
+	m.refresh()
 }
 
 // returns the min, max and range across the data
@@ -289,30 +286,27 @@ func (m *Meshgrid) project(v Vertex) (int, int) {
 	return int(screenX), int(screenY)
 }
 
-func (m *Meshgrid) Refresh() {
+func (m *Meshgrid) refresh() {
 	m.image.Image = m.drawMeshgridLines()
+	m.image.Resize(m.size)
 	m.image.Refresh()
+
 }
 
-func (m *Meshgrid) Layout(size fyne.Size) {
+func (m *Meshgrid) CreateRenderer() fyne.WidgetRenderer {
+	return &meshgridRenderer{m}
+}
+
+type meshgridRenderer struct {
+	*Meshgrid
+}
+
+func (m *meshgridRenderer) Layout(size fyne.Size) {
 	if size == m.size {
 		return
 	}
 	m.size = size
-	m.container.Resize(size)
-	m.Refresh()
-}
-
-func (m *Meshgrid) CreateRenderer() fyne.WidgetRenderer {
-	return &meshgridRenderer{meshgrid: m}
-}
-
-type meshgridRenderer struct {
-	meshgrid *Meshgrid
-}
-
-func (m *meshgridRenderer) Layout(size fyne.Size) {
-	m.meshgrid.Layout(size)
+	m.refresh()
 }
 
 func (m *meshgridRenderer) MinSize() fyne.Size {
@@ -320,14 +314,13 @@ func (m *meshgridRenderer) MinSize() fyne.Size {
 }
 
 func (m *meshgridRenderer) Refresh() {
-
 }
 
 func (m *meshgridRenderer) Destroy() {
 }
 
 func (m *meshgridRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{m.meshgrid.container}
+	return []fyne.CanvasObject{m.image}
 }
 
 func (m *Meshgrid) drawMeshgridLines() *image.RGBA {

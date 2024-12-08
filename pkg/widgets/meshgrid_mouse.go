@@ -10,7 +10,7 @@ import (
 
 func (m *Meshgrid) MouseIn(_ *desktop.MouseEvent) {
 	m.showCrosshair = true
-	m.Refresh()
+	m.refresh()
 }
 
 // Add this method to clear crosshair when mouse leaves
@@ -65,7 +65,7 @@ func (m *Meshgrid) MouseMoved(event *desktop.MouseEvent) {
 	m.lastMouseX = event.Position.X
 	m.lastMouseY = event.Position.Y
 
-	m.Refresh()
+	m.refresh()
 }
 
 func (m *Meshgrid) MouseDown(event *desktop.MouseEvent) {
@@ -89,7 +89,7 @@ func (m *Meshgrid) Scrolled(event *fyne.ScrollEvent) {
 	} else {
 		m.scaleMeshgrid(0.9)
 	}
-	m.Refresh()
+	m.refresh()
 }
 
 func (m *Meshgrid) findValueAtPosition(pos image.Point) (float64, bool) {

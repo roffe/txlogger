@@ -5,7 +5,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/common"
@@ -22,11 +21,13 @@ type HBar struct {
 
 	value float64
 
-	widthFactor  float32
-	container    *fyne.Container
+	widthFactor float32
+
 	max75, max90 float64
 	eightHeight  float32
 	height       float32
+
+	oldSize fyne.Size
 }
 
 type HBarConfig struct {
@@ -46,14 +47,14 @@ func NewHBar(cfg *HBarConfig) *HBar {
 	}
 	s.max75 = s.cfg.Max * .75
 	s.max90 = s.cfg.Max * .90
-	s.container = container.NewWithoutLayout()
+
 	s.render()
 	return s
 }
 
 func (s *HBar) render() {
 	s.face = &canvas.Rectangle{StrokeColor: theme.DisabledColor(), StrokeWidth: 2}
-	s.container.Add(s.face)
+
 	s.barRect = &canvas.Rectangle{FillColor: color.RGBA{0x2C, 0xA5, 0x00, 0x80}}
 
 	s.titleText = &canvas.Text{Text: s.cfg.Title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
@@ -62,10 +63,8 @@ func (s *HBar) render() {
 	for i := 0; i < int(s.cfg.Steps+1); i++ {
 		line := &canvas.Line{StrokeColor: color.RGBA{0x00, 0xE5, 0x00, 0xFF}, StrokeWidth: 2}
 		s.bars = append(s.bars, line)
-		s.container.Add(line)
 	}
-	s.container.Add(s.barRect)
-	s.container.Add(s.titleText)
+
 }
 
 func (s *HBar) SetValue(value float64) {
@@ -88,18 +87,19 @@ func (s *HBar) Value() float64 {
 }
 
 func (s *HBar) CreateRenderer() fyne.WidgetRenderer {
-	return &HBarRenderer{
-		d: s,
-	}
+	return &HBarRenderer{s}
 }
 
 type HBarRenderer struct {
-	d *HBar
+	*HBar
 }
 
-func (dr *HBarRenderer) Layout(space fyne.Size) {
-	//dr.d.container.Resize(space)
-	s := dr.d
+func (s *HBarRenderer) Layout(space fyne.Size) {
+	if s.oldSize == space {
+		return
+	}
+	s.oldSize = space
+
 	diameter := space.Width
 	height := space.Height
 	middle := height * .5
@@ -122,16 +122,21 @@ func (dr *HBarRenderer) Layout(space fyne.Size) {
 	s.SetValue(s.value)
 }
 
-func (dr *HBarRenderer) MinSize() fyne.Size {
-	return dr.d.cfg.Minsize
+func (s *HBarRenderer) MinSize() fyne.Size {
+	return s.cfg.Minsize
 }
 
-func (dr *HBarRenderer) Refresh() {
+func (s *HBarRenderer) Refresh() {
 }
 
-func (dr *HBarRenderer) Destroy() {
+func (s *HBarRenderer) Destroy() {
 }
 
-func (dr *HBarRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{dr.d.container}
+func (s *HBarRenderer) Objects() []fyne.CanvasObject {
+	objs := []fyne.CanvasObject{s.face}
+	for _, line := range s.bars {
+		objs = append(objs, line)
+	}
+	objs = append(objs, s.barRect, s.titleText)
+	return objs
 }
