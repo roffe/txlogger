@@ -196,6 +196,7 @@ func NewSettingsWidget(cfg CanSettingsWidgetConfig) *SettingsWidget {
 
 	sw.logFormat = sw.newLogFormat()
 	sw.logPath = widget.NewLabel("")
+	sw.logPath.Truncation = fyne.TextTruncateEllipsis
 
 	sw.useMPH = sw.newUserMPH()
 	sw.swapRPMandSpeed = sw.newSwapRPMandSpeed()
@@ -342,8 +343,6 @@ func NewSettingsWidget(cfg CanSettingsWidgetConfig) *SettingsWidget {
 			),
 			container.NewBorder(
 				nil,
-				nil,
-				widget.NewLabel("Log folder"),
 				container.NewGridWithColumns(2,
 					widget.NewButtonWithIcon("Reset", theme.ContentClearIcon(), func() {
 						sw.logPath.SetText(datalogger.LOGPATH)
@@ -362,6 +361,8 @@ func NewSettingsWidget(cfg CanSettingsWidgetConfig) *SettingsWidget {
 						fyne.CurrentApp().Preferences().SetString(prefsLogPath, dir)
 					}),
 				),
+				widget.NewLabel("Log folder"),
+				nil,
 				sw.logPath,
 			),
 		),
@@ -458,7 +459,7 @@ func (sw *SettingsWidget) newMeshView() *widget.Check {
 }
 
 func (sw *SettingsWidget) newAutoUpdateLoad() *widget.Check {
-	return widget.NewCheck("Load maps from ECU when online (X & Y-Axis will still be loaded from binary)", func(b bool) {
+	return widget.NewCheck("Load maps from ECU when logging", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsAutoUpdateLoadEcu, b)
 	})
 }
