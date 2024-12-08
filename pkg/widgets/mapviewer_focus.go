@@ -9,6 +9,8 @@ import (
 	"github.com/roffe/txlogger/pkg/debug"
 )
 
+var _ fyne.Focusable = (*MapViewer)(nil)
+
 func (mw *MapViewer) FocusGained() {
 	mw.focused = true
 }
