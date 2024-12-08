@@ -78,6 +78,10 @@ func (mw *MainWindow) newSymbolnameTypeahead() {
 		// Get the list of possible completion
 		var results []string
 		for _, sym := range mw.fw.Symbols() {
+			if sym.Length > 8 {
+				continue
+			}
+
 			if strings.Contains(strings.ToLower(sym.Name), strings.ToLower(s)) {
 				results = append(results, sym.Name)
 			}
