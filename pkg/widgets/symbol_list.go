@@ -9,7 +9,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
@@ -21,7 +20,6 @@ type SymbolListWidget struct {
 	entryMap   map[string]*SymbolWidgetEntry
 	entries    []*SymbolWidgetEntry
 	container  *fyne.Container
-	border     *fyne.Container
 	scroll     *container.Scroll
 	mu         sync.Mutex
 	updateBars bool
@@ -45,36 +43,6 @@ func (s *SymbolListWidget) render() {
 	s.container = container.NewVBox()
 	s.scroll = container.NewVScroll(s.container)
 
-	name := widget.NewLabel("Name")
-	name.TextStyle = fyne.TextStyle{Bold: true}
-
-	value := widget.NewLabel("Value")
-	value.TextStyle = fyne.TextStyle{Bold: true}
-
-	num := widget.NewLabel("#")
-	num.TextStyle = fyne.TextStyle{Bold: true}
-
-	typ := widget.NewLabel("Type")
-	typ.TextStyle = fyne.TextStyle{Bold: true}
-
-	factor := widget.NewLabel("Factor")
-	factor.TextStyle = fyne.TextStyle{Bold: true}
-
-	s.border = container.NewBorder(
-		container.NewGridWithColumns(7,
-			name,
-			widget.NewLabel(""),
-			widget.NewLabel(""),
-			value,
-			num,
-			typ,
-			factor,
-		),
-		nil,
-		nil,
-		nil,
-		s.scroll,
-	)
 }
 
 func (s *SymbolListWidget) UpdateBars(enabled bool) {
@@ -201,7 +169,54 @@ func (s *SymbolListWidget) Symbols() []*symbol.Symbol {
 }
 
 func (s *SymbolListWidget) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(s.border)
+	name := widget.NewLabel("Name")
+	name.TextStyle = fyne.TextStyle{Bold: true}
+
+	value := widget.NewLabel("Value")
+	value.TextStyle = fyne.TextStyle{Bold: true}
+
+	num := widget.NewLabel("#")
+	num.TextStyle = fyne.TextStyle{Bold: true}
+
+	typ := widget.NewLabel("Type")
+	typ.TextStyle = fyne.TextStyle{Bold: true}
+
+	factor := widget.NewLabel("Factor")
+	factor.TextStyle = fyne.TextStyle{Bold: true}
+
+	header := container.New(&headerLayout{}, widget.NewLabel(""), name, value, num, typ, factor, widget.NewLabel(""))
+
+	return widget.NewSimpleRenderer(container.NewBorder(
+		header,
+		nil,
+		nil,
+		nil,
+		s.scroll,
+	))
+}
+
+type headerLayout struct {
+	oldSize fyne.Size
+}
+
+func (h *headerLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	if h.oldSize == size {
+		return
+	}
+	h.oldSize = size
+
+	var x float32
+	padd := size.Width * ((1.0 - sumFloat32(sz)) / float32(len(sz)))
+	for i, o := range objects {
+		o.Resize(fyne.NewSize(size.Width*sz[i], size.Height))
+		o.Move(fyne.NewPos(x, 0))
+		x += o.Size().Width + padd
+	}
+
+}
+
+func (h *headerLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(300, 30)
 }
 
 type SymbolWidgetEntry struct {
@@ -216,13 +231,13 @@ type SymbolWidgetEntry struct {
 	deleteBTN              *widget.Button
 	valueBar               *canvas.Rectangle
 
-	container *fyne.Container
-
 	deleteFunc func(*SymbolWidgetEntry)
 
 	//valueSet bool
 	value    float64
 	min, max float64
+
+	oldSize fyne.Size
 }
 
 func NewSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry)) *SymbolWidgetEntry {
@@ -258,27 +273,17 @@ func NewSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry
 
 	sw.valueBar = canvas.NewRectangle(color.RGBA{255, 0, 0, 255})
 
-	sw.container = container.NewWithoutLayout(
-		sw.copyName,
-		sw.valueBar,
-		sw.symbolName,
-		sw.symbolValue,
-		sw.symbolNumber,
-		sw.symbolType,
-		sw.symbolCorrectionfactor,
-		sw.deleteBTN,
-	)
 	return sw
 }
 
-func (sw *SymbolWidgetEntry) MouseMoved(event *desktop.MouseEvent) {
-}
-
-func (sw *SymbolWidgetEntry) MouseOut() {
-}
-
-func (sw *SymbolWidgetEntry) MouseIn(event *desktop.MouseEvent) {
-}
+//func (sw *SymbolWidgetEntry) MouseMoved(event *desktop.MouseEvent) {
+//}
+//
+//func (sw *SymbolWidgetEntry) MouseOut() {
+//}
+//
+//func (sw *SymbolWidgetEntry) MouseIn(event *desktop.MouseEvent) {
+//}
 
 func (sw *SymbolWidgetEntry) SetCorrectionFactor(f float64) {
 	sw.symbol.Correctionfactor = f
@@ -296,46 +301,8 @@ func (sw *SymbolWidgetEntry) SetCorrectionFactor(f float64) {
 	}
 }
 
-func (sw *SymbolWidgetEntry) MinSize() fyne.Size {
-	return fyne.NewSize(300, 38)
-}
-
-func (sw *SymbolWidgetEntry) Resize(size fyne.Size) {
-	padd := size.Width * ((1.0 - sumFloat32(sz)) / float32(len(sz)))
-	sw.copyName.Resize(fyne.NewSize(size.Width*sz[0], size.Height))
-	sw.symbolName.Resize(fyne.NewSize(size.Width*sz[1], size.Height))
-	sw.symbolValue.Resize(fyne.NewSize(size.Width*sz[2], size.Height))
-	sw.symbolNumber.Resize(fyne.NewSize(size.Width*sz[3], size.Height))
-	sw.symbolType.Resize(fyne.NewSize(size.Width*sz[4], size.Height))
-	sw.symbolCorrectionfactor.Resize(fyne.NewSize(size.Width*sz[5], size.Height))
-	sw.deleteBTN.Resize(fyne.NewSize(size.Width*sz[6], size.Height))
-
-	var x float32
-
-	sw.copyName.Move(fyne.NewPos(x, 0))
-	x += sw.copyName.Size().Width + padd
-
-	sw.symbolName.Move(fyne.NewPos(x, 0))
-	x += sw.symbolName.Size().Width + padd
-
-	sw.symbolValue.Move(fyne.NewPos(x, 0))
-	sw.valueBar.Move(fyne.NewPos(x, 6))
-	x += sw.symbolValue.Size().Width + padd
-
-	sw.symbolNumber.Move(fyne.NewPos(x, 0))
-	x += sw.symbolNumber.Size().Width + padd
-
-	sw.symbolType.Move(fyne.NewPos(x, 0))
-	x += sw.symbolType.Size().Width + padd
-
-	sw.symbolCorrectionfactor.Move(fyne.NewPos(x, 0))
-	x += sw.symbolCorrectionfactor.Size().Width + padd
-
-	sw.deleteBTN.Move(fyne.NewPos(x, 0))
-}
-
 func (sw *SymbolWidgetEntry) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(sw.container)
+	return &symbolWidgetEntryRenderer{sw}
 }
 
 var sz = []float32{
@@ -354,4 +321,66 @@ func sumFloat32(a []float32) float32 {
 		sum += v
 	}
 	return sum
+}
+
+type symbolWidgetEntryRenderer struct {
+	*SymbolWidgetEntry
+}
+
+func (s *symbolWidgetEntryRenderer) Destroy() {
+}
+
+func (s *symbolWidgetEntryRenderer) Layout(size fyne.Size) {
+	if s.oldSize == size {
+		return
+	}
+	s.oldSize = size
+	padd := size.Width * ((1.0 - sumFloat32(sz)) / float32(len(sz)))
+	s.copyName.Resize(fyne.NewSize(size.Width*sz[0], size.Height))
+	s.symbolName.Resize(fyne.NewSize(size.Width*sz[1], size.Height))
+	s.symbolValue.Resize(fyne.NewSize(size.Width*sz[2], size.Height))
+	s.symbolNumber.Resize(fyne.NewSize(size.Width*sz[3], size.Height))
+	s.symbolType.Resize(fyne.NewSize(size.Width*sz[4], size.Height))
+	s.symbolCorrectionfactor.Resize(fyne.NewSize(size.Width*sz[5], size.Height))
+	s.deleteBTN.Resize(fyne.NewSize(size.Width*sz[6], size.Height))
+
+	var x float32
+
+	s.copyName.Move(fyne.NewPos(x, 0))
+	x += s.copyName.Size().Width + padd
+
+	s.symbolName.Move(fyne.NewPos(x, 0))
+	x += s.symbolName.Size().Width + padd
+
+	s.symbolValue.Move(fyne.NewPos(x, 0))
+	s.valueBar.Move(fyne.NewPos(x, 6))
+	x += s.symbolValue.Size().Width + padd
+
+	s.symbolNumber.Move(fyne.NewPos(x, 0))
+	x += s.symbolNumber.Size().Width + padd
+
+	s.symbolType.Move(fyne.NewPos(x, 0))
+	x += s.symbolType.Size().Width + padd
+
+	s.symbolCorrectionfactor.Move(fyne.NewPos(x, 0))
+	x += s.symbolCorrectionfactor.Size().Width + padd
+
+	s.deleteBTN.Move(fyne.NewPos(x, 0))
+}
+
+func (s *symbolWidgetEntryRenderer) MinSize() fyne.Size {
+	return fyne.NewSize(300, 36)
+}
+
+func (s *symbolWidgetEntryRenderer) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{
+		s.copyName,
+		s.valueBar,
+		s.symbolName,
+		s.symbolValue,
+		s.symbolNumber,
+		s.symbolType,
+		s.symbolCorrectionfactor,
+		s.deleteBTN,
+	}
 }
