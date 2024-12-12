@@ -117,10 +117,10 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 	w.Resize(fyne.NewSize(1024, 768))
 
 	dbCfg := &dashboard.Config{
-		App:             a,
-		Mw:              w,
-		Logplayer:       true,
-		LogBtn:          nil,
+		App:       a,
+		Mw:        w,
+		Logplayer: true,
+		//LogBtn:          nil,
 		UseMPH:          a.Preferences().BoolWithFallback("useMPH", false),
 		SwapRPMandSpeed: a.Preferences().BoolWithFallback("swapRPMandSpeed", false),
 		HighAFR:         loadSettingStringFloat64(a, "highAFR", 1.5),
@@ -197,7 +197,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 
 	lp.menu = mainmenu.New(lp, []*fyne.Menu{
 		fyne.NewMenu("File"),
-	}, lp.openMap, lp.openMapz, otherFunc)
+	}, lp.openMap, otherFunc)
 
 	w.SetCloseIntercept(func() {
 		for _, c := range cancelFuncs {

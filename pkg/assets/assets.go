@@ -21,3 +21,9 @@ var KvaserLogoBytes []byte
 
 //go:embed maptun_logo.png
 var MaptunLogoBytes []byte
+
+//go:embed mackanized.png
+var MackanizedBytes []byte
+
+//go:embed left_corner.svg
+var LeftCornerBytes []byte

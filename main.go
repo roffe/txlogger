@@ -5,10 +5,8 @@ import (
 	"image/color"
 	"log"
 	"os"
-	"os/signal"
 	"path"
 	"strings"
-	"syscall"
 	"time"
 
 	_ "embed"
@@ -66,13 +64,13 @@ func main() {
 		mw = windows.NewMainWindow(a, "")
 	}
 
-	quitChan := make(chan os.Signal, 1)
-	signal.Notify(quitChan, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-quitChan
-		mw.CloseIntercept()
-		a.Quit()
-	}()
+	//quitChan := make(chan os.Signal, 2)
+	//signal.Notify(quitChan, os.Interrupt, syscall.SIGTERM)
+	//go func() {
+	//	<-quitChan
+	//	//mw.CloseIntercept()
+	//	a.Quit()
+	//}()
 
 	lastVersion := a.Preferences().String("lastVersion")
 	if lastVersion != a.Metadata().Version {
@@ -83,6 +81,7 @@ func main() {
 			md.Wrapping = fyne.TextWrapWord
 			ww.SetContent(container.NewVScroll(md))
 			ww.Resize(fyne.NewSize(700, 400))
+			ww.CenterOnScreen()
 			ww.Show()
 			time.Sleep(100 * time.Millisecond)
 			ww.RequestFocus()
@@ -90,6 +89,10 @@ func main() {
 	}
 	a.Preferences().SetString("lastVersion", a.Metadata().Version)
 	//go updateCheck(a, mw)
+
+	//a.Lifecycle().SetOnEnteredForeground(func() {
+	//	mw.Maximize()
+	//})
 
 	mw.ShowAndRun()
 }

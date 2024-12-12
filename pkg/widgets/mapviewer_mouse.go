@@ -33,6 +33,7 @@ func (mv *MapViewer) MouseMoved(event *desktop.MouseEvent) {
 
 // MouseDown is called when a mouse button is pressed.
 func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
+	fyne.CurrentApp().Driver().CanvasForObject(mv).Focus(mv)
 	if event.Position.Y > mv.xAxisLabelContainer.Size().Height+mv.innerView.Size().Height {
 		return
 	}
@@ -87,7 +88,7 @@ func (mv *MapViewer) handlePrimaryClickWithShift(event *desktop.MouseEvent) {
 }
 
 func (mv *MapViewer) handleSecondaryClick(event *desktop.MouseEvent) {
-	mv.showPopupMenu(event.Position)
+	mv.showPopupMenu(event.AbsolutePosition)
 }
 
 // calculateCellDimensions calculates and returns the width and height of a cell.

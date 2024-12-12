@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/theme"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/interpolate"
@@ -33,8 +32,30 @@ func (mw *MainWindow) setupMenu() {
 			fyne.NewMenuItem("Play log", mw.playLog),
 			fyne.NewMenuItem("Open log folder", func() {
 				if err := open.Run(mw.settings.GetLogPath()); err != nil {
-					mw.Log("failed to open logs folder: " + err.Error())
+					mw.Error(fmt.Errorf("failed to open logs folder: %w", err))
 				}
+			}),
+			fyne.NewMenuItem("Settings", func() {
+				if mw.wm.Exists("Settings") {
+					return
+				}
+				inner := newInnerWindow("Settings", mw.settings)
+				inner.Icon = theme.SettingsIcon()
+				inner.CloseIntercept = func() {
+					mw.wm.Remove(inner)
+				}
+				mw.wm.Add(inner)
+			}),
+			fyne.NewMenuItem("Help", func() {
+				if mw.wm.Exists("Help") {
+					return
+				}
+				inner := newInnerWindow("Help", Help())
+				inner.Icon = theme.HelpIcon()
+				inner.CloseIntercept = func() {
+					mw.wm.Remove(inner)
+				}
+				mw.wm.Add(inner)
 			}),
 		),
 		fyne.NewMenu("Preset",
@@ -57,12 +78,12 @@ func (mw *MainWindow) setupMenu() {
 			}),
 		),
 	}
-	mw.menu = mainmenu.New(mw, menus, mw.openMap, mw.openMapz, otherFunc)
+	mw.menu = mainmenu.New(mw, menus, mw.openMap, otherFunc)
 }
 
 func (mw *MainWindow) loadBinary() {
 	if mw.dlc != nil {
-		dialog.ShowError(errors.New("stop logging before loading a new binary"), mw.Window)
+		mw.Error(errors.New("stop logging before loading a new binary"))
 		return
 	}
 	filename, err := sdialog.File().Filter("Binary file", "bin").Load()
@@ -70,13 +91,11 @@ func (mw *MainWindow) loadBinary() {
 		if err.Error() == "Cancelled" {
 			return
 		}
-		// dialog.ShowError(err, mw)
-		mw.Log(err.Error())
+		mw.Error(err)
 		return
 	}
 	if err := mw.LoadSymbolsFromFile(filename); err != nil {
-		// dialog.ShowError(err, mw)
-		mw.Log(err.Error())
+		mw.Error(err)
 		return
 	}
 }
@@ -87,75 +106,27 @@ func (mw *MainWindow) playLog() {
 		if err.Error() == "Cancelled" {
 			return
 		}
-		// dialog.ShowError(err, mw)
-		mw.Log(err.Error())
+		mw.Error(err)
 		return
 	}
 	go NewLogPlayer(mw.app, filename, mw.fw)
 }
 
-func (mw *MainWindow) openMapz(typ symbol.ECUType, mapNames ...string) {
-	if mw.fw == nil {
-		mw.Log("No binary loaded")
-		return
-	}
-	joinedNames := strings.Join(mapNames, "|")
-	mv, found := mw.openMaps[joinedNames]
-	if !found {
-		w := mw.app.NewWindow(strings.Join(mapNames, ", ") + " - Map Viewer")
-		view, err := widgets.NewMapViewerMulti(typ, mw.fw, mapNames...)
-		if err != nil {
-			mw.Log(err.Error())
-			return
-		}
-
-		mw.openMaps[joinedNames] = w
-
-		var cancelFuncs []func()
-		for _, mv := range view.Children() {
-			xf := mv.Info().XFrom
-			yf := mv.Info().YFrom
-			if xf != "" {
-				cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(xf, func(value float64) {
-					mv.SetValue(xf, value)
-				}))
-			}
-			if yf != "" {
-				cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(yf, func(value float64) {
-					mv.SetValue(yf, value)
-				}))
-			}
-		}
-
-		w.SetCloseIntercept(func() {
-			delete(mw.openMaps, joinedNames)
-			for _, f := range cancelFuncs {
-				f()
-			}
-			w.Close()
-		})
-
-		w.SetContent(view)
-		w.Show()
-		return
-	}
-	mv.RequestFocus()
-}
-
 func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	if mw.fw == nil {
-		mw.Log("No binary loaded")
+		mw.Error(fmt.Errorf("no binary loaded"))
 		return
 	}
+
 	axis := symbol.GetInfo(typ, mapName)
-	mww, found := mw.openMaps[axis.Z]
-	if found {
-		mww.RequestFocus()
+
+	if mw.wm.Exists(axis.Z + " - " + axis.ZDescription) {
 		return
 	}
+
 	xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := mw.fw.GetXYZ(axis.X, axis.Y, axis.Z)
 	if err != nil {
-		mw.Log(err.Error())
+		mw.Error(err)
 		return
 	}
 
@@ -186,7 +157,8 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 			start := time.Now()
 			if err := mw.dlc.SetRAM(addr+uint32(idx*dataLen), buff.Bytes()); err != nil {
-				mw.Log(err.Error())
+				mw.Error(err)
+				return
 			}
 			mw.Log(fmt.Sprintf("set %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 		}
@@ -208,7 +180,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 			data, err := mw.dlc.GetRAM(addr, uint32(symZ.Length))
 			if err != nil {
-				mw.Log(err.Error())
+				mw.Error(err)
 				return
 			}
 			ints := symZ.BytesToInts(data)
@@ -232,7 +204,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		}
 
 		if err := mw.dlc.SetRAM(startPos, buff.Bytes()); err != nil {
-			mw.Log(err.Error())
+			mw.Error(err)
 			return
 		}
 		buff.Reset()
@@ -247,11 +219,11 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			return
 		}
 		if err := ss.SetData(ss.EncodeInts(data)); err != nil {
-			mw.Log(err.Error())
+			mw.Error(err)
 			return
 		}
 		if err := mw.fw.Save(mw.filename); err != nil {
-			mw.Log(err.Error())
+			mw.Error(err)
 			return
 		}
 		mw.Log(fmt.Sprintf("Saved %s", axis.Z))
@@ -289,7 +261,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		widgets.WithAxisLabels(axis.XDescription, axis.YDescription, axis.ZDescription),
 	)
 	if err != nil {
-		mw.Log(err.Error())
+		mw.Error(err)
 		return
 	}
 
@@ -319,17 +291,28 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		loadFunc()
 		p.Hide()
 	}
-	// mw.tab.Append(container.NewTabItem(axis.Z, mv))
-	w := mw.app.NewWindow(axis.Z + " - " + axis.ZDescription)
-	w.Canvas().SetOnTypedKey(mv.TypedKey)
-	mw.openMaps[axis.Z] = w
-	w.SetCloseIntercept(func() {
-		delete(mw.openMaps, axis.Z)
+
+	mapWindow := newInnerWindow(axis.Z+" - "+axis.ZDescription, mv)
+	mapWindow.Icon = theme.GridIcon()
+	mapWindow.CloseIntercept = func() {
 		for _, f := range cancelFuncs {
 			f()
 		}
-		w.Close()
-	})
-	w.SetContent(mv)
-	w.Show()
+		mw.wm.Remove(mapWindow)
+	}
+	mw.wm.Add(mapWindow)
+	/*
+		w := mw.app.NewWindow(axis.Z + " - " + axis.ZDescription)
+
+		mw.openMaps[axis.Z] = w
+		w.SetCloseIntercept(func() {
+			delete(mw.openMaps, axis.Z)
+			for _, f := range cancelFuncs {
+				f()
+			}
+			w.Close()
+		})
+		w.SetContent(mv)
+		w.Show()
+	*/
 }

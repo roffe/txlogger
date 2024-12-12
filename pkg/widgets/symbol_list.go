@@ -168,6 +168,10 @@ func (s *SymbolListWidget) Symbols() []*symbol.Symbol {
 	return out
 }
 
+func (s *SymbolListWidget) MinSize() fyne.Size {
+	return fyne.NewSize(750, float32(len(s.symbols)*30)+60)
+}
+
 func (s *SymbolListWidget) CreateRenderer() fyne.WidgetRenderer {
 	name := widget.NewLabel("Name")
 	name.TextStyle = fyne.TextStyle{Bold: true}
@@ -216,7 +220,7 @@ func (h *headerLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 }
 
 func (h *headerLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(300, 30)
+	return fyne.NewSize(400, 30)
 }
 
 type SymbolWidgetEntry struct {
@@ -369,7 +373,7 @@ func (s *symbolWidgetEntryRenderer) Layout(size fyne.Size) {
 }
 
 func (s *symbolWidgetEntryRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(300, 36)
+	return fyne.NewSize(400, 36)
 }
 
 func (s *symbolWidgetEntryRenderer) Objects() []fyne.CanvasObject {

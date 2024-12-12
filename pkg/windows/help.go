@@ -15,18 +15,25 @@ import (
 	"github.com/roffe/txlogger/pkg/assets"
 )
 
-func Help(app fyne.App) {
+func Help() *container.AppTabs {
 	kvaserLogo := canvas.NewImageFromResource(fyne.NewStaticResource("kvaser_logo.png", assets.KvaserLogoBytes))
 	kvaserLogo.SetMinSize(fyne.NewSize(190, 117))
 	kvaserLogo.FillMode = canvas.ImageFillContain
 	kvaserLogo.ScaleMode = canvas.ImageScaleSmooth
 
-	w := app.NewWindow("Help")
-	w.Resize(fyne.NewSize(500, 300))
+	mackanizedLogo := canvas.NewImageFromResource(fyne.NewStaticResource("mackanized.png", assets.MackanizedBytes))
+	mackanizedLogo.SetMinSize(fyne.NewSize(302, 80))
+	mackanizedLogo.FillMode = canvas.ImageFillContain
+	mackanizedLogo.ScaleMode = canvas.ImageScaleSmooth
 
 	tx, _ := url.Parse("https://txlogger.com")
 	tt, _ := url.Parse("https://www.trionictuning.com")
 	kv, _ := url.Parse("https://www.kvaser.com")
+	mk, _ := url.Parse("https://www.mackanized.eu/")
+
+	mkLink := widget.NewHyperlink("Mackanized", mk)
+	mkLink.Alignment = fyne.TextAlignCenter
+
 	kvLink := widget.NewHyperlink("Kvaser AB", kv)
 	kvLink.Alignment = fyne.TextAlignCenter
 
@@ -40,13 +47,13 @@ func Help(app fyne.App) {
 				nil,
 				container.NewVBox(
 					widget.NewHyperlink("txlogger.com", tx),
-					widget.NewLabel("Version: "+app.Metadata().Version+" Build: "+strconv.Itoa(app.Metadata().Build)),
+					widget.NewLabel("Version: "+fyne.CurrentApp().Metadata().Version+" Build: "+strconv.Itoa(fyne.CurrentApp().Metadata().Build)),
 					widget.NewLabel("Author: Joakim \"Roffe\" Karlsson"),
 					widget.NewLabel("Special thanks to:"),
 					widget.NewLabel("SAAB for making the cars we ❤️❤️❤️"),
 					widget.NewLabel("MattiasC, Dilemma, J.K Nilsson, Manick"),
 					widget.NewLabel("Artursson, Schottis, Chriva, Myrtilos"),
-					widget.NewLabel("Mackan, Kalej, Bojer"),
+					widget.NewLabel("Mackan, Kalej, Bojer, Saab74"),
 					widget.NewLabel("catavares, Richardc9052, rk3"),
 					widget.NewHyperlink("TrionicTuning", tt),
 					widget.NewLabel("o2o Crew"),
@@ -59,6 +66,13 @@ func Help(app fyne.App) {
 						nil,
 						nil,
 						kvaserLogo,
+					),
+					container.NewBorder(
+						nil,
+						mkLink,
+						nil,
+						nil,
+						mackanizedLogo,
 					),
 					layout.NewSpacer(),
 				),
@@ -85,6 +99,5 @@ func Help(app fyne.App) {
 			)),
 		),
 	)
-	w.SetContent(tabs)
-	w.Show()
+	return tabs
 }

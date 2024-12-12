@@ -8,7 +8,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/common"
@@ -29,9 +28,9 @@ type Dashboard struct {
 	limpMode    *canvas.Image
 	knockIcon   *widgets.Icon
 
-	fullscreenBtn *widget.Button
-	closeBtn      *widget.Button
-	logBtn        *widget.Button
+	//fullscreenBtn *widget.Button
+	//closeBtn      *widget.Button
+	//logBtn *widget.Button
 
 	//dbgBar *fyne.Container
 
@@ -57,10 +56,10 @@ type Gauges struct {
 }
 
 type Config struct {
-	App             fyne.App
-	Mw              fyne.Window
-	Logplayer       bool
-	LogBtn          *widget.Button
+	App       fyne.App
+	Mw        fyne.Window
+	Logplayer bool
+	// LogBtn          *widget.Button
 	OnClose         func()
 	AirDemToString  func(float64) string
 	FCutToString    func(float64) string
@@ -86,8 +85,8 @@ func NewDashboard(cfg *Config) *Dashboard {
 	}
 
 	db := &Dashboard{
-		cfg:       cfg,
-		logBtn:    cfg.LogBtn,
+		cfg: cfg,
+		//logBtn:    cfg.LogBtn,
 		logplayer: cfg.Logplayer,
 		gauges: Gauges{
 			airmass: widgets.NewDualDial(widgets.DualDialConfig{
@@ -209,9 +208,9 @@ func NewDashboard(cfg *Config) *Dashboard {
 			},
 		},
 		checkEngine: canvas.NewImageFromResource(fyne.NewStaticResource("checkengine.png", assets.CheckengineBytes)),
-		fullscreenBtn: widget.NewButtonWithIcon("Fullscreen", theme.ZoomFitIcon(), func() {
-			cfg.Mw.SetFullScreen(!cfg.Mw.FullScreen())
-		}),
+		// fullscreenBtn: widget.NewButtonWithIcon("Fullscreen", theme.ZoomFitIcon(), func() {
+		// 	cfg.Mw.SetFullScreen(!cfg.Mw.FullScreen())
+		// }),
 		knockIcon: widgets.NewIcon(&widgets.IconConfig{
 			Image:   canvas.NewImageFromResource(fyne.NewStaticResource("knock.png", assets.KnockBytes)),
 			Minsize: fyne.NewSize(90, 90),
@@ -222,11 +221,11 @@ func NewDashboard(cfg *Config) *Dashboard {
 
 	db.metricRouter = db.createRouter()
 
-	db.closeBtn = widget.NewButtonWithIcon("Back", theme.NavigateBackIcon(), func() {
-		if db.cfg.OnClose != nil {
-			db.cfg.OnClose()
-		}
-	})
+	// db.closeBtn = widget.NewButtonWithIcon("Back", theme.NavigateBackIcon(), func() {
+	// 	if db.cfg.OnClose != nil {
+	// 		db.cfg.OnClose()
+	// 	}
+	// })
 
 	if cfg.Logplayer {
 		db.text.time = canvas.NewText("00:00:00.00", color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF})
@@ -520,8 +519,13 @@ type dims struct {
 }
 
 func layoutMainDials(db *Dashboard, space fyne.Size, dims *dims) {
+
+	left := db.gauges.pwm.Position().X + db.gauges.pwm.Size().Width
+	right := db.gauges.throttle.Position().X
+	width := right - left
+
 	centerDialSize := fyne.NewSize(
-		space.Width,
+		width,
 		space.Height-125,
 	)
 	centerDialPos := fyne.NewPos(
@@ -608,29 +612,29 @@ func layoutIcons(db *Dashboard, space fyne.Size, dims *dims) {
 
 func layoutButtons(db *Dashboard, space fyne.Size, dims *dims) {
 	// Close button
-	db.closeBtn.Resize(fyne.NewSize(dims.sixthWidth, 55))
-	db.closeBtn.Move(fyne.NewPos(space.Width-dims.sixthWidth, dims.bottomY))
+	//db.closeBtn.Resize(fyne.NewSize(dims.sixthWidth, 55))
+	//db.closeBtn.Move(fyne.NewPos(space.Width-dims.sixthWidth, dims.bottomY))
 
 	if !db.logplayer {
-		// Fullscreen button sizing based on screen width
-		if space.Width < 1000 {
-			db.fullscreenBtn.SetText("(F)")
-			db.fullscreenBtn.Resize(fyne.NewSize(dims.sixthWidth*common.OneHalfOne, 55))
-		} else if space.Width < 1300 {
-			db.fullscreenBtn.SetText("Fullscrn")
-			db.fullscreenBtn.Resize(fyne.NewSize(dims.sixthWidth*common.OneOneEight, 55))
-		} else {
-			db.fullscreenBtn.SetText("Fullscreen")
-			db.fullscreenBtn.Resize(fyne.NewSize(dims.sixthWidth*common.OneOneFive, 55))
-		}
-
-		// Log button
-		db.logBtn.Resize(fyne.NewSize(db.gauges.wblambda.Position().X-db.fullscreenBtn.Size().Width-14, 55))
-		db.logBtn.Move(fyne.NewPos(db.fullscreenBtn.Size().Width+5, dims.bottomY))
+		//// Fullscreen button sizing based on screen width
+		//if space.Width < 1000 {
+		//	db.fullscreenBtn.SetText("(F)")
+		//	db.fullscreenBtn.Resize(fyne.NewSize(dims.sixthWidth*common.OneHalfOne, 55))
+		//} else if space.Width < 1300 {
+		//	db.fullscreenBtn.SetText("Fullscrn")
+		//	db.fullscreenBtn.Resize(fyne.NewSize(dims.sixthWidth*common.OneOneEight, 55))
+		//} else {
+		//	db.fullscreenBtn.SetText("Fullscreen")
+		//	db.fullscreenBtn.Resize(fyne.NewSize(dims.sixthWidth*common.OneOneFive, 55))
+		//}
+		//
+		//// Log button
+		//db.logBtn.Resize(fyne.NewSize(db.gauges.wblambda.Position().X-db.fullscreenBtn.Size().Width-14, 55))
+		//db.logBtn.Move(fyne.NewPos(db.fullscreenBtn.Size().Width+5, dims.bottomY))
 	} else {
 		db.text.time.Move(fyne.NewPos(dims.centerX-100, space.Height*common.OneHalfSix))
 	}
-	db.fullscreenBtn.Move(fyne.NewPos(0, dims.bottomY))
+	//db.fullscreenBtn.Move(fyne.NewPos(0, dims.bottomY))
 }
 
 func layoutTexts(db *Dashboard, space fyne.Size, dims *dims) {
@@ -709,14 +713,14 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	// Layout horizontal bars
 	layoutHorizontalBars(dr.db, space, dims)
 
-	// Layout main dials
-	layoutMainDials(dr.db, space, dims)
-
 	// Layout side dials
 	layoutSideDials(dr.db, space, dims)
 
 	// Layout vertical bars
 	layoutVerticalBars(dr.db, space, dims)
+
+	// Layout main dials
+	layoutMainDials(dr.db, space, dims)
 
 	// Layout icons
 	layoutIcons(dr.db, space, dims)
@@ -732,7 +736,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 }
 
 func (dr *DashboardRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(400, 250)
+	return fyne.NewSize(550, 300)
 }
 
 func (dr *DashboardRenderer) Refresh() {
@@ -770,9 +774,9 @@ func (dr *DashboardRenderer) Objects() []fyne.CanvasObject {
 	}
 
 	if !dr.db.logplayer {
-		cont = append(cont, dr.db.fullscreenBtn)
-		cont = append(cont, dr.db.closeBtn)
-		cont = append(cont, dr.db.logBtn)
+		// cont = append(cont, dr.db.fullscreenBtn)
+		// cont = append(cont, dr.db.closeBtn)
+		// cont = append(cont, dr.db.logBtn)
 	} else {
 		cont = append(cont, dr.db.text.time)
 	}

@@ -28,14 +28,16 @@ func (mw *MainWindow) loadPrefs(filename string) {
 	if filename == "" {
 		if filename := mw.app.Preferences().String(prefsLastBinFile); filename != "" {
 			if err := mw.LoadSymbolsFromFile(filename); err != nil {
-				mw.Log(err.Error())
+				mw.Error(err)
+				return
 			}
 			mw.filename = filename
 			return
 		}
 	} else {
 		if err := mw.LoadSymbolsFromFile(filename); err != nil {
-			mw.Log(err.Error())
+			mw.Error(err)
+			return
 		}
 		mw.filename = filename
 	}
@@ -55,7 +57,7 @@ func (mw *MainWindow) newOutputList() {
 			i := item.(binding.String)
 			txt, err := i.Get()
 			if err != nil {
-				mw.Log(err.Error())
+				mw.Error(err)
 				return
 			}
 			obj.(*widget.Label).SetText(txt)

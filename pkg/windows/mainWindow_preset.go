@@ -22,11 +22,11 @@ func (mw *MainWindow) savePreset() {
 		return
 	}
 	if err := presets.Set(mw.presetSelect.Selected, mw.symbolList.Symbols()); err != nil {
-		dialog.ShowError(err, mw)
+		mw.Error(err)
 		return
 	}
 	if err := presets.Save(mw.app); err != nil {
-		mw.Log(err.Error())
+		mw.Error(err)
 		return
 	}
 }
@@ -39,15 +39,15 @@ func (mw *MainWindow) newPreset() {
 		func(create bool) {
 			if create {
 				if presetName.Text == "" {
-					dialog.ShowError(fmt.Errorf("name can't be empty"), mw)
+					mw.Error(fmt.Errorf("name can't be empty"))
 					return
 				}
 				if err := presets.Set(presetName.Text, mw.symbolList.Symbols()); err != nil {
-					dialog.ShowError(err, mw)
+					mw.Error(err)
 					return
 				}
 				if err := presets.Save(mw.app); err != nil {
-					mw.Log(err.Error())
+					mw.Error(err)
 					return
 				}
 				mw.reloadPresets()
@@ -65,11 +65,11 @@ func (mw *MainWindow) importPreset() {
 		if err.Error() == "Cancelled" {
 			return
 		}
-		mw.Log(err.Error())
+		mw.Error(err)
 		return
 	}
 	if err := mw.LoadPreset(filename); err != nil {
-		mw.Log(err.Error())
+		mw.Error(err)
 		return
 	}
 	mw.SyncSymbols()
@@ -81,14 +81,14 @@ func (mw *MainWindow) exportPreset() {
 		if err.Error() == "Cancelled" {
 			return
 		}
-		mw.Log(err.Error())
+		mw.Error(err)
 		return
 	}
 	if !strings.HasSuffix(filename, ".txp") {
 		filename += ".txp"
 	}
 	if err := mw.SavePreset(filename); err != nil {
-		mw.Log(err.Error())
+		mw.Error(err)
 		return
 	}
 }
@@ -100,18 +100,18 @@ func (mw *MainWindow) deletePreset() {
 	}
 
 	if strings.EqualFold(mw.presetSelect.Selected, "T7 Dash") || strings.EqualFold(mw.presetSelect.Selected, "T8 Dash") {
-		dialog.ShowError(fmt.Errorf("can't delete built-in preset"), mw)
+		mw.Error(fmt.Errorf("can't delete built-in preset"))
 		return
 	}
 
 	dialog.ShowConfirm("Confirm preset delete", "Delete preset '"+mw.presetSelect.Selected+"', are you sure?", func(b bool) {
 		if b {
 			if err := presets.Delete(mw.presetSelect.Selected); err != nil {
-				dialog.ShowError(err, mw)
+				mw.Error(err)
 				return
 			}
 			if err := presets.Save(mw.app); err != nil {
-				mw.Log(err.Error())
+				mw.Error(err)
 				return
 			}
 			mw.reloadPresets()

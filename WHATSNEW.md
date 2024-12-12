@@ -1,6 +1,8 @@
 # 1.0.20
 
+  - Competely new UI! most windows & maps now opens inside the main window and is resizeable and arrangeable
   - Reworked legend to have a more "fixed size" and value moved to the left
+  - Fixed scaling of IOFF x-axis when live viewing BstKnkCal.MaxAirmass on T8
 
 # 1.0.19
 

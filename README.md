@@ -5,7 +5,7 @@ Blazing fast data logging for Trionic 7 & 8 ECU's found in Saab 9-5 & 9-3
 
 Created after discussions on [TrionicTuning](https://www.trionictuning.com/forum/viewtopic.php?f=34&t=14297)
 
-Built on top of [goCAN](https://github.com/roffe/gocan) and [Fyne](https://fyne.io/)
+Built on top of [goCAN](https://github.com/roffe/gocan)
 
 “Gone but never forgotten”
 

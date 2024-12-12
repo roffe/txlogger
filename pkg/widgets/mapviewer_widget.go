@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
@@ -122,12 +123,6 @@ func NewMapViewer(options ...MapViewerOption) (*MapViewer, error) {
 	if mv.numColumns*mv.numRows != mv.numData && mv.numColumns > 1 && mv.numRows > 1 {
 		return nil, fmt.Errorf("NewMapViewer columns * rows != datalen")
 	}
-
-	//go func() {
-	//	for xy := range mv.setChan {
-	//		mv.setXY(xy.x, xy.y)
-	//	}
-	//}()
 
 	return mv, nil
 }
@@ -457,6 +452,10 @@ func (mv *MapViewer) Refresh() {
 		}
 		mv.mesh.LoadFloat64s(values)
 	}
+}
+
+func (mv *MapViewer) Cursor() desktop.Cursor {
+	return desktop.CrosshairCursor
 }
 
 func (mv *MapViewer) CreateRenderer() fyne.WidgetRenderer {

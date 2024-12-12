@@ -249,7 +249,6 @@ func (c *DialRenderer) Objects() []fyne.CanvasObject {
 	for _, v := range c.pips {
 		objs = append(objs, v)
 	}
-
 	objs = append(objs, c.face, c.cover, c.titleText, c.center /*, c.highestObservedMarker*/, c.needle, c.displayText)
 	return objs
 }

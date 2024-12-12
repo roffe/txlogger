@@ -2,17 +2,20 @@ package windows
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path"
 	"strings"
+	"syscall"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/driver"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	xwidget "fyne.io/x/fyne/widget"
@@ -23,9 +26,8 @@ import (
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ecu"
-	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/mainmenu"
-	"github.com/roffe/txlogger/pkg/plotter"
+	"github.com/roffe/txlogger/pkg/multiwindow"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"golang.org/x/net/context"
@@ -55,27 +57,18 @@ type MainWindow struct {
 	addSymbolBtn *widget.Button
 	logBtn       *widget.Button
 
-	loadSymbolsEcuBtn  *widget.Button
-	loadSymbolsFileBtn *widget.Button
-	syncSymbolsBtn     *widget.Button
+	loadSymbolsEcuBtn *widget.Button
+	//loadSymbolsFileBtn *widget.Button
+	syncSymbolsBtn *widget.Button
 
 	dashboardBtn *widget.Button
-	plotterBtn   *widget.Button
 	logplayerBtn *widget.Button
-	helpBtn      *widget.Button
-	settingsBtn  *widget.Button
 
 	//loadConfigBtn *widget.Button
 	//saveConfigBtn *widget.Button
 	presetSelect *widget.Select
 
-	captureCounter binding.Int
-	errorCounter   binding.Int
-	fpsCounter     binding.Int
-
-	capturedCounterLabel *widget.Label
-	errorCounterLabel    *widget.Label
-	fpsLabel             *widget.Label
+	counters *mainWindowCounters
 
 	loggingRunning bool
 
@@ -85,61 +78,78 @@ type MainWindow struct {
 
 	dlc       datalogger.IClient
 	dashboard *dashboard.Dashboard
-	plotter   *plotter.Plotter
+
+	//mws *container.MultipleWindows
+	wm *windowManager
 
 	buttonsDisabled bool
 
-	leading *fyne.Container
-
 	settings *widgets.SettingsWidget
 
-	openMaps map[string]fyne.Window
+	//openMaps map[string]fyne.Window
 
-	tab *container.AppTabs
-	//doctab *container.DocTabs
 	statusText *widget.Label
 
-	otoCtx *oto.Context
+	oCtx *oto.Context
+
+	content *fyne.Container
 }
 
-func NewMainWindow(a fyne.App, filename string) *MainWindow {
+type mainWindowCounters struct {
+	captureCounter       binding.Int
+	capturedCounterLabel *widget.Label
 
-	op := &oto.NewContextOptions{}
+	errorCounter      binding.Int
+	errorCounterLabel *widget.Label
 
-	// Usually 44100 or 48000. Other values might cause distortions in Oto
-	op.SampleRate = 44100
+	fpsCounter binding.Int
+	fpsLabel   *widget.Label
+}
 
-	// Number of channels (aka locations) to play sounds from. Either 1 or 2.
-	// 1 is mono sound, and 2 is stereo (most speakers are stereo).
-	op.ChannelCount = 2
-
-	// Format of the source. go-mp3's format is signed 16bit integers.
-	op.Format = oto.FormatSignedInt16LE
-
-	// Remember that you should **not** create more than one context
-	otoCtx, readyChan, err := oto.NewContext(op)
+// Remember that you should **not** create more than one context
+func newSound() *oto.Context {
+	opts := &oto.NewContextOptions{
+		// Usually 44100 or 48000. Other values might cause distortions in Oto
+		SampleRate: 44100,
+		// Number of channels (aka locations) to play sounds from. Either 1 or 2.
+		// 1 is mono sound, and 2 is stereo (most speakers are stereo).
+		ChannelCount: 2,
+		// Format of the source. go-mp3's format is signed 16bit integers.
+		Format: oto.FormatSignedInt16LE,
+	}
+	otoCtx, readyChan, err := oto.NewContext(opts)
 	if err != nil {
 		panic("oto.NewContext failed: " + err.Error())
 	}
 	// It might take a bit for the hardware audio devices to be ready, so we wait on the channel.
-	<-readyChan
+	select {
+	case <-readyChan:
+		return otoCtx
+	case <-time.After(5 * time.Second):
+		fyne.LogError("oto", errors.New("timeout waiting for audio device"))
+		return nil
+	}
+}
+
+func NewMainWindow(a fyne.App, filename string) *MainWindow {
 
 	mw := &MainWindow{
-		Window:         a.NewWindow("txlogger"),
-		app:            a,
-		outputData:     binding.NewStringList(),
-		captureCounter: binding.NewInt(),
-		errorCounter:   binding.NewInt(),
-		fpsCounter:     binding.NewInt(),
+		Window:     a.NewWindow("txlogger"),
+		app:        a,
+		outputData: binding.NewStringList(),
 
-		openMaps: make(map[string]fyne.Window),
+		counters: &mainWindowCounters{
+			captureCounter: binding.NewInt(),
+			errorCounter:   binding.NewInt(),
+			fpsCounter:     binding.NewInt(),
+		},
 
 		statusText: widget.NewLabel("Harder, Better, Faster, Stronger"),
 
-		otoCtx: otoCtx,
+		oCtx: newSound(),
+		wm:   newWindowManager(),
 	}
-
-	mw.Resize(fyne.NewSize(1024, 768))
+	mw.Window.SetPadded(true)
 
 	updateSymbols := func(syms []*symbol.Symbol) {
 		if mw.dlc != nil {
@@ -147,7 +157,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 				if err.Error() == "pending" {
 					return
 				}
-				mw.Log(err.Error())
+				mw.Error(err)
 			}
 		}
 	}
@@ -173,7 +183,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		}
 		preset, err := presets.Get(s)
 		if err != nil {
-			dialog.ShowError(err, mw)
+			mw.Error(err)
 			return
 		}
 		mw.symbolList.LoadSymbols(preset...)
@@ -186,30 +196,30 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 	mw.newOutputList()
 	mw.newSymbolnameTypeahead()
 
-	mw.capturedCounterLabel = &widget.Label{
+	mw.counters.capturedCounterLabel = &widget.Label{
 		Alignment: fyne.TextAlignLeading,
 	}
-	mw.captureCounter.AddListener(binding.NewDataListener(func() {
-		if val, err := mw.captureCounter.Get(); err == nil {
-			mw.capturedCounterLabel.SetText(fmt.Sprintf("Cap: %d", val))
+	mw.counters.captureCounter.AddListener(binding.NewDataListener(func() {
+		if val, err := mw.counters.captureCounter.Get(); err == nil {
+			mw.counters.capturedCounterLabel.SetText(fmt.Sprintf("Cap: %d", val))
 		}
 	}))
 
-	mw.errorCounterLabel = &widget.Label{
+	mw.counters.errorCounterLabel = &widget.Label{
 		Alignment: fyne.TextAlignLeading,
 	}
-	mw.errorCounter.AddListener(binding.NewDataListener(func() {
-		if val, err := mw.errorCounter.Get(); err == nil {
-			mw.errorCounterLabel.SetText(fmt.Sprintf("Err: %d", val))
+	mw.counters.errorCounter.AddListener(binding.NewDataListener(func() {
+		if val, err := mw.counters.errorCounter.Get(); err == nil {
+			mw.counters.errorCounterLabel.SetText(fmt.Sprintf("Err: %d", val))
 		}
 	}))
 
-	mw.fpsLabel = &widget.Label{
+	mw.counters.fpsLabel = &widget.Label{
 		Alignment: fyne.TextAlignLeading,
 	}
-	mw.fpsCounter.AddListener(binding.NewDataListener(func() {
-		if val, err := mw.fpsCounter.Get(); err == nil {
-			mw.fpsLabel.SetText(fmt.Sprintf("Fps: %d", val))
+	mw.counters.fpsCounter.AddListener(binding.NewDataListener(func() {
+		if val, err := mw.counters.fpsCounter.Get(); err == nil {
+			mw.counters.fpsLabel.SetText(fmt.Sprintf("Fps: %d", val))
 		}
 	}))
 
@@ -222,15 +232,10 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		EcuSelect: mw.ecuSelect,
 	})
 
-	mw.setupTabs()
-
 	mw.loadPrefs(filename)
 	if mw.fw == nil {
 		mw.setTitle("No symbols loaded")
 	}
-
-	mw.SetMaster()
-	mw.SetContent(mw.tab)
 
 	mw.SetOnDropped(func(p fyne.Position, uris []fyne.URI) {
 		log.Println("Dropped", uris)
@@ -245,101 +250,120 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		}
 	})
 
-	mw.app.Driver().SetDisableScreenBlanking(true)
+	mw.content = container.NewBorder(
+		container.NewBorder(
+			nil,
+			nil,
+			container.NewHBox(
+				container.NewBorder(
+					nil,
+					nil,
+					widget.NewLabel("ECU"),
+					nil,
+					mw.ecuSelect,
+				),
+				container.NewBorder(
+					nil,
+					nil,
+					widget.NewLabel("Preset"),
+					nil,
+					mw.presetSelect,
+				),
+				widget.NewSeparator(),
+				widget.NewButtonWithIcon("Symbol list", theme.ListIcon(), func() {
+					if mw.wm.Exists("Symbol list") {
+						return
+					}
+					symbolListWindow := newInnerWindow("Symbol list", container.NewBorder(
+						container.NewVBox(
+							container.NewBorder(
+								nil,
+								nil,
+								widget.NewIcon(theme.SearchIcon()),
+								container.NewHBox(
+									mw.addSymbolBtn,
+									mw.loadSymbolsEcuBtn,
+									mw.syncSymbolsBtn,
+								),
+								mw.symbolLookup,
+							),
+						),
+						nil,
+						nil,
+						nil,
+						mw.symbolList,
+					))
+					symbolListWindow.Icon = theme.ListIcon()
+					symbolListWindow.CloseIntercept = func() {
+						mw.wm.Remove(symbolListWindow)
+					}
+					mw.wm.Add(symbolListWindow)
+					//symbolListWindow.Resize(fyne.NewSize(800, 700))
+				}),
 
+				mw.logBtn,
+			),
+			nil,
+			container.NewHBox(
+				mw.logplayerBtn,
+				mw.dashboardBtn,
+				widget.NewButtonWithIcon("Arrange", theme.GridIcon(), func() {
+					mw.wm.content.ArrangeWindows(multiwindow.MultipleWindowsArrangeLayoutGrid)
+				}),
+			),
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			nil,
+			container.NewGridWithColumns(4,
+				mw.counters.capturedCounterLabel,
+				mw.counters.errorCounterLabel,
+				mw.counters.fpsLabel,
+				widget.NewButtonWithIcon("Debug log", theme.InfoIcon(), func() {
+					if mw.wm.Exists("Debug log") {
+						return
+					}
+					debugWindow := newInnerWindow("Debug log", container.NewVScroll(mw.output))
+					debugWindow.Icon = theme.ContentCopyIcon()
+					debugWindow.OnTappedIcon = func() {
+						str, err := mw.outputData.Get()
+						if err != nil {
+							mw.Error(err)
+							return
+						}
+						fyne.CurrentApp().Clipboard().SetContent(strings.Join(str, "\n"))
+						dialog.ShowInformation("Debug log", "Content copied to clipboard", mw)
+					}
+					mw.wm.Add(debugWindow)
+					debugWindow.CloseIntercept = func() {
+						mw.wm.Remove(debugWindow)
+					}
+
+					debugWindow.Resize(fyne.NewSize(350, 500))
+					mw.output.ScrollToBottom()
+				}),
+			),
+			mw.statusText,
+		),
+		nil,
+		nil,
+		mw.wm.content,
+	)
+	mw.SetContent(mw.content)
+	mw.Resize(fyne.NewSize(1024, 768))
+	mw.CenterOnScreen()
+	mw.SetMaster()
 	return mw
 }
+
 func (mw *MainWindow) CloseIntercept() {
 	if mw.dlc != nil {
 		mw.dlc.Close()
 		time.Sleep(500 * time.Millisecond)
 	}
-	//mw.SaveSymbolList()
 	debug.Close()
 	mw.Close()
-}
-
-func (mw *MainWindow) createLeading() *fyne.Container {
-	return container.NewBorder(
-		container.NewVBox(
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewIcon(theme.SearchIcon()),
-				container.NewHBox(
-					mw.addSymbolBtn,
-					mw.loadSymbolsFileBtn,
-					mw.loadSymbolsEcuBtn,
-					mw.syncSymbolsBtn,
-				),
-				mw.symbolLookup,
-			),
-		),
-		container.NewGridWithColumns(1,
-			mw.statusText,
-		),
-		nil,
-		nil,
-		mw.symbolList,
-	)
-}
-
-func (mw *MainWindow) setupTabs() {
-
-	mw.leading = mw.createLeading()
-	mw.tab = container.NewAppTabs()
-
-	bottomSplit := container.NewVSplit(
-		mw.output,
-		container.NewVBox(
-			mw.dashboardBtn,
-			//mw.plotterBtn,
-			mw.logplayerBtn,
-			mw.helpBtn,
-			//mw.settingsBtn,
-			container.NewGridWithColumns(3,
-				mw.capturedCounterLabel,
-				mw.errorCounterLabel,
-				mw.fpsLabel,
-			),
-		),
-	)
-	bottomSplit.SetOffset(0.9)
-
-	trailing := container.NewVSplit(
-		container.NewVBox(
-			container.NewBorder(
-				nil,
-				nil,
-				layout.NewFixedWidth(75, widget.NewLabel("ECU")),
-				nil,
-				mw.ecuSelect,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				layout.NewFixedWidth(75, widget.NewLabel("Preset")),
-				nil,
-				mw.presetSelect,
-			),
-			mw.logBtn,
-		),
-		bottomSplit,
-	)
-	trailing.SetOffset(0.1)
-
-	hsplit := container.NewHSplit(
-		mw.leading,
-		trailing,
-	)
-	hsplit.SetOffset(0.8)
-
-	// E85.X_EthAct_Tech2
-	//
-
-	mw.tab.Append(container.NewTabItemWithIcon("Logging", theme.ListIcon(), hsplit))
-	//mw.tab.Append(container.NewTabItemWithIcon("T7", theme.ComputerIcon(), NewT7Extras(mw, fyne.NewSize(200, 100))))
-	mw.tab.Append(container.NewTabItemWithIcon("Settings", theme.SettingsIcon(), mw.settings))
 }
 
 func (mw *MainWindow) Log(s string) {
@@ -348,9 +372,15 @@ func (mw *MainWindow) Log(s string) {
 	mw.output.ScrollToBottom()
 }
 
+func (mw *MainWindow) Error(err error) {
+	debug.Log("error:" + err.Error())
+	mw.outputData.Append(err.Error())
+	mw.output.ScrollToBottom()
+	dialog.ShowError(err, mw)
+}
+
 func (mw *MainWindow) SyncSymbols() {
 	if mw.fw == nil {
-		//mw.Log("Load bin to sync symbols")
 		return
 	}
 	cnt := 0
@@ -376,7 +406,7 @@ func (mw *MainWindow) SyncSymbols() {
 func (mw *MainWindow) Disable() {
 	mw.buttonsDisabled = true
 	mw.addSymbolBtn.Disable()
-	mw.loadSymbolsFileBtn.Disable()
+	//mw.loadSymbolsFileBtn.Disable()
 	mw.loadSymbolsEcuBtn.Disable()
 	mw.syncSymbolsBtn.Disable()
 	if !mw.loggingRunning {
@@ -390,7 +420,7 @@ func (mw *MainWindow) Disable() {
 func (mw *MainWindow) Enable() {
 	mw.buttonsDisabled = false
 	mw.addSymbolBtn.Enable()
-	mw.loadSymbolsFileBtn.Enable()
+	//mw.loadSymbolsFileBtn.Enable()
 	mw.loadSymbolsEcuBtn.Enable()
 	mw.syncSymbolsBtn.Enable()
 	mw.logBtn.Enable()
@@ -479,4 +509,58 @@ func (mw *MainWindow) SavePreset(filename string) error {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 	return nil
+}
+
+// -----
+
+var (
+	u32             = syscall.NewLazyDLL("user32.dll")
+	procPostMessage = u32.NewProc("PostMessageW")
+)
+
+const (
+	WM_SYSCOMMAND = 274
+	SC_RESTORE    = 0xF120
+	SC_MINIMIZE   = 0xF020
+	SC_MAXIMIZE   = 0xF030
+)
+
+func PostMessage(hwnd uintptr, msg uint32, wParam, lParam uintptr) bool {
+	ret, _, _ := procPostMessage.Call(hwnd, uintptr(msg), wParam, lParam)
+	return ret != 0
+}
+func (mw *MainWindow) Maximize() {
+	ctx, ok := mw.Window.(driver.NativeWindow)
+	if ok {
+		ctx.RunNative(func(c any) {
+			switch t := c.(type) {
+			case driver.WindowsWindowContext:
+				PostMessage(t.HWND, WM_SYSCOMMAND, SC_MAXIMIZE, 0)
+			}
+		})
+	}
+}
+
+func (mw *MainWindow) Minimize() {
+	ctx, ok := mw.Window.(driver.NativeWindow)
+	if ok {
+		ctx.RunNative(func(c any) {
+			switch t := c.(type) {
+			case driver.WindowsWindowContext:
+				PostMessage(t.HWND, WM_SYSCOMMAND, SC_MINIMIZE, 0)
+			}
+		})
+	}
+}
+
+func (mw *MainWindow) Restore() {
+	ctx, ok := mw.Window.(driver.NativeWindow)
+	if ok {
+		ctx.RunNative(func(c any) {
+			switch t := c.(type) {
+			case driver.WindowsWindowContext:
+				PostMessage(t.HWND, WM_SYSCOMMAND, SC_RESTORE, 0)
+			}
+		})
+	}
 }

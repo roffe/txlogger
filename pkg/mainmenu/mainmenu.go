@@ -168,11 +168,10 @@ type MainMenu struct {
 	otherFunc func(string)
 }
 
-func New(w fyne.Window, menus []*fyne.Menu, oneFunc func(symbol.ECUType, string), multiFunc func(symbol.ECUType, ...string), otherFunc func(string)) *MainMenu {
+func New(w fyne.Window, menus []*fyne.Menu, oneFunc func(symbol.ECUType, string), otherFunc func(string)) *MainMenu {
 	return &MainMenu{
 		w:         w,
 		oneFunc:   oneFunc,
-		multiFunc: multiFunc,
 		menus:     menus,
 		otherFunc: otherFunc,
 	}
