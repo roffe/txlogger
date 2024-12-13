@@ -1,7 +1,6 @@
 package windows
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -10,10 +9,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 	xwidget "fyne.io/x/fyne/widget"
 )
-
-func (mw *MainWindow) setTitle(str string) {
-	mw.SetTitle(fmt.Sprintf("txlogger - %s", str))
-}
 
 func (mw *MainWindow) loadPrefs(filename string) {
 	if ecu := mw.app.Preferences().StringWithFallback(prefsSelectedECU, "T7"); ecu != "" {
