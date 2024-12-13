@@ -18,47 +18,57 @@ func newInnerWindow(title string, content fyne.CanvasObject) *innerWindow {
 }
 
 type windowHistory struct {
-	position fyne.Position
-	size     fyne.Size
+	position         fyne.Position
+	size             fyne.Size
+	maximized        bool
+	preMaximizedPos  fyne.Position
+	preMaximizedSize fyne.Size
 }
 
 type windowManager struct {
 	open    map[string]*innerWindow
 	history map[string]windowHistory
-	content *multiwindow.MultipleWindows
 	mu      sync.RWMutex
 
+	*multiwindow.MultipleWindows
 	openOffset fyne.Position
 }
 
 func newWindowManager() *windowManager {
 	wm := &windowManager{
-		open:    make(map[string]*innerWindow),
-		history: make(map[string]windowHistory),
-		content: multiwindow.NewMultipleWindows(),
+		open:            make(map[string]*innerWindow),
+		history:         make(map[string]windowHistory),
+		MultipleWindows: multiwindow.NewMultipleWindows(),
 	}
-	wm.content.LockViewport = true
+	wm.MultipleWindows.LockViewport = true
 	return wm
 }
 
-func (wm *windowManager) Exists(title string) bool {
+func (wm *windowManager) HasWindow(title string) bool {
 	wm.mu.RLock()
 	defer wm.mu.RUnlock()
 	w, ok := wm.open[title]
 	if ok {
-		wm.content.Raise(w.InnerWindow)
+		wm.MultipleWindows.Raise(w.InnerWindow)
 	}
 	return ok
 }
 
 func (wm *windowManager) Add(w *innerWindow) {
+	if wm.HasWindow(w.Title()) {
+		return
+	}
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 	wm.open[w.Title()] = w
+
+	wm.MultipleWindows.Add(w.InnerWindow)
+
 	h, found := wm.history[w.Title()]
 	if found {
 		w.Move(h.position)
 		w.Resize(h.size)
+		w.SetMaximized(h.maximized, h.preMaximizedPos, h.preMaximizedSize)
 	} else {
 		w.Move(wm.openOffset)
 		wm.openOffset = wm.openOffset.AddXY(15, 15)
@@ -67,18 +77,23 @@ func (wm *windowManager) Add(w *innerWindow) {
 			wm.openOffset.Y = 0
 		}
 	}
-	wm.content.Add(w.InnerWindow)
 }
 
 func (wm *windowManager) Remove(w *innerWindow) {
-	delete(wm.open, w.Title())
-	wm.content.Remove(w.InnerWindow)
-	wm.history[w.Title()] = windowHistory{
-		position: w.Position(),
-		size:     w.Size(),
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+	title := w.Title()
+	delete(wm.open, title)
+	wm.MultipleWindows.Remove(w.InnerWindow)
+	wm.history[title] = windowHistory{
+		position:         w.Position(),
+		size:             w.Size(),
+		maximized:        w.Maximized(),
+		preMaximizedPos:  w.PreMaximizedPos(),
+		preMaximizedSize: w.PreMaximizedSize(),
 	}
 }
 
 func (wm *windowManager) Size() fyne.Size {
-	return wm.content.Size()
+	return wm.MultipleWindows.Size()
 }

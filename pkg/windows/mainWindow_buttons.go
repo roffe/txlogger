@@ -17,14 +17,12 @@ import (
 )
 
 func (mw *MainWindow) createButtons() {
-	mw.addSymbolBtn = mw.addSymbolBtnFunc()
-	//mw.loadSymbolsFileBtn = mw.loadSymbolsFileBtnFunc()
-	mw.loadSymbolsEcuBtn = mw.loadSymbolsEcuBtnFunc()
-	mw.syncSymbolsBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), mw.SyncSymbols)
-	mw.dashboardBtn = mw.newDashboardBtn()
-
-	mw.logplayerBtn = mw.newLogplayerBtn()
-	mw.logBtn = mw.newLogBtn()
+	mw.buttons.addSymbolBtn = mw.addSymbolBtnFunc()
+	mw.buttons.loadSymbolsEcuBtn = mw.loadSymbolsEcuBtnFunc()
+	mw.buttons.syncSymbolsBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), mw.SyncSymbols)
+	mw.buttons.dashboardBtn = mw.newDashboardBtn()
+	mw.buttons.logplayerBtn = mw.newLogplayerBtn()
+	mw.buttons.logBtn = mw.newLogBtn()
 }
 
 func (mw *MainWindow) addSymbolBtnFunc() *widget.Button {
@@ -93,7 +91,7 @@ func (mw *MainWindow) newLogBtn() *widget.Button {
 
 func (mw *MainWindow) newDashboardBtn() *widget.Button {
 	return widget.NewButtonWithIcon("Dashboard", theme.InfoIcon(), func() {
-		if mw.wm.Exists("Dashboard") {
+		if mw.wm.HasWindow("Dashboard") {
 			return
 		}
 
@@ -192,8 +190,8 @@ func (mw *MainWindow) startLogging() {
 
 	mw.loggingRunning = true
 
-	mw.logBtn.SetIcon(theme.MediaStopIcon())
-	mw.logBtn.SetText("Stop")
+	mw.buttons.logBtn.SetIcon(theme.MediaStopIcon())
+	mw.buttons.logBtn.SetText("Stop")
 	mw.Disable()
 
 	//var cancel func()
@@ -222,8 +220,8 @@ func (mw *MainWindow) startLogging() {
 		}
 		mw.dlc = nil
 		mw.loggingRunning = false
-		mw.logBtn.SetIcon(theme.MediaPlayIcon())
-		mw.logBtn.SetText("Start")
+		mw.buttons.logBtn.SetIcon(theme.MediaPlayIcon())
+		mw.buttons.logBtn.SetText("Start")
 	}()
 }
 

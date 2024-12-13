@@ -36,7 +36,7 @@ func (mw *MainWindow) setupMenu() {
 				}
 			}),
 			fyne.NewMenuItem("Settings", func() {
-				if mw.wm.Exists("Settings") {
+				if mw.wm.HasWindow("Settings") {
 					return
 				}
 				inner := newInnerWindow("Settings", mw.settings)
@@ -47,7 +47,7 @@ func (mw *MainWindow) setupMenu() {
 				mw.wm.Add(inner)
 			}),
 			fyne.NewMenuItem("Help", func() {
-				if mw.wm.Exists("Help") {
+				if mw.wm.HasWindow("Help") {
 					return
 				}
 				inner := newInnerWindow("Help", Help())
@@ -67,14 +67,14 @@ func (mw *MainWindow) setupMenu() {
 		),
 		fyne.NewMenu("Other",
 			fyne.NewMenuItem("Update txbridge firmware", func() {
-				w := mw.app.NewWindow("txbridge firmware updater")
-				w.SetContent(
-					widgets.NewTxUpdater(
-						mw.settings.CanSettings.GetSerialPort(),
-					),
-				)
-				w.Resize(fyne.NewSize(400, 300))
-				w.Show()
+				updater := newInnerWindow("txbridge firmware updater", widgets.NewTxUpdater(
+					mw.settings.CanSettings.GetSerialPort(),
+				))
+				updater.Icon = theme.DownloadIcon()
+				updater.CloseIntercept = func() {
+					mw.wm.Remove(updater)
+				}
+				mw.wm.Add(updater)
 			}),
 		),
 	}
@@ -120,7 +120,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 	axis := symbol.GetInfo(typ, mapName)
 
-	if mw.wm.Exists(axis.Z + " - " + axis.ZDescription) {
+	if mw.wm.HasWindow(axis.Z + " - " + axis.ZDescription) {
 		return
 	}
 

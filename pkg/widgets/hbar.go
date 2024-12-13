@@ -53,7 +53,7 @@ func NewHBar(cfg *HBarConfig) *HBar {
 }
 
 func (s *HBar) render() {
-	s.face = &canvas.Rectangle{StrokeColor: theme.DisabledColor(), StrokeWidth: 2}
+	s.face = &canvas.Rectangle{StrokeColor: theme.Color(theme.ColorNameDisabled), StrokeWidth: 2}
 
 	s.barRect = &canvas.Rectangle{FillColor: color.RGBA{0x2C, 0xA5, 0x00, 0x80}}
 

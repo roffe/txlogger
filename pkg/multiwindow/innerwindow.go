@@ -10,7 +10,6 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/txlogger/pkg/assets"
 )
 
 var _ fyne.Widget = (*InnerWindow)(nil)
@@ -38,6 +37,7 @@ type InnerWindow struct {
 
 	maximized        bool
 	active           bool
+	leftDrag         bool
 	preMaximizedSize fyne.Size
 	preMaximizedPos  fyne.Position
 }
@@ -52,6 +52,24 @@ func NewInnerWindow(title string, content fyne.CanvasObject) *InnerWindow {
 	}
 	w.ExtendBaseWidget(w)
 	return w
+}
+
+func (w *InnerWindow) Maximized() bool {
+	return w.maximized
+}
+
+func (w *InnerWindow) SetMaximized(maximized bool, prePos fyne.Position, preSize fyne.Size) {
+	w.maximized = maximized
+	w.preMaximizedPos = prePos
+	w.preMaximizedSize = preSize
+}
+
+func (w *InnerWindow) PreMaximizedSize() fyne.Size {
+	return w.preMaximizedSize
+}
+
+func (w *InnerWindow) PreMaximizedPos() fyne.Position {
+	return w.preMaximizedPos
 }
 
 func (w *InnerWindow) Close() {
@@ -111,11 +129,12 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 	v := fyne.CurrentApp().Settings().ThemeVariant()
 	w.bg = canvas.NewRectangle(th.Color(theme.ColorNameOverlayBackground, v))
 	contentBG := canvas.NewRectangle(th.Color(theme.ColorNameBackground, v))
-	corner := newDraggableCorner(w)
+	leftCorner := newDraggableCorner(w, true)
+	rightCorner := newDraggableCorner(w, false)
 
-	objects := []fyne.CanvasObject{w.bg, contentBG, bar, w.content, corner}
+	objects := []fyne.CanvasObject{w.bg, contentBG, bar, w.content, leftCorner, rightCorner}
 	return &innerWindowRenderer{ShadowingRenderer: NewShadowingRenderer(objects, DialogLevel),
-		win: w, bar: bar, bg: w.bg, corner: corner, contentBG: contentBG}
+		win: w, bar: bar, bg: w.bg, leftCorner: leftCorner, rightCorner: rightCorner, contentBG: contentBG}
 }
 
 func (w *InnerWindow) SetContent(obj fyne.CanvasObject) {
@@ -151,44 +170,59 @@ type innerWindowRenderer struct {
 	win           *InnerWindow
 	bar           *fyne.Container
 	bg, contentBG *canvas.Rectangle
-	corner        fyne.CanvasObject
+	leftCorner    fyne.CanvasObject
+	rightCorner   fyne.CanvasObject
 }
 
 func (i *innerWindowRenderer) Layout(size fyne.Size) {
-	th := i.win.Theme()
-	pad := th.Size(theme.SizeNamePadding)
+	// Calculate padding and base size
+	padding := i.win.Theme().Size(theme.SizeNamePadding)
+	basePos := fyne.NewSquareOffsetPos(padding / 2)
+	contentSize := size.Subtract(fyne.NewSquareSize(padding))
 
-	pos := fyne.NewSquareOffsetPos(pad / 2)
-	size = size.Subtract(fyne.NewSquareSize(pad))
-	i.LayoutShadow(size, pos)
+	// Pre-calculate commonly used dimensions
+	adjustedWidth := contentSize.Width - padding*2
 
-	i.bg.Move(pos)
-	i.bg.Resize(size)
+	// Layout shadow and background
+	i.LayoutShadow(contentSize, basePos)
+	i.bg.Move(basePos)
+	i.bg.Resize(contentSize)
 
+	// Layout title bar
 	barHeight := i.bar.MinSize().Height
-	i.bar.Move(pos.AddXY(pad, 0))
-	i.bar.Resize(fyne.NewSize(size.Width-pad*2, barHeight))
+	i.bar.Resize(fyne.NewSize(adjustedWidth, barHeight))
+	i.bar.Move(basePos.AddXY(padding, 0))
 
-	innerPos := pos.AddXY(pad, barHeight)
-	innerSize := fyne.NewSize(size.Width-pad*2, size.Height-pad-barHeight)
-	i.contentBG.Move(innerPos)
-	i.contentBG.Resize(innerSize)
-	i.win.content.Move(innerPos)
-	i.win.content.Resize(innerSize)
+	// Layout main content area
+	contentPos := basePos.AddXY(padding, barHeight)
+	contentDimensions := fyne.NewSize(adjustedWidth, contentSize.Height-padding-barHeight)
 
-	cornerSize := i.corner.MinSize()
-	i.corner.Move(pos.Add(size).Subtract(cornerSize).AddXY(1, 1))
-	i.corner.Resize(cornerSize)
+	i.contentBG.Move(contentPos)
+	i.contentBG.Resize(contentDimensions)
+	i.win.content.Move(contentPos)
+	i.win.content.Resize(contentDimensions)
+
+	// Layout corners
+	i.layoutCorners(basePos, contentSize)
+}
+
+// Helper method to handle corner layout
+func (i *innerWindowRenderer) layoutCorners(basePos fyne.Position, size fyne.Size) {
+	rightSize := i.rightCorner.MinSize()
+	i.rightCorner.Move(basePos.Add(size).Subtract(rightSize).AddXY(1, 1))
+	i.rightCorner.Resize(rightSize)
+
+	leftSize := i.leftCorner.MinSize()
+	leftPos := basePos.AddXY(0, size.Height-leftSize.Height).AddXY(-1, 1)
+	i.leftCorner.Move(leftPos)
+	i.leftCorner.Resize(leftSize)
 }
 
 func (i *innerWindowRenderer) MinSize() fyne.Size {
-	th := i.win.Theme()
-	pad := th.Size(theme.SizeNamePadding)
+	pad := i.win.Theme().Size(theme.SizeNamePadding)
 	contentMin := i.win.content.MinSize()
 	barMin := i.bar.MinSize()
-
 	innerWidth := fyne.Max(barMin.Width, contentMin.Width)
-
 	return fyne.NewSize(innerWidth+pad*2, contentMin.Height+pad+barMin.Height).Add(fyne.NewSquareSize(pad))
 }
 
@@ -200,7 +234,6 @@ func (i *innerWindowRenderer) Refresh() {
 	i.contentBG.FillColor = th.Color(theme.ColorNameBackground, v)
 	i.contentBG.Refresh()
 	i.bar.Refresh()
-
 	title := i.bar.Objects[0].(*draggableLabel)
 	title.SetText(i.win.title)
 	i.ShadowingRenderer.RefreshShadow()
@@ -257,22 +290,23 @@ var _ desktop.Cursorable = (*draggableCorner)(nil)
 
 type draggableCorner struct {
 	widget.BaseWidget
-	win *InnerWindow
+	win     *InnerWindow
+	leading bool
 }
 
-var dragcornerindicatorleftIconRes = &fyne.StaticResource{
-	StaticName:    "drag-corner-indicator-left.svg",
-	StaticContent: assets.LeftCornerBytes,
-}
-
-func newDraggableCorner(w *InnerWindow) *draggableCorner {
-	d := &draggableCorner{win: w}
+func newDraggableCorner(w *InnerWindow, leading bool) *draggableCorner {
+	d := &draggableCorner{win: w, leading: leading}
 	d.ExtendBaseWidget(d)
 	return d
 }
 
 func (c *draggableCorner) CreateRenderer() fyne.WidgetRenderer {
-	prop := canvas.NewImageFromResource(fyne.CurrentApp().Settings().Theme().Icon(theme.IconNameDragCornerIndicator))
+	var prop *canvas.Image
+	if c.leading {
+		prop = canvas.NewImageFromResource(fyne.CurrentApp().Settings().Theme().Icon(fyne.ThemeIconName("drag-corner-indicator-left")))
+	} else {
+		prop = canvas.NewImageFromResource(fyne.CurrentApp().Settings().Theme().Icon(theme.IconNameDragCornerIndicator))
+	}
 	prop.SetMinSize(fyne.NewSquareSize(16))
 	return widget.NewSimpleRenderer(prop)
 }
@@ -283,6 +317,7 @@ func (c *draggableCorner) Cursor() desktop.Cursor {
 
 func (c *draggableCorner) Dragged(ev *fyne.DragEvent) {
 	if f := c.win.OnResized; f != nil {
+		c.win.leftDrag = c.leading
 		c.win.OnResized(ev)
 	}
 }

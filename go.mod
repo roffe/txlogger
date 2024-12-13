@@ -11,11 +11,11 @@ require (
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9
 	go.bug.st/serial v1.6.2
-	golang.org/x/crypto v0.29.0
-	golang.org/x/image v0.22.0
+	golang.org/x/crypto v0.31.0
+	golang.org/x/image v0.23.0
 	golang.org/x/mod v0.22.0
-	golang.org/x/net v0.31.0
-	golang.org/x/sync v0.9.0
+	golang.org/x/net v0.32.0
+	golang.org/x/sync v0.10.0
 )
 
 require (
@@ -49,13 +49,13 @@ require (
 	github.com/rogpeppe/go-internal v1.8.0 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
-	github.com/stretchr/testify v1.9.0 // indirect
+	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
 	go.einride.tech/can v0.12.1 // indirect
-	golang.org/x/mobile v0.0.0-20241108191957-fa514ef75a0f // indirect
-	golang.org/x/sys v0.27.0 // indirect
-	golang.org/x/text v0.20.0 // indirect
-	golang.org/x/tools v0.27.0 // indirect
+	golang.org/x/mobile v0.0.0-20241204233305-ce44b2716d33 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/tools v0.28.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
@@ -73,14 +73,14 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.4.0 // indirect
-	github.com/ebitengine/purego v0.8.0 // indirect
-	github.com/jeandeaual/go-locale v0.0.0-20240223122105-ce5225dcaa49 // indirect
+	github.com/ebitengine/purego v0.8.1 // indirect
+	github.com/jeandeaual/go-locale v0.0.0-20241204123234-32dda1c00a20 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.4.1 // indirect
 	github.com/rymdport/portal v0.3.0 // indirect
-	github.com/soypat/cyw43439 v0.0.0-20241027225731-a40e87e292b5 // indirect
+	github.com/soypat/cyw43439 v0.0.0-20241116210509-ae1ce0e084c5 // indirect
 	github.com/soypat/seqs v0.0.0-20240527012110-1201bab640ef // indirect
 	github.com/tinygo-org/pio v0.0.0-20240901140349-27cbe9d986eb // indirect
-	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
+	golang.org/x/exp v0.0.0-20241210194714-1829a127f884 // indirect
 )
 
 require (

@@ -12,8 +12,7 @@ import (
 )
 
 func (mw *MainWindow) setTitle(str string) {
-	meta := mw.app.Metadata()
-	mw.SetTitle(fmt.Sprintf("txlogger v%s Build %d - %s", meta.Version, meta.Build, str))
+	mw.SetTitle(fmt.Sprintf("txlogger - %s", str))
 }
 
 func (mw *MainWindow) loadPrefs(filename string) {

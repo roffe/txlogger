@@ -58,7 +58,6 @@ func NewTxUpdater(port string) *TxUpdater {
 
 	t.updateBtn = widget.NewButton("Update", func() {
 		t.updateBtn.Disable()
-		defer t.updateBtn.Enable()
 		defer func() {
 			go func() {
 				time.Sleep(100 * time.Millisecond)
@@ -79,15 +78,21 @@ func NewTxUpdater(port string) *TxUpdater {
 			},
 			ProgressFunc: t.progressbar.SetValue,
 		}
-
-		if err := ota.UpdateOTA(cfg); err != nil {
-			t.outputData.Append(fmt.Sprint("Error: ", err))
-		}
+		go func() {
+			defer t.updateBtn.Enable()
+			if err := ota.UpdateOTA(cfg); err != nil {
+				t.outputData.Append(fmt.Sprint("Error: ", err))
+			}
+		}()
 
 	})
 
 	t.render()
 	return t
+}
+
+func (tu *TxUpdater) MinSize() fyne.Size {
+	return fyne.NewSize(400, 300)
 }
 
 func (tu *TxUpdater) render() *TxUpdater {

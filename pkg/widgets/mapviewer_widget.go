@@ -13,7 +13,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
@@ -454,9 +453,9 @@ func (mv *MapViewer) Refresh() {
 	}
 }
 
-func (mv *MapViewer) Cursor() desktop.Cursor {
-	return desktop.CrosshairCursor
-}
+// func (mv *MapViewer) Cursor() desktop.Cursor {
+// 	return desktop.PointerCursor
+// }
 
 func (mv *MapViewer) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(mv.content)

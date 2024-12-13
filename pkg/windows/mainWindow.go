@@ -8,14 +8,12 @@ import (
 	"os"
 	"path"
 	"strings"
-	"syscall"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/driver"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	xwidget "fyne.io/x/fyne/widget"
@@ -54,20 +52,9 @@ type MainWindow struct {
 
 	ecuSelect *widget.Select
 
-	addSymbolBtn *widget.Button
-	logBtn       *widget.Button
-
-	loadSymbolsEcuBtn *widget.Button
-	//loadSymbolsFileBtn *widget.Button
-	syncSymbolsBtn *widget.Button
-
-	dashboardBtn *widget.Button
-	logplayerBtn *widget.Button
-
-	//loadConfigBtn *widget.Button
-	//saveConfigBtn *widget.Button
 	presetSelect *widget.Select
 
+	buttons  *mainWindowButtons
 	counters *mainWindowCounters
 
 	loggingRunning bool
@@ -79,20 +66,28 @@ type MainWindow struct {
 	dlc       datalogger.IClient
 	dashboard *dashboard.Dashboard
 
-	//mws *container.MultipleWindows
 	wm *windowManager
 
 	buttonsDisabled bool
 
 	settings *widgets.SettingsWidget
 
-	//openMaps map[string]fyne.Window
-
 	statusText *widget.Label
 
 	oCtx *oto.Context
 
 	content *fyne.Container
+}
+
+type mainWindowButtons struct {
+	addSymbolBtn *widget.Button
+	logBtn       *widget.Button
+
+	loadSymbolsEcuBtn *widget.Button
+	syncSymbolsBtn    *widget.Button
+
+	dashboardBtn *widget.Button
+	logplayerBtn *widget.Button
 }
 
 type mainWindowCounters struct {
@@ -143,6 +138,8 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 			errorCounter:   binding.NewInt(),
 			fpsCounter:     binding.NewInt(),
 		},
+
+		buttons: &mainWindowButtons{},
 
 		statusText: widget.NewLabel("Harder, Better, Faster, Stronger"),
 
@@ -271,7 +268,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 				),
 				widget.NewSeparator(),
 				widget.NewButtonWithIcon("Symbol list", theme.ListIcon(), func() {
-					if mw.wm.Exists("Symbol list") {
+					if mw.wm.HasWindow("Symbol list") {
 						return
 					}
 					symbolListWindow := newInnerWindow("Symbol list", container.NewBorder(
@@ -281,9 +278,9 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 								nil,
 								widget.NewIcon(theme.SearchIcon()),
 								container.NewHBox(
-									mw.addSymbolBtn,
-									mw.loadSymbolsEcuBtn,
-									mw.syncSymbolsBtn,
+									mw.buttons.addSymbolBtn,
+									mw.buttons.loadSymbolsEcuBtn,
+									mw.buttons.syncSymbolsBtn,
 								),
 								mw.symbolLookup,
 							),
@@ -301,14 +298,14 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 					//symbolListWindow.Resize(fyne.NewSize(800, 700))
 				}),
 
-				mw.logBtn,
+				mw.buttons.logBtn,
 			),
 			nil,
 			container.NewHBox(
-				mw.logplayerBtn,
-				mw.dashboardBtn,
+				mw.buttons.logplayerBtn,
+				mw.buttons.dashboardBtn,
 				widget.NewButtonWithIcon("Arrange", theme.GridIcon(), func() {
-					mw.wm.content.ArrangeWindows(multiwindow.MultipleWindowsArrangeLayoutGrid)
+					mw.wm.MultipleWindows.Arrange(multiwindow.MultipleWindowsArrangeLayoutGrid)
 				}),
 			),
 		),
@@ -321,7 +318,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 				mw.counters.errorCounterLabel,
 				mw.counters.fpsLabel,
 				widget.NewButtonWithIcon("Debug log", theme.InfoIcon(), func() {
-					if mw.wm.Exists("Debug log") {
+					if mw.wm.HasWindow("Debug log") {
 						return
 					}
 					debugWindow := newInnerWindow("Debug log", container.NewVScroll(mw.output))
@@ -348,7 +345,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		),
 		nil,
 		nil,
-		mw.wm.content,
+		mw.wm.MultipleWindows,
 	)
 	mw.SetContent(mw.content)
 	mw.Resize(fyne.NewSize(1024, 768))
@@ -405,12 +402,11 @@ func (mw *MainWindow) SyncSymbols() {
 
 func (mw *MainWindow) Disable() {
 	mw.buttonsDisabled = true
-	mw.addSymbolBtn.Disable()
-	//mw.loadSymbolsFileBtn.Disable()
-	mw.loadSymbolsEcuBtn.Disable()
-	mw.syncSymbolsBtn.Disable()
+	mw.buttons.addSymbolBtn.Disable()
+	mw.buttons.loadSymbolsEcuBtn.Disable()
+	mw.buttons.syncSymbolsBtn.Disable()
 	if !mw.loggingRunning {
-		mw.logBtn.Disable()
+		mw.buttons.logBtn.Disable()
 	}
 	mw.ecuSelect.Disable()
 	mw.presetSelect.Disable()
@@ -419,11 +415,10 @@ func (mw *MainWindow) Disable() {
 
 func (mw *MainWindow) Enable() {
 	mw.buttonsDisabled = false
-	mw.addSymbolBtn.Enable()
-	//mw.loadSymbolsFileBtn.Enable()
-	mw.loadSymbolsEcuBtn.Enable()
-	mw.syncSymbolsBtn.Enable()
-	mw.logBtn.Enable()
+	mw.buttons.addSymbolBtn.Enable()
+	mw.buttons.loadSymbolsEcuBtn.Enable()
+	mw.buttons.syncSymbolsBtn.Enable()
+	mw.buttons.logBtn.Enable()
 	mw.ecuSelect.Enable()
 	mw.presetSelect.Enable()
 	mw.symbolList.Enable()
@@ -476,13 +471,9 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	}
 	mw.setTitle(filename)
 	mw.app.Preferences().SetString(prefsLastBinFile, filename)
-
 	mw.ecuSelect.SetSelected(ecuType.String())
-
 	mw.fw = symbols
 	mw.SyncSymbols()
-
-	//os.WriteFile("symbols.txt", []byte(symbols.Dump()), 0644)
 	return nil
 }
 
@@ -513,6 +504,7 @@ func (mw *MainWindow) SavePreset(filename string) error {
 
 // -----
 
+/*
 var (
 	u32             = syscall.NewLazyDLL("user32.dll")
 	procPostMessage = u32.NewProc("PostMessageW")
@@ -564,3 +556,4 @@ func (mw *MainWindow) Restore() {
 		})
 	}
 }
+*/
