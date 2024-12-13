@@ -127,7 +127,6 @@ func newSound() *oto.Context {
 }
 
 func NewMainWindow(a fyne.App, filename string) *MainWindow {
-
 	mw := &MainWindow{
 		Window:     a.NewWindow("txlogger"),
 		app:        a,
@@ -231,7 +230,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 
 	mw.loadPrefs(filename)
 	if mw.fw == nil {
-		mw.setTitle("No symbols loaded")
+		mw.SetTitle("No symbols loaded")
 	}
 
 	mw.SetOnDropped(func(p fyne.Position, uris []fyne.URI) {
@@ -460,7 +459,7 @@ func (mw *MainWindow) LoadSymbolsFromECU() error {
 		mw.SyncSymbols()
 	}
 
-	mw.setTitle("Symbols loaded from ECU " + time.Now().Format("2006-01-02 15:04:05.000"))
+	mw.SetTitle("Symbols loaded from ECU " + time.Now().Format("2006-01-02 15:04:05.000"))
 	return nil
 }
 
@@ -469,7 +468,7 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	if err != nil {
 		return fmt.Errorf("error loading symbols: %w", err)
 	}
-	mw.setTitle(filename)
+	mw.SetTitle(filename)
 	mw.app.Preferences().SetString(prefsLastBinFile, filename)
 	mw.ecuSelect.SetSelected(ecuType.String())
 	mw.fw = symbols
