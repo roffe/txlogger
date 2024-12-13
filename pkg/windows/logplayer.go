@@ -17,13 +17,13 @@ import (
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/capture"
-	"github.com/roffe/txlogger/pkg/dashboard"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/eventbus"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/mainmenu"
 	"github.com/roffe/txlogger/pkg/plotter"
+	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 )
 
 const TIME_FORMAT = "02-01-2006 15:04:05.999"
@@ -113,7 +113,7 @@ func loadSettingStringFloat64(app fyne.App, key string, def float64) float64 {
 }
 
 func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) *LogPlayer {
-	w := a.NewWindow("LogPlayer " + filename)
+	w := a.NewWindow(filepath.Base(filename))
 	w.Resize(fyne.NewSize(1024, 768))
 
 	dbCfg := &dashboard.Config{

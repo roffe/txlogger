@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -20,14 +21,16 @@ import (
 	"github.com/ebitengine/oto/v3"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/capture"
-	"github.com/roffe/txlogger/pkg/dashboard"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/mainmenu"
 	"github.com/roffe/txlogger/pkg/multiwindow"
 	"github.com/roffe/txlogger/pkg/presets"
-	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/widgets/dashboard"
+	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
+	"github.com/roffe/txlogger/pkg/widgets/settings"
+	"github.com/roffe/txlogger/pkg/widgets/symbollist"
 	"golang.org/x/net/context"
 )
 
@@ -60,7 +63,7 @@ type MainWindow struct {
 	loggingRunning bool
 
 	filename   string
-	symbolList *widgets.SymbolListWidget
+	symbolList *symbollist.SymbolListWidget
 	fw         symbol.SymbolCollection
 
 	dlc       datalogger.IClient
@@ -70,7 +73,7 @@ type MainWindow struct {
 
 	buttonsDisabled bool
 
-	settings *widgets.SettingsWidget
+	settings *settings.SettingsWidget
 
 	statusText *widget.Label
 
@@ -158,7 +161,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		}
 	}
 
-	mw.symbolList = widgets.NewSymbolListWidget(mw, updateSymbols)
+	mw.symbolList = symbollist.New(mw, updateSymbols)
 
 	mw.setupMenu()
 
@@ -224,7 +227,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		mw.SetMainMenu(mw.menu.GetMenu(s))
 	})
 
-	mw.settings = widgets.NewSettingsWidget(widgets.CanSettingsWidgetConfig{
+	mw.settings = settings.New(&settings.Config{
 		EcuSelect: mw.ecuSelect,
 	})
 
@@ -431,7 +434,7 @@ func (mw *MainWindow) LoadSymbolsFromECU() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	p := widgets.NewProgressModal(mw.Window.Content(), "Loading symbols from ECU")
+	p := progressmodal.New(mw.Window.Content(), "Loading symbols from ECU")
 	p.Show()
 	defer p.Hide()
 
@@ -459,7 +462,7 @@ func (mw *MainWindow) LoadSymbolsFromECU() error {
 		mw.SyncSymbols()
 	}
 
-	mw.SetTitle("Symbols loaded from ECU " + time.Now().Format("2006-01-02 15:04:05.000"))
+	mw.Log("Symbols loaded from ECU " + time.Now().Format("2006-01-02 15:04:05.000"))
 	return nil
 }
 
@@ -468,7 +471,7 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	if err != nil {
 		return fmt.Errorf("error loading symbols: %w", err)
 	}
-	mw.SetTitle(filename)
+	mw.SetTitle(filepath.Base(filename))
 	mw.app.Preferences().SetString(prefsLastBinFile, filename)
 	mw.ecuSelect.SetSelected(ecuType.String())
 	mw.fw = symbols

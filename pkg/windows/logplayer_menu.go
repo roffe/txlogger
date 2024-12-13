@@ -8,7 +8,7 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/interpolate"
-	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 )
 
 func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
@@ -28,24 +28,24 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 			return
 		}
 
-		mv, err := widgets.NewMapViewer(
-			widgets.WithXData(xData),
-			widgets.WithYData(yData),
-			widgets.WithZData(zData),
-			widgets.WithXCorrFac(xCorrFac),
-			widgets.WithYCorrFac(yCorrFac),
-			widgets.WithZCorrFac(zCorrFac),
-			widgets.WithXOffset(symbol.T5Offsets[axis.X]),
-			widgets.WithYOffset(symbol.T5Offsets[axis.Y]),
-			widgets.WithZOffset(symbol.T5Offsets[axis.Z]),
-			widgets.WithXFrom(axis.XFrom),
-			widgets.WithYFrom(axis.YFrom),
-			widgets.WithInterPolFunc(interpolate.Interpolate),
-			widgets.WithEditable(false),
-			widgets.WithWidebandSymbolName(lp.lambSymbolName),
-			widgets.WithWBL(true),
-			//widgets.WithFollowCrosshair(lp.app.Preferences().BoolWithFallback("cursorFollowCrosshair", false)),
-			widgets.WithAxisLabels(axis.XDescription, axis.YDescription, axis.ZDescription),
+		mv, err := mapviewer.NewMapViewer(
+			mapviewer.WithXData(xData),
+			mapviewer.WithYData(yData),
+			mapviewer.WithZData(zData),
+			mapviewer.WithXCorrFac(xCorrFac),
+			mapviewer.WithYCorrFac(yCorrFac),
+			mapviewer.WithZCorrFac(zCorrFac),
+			mapviewer.WithXOffset(symbol.T5Offsets[axis.X]),
+			mapviewer.WithYOffset(symbol.T5Offsets[axis.Y]),
+			mapviewer.WithZOffset(symbol.T5Offsets[axis.Z]),
+			mapviewer.WithXFrom(axis.XFrom),
+			mapviewer.WithYFrom(axis.YFrom),
+			mapviewer.WithInterPolFunc(interpolate.Interpolate),
+			mapviewer.WithEditable(false),
+			mapviewer.WithWidebandSymbolName(lp.lambSymbolName),
+			mapviewer.WithWBL(true),
+			//mapviewer.WithFollowCrosshair(lp.app.Preferences().BoolWithFallback("cursorFollowCrosshair", false)),
+			mapviewer.WithAxisLabels(axis.XDescription, axis.YDescription, axis.ZDescription),
 		)
 		if err != nil {
 			dialog.ShowError(fmt.Errorf("x: %s y: %s z: %s err: %w", axis.X, axis.Y, axis.Z, err), lp.Window)

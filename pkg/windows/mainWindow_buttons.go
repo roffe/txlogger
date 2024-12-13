@@ -9,10 +9,10 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
-	"github.com/roffe/txlogger/pkg/dashboard"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/snd"
+	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	sdialog "github.com/sqweek/dialog"
 )
 

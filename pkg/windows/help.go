@@ -30,6 +30,10 @@ func Help() *container.AppTabs {
 	tt, _ := url.Parse("https://www.trionictuning.com")
 	kv, _ := url.Parse("https://www.kvaser.com")
 	mk, _ := url.Parse("https://www.mackanized.eu/")
+	txlogo := canvas.NewImageFromResource(fyne.CurrentApp().Metadata().Icon)
+	txlogo.ScaleMode = canvas.ImageScaleSmooth
+	txlogo.FillMode = canvas.ImageFillContain
+	txlogo.SetMinSize(fyne.NewSquareSize(90))
 
 	mkLink := widget.NewHyperlink("Mackanized", mk)
 	mkLink.Alignment = fyne.TextAlignCenter
@@ -40,16 +44,27 @@ func Help() *container.AppTabs {
 	lb2 := widget.NewLabel("Made with support from")
 	lb2.Alignment = fyne.TextAlignCenter
 
+	thnx := widget.NewLabel("Special thanks to:")
+	thnx.TextStyle.Bold = true
+
 	tabs := container.NewAppTabs(
 		container.NewTabItemWithIcon("About", theme.InfoIcon(),
 			container.NewBorder(
 				nil,
 				nil,
 				container.NewVBox(
-					widget.NewHyperlink("txlogger.com", tx),
-					widget.NewLabel("Version: "+fyne.CurrentApp().Metadata().Version+" Build: "+strconv.Itoa(fyne.CurrentApp().Metadata().Build)),
-					widget.NewLabel("Author: Joakim \"Roffe\" Karlsson"),
-					widget.NewLabel("Special thanks to:"),
+					container.NewBorder(
+						nil,
+						nil,
+						txlogo,
+						nil,
+						container.NewVBox(
+							widget.NewHyperlink("txlogger.com", tx),
+							widget.NewLabel("Version: "+fyne.CurrentApp().Metadata().Version+" Build: "+strconv.Itoa(fyne.CurrentApp().Metadata().Build)),
+							widget.NewLabel("Author: Joakim \"Roffe\" Karlsson"),
+						),
+					),
+					thnx,
 					widget.NewLabel("SAAB for making the cars we ❤️❤️❤️"),
 					widget.NewLabel("MattiasC, Dilemma, J.K Nilsson, Manick"),
 					widget.NewLabel("Artursson, Schottis, Chriva, Myrtilos"),
@@ -100,4 +115,81 @@ func Help() *container.AppTabs {
 		),
 	)
 	return tabs
+}
+
+func About() *fyne.Container {
+	kvaserLogo := canvas.NewImageFromResource(fyne.NewStaticResource("kvaser_logo.png", assets.KvaserLogoBytes))
+	kvaserLogo.SetMinSize(fyne.NewSize(190, 117))
+	kvaserLogo.FillMode = canvas.ImageFillContain
+	kvaserLogo.ScaleMode = canvas.ImageScaleSmooth
+
+	mackanizedLogo := canvas.NewImageFromResource(fyne.NewStaticResource("mackanized.png", assets.MackanizedBytes))
+	mackanizedLogo.SetMinSize(fyne.NewSize(302, 80))
+	mackanizedLogo.FillMode = canvas.ImageFillContain
+	mackanizedLogo.ScaleMode = canvas.ImageScaleSmooth
+
+	tx, _ := url.Parse("https://txlogger.com")
+	tt, _ := url.Parse("https://www.trionictuning.com")
+	kv, _ := url.Parse("https://www.kvaser.com")
+	mk, _ := url.Parse("https://www.mackanized.eu/")
+	txlogo := canvas.NewImageFromResource(fyne.CurrentApp().Metadata().Icon)
+	txlogo.ScaleMode = canvas.ImageScaleSmooth
+	txlogo.FillMode = canvas.ImageFillContain
+	txlogo.SetMinSize(fyne.NewSquareSize(90))
+
+	mkLink := widget.NewHyperlink("Mackanized", mk)
+	mkLink.Alignment = fyne.TextAlignCenter
+
+	kvLink := widget.NewHyperlink("Kvaser AB", kv)
+	kvLink.Alignment = fyne.TextAlignCenter
+
+	lb2 := widget.NewLabel("Made with support from")
+	lb2.Alignment = fyne.TextAlignCenter
+
+	thnx := widget.NewLabel("Special thanks to:")
+	thnx.TextStyle.Bold = true
+
+	return container.NewBorder(
+		nil,
+		nil,
+		container.NewVBox(
+			container.NewBorder(
+				nil,
+				nil,
+				txlogo,
+				nil,
+				container.NewVBox(
+					widget.NewHyperlink("txlogger.com", tx),
+					widget.NewLabel("Version: "+fyne.CurrentApp().Metadata().Version+" Build: "+strconv.Itoa(fyne.CurrentApp().Metadata().Build)),
+					widget.NewLabel("Author: Joakim \"Roffe\" Karlsson"),
+				),
+			),
+			thnx,
+			widget.NewLabel("SAAB for making the cars we ❤️❤️❤️"),
+			widget.NewLabel("MattiasC, Dilemma, J.K Nilsson, Manick"),
+			widget.NewLabel("Artursson, Schottis, Chriva, Myrtilos"),
+			widget.NewLabel("Mackan, Kalej, Bojer, Saab74"),
+			widget.NewLabel("catavares, Richardc9052, rk3"),
+			widget.NewHyperlink("TrionicTuning", tt),
+			widget.NewLabel("o2o Crew"),
+		),
+		container.NewVBox(
+			lb2,
+			container.NewBorder(
+				nil,
+				kvLink,
+				nil,
+				nil,
+				kvaserLogo,
+			),
+			container.NewBorder(
+				nil,
+				mkLink,
+				nil,
+				nil,
+				mackanizedLogo,
+			),
+			layout.NewSpacer(),
+		),
+	)
 }

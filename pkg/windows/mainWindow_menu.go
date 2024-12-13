@@ -12,7 +12,9 @@ import (
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/mainmenu"
-	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
+	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
+	"github.com/roffe/txlogger/pkg/widgets/txupdater"
 	"github.com/skratchdot/open-golang/open"
 	sdialog "github.com/sqweek/dialog"
 )
@@ -46,11 +48,11 @@ func (mw *MainWindow) setupMenu() {
 				}
 				mw.wm.Add(inner)
 			}),
-			fyne.NewMenuItem("Help", func() {
-				if mw.wm.HasWindow("Help") {
+			fyne.NewMenuItem("About", func() {
+				if mw.wm.HasWindow("About") {
 					return
 				}
-				inner := newInnerWindow("Help", Help())
+				inner := newInnerWindow("About", About())
 				inner.Icon = theme.HelpIcon()
 				inner.CloseIntercept = func() {
 					mw.wm.Remove(inner)
@@ -67,7 +69,7 @@ func (mw *MainWindow) setupMenu() {
 		),
 		fyne.NewMenu("Other",
 			fyne.NewMenuItem("Update txbridge firmware", func() {
-				updater := newInnerWindow("txbridge firmware updater", widgets.NewTxUpdater(
+				updater := newInnerWindow("txbridge firmware updater", txupdater.New(
 					mw.settings.CanSettings.GetSerialPort(),
 				))
 				updater.Icon = theme.DownloadIcon()
@@ -132,7 +134,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 	symZ := mw.fw.GetByName(axis.Z)
 
-	var mv *widgets.MapViewer
+	var mv *mapviewer.MapViewer
 
 	updateFunc := func(idx int, value []int) {
 		if mw.dlc != nil && mw.settings.GetAutoSave() {
@@ -234,31 +236,31 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 	}
 
-	mv, err = widgets.NewMapViewer(
-		widgets.WithSymbol(symZ),
-		widgets.WithXData(xData),
-		widgets.WithYData(yData),
-		widgets.WithZData(zData),
-		widgets.WithXCorrFac(xCorrFac),
-		widgets.WithYCorrFac(yCorrFac),
-		widgets.WithZCorrFac(zCorrFac),
-		widgets.WithXOffset(symbol.T5Offsets[axis.X]),
-		widgets.WithYOffset(symbol.T5Offsets[axis.Y]),
-		widgets.WithZOffset(symbol.T5Offsets[axis.Z]),
-		widgets.WithXFrom(axis.XFrom),
-		widgets.WithYFrom(axis.YFrom),
-		widgets.WithInterPolFunc(interpolate.Interpolate),
-		widgets.WithUpdateECUFunc(updateFunc),
-		widgets.WithLoadECUFunc(loadFunc),
-		widgets.WithSaveECUFunc(saveFunc),
-		widgets.WithSaveFileFunc(saveFileFunc),
-		widgets.WithMeshView(mw.settings.GetMeshView()),
-		widgets.WithWidebandSymbolName(mw.settings.GetWidebandSymbolName()),
-		widgets.WithEditable(true),
-		widgets.WithButtons(true),
-		widgets.WithWBL(mw.settings.GetWidebandType() != "None"),
-		widgets.WithFollowCrosshair(mw.settings.GetCursorFollowCrosshair()),
-		widgets.WithAxisLabels(axis.XDescription, axis.YDescription, axis.ZDescription),
+	mv, err = mapviewer.NewMapViewer(
+		mapviewer.WithSymbol(symZ),
+		mapviewer.WithXData(xData),
+		mapviewer.WithYData(yData),
+		mapviewer.WithZData(zData),
+		mapviewer.WithXCorrFac(xCorrFac),
+		mapviewer.WithYCorrFac(yCorrFac),
+		mapviewer.WithZCorrFac(zCorrFac),
+		mapviewer.WithXOffset(symbol.T5Offsets[axis.X]),
+		mapviewer.WithYOffset(symbol.T5Offsets[axis.Y]),
+		mapviewer.WithZOffset(symbol.T5Offsets[axis.Z]),
+		mapviewer.WithXFrom(axis.XFrom),
+		mapviewer.WithYFrom(axis.YFrom),
+		mapviewer.WithInterPolFunc(interpolate.Interpolate),
+		mapviewer.WithUpdateECUFunc(updateFunc),
+		mapviewer.WithLoadECUFunc(loadFunc),
+		mapviewer.WithSaveECUFunc(saveFunc),
+		mapviewer.WithSaveFileFunc(saveFileFunc),
+		mapviewer.WithMeshView(mw.settings.GetMeshView()),
+		mapviewer.WithWidebandSymbolName(mw.settings.GetWidebandSymbolName()),
+		mapviewer.WithEditable(true),
+		mapviewer.WithButtons(true),
+		mapviewer.WithWBL(mw.settings.GetWidebandType() != "None"),
+		mapviewer.WithFollowCrosshair(mw.settings.GetCursorFollowCrosshair()),
+		mapviewer.WithAxisLabels(axis.XDescription, axis.YDescription, axis.ZDescription),
 	)
 	if err != nil {
 		mw.Error(err)
@@ -286,7 +288,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	//}
 
 	if mw.settings.GetAutoLoad() && mw.dlc != nil {
-		p := widgets.NewProgressModal(mw.Window.Content(), "Loading "+axis.Z)
+		p := progressmodal.New(mw.Window.Content(), "Loading "+axis.Z)
 		p.Show()
 		loadFunc()
 		p.Hide()
