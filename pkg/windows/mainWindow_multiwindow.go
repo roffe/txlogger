@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"fyne.io/fyne/v2"
-	"github.com/roffe/txlogger/pkg/multiwindow"
+	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
 
 type innerWindow struct {

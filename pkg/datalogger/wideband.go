@@ -8,8 +8,8 @@ import (
 
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/adapter"
-	"github.com/roffe/txlogger/pkg/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/aem"
+	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
 )
 

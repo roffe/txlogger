@@ -22,8 +22,8 @@ import (
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/mainmenu"
-	"github.com/roffe/txlogger/pkg/plotter"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
+	"github.com/roffe/txlogger/pkg/widgets/plotter"
 )
 
 const TIME_FORMAT = "02-01-2006 15:04:05.999"

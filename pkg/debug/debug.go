@@ -6,18 +6,24 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 )
 
-func init() {
+var initOnce sync.Once
+var fh *os.File
+
+func start() {
 	var err error
-	f, err = os.OpenFile("debug.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	fh, err = os.OpenFile("debug.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Printf("error opening file: %v", err)
 	}
 }
 
 func Log(msg string) {
+	initOnce.Do(start)
+
 	timeStr := time.Now().Format("2006-01-02 15:04:05.000")
 	_, fullPath, line, ok := runtime.Caller(2)
 	filename := filepath.Base(fullPath)
@@ -28,20 +34,18 @@ func Log(msg string) {
 	}
 }
 
-var f *os.File
-
 func LogRaw(msg string) {
-	if f == nil {
+	if fh == nil {
 		var err error
-		f, err = os.OpenFile("debug.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		fh, err = os.OpenFile("debug.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		if err == nil {
 			log.Println("error opening file: %w", err)
 			return
 		}
 	}
-	f.WriteString(msg + "\n")
+	fh.WriteString(msg + "\n")
 }
 func Close() {
-	f.Sync()
-	f.Close()
+	fh.Sync()
+	fh.Close()
 }
