@@ -143,9 +143,9 @@ func (s *SymbolListWidget) clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.container.RemoveAll()
-	s.symbols = []*symbol.Symbol{}
-	s.entries = []*SymbolWidgetEntry{}
-	s.entryMap = make(map[string]*SymbolWidgetEntry)
+	s.symbols = s.symbols[:0]
+	s.entries = s.entries[:0]
+	clear(s.entryMap)
 	s.onUpdate(s.symbols)
 }
 
