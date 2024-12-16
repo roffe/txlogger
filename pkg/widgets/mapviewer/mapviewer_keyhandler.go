@@ -54,7 +54,7 @@ func (mv *MapViewer) copy() {
 }
 
 func (mv *MapViewer) paste() {
-	if !mv.editable {
+	if !mv.opts.editable {
 		return
 	}
 	cb := fyne.CurrentApp().Clipboard().Content()
@@ -100,11 +100,11 @@ func (mv *MapViewer) paste() {
 		}
 		mv.zData[index] = value
 		if len(split) < 30 {
-			mv.updateECUFunc(index, []int{mv.zData[index]})
+			mv.funcs.updateECUFunc(index, []int{mv.zData[index]})
 		}
 	}
 	if len(split) >= 30 {
-		mv.saveECUFunc(mv.zData)
+		mv.funcs.saveECUFunc(mv.zData)
 	}
 	mv.Refresh()
 }
@@ -189,11 +189,11 @@ func (mv *MapViewer) shouldFullSync(updates []updateBlock) bool {
 }
 
 func (mv *MapViewer) fullSync() {
-	mv.saveECUFunc(mv.zData)
+	mv.funcs.saveECUFunc(mv.zData)
 }
 
 func (mv *MapViewer) partialSync(updates []updateBlock) {
 	for _, update := range updates {
-		mv.updateECUFunc(update.idx, update.data)
+		mv.funcs.updateECUFunc(update.idx, update.data)
 	}
 }

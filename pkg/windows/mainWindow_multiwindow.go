@@ -54,29 +54,29 @@ func (wm *windowManager) HasWindow(title string) bool {
 	return ok
 }
 
-func (wm *windowManager) Add(w *innerWindow) {
+func (wm *windowManager) Add(w *innerWindow, startPosition ...fyne.Position) {
 	if wm.HasWindow(w.Title()) {
 		return
 	}
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 	wm.open[w.Title()] = w
-
-	wm.MultipleWindows.Add(w.InnerWindow)
-
-	h, found := wm.history[w.Title()]
-	if found {
-		w.Move(h.position)
-		w.Resize(h.size)
-		w.SetMaximized(h.maximized, h.preMaximizedPos, h.preMaximizedSize)
-	} else {
-		w.Move(wm.openOffset)
-		wm.openOffset = wm.openOffset.AddXY(15, 15)
-		if wm.openOffset.X > 150 {
-			wm.openOffset.X = 0
-			wm.openOffset.Y = 0
+	wm.MultipleWindows.Add(w.InnerWindow, startPosition...)
+	/*
+		h, found := wm.history[w.Title()]
+		if found {
+			w.Move(h.position)
+			w.Resize(h.size)
+			w.SetMaximized(h.maximized, h.preMaximizedPos, h.preMaximizedSize)
+		} else {
+			w.Move(wm.openOffset)
+			wm.openOffset = wm.openOffset.AddXY(15, 15)
+			if wm.openOffset.X > 150 {
+				wm.openOffset.X = 0
+				wm.openOffset.Y = 0
+			}
 		}
-	}
+	*/
 }
 
 func (wm *windowManager) Remove(w *innerWindow) {
@@ -85,13 +85,15 @@ func (wm *windowManager) Remove(w *innerWindow) {
 	title := w.Title()
 	delete(wm.open, title)
 	wm.MultipleWindows.Remove(w.InnerWindow)
-	wm.history[title] = windowHistory{
-		position:         w.Position(),
-		size:             w.Size(),
-		maximized:        w.Maximized(),
-		preMaximizedPos:  w.PreMaximizedPos(),
-		preMaximizedSize: w.PreMaximizedSize(),
-	}
+	/*
+		wm.history[title] = windowHistory{
+			position:         w.Position(),
+			size:             w.Size(),
+			maximized:        w.Maximized(),
+			preMaximizedPos:  w.PreMaximizedPos(),
+			preMaximizedSize: w.PreMaximizedSize(),
+		}
+	*/
 }
 
 func (wm *windowManager) Size() fyne.Size {

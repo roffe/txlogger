@@ -13,6 +13,7 @@ import (
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/mainmenu"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
+	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
 	"github.com/roffe/txlogger/pkg/widgets/txupdater"
 	"github.com/skratchdot/open-golang/open"
@@ -23,12 +24,19 @@ func (mw *MainWindow) setupMenu() {
 	otherFunc := func(str string) {
 		switch str {
 		case "Register EU0D":
-			mr := NewMyrtilosRegistration(mw.app, mw)
-			mr.Show()
+			if mw.wm.HasWindow("Register EU0D") {
+				return
+			}
+			inner := newInnerWindow("Register EU0D", NewMyrtilosRegistration(mw))
+			inner.Icon = theme.InfoIcon()
+			inner.CloseIntercept = func() {
+				mw.wm.Remove(inner)
+			}
+			mw.wm.Add(inner)
 		}
 	}
 
-	menus := []*fyne.Menu{
+	leading := []*fyne.Menu{
 		fyne.NewMenu("File",
 			fyne.NewMenuItem("Load binary", mw.loadBinary),
 			fyne.NewMenuItem("Play log", mw.playLog),
@@ -80,7 +88,25 @@ func (mw *MainWindow) setupMenu() {
 			}),
 		),
 	}
-	mw.menu = mainmenu.New(mw, menus, mw.openMap, otherFunc)
+
+	trailing := []*fyne.Menu{
+		fyne.NewMenu("Arrange",
+			fyne.NewMenuItem("Grid", func() {
+				mw.wm.MultipleWindows.Arrange(&multiwindow.GridArranger{})
+			}),
+			fyne.NewMenuItem("Floating", func() {
+				mw.wm.MultipleWindows.Arrange(&multiwindow.FloatingArranger{})
+			}),
+			fyne.NewMenuItem("Pack", func() {
+				mw.wm.MultipleWindows.Arrange(&multiwindow.PackArranger{})
+			}),
+			fyne.NewMenuItem("Preserve", func() {
+				mw.wm.MultipleWindows.Arrange(&multiwindow.PreservingArranger{})
+			}),
+		),
+	}
+
+	mw.menu = mainmenu.New(mw, leading, trailing, mw.openMap, otherFunc)
 }
 
 func (mw *MainWindow) loadBinary() {
@@ -148,7 +174,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			}
 
 			var addr uint32
-			switch mw.ecuSelect.Selected {
+			switch mw.selects.ecuSelect.Selected {
 			case "T5":
 				addr = symZ.SramOffset
 			case "T7":
@@ -171,7 +197,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			start := time.Now()
 			var addr uint32
 
-			switch mw.ecuSelect.Selected {
+			switch mw.selects.ecuSelect.Selected {
 			case "T5":
 				addr = symZ.SramOffset
 			case "T7":
@@ -198,7 +224,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		start := time.Now()
 		buff := bytes.NewBuffer(symZ.EncodeInts(data))
 		var startPos uint32
-		switch mw.ecuSelect.Selected {
+		switch mw.selects.ecuSelect.Selected {
 		case "T7":
 			startPos = symZ.Address
 		case "T8":
@@ -236,7 +262,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 	}
 
-	mv, err = mapviewer.NewMapViewer(
+	mv, err = mapviewer.New(
 		mapviewer.WithSymbol(symZ),
 		mapviewer.WithXData(xData),
 		mapviewer.WithYData(yData),
@@ -258,7 +284,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		mapviewer.WithWidebandSymbolName(mw.settings.GetWidebandSymbolName()),
 		mapviewer.WithEditable(true),
 		mapviewer.WithButtons(true),
-		mapviewer.WithWBL(mw.settings.GetWidebandType() != "None"),
+		//mapviewer.WithWBL(mw.settings.GetWidebandType() != "None"),
 		mapviewer.WithFollowCrosshair(mw.settings.GetCursorFollowCrosshair()),
 		mapviewer.WithAxisLabels(axis.XDescription, axis.YDescription, axis.ZDescription),
 	)
@@ -296,6 +322,11 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 	mapWindow := newInnerWindow(axis.Z+" - "+axis.ZDescription, mv)
 	mapWindow.Icon = theme.GridIcon()
+
+	mv.OnMouseDown = func() {
+		mw.wm.Raise(mapWindow.InnerWindow)
+	}
+
 	mapWindow.CloseIntercept = func() {
 		for _, f := range cancelFuncs {
 			f()

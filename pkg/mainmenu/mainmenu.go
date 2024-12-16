@@ -161,18 +161,19 @@ var T8SymbolsTuning = map[string][]string{
 }
 
 type MainMenu struct {
-	w         fyne.Window
-	menus     []*fyne.Menu
-	oneFunc   func(symbol.ECUType, string)
-	multiFunc func(symbol.ECUType, ...string)
-	otherFunc func(string)
+	w                 fyne.Window
+	leading, trailing []*fyne.Menu
+	oneFunc           func(symbol.ECUType, string)
+	multiFunc         func(symbol.ECUType, ...string)
+	otherFunc         func(string)
 }
 
-func New(w fyne.Window, menus []*fyne.Menu, oneFunc func(symbol.ECUType, string), otherFunc func(string)) *MainMenu {
+func New(w fyne.Window, leading, trailing []*fyne.Menu, oneFunc func(symbol.ECUType, string), otherFunc func(string)) *MainMenu {
 	return &MainMenu{
 		w:         w,
 		oneFunc:   oneFunc,
-		menus:     menus,
+		leading:   leading,
+		trailing:  trailing,
 		otherFunc: otherFunc,
 	}
 }
@@ -197,7 +198,7 @@ func (mw *MainMenu) GetMenu(name string) *fyne.MainMenu {
 		typ = symbol.ECU_T8
 	}
 
-	menus := append([]*fyne.Menu{}, mw.menus...)
+	menus := append([]*fyne.Menu{}, mw.leading...)
 
 	for _, category := range order {
 		var items []*fyne.MenuItem
@@ -234,5 +235,8 @@ func (mw *MainMenu) GetMenu(name string) *fyne.MainMenu {
 		}
 		menus = append(menus, fyne.NewMenu(category, items...))
 	}
+
+	menus = append(menus, mw.trailing...)
+
 	return fyne.NewMainMenu(menus...)
 }

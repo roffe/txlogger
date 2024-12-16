@@ -89,10 +89,6 @@ func New(port string) *TxUpdater {
 	return t
 }
 
-func (tu *TxUpdater) MinSize() fyne.Size {
-	return fyne.NewSize(400, 300)
-}
-
 func (tu *TxUpdater) render() *TxUpdater {
 	tu.container = container.NewStack(
 		container.NewBorder(

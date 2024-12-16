@@ -27,7 +27,7 @@ import (
 	"github.com/roffe/txlogger/pkg/mainmenu"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
-	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
+	"github.com/roffe/txlogger/pkg/widgets/msglist"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
@@ -50,20 +50,16 @@ type MainWindow struct {
 
 	symbolLookup *xwidget.CompletionEntry
 
-	output     *widget.List
 	outputData binding.StringList
 
-	ecuSelect *widget.Select
-
-	presetSelect *widget.Select
-
+	selects  *mainWindowSelects
 	buttons  *mainWindowButtons
 	counters *mainWindowCounters
 
 	loggingRunning bool
 
 	filename   string
-	symbolList *symbollist.SymbolListWidget
+	symbolList *symbollist.Widget
 	fw         symbol.SymbolCollection
 
 	dlc       datalogger.IClient
@@ -82,26 +78,27 @@ type MainWindow struct {
 	content *fyne.Container
 }
 
-type mainWindowButtons struct {
-	addSymbolBtn *widget.Button
-	logBtn       *widget.Button
+type mainWindowSelects struct {
+	ecuSelect    *widget.Select
+	presetSelect *widget.Select
+}
 
+type mainWindowButtons struct {
+	addSymbolBtn      *widget.Button
+	logBtn            *widget.Button
 	loadSymbolsEcuBtn *widget.Button
 	syncSymbolsBtn    *widget.Button
-
-	dashboardBtn *widget.Button
-	logplayerBtn *widget.Button
+	dashboardBtn      *widget.Button
+	logplayerBtn      *widget.Button
 }
 
 type mainWindowCounters struct {
 	captureCounter       binding.Int
 	capturedCounterLabel *widget.Label
-
-	errorCounter      binding.Int
-	errorCounterLabel *widget.Label
-
-	fpsCounter binding.Int
-	fpsLabel   *widget.Label
+	errorCounter         binding.Int
+	errorCounterLabel    *widget.Label
+	fpsCounter           binding.Int
+	fpsLabel             *widget.Label
 }
 
 // Remember that you should **not** create more than one context
@@ -141,6 +138,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 			fpsCounter:     binding.NewInt(),
 		},
 
+		selects: &mainWindowSelects{},
 		buttons: &mainWindowButtons{},
 
 		statusText: widget.NewLabel("Harder, Better, Faster, Stronger"),
@@ -176,7 +174,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 
 	mw.createButtons()
 
-	mw.presetSelect = widget.NewSelect(append([]string{"Select preset"}, presets.Names()...), func(s string) {
+	mw.selects.presetSelect = widget.NewSelect(append([]string{"Select preset"}, presets.Names()...), func(s string) {
 		if s == "Select preset" {
 			return
 		}
@@ -189,10 +187,9 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		mw.SyncSymbols()
 		mw.app.Preferences().SetString(prefsSelectedPreset, s)
 	})
-	mw.presetSelect.Alignment = fyne.TextAlignLeading
-	mw.presetSelect.PlaceHolder = "Select preset"
+	mw.selects.presetSelect.Alignment = fyne.TextAlignLeading
+	mw.selects.presetSelect.PlaceHolder = "Select preset"
 
-	mw.newOutputList()
 	mw.newSymbolnameTypeahead()
 
 	mw.counters.capturedCounterLabel = &widget.Label{
@@ -222,13 +219,13 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		}
 	}))
 
-	mw.ecuSelect = widget.NewSelect([]string{"T5", "T7", "T8"}, func(s string) {
+	mw.selects.ecuSelect = widget.NewSelect([]string{"T5", "T7", "T8"}, func(s string) {
 		mw.app.Preferences().SetString(prefsSelectedECU, s)
 		mw.SetMainMenu(mw.menu.GetMenu(s))
 	})
 
 	mw.settings = settings.New(&settings.Config{
-		EcuSelect: mw.ecuSelect,
+		EcuSelect: mw.selects.ecuSelect,
 	})
 
 	mw.loadPrefs(filename)
@@ -259,14 +256,14 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 					nil,
 					widget.NewLabel("ECU"),
 					nil,
-					mw.ecuSelect,
+					mw.selects.ecuSelect,
 				),
 				container.NewBorder(
 					nil,
 					nil,
 					widget.NewLabel("Preset"),
 					nil,
-					mw.presetSelect,
+					mw.selects.presetSelect,
 				),
 				widget.NewSeparator(),
 				widget.NewButtonWithIcon("Symbol list", theme.ListIcon(), func() {
@@ -306,9 +303,6 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 			container.NewHBox(
 				mw.buttons.logplayerBtn,
 				mw.buttons.dashboardBtn,
-				widget.NewButtonWithIcon("Arrange", theme.GridIcon(), func() {
-					mw.wm.MultipleWindows.Arrange(multiwindow.MultipleWindowsArrangeLayoutGrid)
-				}),
 			),
 		),
 		container.NewBorder(
@@ -323,7 +317,8 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 					if mw.wm.HasWindow("Debug log") {
 						return
 					}
-					debugWindow := newInnerWindow("Debug log", container.NewVScroll(mw.output))
+					dbl := msglist.New(mw.outputData)
+					debugWindow := newInnerWindow("Debug log", dbl)
 					debugWindow.Icon = theme.ContentCopyIcon()
 					debugWindow.OnTappedIcon = func() {
 						str, err := mw.outputData.Get()
@@ -334,13 +329,11 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 						fyne.CurrentApp().Clipboard().SetContent(strings.Join(str, "\n"))
 						dialog.ShowInformation("Debug log", "Content copied to clipboard", mw)
 					}
-					mw.wm.Add(debugWindow)
 					debugWindow.CloseIntercept = func() {
 						mw.wm.Remove(debugWindow)
 					}
-
-					debugWindow.Resize(fyne.NewSize(350, 500))
-					mw.output.ScrollToBottom()
+					xy := mw.wm.MultipleWindows.Size().Subtract(dbl.MinSize().AddWidthHeight(40, 60))
+					mw.wm.Add(debugWindow, fyne.NewPos(xy.Width, xy.Height))
 				}),
 			),
 			mw.statusText,
@@ -368,13 +361,11 @@ func (mw *MainWindow) CloseIntercept() {
 func (mw *MainWindow) Log(s string) {
 	debug.Log(s)
 	mw.outputData.Append(s)
-	mw.output.ScrollToBottom()
 }
 
 func (mw *MainWindow) Error(err error) {
 	debug.Log("error:" + err.Error())
 	mw.outputData.Append(err.Error())
-	mw.output.ScrollToBottom()
 	dialog.ShowError(err, mw)
 }
 
@@ -410,8 +401,8 @@ func (mw *MainWindow) Disable() {
 	if !mw.loggingRunning {
 		mw.buttons.logBtn.Disable()
 	}
-	mw.ecuSelect.Disable()
-	mw.presetSelect.Disable()
+	mw.selects.ecuSelect.Disable()
+	mw.selects.presetSelect.Disable()
 	mw.symbolList.Disable()
 }
 
@@ -421,13 +412,13 @@ func (mw *MainWindow) Enable() {
 	mw.buttons.loadSymbolsEcuBtn.Enable()
 	mw.buttons.syncSymbolsBtn.Enable()
 	mw.buttons.logBtn.Enable()
-	mw.ecuSelect.Enable()
-	mw.presetSelect.Enable()
+	mw.selects.ecuSelect.Enable()
+	mw.selects.presetSelect.Enable()
 	mw.symbolList.Enable()
 }
 
 func (mw *MainWindow) LoadSymbolsFromECU() error {
-	device, err := mw.settings.CanSettings.GetAdapter(mw.ecuSelect.Selected, mw.Log)
+	device, err := mw.settings.CanSettings.GetAdapter(mw.selects.ecuSelect.Selected, mw.Log)
 	if err != nil {
 		return err
 	}
@@ -438,7 +429,7 @@ func (mw *MainWindow) LoadSymbolsFromECU() error {
 	p.Show()
 	defer p.Hide()
 
-	switch mw.ecuSelect.Selected {
+	switch mw.selects.ecuSelect.Selected {
 	case "T5":
 		symbols, err := ecu.GetSymbolsT5(ctx, device, mw.Log)
 		if err != nil {
@@ -473,7 +464,7 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	}
 	mw.SetTitle(filepath.Base(filename))
 	mw.app.Preferences().SetString(prefsLastBinFile, filename)
-	mw.ecuSelect.SetSelected(ecuType.String())
+	mw.selects.ecuSelect.SetSelected(ecuType.String())
 	mw.fw = symbols
 	mw.SyncSymbols()
 	return nil

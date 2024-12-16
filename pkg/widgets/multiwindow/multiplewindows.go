@@ -1,7 +1,7 @@
 package multiwindow
 
 import (
-	"math"
+	"log"
 	"sync"
 
 	"fyne.io/fyne/v2"
@@ -10,30 +10,18 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// MultipleWindowsArrangeLayout is an enumeration of the possible layout arrangements for the `MultipleWindows.Arrange()` container.
-type MultipleWindowsArrangeLayout int
-
-const (
-	// MultipleWindowsArrangementLayoutHorizontal will arrange the windows horizontally.
-	MultipleWindowsArrangeLayoutHorizontal MultipleWindowsArrangeLayout = iota
-	// MultipleWindowsArrangementLayoutVertical will arrange the windows vertically.
-	MultipleWindowsArrangeLayoutVertical
-	// MultipleWindowsArrangementLayoutGrid will arrange the windows in a grid.
-	MultipleWindowsArrangeLayoutGrid
-)
-
 // MultipleWindows is a container that handles multiple `InnerWindow` containers.
 type MultipleWindows struct {
 	widget.BaseWidget
 
-	// LockViewport determines if the windows can be moved or resized outside the viewport.
-	// If set to true, the windows size & position will be clamped to the viewport bounds.
 	LockViewport bool
 
 	Windows []*InnerWindow
 
 	content      *fyne.Container
 	propertyLock sync.RWMutex
+
+	openOffset fyne.Position
 }
 
 // NewMultipleWindows creates a new `MultipleWindows` container to manage many inner windows.
@@ -46,112 +34,48 @@ func NewMultipleWindows(wins ...*InnerWindow) *MultipleWindows {
 	return m
 }
 
-func (m *MultipleWindows) Add(w *InnerWindow) {
+func (m *MultipleWindows) CreateRenderer() fyne.WidgetRenderer {
+	m.content = container.New(&multiWinLayout{})
+	m.refreshChildren()
+	return widget.NewSimpleRenderer(m.content)
+}
+
+func (m *MultipleWindows) Add(w *InnerWindow, startPosition ...fyne.Position) {
 	m.propertyLock.Lock()
 	defer m.propertyLock.Unlock()
 	m.setupChild(w)
 	m.Windows = append(m.Windows, w)
-	m.refreshChildren()
+	if len(startPosition) == 0 {
+		w.Move(m.openOffset)
+		m.openOffset = m.openOffset.AddXY(15, 15)
+		if m.openOffset.X > 150 {
+			m.openOffset.X = 0
+			m.openOffset.Y = 0
+		}
+	} else if len(startPosition) == 1 {
+		w.Move(startPosition[0])
+	}
+
+	m.content.Add(w)
+	m.raise(w)
 }
 
 // Remove removes the given window from the container.
 func (m *MultipleWindows) Remove(w *InnerWindow) {
 	m.propertyLock.Lock()
 	defer m.propertyLock.Unlock()
-
-	id := -1
 	for i, ww := range m.Windows {
 		if ww == w {
-			id = i
-			break
+			m.Windows = append(m.Windows[:i], m.Windows[i+1:]...)
+			m.content.Remove(w)
+			m.refreshChildren()
+			return
 		}
-	}
-	if id == -1 {
-		return
-	}
-	m.Windows = append(m.Windows[:id], m.Windows[id+1:]...)
-	m.refreshChildren()
-}
-
-func (m *MultipleWindows) Arrange(a MultipleWindowsArrangeLayout) {
-	switch a {
-	case MultipleWindowsArrangeLayoutHorizontal:
-		for i, w := range m.Windows {
-			w.Move(fyne.NewPos(float32(i)*w.Size().Width, 0))
-		}
-	case MultipleWindowsArrangeLayoutVertical:
-		for i, w := range m.Windows {
-			w.Move(fyne.NewPos(0, float32(i)*w.Size().Height))
-		}
-	case MultipleWindowsArrangeLayoutGrid:
-		m.arrangeSquare()
-	default:
 	}
 }
 
-func (m *MultipleWindows) arrangeSquare() {
-	if len(m.Windows) == 0 {
-		return
-	}
-
-	maxSize := m.content.Size()
-	numWindows := len(m.Windows)
-
-	// Calculate grid dimensions - store as constants to avoid recalculation
-	cols := int(math.Ceil(math.Sqrt(float64(numWindows))))
-	rows := (numWindows + cols - 1) / cols
-	windowsInLastRow := numWindows - (rows-1)*cols
-
-	const (
-		padding float32 = 0
-		minSize float32 = 200
-	)
-
-	// Pre-calculate dimensions once
-	availWidth := maxSize.Width - (padding * float32(cols+1))
-	availHeight := maxSize.Height - (padding * float32(rows+1))
-	baseWidth := fyne.Max(availWidth/float32(cols), minSize)
-	baseHeight := fyne.Max(availHeight/float32(rows), minSize)
-
-	// Pre-calculate last row width if needed
-	var lastRowWidth float32
-	if windowsInLastRow < cols {
-		totalPadding := padding * float32(windowsInLastRow+1)
-		lastRowWidth = (maxSize.Width - totalPadding) / float32(windowsInLastRow)
-	}
-
-	// Process windows in place to avoid allocation
-	for i, window := range m.Windows {
-		row := i / cols
-		col := i % cols
-
-		width := baseWidth
-		posX := padding + float32(col)*(baseWidth+padding)
-
-		// Only adjust width for last row
-		if row == rows-1 && windowsInLastRow < cols {
-			width = lastRowWidth
-			posX = padding + float32(col)*(width+padding)
-		}
-
-		posY := padding + float32(row)*(baseHeight+padding)
-
-		// Set window properties directly
-		window.preMaximizedPos = fyne.NewPos(
-			posX+(width-window.Size().Width)/2,
-			posY+(baseHeight-window.Size().Height)/2,
-		)
-		window.preMaximizedSize = window.Size()
-		window.Resize(fyne.NewSize(width, baseHeight))
-		window.Move(fyne.NewPos(posX, posY))
-		window.maximized = true
-	}
-}
-
-func (m *MultipleWindows) CreateRenderer() fyne.WidgetRenderer {
-	m.content = container.New(&multiWinLayout{})
-	m.refreshChildren()
-	return widget.NewSimpleRenderer(m.content)
+func (m *MultipleWindows) Arrange(arr Arranger) {
+	arr.Layout(m.content.Size(), m.LockViewport, m.Windows)
 }
 
 func (m *MultipleWindows) Refresh() {
@@ -159,12 +83,15 @@ func (m *MultipleWindows) Refresh() {
 }
 
 func (m *MultipleWindows) Raise(w *InnerWindow) {
+	m.propertyLock.Lock()
+	defer m.propertyLock.Unlock()
+	m.raise(w)
+}
+
+func (m *MultipleWindows) raise(w *InnerWindow) {
 	if w.active {
 		return
 	}
-	m.propertyLock.RLock()
-	defer m.propertyLock.RUnlock()
-
 	id := -1
 	for i, ww := range m.Windows {
 		if ww == w {
@@ -173,13 +100,12 @@ func (m *MultipleWindows) Raise(w *InnerWindow) {
 			w.active = true
 			continue
 		}
-		ww.bgFillColor = theme.ColorNameOverlayBackground
 		ww.active = false
+		ww.bgFillColor = theme.ColorNameOverlayBackground
 	}
 	if id == -1 {
 		return
 	}
-
 	windows := append(m.Windows[:id], m.Windows[id+1:]...)
 	m.Windows = append(windows, w)
 	m.refreshChildren()
@@ -189,12 +115,11 @@ func (m *MultipleWindows) refreshChildren() {
 	if m.content == nil {
 		return
 	}
-
-	objects := make([]fyne.CanvasObject, len(m.Windows))
+	objs := make([]fyne.CanvasObject, len(m.Windows))
 	for i, w := range m.Windows {
-		objects[i] = w
+		objs[i] = w
 	}
-	m.content.Objects = objects
+	m.content.Objects = objs
 	m.content.Refresh()
 }
 
@@ -202,7 +127,9 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 	w.OnDragged = func(ev *fyne.DragEvent) {
 		if w.maximized {
 			mouseRatio := ev.Position.X / w.Size().Width
-			w.Resize(w.MinSize())
+			sz := w.MinSize()
+			log.Println(sz)
+			w.Resize(sz)
 			w.Move(fyne.NewPos(ev.AbsolutePosition.X-mouseRatio*w.MinSize().Width, w.Position().Y))
 			w.maximized = false
 			return
@@ -214,9 +141,7 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 			bounds := m.content.Size()
 			newPos.X = clamp32(newPos.X, 0, bounds.Width-size.Width)
 			newPos.Y = clamp32(newPos.Y, 0, bounds.Height-size.Height)
-
 			bounds.Subtract(size).Max(newPos)
-
 		}
 		w.Move(newPos)
 	}
@@ -264,7 +189,6 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 	}
 
 	w.OnMaximized = func() {
-		m.Raise(w)
 		if !w.maximized {
 			w.preMaximizedSize = w.Size()
 			w.preMaximizedPos = w.Position()
@@ -278,6 +202,7 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 			w.Resize(w.preMaximizedSize)
 		}
 		w.maximized = !w.maximized
+		m.Raise(w)
 	}
 }
 

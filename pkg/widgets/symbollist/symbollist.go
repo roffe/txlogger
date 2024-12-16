@@ -15,7 +15,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
-type SymbolListWidget struct {
+type Widget struct {
 	widget.BaseWidget
 	symbols    []*symbol.Symbol
 	entryMap   map[string]*SymbolWidgetEntry
@@ -28,8 +28,8 @@ type SymbolListWidget struct {
 	w          fyne.Window
 }
 
-func New(w fyne.Window, updateFunc func([]*symbol.Symbol), symbols ...*symbol.Symbol) *SymbolListWidget {
-	sl := &SymbolListWidget{
+func New(w fyne.Window, updateFunc func([]*symbol.Symbol), symbols ...*symbol.Symbol) *Widget {
+	sl := &Widget{
 		entryMap: make(map[string]*SymbolWidgetEntry),
 		onUpdate: updateFunc,
 		w:        w,
@@ -40,17 +40,17 @@ func New(w fyne.Window, updateFunc func([]*symbol.Symbol), symbols ...*symbol.Sy
 	return sl
 }
 
-func (s *SymbolListWidget) render() {
+func (s *Widget) render() {
 	s.container = container.NewVBox()
 	s.scroll = container.NewVScroll(s.container)
 
 }
 
-func (s *SymbolListWidget) UpdateBars(enabled bool) {
+func (s *Widget) UpdateBars(enabled bool) {
 	s.updateBars = enabled
 }
 
-func (s *SymbolListWidget) SetValue(name string, value float64) {
+func (s *Widget) SetValue(name string, value float64) {
 	val, found := s.entryMap[name]
 	if found {
 		if value == val.value {
@@ -89,21 +89,21 @@ func (s *SymbolListWidget) SetValue(name string, value float64) {
 	}
 }
 
-func (s *SymbolListWidget) Disable() {
+func (s *Widget) Disable() {
 	for _, e := range s.entries {
 		e.symbolCorrectionfactor.Disable()
 		e.deleteBTN.Disable()
 	}
 }
 
-func (s *SymbolListWidget) Enable() {
+func (s *Widget) Enable() {
 	for _, e := range s.entries {
 		e.symbolCorrectionfactor.Enable()
 		e.deleteBTN.Enable()
 	}
 }
 
-func (s *SymbolListWidget) Add(symbols ...*symbol.Symbol) {
+func (s *Widget) Add(symbols ...*symbol.Symbol) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -134,13 +134,13 @@ func (s *SymbolListWidget) Add(symbols ...*symbol.Symbol) {
 	s.onUpdate(s.symbols)
 }
 
-func (s *SymbolListWidget) Clear() {
+func (s *Widget) Clear() {
 	for _, e := range s.entries {
 		e.symbolValue.SetText("---")
 	}
 }
 
-func (s *SymbolListWidget) clear() {
+func (s *Widget) clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.container.RemoveAll()
@@ -150,18 +150,18 @@ func (s *SymbolListWidget) clear() {
 	s.onUpdate(s.symbols)
 }
 
-func (s *SymbolListWidget) LoadSymbols(symbols ...*symbol.Symbol) {
+func (s *Widget) LoadSymbols(symbols ...*symbol.Symbol) {
 	s.clear()
 	s.Add(symbols...)
 }
 
-func (s *SymbolListWidget) Count() int {
+func (s *Widget) Count() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return len(s.symbols)
 }
 
-func (s *SymbolListWidget) Symbols() []*symbol.Symbol {
+func (s *Widget) Symbols() []*symbol.Symbol {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := make([]*symbol.Symbol, len(s.symbols))
@@ -169,11 +169,11 @@ func (s *SymbolListWidget) Symbols() []*symbol.Symbol {
 	return out
 }
 
-func (s *SymbolListWidget) MinSize() fyne.Size {
-	return fyne.NewSize(750, float32(len(s.symbols)*30)+60)
+func (s *Widget) MinSize() fyne.Size {
+	return fyne.NewSize(750, 400)
 }
 
-func (s *SymbolListWidget) CreateRenderer() fyne.WidgetRenderer {
+func (s *Widget) CreateRenderer() fyne.WidgetRenderer {
 	name := widget.NewLabel("Name")
 	name.TextStyle = fyne.TextStyle{Bold: true}
 

@@ -30,6 +30,9 @@ type InnerWindow struct {
 	OnMouseDown                                         func()                `json:"-"`
 	Icon                                                fyne.Resource
 
+	icon                     fyne.CanvasObject
+	minBtn, maxBtn, closeBtn *widget.Button
+
 	title       string
 	bg          *canvas.Rectangle
 	bgFillColor fyne.ThemeColorName
@@ -51,7 +54,19 @@ func NewInnerWindow(title string, content fyne.CanvasObject) *InnerWindow {
 		bgFillColor: theme.ColorNameOverlayBackground,
 	}
 	w.ExtendBaseWidget(w)
+
 	return w
+}
+
+// MouseDown is called when the user presses the mouse button on the draggable corner.
+func (w *InnerWindow) MouseDown(*desktop.MouseEvent) {
+	if w.OnMouseDown != nil {
+		w.OnMouseDown()
+	}
+}
+
+// MouseUp is called when the user releases the mouse button on the draggable corner.
+func (w *InnerWindow) MouseUp(*desktop.MouseEvent) {
 }
 
 func (w *InnerWindow) Maximized() bool {
@@ -77,33 +92,16 @@ func (w *InnerWindow) Close() {
 }
 
 func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
-	w.ExtendBaseWidget(w)
 
-	min := &widget.Button{Icon: theme.WindowMinimizeIcon(), Importance: widget.LowImportance, OnTapped: w.OnMinimized}
+	w.minBtn = &widget.Button{Icon: theme.WindowMinimizeIcon(), Importance: widget.LowImportance, OnTapped: w.OnMinimized}
 	if w.OnMinimized == nil {
-		min.Disable()
+		w.minBtn.Disable()
 	}
-	max := &widget.Button{Icon: theme.WindowMaximizeIcon(), Importance: widget.LowImportance, OnTapped: w.OnMaximized}
+	w.maxBtn = &widget.Button{Icon: theme.WindowMaximizeIcon(), Importance: widget.LowImportance, OnTapped: w.OnMaximized}
 	if w.OnMaximized == nil {
-		max.Disable()
+		w.maxBtn.Disable()
 	}
-
-	var icon fyne.CanvasObject
-	if w.Icon != nil {
-		icon = &widget.Button{Icon: w.Icon, Importance: widget.LowImportance, OnTapped: func() {
-			if f := w.OnTappedIcon; f != nil {
-				f()
-			}
-		}}
-		if w.OnTappedIcon == nil {
-			icon.(*widget.Button).Disable()
-		}
-	}
-
-	title := newDraggableLabel(w.title, w)
-	title.Truncation = fyne.TextTruncateEllipsis
-
-	close := &widget.Button{Icon: theme.WindowCloseIcon(), Importance: widget.DangerImportance, OnTapped: func() {
+	w.closeBtn = &widget.Button{Icon: theme.WindowCloseIcon(), Importance: widget.DangerImportance, OnTapped: func() {
 		if f := w.CloseIntercept; f != nil {
 			f()
 		} else {
@@ -111,18 +109,32 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 		}
 	}}
 
+	if w.Icon != nil {
+		w.icon = &widget.Button{Icon: w.Icon, Importance: widget.LowImportance, OnTapped: func() {
+			if f := w.OnTappedIcon; f != nil {
+				f()
+			}
+		}}
+		if w.OnTappedIcon == nil {
+			w.icon.(*widget.Button).Disable()
+		}
+	}
+
+	title := newDraggableLabel(w.title, w)
+	title.Truncation = fyne.TextTruncateEllipsis
+
 	isLeading := w.ButtonAlignment == widget.ButtonAlignLeading || (w.ButtonAlignment == widget.ButtonAlignCenter && runtime.GOOS == "darwin")
 
 	var buttons *fyne.Container
 	var bar *fyne.Container
 	if isLeading {
 		// Left side (darwin default or explicit left alignment)
-		buttons = container.NewHBox(close, min, max)
-		bar = container.NewBorder(nil, nil, buttons, icon, title)
+		buttons = container.NewHBox(w.closeBtn, w.minBtn, w.maxBtn)
+		bar = container.NewBorder(nil, nil, buttons, w.icon, title)
 	} else {
 		// Right side (Windows/Linux default and explicit right alignment)
-		buttons = container.NewHBox(min, max, close)
-		bar = container.NewBorder(nil, nil, icon, buttons, title)
+		buttons = container.NewHBox(w.minBtn, w.maxBtn, w.closeBtn)
+		bar = container.NewBorder(nil, nil, w.icon, buttons, title)
 	}
 
 	th := w.Theme()
@@ -166,7 +178,6 @@ var _ fyne.WidgetRenderer = (*innerWindowRenderer)(nil)
 
 type innerWindowRenderer struct {
 	*ShadowingRenderer
-
 	win           *InnerWindow
 	bar           *fyne.Container
 	bg, contentBG *canvas.Rectangle

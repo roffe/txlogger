@@ -8,6 +8,10 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 )
 
+//func (m *Meshgrid) Cursor() desktop.Cursor {
+//	return desktop.CrosshairCursor
+//}
+
 func (m *Meshgrid) MouseIn(_ *desktop.MouseEvent) {
 	m.showCrosshair = true
 	m.refresh()

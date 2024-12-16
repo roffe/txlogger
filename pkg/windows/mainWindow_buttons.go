@@ -74,11 +74,11 @@ func (mw *MainWindow) newLogBtn() *widget.Button {
 			return
 		}
 		for _, v := range mw.symbolList.Symbols() {
-			if v.Name == "AirMassMast.m_Request" && mw.ecuSelect.Selected == "T7" {
+			if v.Name == "AirMassMast.m_Request" && mw.selects.ecuSelect.Selected == "T7" {
 				mw.Error(fmt.Errorf("AirMassMast.m_Request is not supported on T7, Did you forget to change preset?"))
 				return
 			}
-			if v.Name == "m_Request" && mw.ecuSelect.Selected == "T8" {
+			if v.Name == "m_Request" && mw.selects.ecuSelect.Selected == "T8" {
 				mw.Error(fmt.Errorf("m_Request is not supported on T8, Did you forget to change preset?"))
 				return
 			}
@@ -123,7 +123,7 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 			WidebandSymbol:  mw.settings.GetWidebandSymbolName(),
 		}
 
-		switch mw.ecuSelect.Selected {
+		switch mw.selects.ecuSelect.Selected {
 		case "T7":
 			dbcfg.AirDemToString = datalogger.AirDemToStringT7
 		case "T8":
@@ -175,7 +175,7 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 }
 
 func (mw *MainWindow) startLogging() {
-	device, err := mw.settings.CanSettings.GetAdapter(mw.ecuSelect.Selected, mw.Log)
+	device, err := mw.settings.CanSettings.GetAdapter(mw.selects.ecuSelect.Selected, mw.Log)
 	if err != nil {
 		d := dialog.NewError(err, mw)
 		d.Show()
@@ -227,7 +227,7 @@ func (mw *MainWindow) startLogging() {
 
 func (mw *MainWindow) newDataLogger(device gocan.Adapter) (datalogger.IClient, error) {
 	return datalogger.New(datalogger.Config{
-		ECU:            mw.ecuSelect.Selected,
+		ECU:            mw.selects.ecuSelect.Selected,
 		Device:         device,
 		Symbols:        mw.symbolList.Symbols(),
 		Rate:           mw.settings.GetFreq(),

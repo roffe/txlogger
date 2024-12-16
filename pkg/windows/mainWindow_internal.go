@@ -4,19 +4,16 @@ import (
 	"sort"
 	"strings"
 
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/data/binding"
-	"fyne.io/fyne/v2/widget"
 	xwidget "fyne.io/x/fyne/widget"
 )
 
 func (mw *MainWindow) loadPrefs(filename string) {
 	if ecu := mw.app.Preferences().StringWithFallback(prefsSelectedECU, "T7"); ecu != "" {
-		mw.ecuSelect.SetSelected(ecu)
+		mw.selects.ecuSelect.SetSelected(ecu)
 	}
 
 	if preset := mw.app.Preferences().String(prefsSelectedPreset); preset != "" {
-		mw.presetSelect.SetSelected(preset)
+		mw.selects.presetSelect.SetSelected(preset)
 	}
 
 	if filename == "" {
@@ -36,27 +33,6 @@ func (mw *MainWindow) loadPrefs(filename string) {
 		mw.filename = filename
 	}
 
-}
-
-func (mw *MainWindow) newOutputList() {
-	mw.output = widget.NewListWithData(
-		mw.outputData,
-		func() fyne.CanvasObject {
-			w := widget.NewLabel("")
-			w.Alignment = fyne.TextAlignLeading
-			w.Truncation = fyne.TextTruncateEllipsis
-			return w
-		},
-		func(item binding.DataItem, obj fyne.CanvasObject) {
-			i := item.(binding.String)
-			txt, err := i.Get()
-			if err != nil {
-				mw.Error(err)
-				return
-			}
-			obj.(*widget.Label).SetText(txt)
-		},
-	)
 }
 
 func (mw *MainWindow) newSymbolnameTypeahead() {

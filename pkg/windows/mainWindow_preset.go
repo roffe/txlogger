@@ -12,16 +12,16 @@ import (
 
 func (mw *MainWindow) reloadPresets() {
 	sets := append([]string{"Select preset"}, presets.Names()...)
-	mw.presetSelect.SetOptions(sets)
+	mw.selects.presetSelect.SetOptions(sets)
 }
 
 func (mw *MainWindow) savePreset() {
-	if mw.presetSelect.Selected == "Select preset" {
+	if mw.selects.presetSelect.Selected == "Select preset" {
 		//dialog.ShowInformation("No preset selected", "Use 'New' to create a new preset", mw)
 		mw.newPreset()
 		return
 	}
-	if err := presets.Set(mw.presetSelect.Selected, mw.symbolList.Symbols()); err != nil {
+	if err := presets.Set(mw.selects.presetSelect.Selected, mw.symbolList.Symbols()); err != nil {
 		mw.Error(err)
 		return
 	}
@@ -51,7 +51,7 @@ func (mw *MainWindow) newPreset() {
 					return
 				}
 				mw.reloadPresets()
-				mw.presetSelect.SetSelected(presetName.Text)
+				mw.selects.presetSelect.SetSelected(presetName.Text)
 			}
 		},
 		mw,
@@ -94,19 +94,19 @@ func (mw *MainWindow) exportPreset() {
 }
 
 func (mw *MainWindow) deletePreset() {
-	if mw.presetSelect.Selected == "Select preset" {
+	if mw.selects.presetSelect.Selected == "Select preset" {
 		dialog.ShowInformation("No preset selected", "Select a preset to delete", mw)
 		return
 	}
 
-	if strings.EqualFold(mw.presetSelect.Selected, "T7 Dash") || strings.EqualFold(mw.presetSelect.Selected, "T8 Dash") {
+	if strings.EqualFold(mw.selects.presetSelect.Selected, "T7 Dash") || strings.EqualFold(mw.selects.presetSelect.Selected, "T8 Dash") {
 		mw.Error(fmt.Errorf("can't delete built-in preset"))
 		return
 	}
 
-	dialog.ShowConfirm("Confirm preset delete", "Delete preset '"+mw.presetSelect.Selected+"', are you sure?", func(b bool) {
+	dialog.ShowConfirm("Confirm preset delete", "Delete preset '"+mw.selects.presetSelect.Selected+"', are you sure?", func(b bool) {
 		if b {
-			if err := presets.Delete(mw.presetSelect.Selected); err != nil {
+			if err := presets.Delete(mw.selects.presetSelect.Selected); err != nil {
 				mw.Error(err)
 				return
 			}
@@ -115,7 +115,7 @@ func (mw *MainWindow) deletePreset() {
 				return
 			}
 			mw.reloadPresets()
-			mw.presetSelect.SetSelected("Select preset")
+			mw.selects.presetSelect.SetSelected("Select preset")
 		}
 	}, mw)
 }

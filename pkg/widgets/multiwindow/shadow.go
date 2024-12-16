@@ -43,6 +43,7 @@ const (
 	ShadowRight
 	ShadowBottom
 	ShadowTop
+	ShadowBottomRight
 )
 
 // NewShadow create a new Shadow.
@@ -151,6 +152,13 @@ func (r *shadowRenderer) createShadows() {
 		r.bl.CenterOffsetY = -0.5
 		r.l = canvas.NewHorizontalGradient(color.Transparent, fg)
 		r.SetObjects([]fyne.CanvasObject{r.tl, r.t, r.tr, r.r, r.br, r.b, r.bl, r.l})
+	case ShadowBottomRight:
+		r.br = canvas.NewRadialGradient(fg, color.Transparent)
+		r.br.CenterOffsetX = -0.5
+		r.br.CenterOffsetY = -0.5
+		r.b = canvas.NewVerticalGradient(fg, color.Transparent)
+		r.r = canvas.NewHorizontalGradient(fg, color.Transparent)
+		r.SetObjects([]fyne.CanvasObject{r.br, r.b, r.r})
 	}
 }
 

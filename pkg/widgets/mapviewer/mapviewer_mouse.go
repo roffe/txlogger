@@ -33,6 +33,10 @@ func (mv *MapViewer) MouseMoved(event *desktop.MouseEvent) {
 
 // MouseDown is called when a mouse button is pressed.
 func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
+	if mv.OnMouseDown != nil {
+		mv.OnMouseDown()
+	}
+
 	fyne.CurrentApp().Driver().CanvasForObject(mv).Focus(mv)
 	if event.Position.Y > mv.xAxisLabelContainer.Size().Height+mv.innerView.Size().Height {
 		return
@@ -169,7 +173,7 @@ func (mv *MapViewer) showPopupMenu(pos fyne.Position) {
 			}),
 		)
 
-		if mv.editable {
+		if mv.opts.editable {
 			menu.Items = append(menu.Items,
 				fyne.NewMenuItem("Paste", func() {
 					mv.paste()

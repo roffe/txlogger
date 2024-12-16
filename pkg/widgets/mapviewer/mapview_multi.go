@@ -25,7 +25,7 @@ func NewMapViewerMulti(typ symbol.ECUType, symbols symbol.SymbolCollection, mapN
 		if err != nil {
 			return nil, err
 		}
-		mv, err := NewMapViewer(
+		mv, err := New(
 			WithXData(xData),
 			WithYData(yData),
 			WithZData(zData),

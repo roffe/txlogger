@@ -35,7 +35,7 @@ func (mv *MapViewer) TypedRune(r rune) {
 }
 
 func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
-	if !mv.editable {
+	if !mv.opts.editable {
 		return
 	}
 	//	log.Println("TypedKey", key.Name, shifted, key.Physical.ScanCode)

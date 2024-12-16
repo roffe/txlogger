@@ -4,14 +4,13 @@ go 1.23
 
 require (
 	github.com/avast/retry-go/v4 v4.6.0
-	github.com/fatih/color v1.18.0
-	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
+	github.com/fatih/color v1.18.0 // indirect
 	github.com/roffe/gocan v0.0.0-20241207110253-bc5f0434702d
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
-	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9
+	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9 // indirect
 	go.bug.st/serial v1.6.2
-	golang.org/x/crypto v0.31.0
+	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/image v0.23.0
 	golang.org/x/mod v0.22.0
 	golang.org/x/net v0.32.0
@@ -19,7 +18,7 @@ require (
 )
 
 require (
-	fyne.io/fyne/v2 v2.5.3-rc6.0.20241212104758-5ee9979bbcd1
+	fyne.io/fyne/v2 v2.5.3-rc7.0.20241215104605-a032b58e1cce
 	fyne.io/systray v1.11.0 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
@@ -66,7 +65,6 @@ require fyne.io/x/fyne v0.0.0-20240803204126-8b5b5bfe65ef
 
 require (
 	github.com/ebitengine/oto/v3 v3.3.1
-	github.com/google/gousb v1.1.3
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/jellydator/ttlcache/v3 v3.3.0
 )
@@ -74,6 +72,7 @@ require (
 require (
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/ebitengine/purego v0.8.1 // indirect
+	github.com/google/gousb v1.1.3 // indirect
 	github.com/jeandeaual/go-locale v0.0.0-20241204123234-32dda1c00a20 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.4.1 // indirect
 	github.com/rymdport/portal v0.3.0 // indirect

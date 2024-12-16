@@ -28,7 +28,7 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 			return
 		}
 
-		mv, err := mapviewer.NewMapViewer(
+		mv, err := mapviewer.New(
 			mapviewer.WithXData(xData),
 			mapviewer.WithYData(yData),
 			mapviewer.WithZData(zData),

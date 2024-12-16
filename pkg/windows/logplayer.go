@@ -197,7 +197,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 
 	lp.menu = mainmenu.New(lp, []*fyne.Menu{
 		fyne.NewMenu("File"),
-	}, lp.openMap, otherFunc)
+	}, nil, lp.openMap, otherFunc)
 
 	w.SetCloseIntercept(func() {
 		for _, c := range cancelFuncs {

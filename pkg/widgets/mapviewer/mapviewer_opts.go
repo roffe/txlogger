@@ -13,7 +13,7 @@ type UpdateFunc func(idx int, value []int)
 
 func WithButtons(buttons bool) MapViewerOption {
 	return func(mv *MapViewer) error {
-		mv.buttonsEnabled = buttons
+		mv.opts.buttonsEnabled = buttons
 		return nil
 	}
 }
@@ -119,28 +119,28 @@ func WithInterPolFunc(ipf interpolate.InterPolFunc) MapViewerOption {
 
 func WithSaveFileFunc(saveFileFunc SaveFunc) MapViewerOption {
 	return func(mv *MapViewer) error {
-		mv.saveFileFunc = saveFileFunc
+		mv.funcs.saveFileFunc = saveFileFunc
 		return nil
 	}
 }
 
 func WithLoadECUFunc(loadFunc LoadFunc) MapViewerOption {
 	return func(mv *MapViewer) error {
-		mv.loadECUFunc = loadFunc
+		mv.funcs.loadECUFunc = loadFunc
 		return nil
 	}
 }
 
 func WithSaveECUFunc(saveECUFunc SaveFunc) MapViewerOption {
 	return func(mv *MapViewer) error {
-		mv.saveECUFunc = saveECUFunc
+		mv.funcs.saveECUFunc = saveECUFunc
 		return nil
 	}
 }
 
 func WithUpdateECUFunc(updateFunc UpdateFunc) MapViewerOption {
 	return func(mv *MapViewer) error {
-		mv.updateECUFunc = updateFunc
+		mv.funcs.updateECUFunc = updateFunc
 		return nil
 	}
 }
@@ -161,14 +161,14 @@ func WithMeshView(meshView bool) MapViewerOption {
 
 func WithWBL(enabled bool) MapViewerOption {
 	return func(mv *MapViewer) error {
-		mv.showWBL = enabled
+		mv.opts.showWBL = enabled
 		return nil
 	}
 }
 
 func WithEditable(editable bool) MapViewerOption {
 	return func(mv *MapViewer) error {
-		mv.editable = editable
+		mv.opts.editable = editable
 		return nil
 	}
 }
@@ -182,7 +182,7 @@ func WithWidebandSymbolName(lambdaName string) MapViewerOption {
 
 func WithFollowCrosshair(enabled bool) MapViewerOption {
 	return func(mv *MapViewer) error {
-		mv.cursorFollowCrosshair = enabled
+		mv.opts.cursorFollowCrosshair = enabled
 		return nil
 	}
 }
