@@ -3,6 +3,7 @@ package symbollist
 import (
 	"fmt"
 	"image/color"
+	"sort"
 	"strconv"
 	"sync"
 
@@ -48,6 +49,15 @@ func (s *Widget) render() {
 
 func (s *Widget) UpdateBars(enabled bool) {
 	s.updateBars = enabled
+}
+
+func (s *Widget) Names() []string {
+	names := make([]string, len(s.symbols))
+	for i, s := range s.symbols {
+		names[i] = s.Name
+	}
+	sort.Strings(names)
+	return names
 }
 
 func (s *Widget) SetValue(name string, value float64) {

@@ -28,6 +28,7 @@ import (
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/msglist"
+	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
@@ -144,8 +145,8 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		statusText: widget.NewLabel("Harder, Better, Faster, Stronger"),
 
 		oCtx: newSound(),
-		wm:   newWindowManager(),
 	}
+	mw.wm = newWindowManager(mw)
 	mw.Window.SetPadded(true)
 
 	updateSymbols := func(syms []*symbol.Symbol) {
@@ -246,6 +247,29 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 		}
 	})
 
+	opts, err := listLayouts()
+	if err != nil {
+		mw.Error(err)
+	}
+
+	var selEntry *widget.Select
+	selEntry = widget.NewSelect(opts, func(s string) {
+		if s == "" {
+			return
+		}
+		switch s {
+		case "Save Layout":
+			if err := mw.wm.SaveLayout(); err != nil {
+				mw.Error(err)
+			}
+			selEntry.ClearSelected()
+		default:
+			if err := mw.wm.LoadLayout(s); err != nil {
+				mw.Error(err)
+			}
+		}
+	})
+
 	mw.content = container.NewBorder(
 		container.NewBorder(
 			nil,
@@ -296,19 +320,46 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 					mw.wm.Add(symbolListWindow)
 					//symbolListWindow.Resize(fyne.NewSize(800, 700))
 				}),
-
 				mw.buttons.logBtn,
 			),
 			nil,
 			container.NewHBox(
 				mw.buttons.logplayerBtn,
 				mw.buttons.dashboardBtn,
+				widget.NewButtonWithIcon("", theme.GridIcon(), func() {
+					mw.wm.MultipleWindows.Arrange(&multiwindow.GridArranger{})
+				}),
+				widget.NewButtonWithIcon("", theme.ContentAddIcon(), func() {
+					if mw.wm.HasWindow("Create gauge") {
+						return
+					}
+					gs := NewGaugeCreator(mw)
+					iw := newInnerWindow("Create gauge", gs)
+					iw.Icon = theme.ContentAddIcon()
+					iw.CloseIntercept = func() {
+						mw.wm.Remove(iw)
+					}
+					mw.wm.Add(iw)
+				}),
 			),
 		),
 		container.NewBorder(
 			nil,
 			nil,
-			nil,
+			container.NewBorder(
+				nil,
+				nil,
+				nil,
+				widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
+					opts, err := listLayouts()
+					if err != nil {
+						mw.Error(err)
+						return
+					}
+					selEntry.SetOptions(opts)
+				}),
+				selEntry,
+			),
 			container.NewGridWithColumns(4,
 				mw.counters.capturedCounterLabel,
 				mw.counters.errorCounterLabel,
@@ -332,7 +383,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 					debugWindow.CloseIntercept = func() {
 						mw.wm.Remove(debugWindow)
 					}
-					xy := mw.wm.MultipleWindows.Size().Subtract(dbl.MinSize().AddWidthHeight(40, 60))
+					xy := mw.wm.MultipleWindows.Size().Subtract(dbl.MinSize().AddWidthHeight(20, 60))
 					mw.wm.Add(debugWindow, fyne.NewPos(xy.Width, xy.Height))
 				}),
 			),

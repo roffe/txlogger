@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/common"
+	"github.com/roffe/txlogger/pkg/widgets"
 )
 
 type HBar struct {
@@ -17,7 +18,7 @@ type HBar struct {
 	titleText *canvas.Text
 	bars      []*canvas.Line
 
-	cfg *Config
+	cfg widgets.GaugeConfig
 
 	value float64
 
@@ -30,14 +31,7 @@ type HBar struct {
 	oldSize fyne.Size
 }
 
-type Config struct {
-	Title    string
-	Min, Max float64
-	Steps    int
-	Minsize  fyne.Size
-}
-
-func New(cfg *Config) *HBar {
+func New(cfg widgets.GaugeConfig) *HBar {
 	s := &HBar{
 		cfg: cfg,
 	}
@@ -123,7 +117,7 @@ func (s *HBarRenderer) Layout(space fyne.Size) {
 }
 
 func (s *HBarRenderer) MinSize() fyne.Size {
-	return s.cfg.Minsize
+	return s.cfg.MinSize
 }
 
 func (s *HBarRenderer) Refresh() {

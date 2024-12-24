@@ -1,11 +1,49 @@
 package windows
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
+	"fyne.io/fyne/v2/theme"
 	xwidget "fyne.io/x/fyne/widget"
 )
+
+// list .json files in the folder layouts
+func listLayouts() ([]string, error) {
+	opts := []string{"Save Layout"}
+	files, err := os.ReadDir("layouts")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("failed to read layouts folder: %w", err)
+	}
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		if filepath.Ext(f.Name()) != ".json" {
+			continue
+		}
+		opts = append(opts, strings.TrimSuffix(f.Name(), ".json"))
+	}
+	return opts, nil
+}
+
+func (mw *MainWindow) openSettings() {
+	if mw.wm.HasWindow("Settings") {
+		return
+	}
+	inner := newInnerWindow("Settings", mw.settings)
+	inner.Icon = theme.SettingsIcon()
+	inner.CloseIntercept = func() {
+		mw.wm.Remove(inner)
+	}
+	mw.wm.Add(inner)
+}
 
 func (mw *MainWindow) loadPrefs(filename string) {
 	if ecu := mw.app.Preferences().StringWithFallback(prefsSelectedECU, "T7"); ecu != "" {

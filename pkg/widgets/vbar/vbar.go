@@ -19,7 +19,7 @@ type VBar struct {
 	displayText *canvas.Text
 	bars        []*canvas.Line
 
-	cfg *Config
+	cfg widgets.GaugeConfig
 
 	value float64
 
@@ -34,15 +34,7 @@ type VBar struct {
 	}
 }
 
-type Config struct {
-	Title      string
-	Min, Max   float64
-	Steps      int
-	Minsize    fyne.Size
-	ColorScale widgets.ColorScheme
-}
-
-func New(cfg *Config) *VBar {
+func New(cfg widgets.GaugeConfig) *VBar {
 	s := &VBar{
 		cfg: cfg,
 	}
@@ -153,7 +145,7 @@ type VBarRenderer struct {
 }
 
 func (r *VBarRenderer) MinSize() fyne.Size {
-	return r.cfg.Minsize
+	return r.cfg.MinSize
 }
 
 func (r *VBarRenderer) Refresh() {

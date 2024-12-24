@@ -43,8 +43,8 @@ func (m *MultipleWindows) CreateRenderer() fyne.WidgetRenderer {
 func (m *MultipleWindows) Add(w *InnerWindow, startPosition ...fyne.Position) {
 	m.propertyLock.Lock()
 	defer m.propertyLock.Unlock()
-	m.setupChild(w)
 	m.Windows = append(m.Windows, w)
+	m.setupChild(w)
 	if len(startPosition) == 0 {
 		w.Move(m.openOffset)
 		m.openOffset = m.openOffset.AddXY(15, 15)

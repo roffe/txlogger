@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/common"
+	"github.com/roffe/txlogger/pkg/widgets"
 )
 
 type CBar struct {
@@ -18,7 +19,7 @@ type CBar struct {
 	displayText *canvas.Text
 	bars        []*canvas.Line
 
-	cfg *Config
+	cfg widgets.GaugeConfig
 
 	// Cached values
 	value float64
@@ -37,31 +38,12 @@ type CBar struct {
 	stepFactor       float32
 }
 
-// Config structs remain the same
-type TextPosition int
-
-const (
-	TextAtTop TextPosition = iota
-	TextAtBottom
-	TextAtCenter
-)
-
-type Config struct {
-	Title            string
-	DisplayString    string
-	DisplayTextSize  int
-	Min, Max, Center float64
-	Steps            int
-	Minsize          fyne.Size
-	TextPosition     TextPosition
-}
-
-func New(cfg *Config) *CBar {
-	if cfg.Minsize.Width == 0 {
-		cfg.Minsize.Width = 50
+func New(cfg widgets.GaugeConfig) *CBar {
+	if cfg.MinSize.Width == 0 {
+		cfg.MinSize.Width = 50
 	}
-	if cfg.Minsize.Height == 0 {
-		cfg.Minsize.Height = 50
+	if cfg.MinSize.Height == 0 {
+		cfg.MinSize.Height = 50
 	}
 	if cfg.Steps == 0 {
 		cfg.Steps = 10
@@ -169,9 +151,9 @@ func (s *CBar) refresh() {
 	// Calculate text position
 	var y float32
 	switch s.cfg.TextPosition {
-	case TextAtTop:
+	case widgets.TextAtTop:
 		y = -s.bar.MinSize().Height - s.displayText.MinSize().Height
-	case TextAtBottom:
+	case widgets.TextAtBottom:
 		y = s.lastSize.Height
 	}
 
@@ -191,7 +173,7 @@ type CBarRenderer struct {
 }
 
 func (r *CBarRenderer) MinSize() fyne.Size {
-	return r.cfg.Minsize
+	return r.cfg.MinSize
 }
 
 func (r *CBarRenderer) Refresh() {

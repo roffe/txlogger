@@ -41,6 +41,8 @@ fyne.io/fyne/v2 v2.5.3-rc6.0.20241212104758-5ee9979bbcd1 h1:rZqgqjkjjLEfzyYxITUK
 fyne.io/fyne/v2 v2.5.3-rc6.0.20241212104758-5ee9979bbcd1/go.mod h1:Dsh1J0yBU6w+LivvLN1d+ueuE1cgiHj+hWlR45JEmpk=
 fyne.io/fyne/v2 v2.5.3-rc7.0.20241215104605-a032b58e1cce h1:/xoQFP4lktO2KeNrfeRyRbD6PRAw7K0UHbgzLyL1Sm8=
 fyne.io/fyne/v2 v2.5.3-rc7.0.20241215104605-a032b58e1cce/go.mod h1:Dsh1J0yBU6w+LivvLN1d+ueuE1cgiHj+hWlR45JEmpk=
+fyne.io/fyne/v2 v2.5.3-rc7.0.20241216165619-7fea2ebbbb96 h1:Lg6IO/MQ3CQnBTwm4jSE7GzXu6ioTgyMUirS7yPIwRY=
+fyne.io/fyne/v2 v2.5.3-rc7.0.20241216165619-7fea2ebbbb96/go.mod h1:Dsh1J0yBU6w+LivvLN1d+ueuE1cgiHj+hWlR45JEmpk=
 fyne.io/systray v1.11.0 h1:D9HISlxSkx+jHSniMBR6fCFOUjk1x/OOOJLa9lJYAKg=
 fyne.io/systray v1.11.0/go.mod h1:RVwqP9nYMo7h5zViCBHri2FgjXF7H2cub7MAq4NSoLs=
 fyne.io/x/fyne v0.0.0-20240803204126-8b5b5bfe65ef h1:5qFhIzsvwmIybR4GlmENHHjOkQB5XsRZ6ujO0ktnsl4=

@@ -46,15 +46,7 @@ func (mw *MainWindow) setupMenu() {
 				}
 			}),
 			fyne.NewMenuItem("Settings", func() {
-				if mw.wm.HasWindow("Settings") {
-					return
-				}
-				inner := newInnerWindow("Settings", mw.settings)
-				inner.Icon = theme.SettingsIcon()
-				inner.CloseIntercept = func() {
-					mw.wm.Remove(inner)
-				}
-				mw.wm.Add(inner)
+				mw.openSettings()
 			}),
 			fyne.NewMenuItem("About", func() {
 				if mw.wm.HasWindow("About") {
@@ -307,11 +299,9 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		}))
 	}
 
-	//if mw.settings.GetWidebandType() != "ECU" {
 	cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(mw.settings.GetWidebandSymbolName(), func(value float64) {
 		mv.SetValue(mw.settings.GetWidebandSymbolName(), value)
 	}))
-	//}
 
 	if mw.settings.GetAutoLoad() && mw.dlc != nil {
 		p := progressmodal.New(mw.Window.Content(), "Loading "+axis.Z)
@@ -334,18 +324,4 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		mw.wm.Remove(mapWindow)
 	}
 	mw.wm.Add(mapWindow)
-	/*
-		w := mw.app.NewWindow(axis.Z + " - " + axis.ZDescription)
-
-		mw.openMaps[axis.Z] = w
-		w.SetCloseIntercept(func() {
-			delete(mw.openMaps, axis.Z)
-			for _, f := range cancelFuncs {
-				f()
-			}
-			w.Close()
-		})
-		w.SetContent(mv)
-		w.Show()
-	*/
 }

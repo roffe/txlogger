@@ -128,15 +128,12 @@ func (mv *MapViewer) updateSelection(nselectedX, nSelectedY int) {
 
 // updateCursorPositionAndSize updates the cursor's position and size on the screen.
 func (mv *MapViewer) updateCursorPositionAndSize(topLeftX, topLeftY, width, height float32) {
-	mv.cursor.Resize(fyne.NewSize(width+2, height+1))
-	mv.cursor.Move(fyne.NewPos(topLeftX-1, topLeftY))
+	mv.selectionRect.Resize(fyne.NewSize(width+2, height+1))
+	mv.selectionRect.Move(fyne.NewPos(topLeftX-1, topLeftY))
 }
 
 // handleFocusAndInputBuffer focuses the MapViewer and clears the input buffer if necessary.
 func (mv *MapViewer) handleFocusAndInputBuffer() {
-	//if c := fyne.CurrentApp().Driver().CanvasForObject(mv); c != nil {
-	//	c.Focus(mv)
-	//}
 	if mv.inputBuffer.Len() > 0 {
 		mv.inputBuffer.Reset()
 		mv.restoreSelectedValues()

@@ -11,17 +11,8 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/common"
+	"github.com/roffe/txlogger/pkg/widgets"
 )
-
-type Config struct {
-	Title string
-	Min   float64
-	Max   float64
-	Steps int
-	//Factor        float64
-	DisplayString string    // default "%.0f"
-	MinSize       fyne.Size // default 260x260
-}
 
 type DualDial struct {
 	widget.BaseWidget
@@ -62,7 +53,7 @@ type DualDial struct {
 	buf1, buf2                 bytes.Buffer
 }
 
-func New(cfg Config) *DualDial {
+func New(cfg widgets.GaugeConfig) *DualDial {
 	s := &DualDial{
 		title:         cfg.Title,
 		min:           cfg.Min,
@@ -213,9 +204,9 @@ func (c *DualDialRenderer) Layout(space fyne.Size) {
 	c.center.Move(c.middle.SubtractXY(center*common.OneHalf, center*common.OneHalf))
 	c.center.Resize(fyne.NewSize(center, center))
 
-	coverHeight := size.Height * common.OneSixth
-	c.cover.Move(fyne.NewPos(0, c.middle.Y+c.radius*common.OneSeventh*5))
-	c.cover.Resize(fyne.NewSize(space.Width, coverHeight))
+	coverY := c.middle.Y + c.radius*common.OneSeventh*5
+	c.cover.Move(fyne.NewPos(0, coverY))
+	c.cover.Resize(fyne.NewSize(space.Width, space.Height-coverY))
 
 	sixthDiameter := c.diameter * common.OneSixth
 

@@ -154,7 +154,7 @@ func WithSymbol(symbol *symbol.Symbol) MapViewerOption {
 
 func WithMeshView(meshView bool) MapViewerOption {
 	return func(mv *MapViewer) error {
-		mv.meshView = meshView
+		mv.opts.meshView = meshView
 		return nil
 	}
 }

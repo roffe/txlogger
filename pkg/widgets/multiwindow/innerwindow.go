@@ -92,7 +92,6 @@ func (w *InnerWindow) Close() {
 }
 
 func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
-
 	w.minBtn = &widget.Button{Icon: theme.WindowMinimizeIcon(), Importance: widget.LowImportance, OnTapped: w.OnMinimized}
 	if w.OnMinimized == nil {
 		w.minBtn.Disable()
@@ -101,7 +100,7 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 	if w.OnMaximized == nil {
 		w.maxBtn.Disable()
 	}
-	w.closeBtn = &widget.Button{Icon: theme.WindowCloseIcon(), Importance: widget.DangerImportance, OnTapped: func() {
+	w.closeBtn = &widget.Button{Icon: theme.WindowCloseIcon(), Importance: widget.LowImportance, OnTapped: func() {
 		if f := w.CloseIntercept; f != nil {
 			f()
 		} else {
@@ -313,10 +312,11 @@ func newDraggableCorner(w *InnerWindow, leading bool) *draggableCorner {
 
 func (c *draggableCorner) CreateRenderer() fyne.WidgetRenderer {
 	var prop *canvas.Image
+	th := fyne.CurrentApp().Settings().Theme()
 	if c.leading {
-		prop = canvas.NewImageFromResource(fyne.CurrentApp().Settings().Theme().Icon(fyne.ThemeIconName("drag-corner-indicator-left")))
+		prop = canvas.NewImageFromResource(th.Icon(fyne.ThemeIconName("drag-corner-indicator-left")))
 	} else {
-		prop = canvas.NewImageFromResource(fyne.CurrentApp().Settings().Theme().Icon(theme.IconNameDragCornerIndicator))
+		prop = canvas.NewImageFromResource(th.Icon(theme.IconNameDragCornerIndicator))
 	}
 	prop.SetMinSize(fyne.NewSquareSize(16))
 	return widget.NewSimpleRenderer(prop)

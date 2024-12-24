@@ -11,16 +11,8 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/common"
+	"github.com/roffe/txlogger/pkg/widgets"
 )
-
-type Config struct {
-	Title         string
-	Min           float64
-	Max           float64
-	Steps         int
-	DisplayString string    // default "%.0f"
-	MinSize       fyne.Size // default 260x260
-}
 
 type Dial struct {
 	widget.BaseWidget
@@ -57,7 +49,7 @@ type Dial struct {
 	buf bytes.Buffer
 }
 
-func New(cfg Config) *Dial {
+func New(cfg widgets.GaugeConfig) *Dial {
 	c := &Dial{
 		title:         cfg.Title,
 		min:           cfg.Min,
@@ -200,8 +192,9 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 	c.center.Move(c.middle.SubtractXY(center*common.OneHalf, center*common.OneHalf))
 	c.center.Resize(fyne.NewSize(center, center))
 
-	c.cover.Move(fyne.NewPos(0, c.middle.Y+c.radius*common.OneSeventh*5))
-	c.cover.Resize(fyne.NewSize(space.Width, size.Height*common.OneSixth))
+	coverY := c.middle.Y + c.radius*common.OneSeventh*5
+	c.cover.Move(fyne.NewPos(0, coverY))
+	c.cover.Resize(fyne.NewSize(space.Width, space.Height-coverY))
 
 	c.displayText.TextSize = c.radius * common.OneHalf
 	c.displayText.Text = fmt.Sprintf(c.displayString, c.value)
