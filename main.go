@@ -205,5 +205,4 @@ func (m txTheme) Size(name fyne.ThemeSizeName) float32 {
 	default:
 		return 0
 	}
-
 }

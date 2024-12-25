@@ -46,6 +46,10 @@ func New(cfg widgets.GaugeConfig) *VBar {
 	return s
 }
 
+func (s *VBar) GetConfig() widgets.GaugeConfig {
+	return s.cfg
+}
+
 func (s *VBar) render() {
 	s.face = &canvas.Rectangle{
 		StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0xFF},

@@ -17,11 +17,10 @@ import (
 type DualDial struct {
 	widget.BaseWidget
 
-	title         string
+	cfg widgets.GaugeConfig
+
 	titleText     *canvas.Text
 	displayString string
-
-	min, max float64
 
 	value  float64
 	value2 float64
@@ -55,10 +54,8 @@ type DualDial struct {
 
 func New(cfg widgets.GaugeConfig) *DualDial {
 	s := &DualDial{
-		title:         cfg.Title,
-		min:           cfg.Min,
-		max:           cfg.Max,
-		steps:         30,
+		cfg:           cfg,
+		steps:         10,
 		displayString: "%.0f",
 		minsize:       fyne.NewSize(100, 100),
 	}
@@ -75,7 +72,7 @@ func New(cfg widgets.GaugeConfig) *DualDial {
 		s.minsize = cfg.MinSize
 	}
 
-	s.factor = s.max / s.steps
+	s.factor = s.cfg.Max / s.steps
 
 	s.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0xFF}, StrokeWidth: 3}
 	s.cover = &canvas.Rectangle{FillColor: theme.Color(theme.ColorNameBackground)}
@@ -83,7 +80,7 @@ func New(cfg widgets.GaugeConfig) *DualDial {
 	s.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 2}
 	s.needle2 = &canvas.Line{StrokeColor: color.RGBA{R: 249, G: 27, B: 2, A: 255}, StrokeWidth: 2}
 
-	s.titleText = &canvas.Text{Text: s.title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
+	s.titleText = &canvas.Text{Text: s.cfg.Title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
 	s.titleText.TextStyle.Monospace = true
 	s.titleText.Alignment = fyne.TextAlignCenter
 
@@ -103,16 +100,20 @@ func New(cfg widgets.GaugeConfig) *DualDial {
 		s.pips = append(s.pips, pip)
 	}
 
-	totalRange := s.max - s.min
+	totalRange := s.cfg.Max - s.cfg.Min
 	s.needleRotConst = common.Pi15 / (s.steps * (totalRange / s.steps))
 	s.lineRotConst = common.Pi15 / s.steps
 
 	return s
 }
 
+func (c *DualDial) GetConfig() widgets.GaugeConfig {
+	return c.cfg
+}
+
 func (c *DualDial) rotateNeedle(hand *canvas.Line, facePosition float64) {
 	// Normalize the value to start from 0 regardless of minimum value
-	normalizedPosition := facePosition - c.min
+	normalizedPosition := facePosition - c.cfg.Min
 	if normalizedPosition < 0 {
 		normalizedPosition = 0
 	}
@@ -206,7 +207,7 @@ func (c *DualDialRenderer) Layout(space fyne.Size) {
 
 	coverY := c.middle.Y + c.radius*common.OneSeventh*5
 	c.cover.Move(fyne.NewPos(0, coverY))
-	c.cover.Resize(fyne.NewSize(space.Width, space.Height-coverY))
+	c.cover.Resize(fyne.NewSize(space.Width, (space.Height-coverY)+1))
 
 	sixthDiameter := c.diameter * common.OneSixth
 

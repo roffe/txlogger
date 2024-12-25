@@ -18,7 +18,7 @@ func New() *Widget {
 }
 
 func (e *Widget) TypedRune(r rune) {
-	if (r >= '0' && r <= '9') || r == '.' || r == ',' {
+	if (r >= '0' && r <= '9') || r == '.' || r == ',' || r == '-' {
 		e.Entry.TypedRune(r)
 	}
 }

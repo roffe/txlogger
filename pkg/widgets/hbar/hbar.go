@@ -46,6 +46,10 @@ func New(cfg widgets.GaugeConfig) *HBar {
 	return s
 }
 
+func (s *HBar) GetConfig() widgets.GaugeConfig {
+	return s.cfg
+}
+
 func (s *HBar) render() {
 	s.face = &canvas.Rectangle{StrokeColor: theme.Color(theme.ColorNameDisabled), StrokeWidth: 2}
 

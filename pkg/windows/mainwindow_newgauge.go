@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/widgets"
@@ -21,21 +23,20 @@ var _ fyne.Widget = (*GaugeCreator)(nil)
 type GaugeCreator struct {
 	widget.BaseWidget
 
-	mw      *MainWindow
-	form    *widget.Form
-	entries *gaugeEntries
+	mw        *MainWindow
+	form      *widget.Form
+	entries   *gaugeEntries
+	container *fyne.Container
 }
 
 type gaugeEntries struct {
-	name                *widget.Entry
-	unit                *widget.Entry
-	displayString       *widget.Entry
-	symbolName          *widget.Select
-	symbolNameSecondary *widget.Select
-	min                 *numericentry.Widget
-	max                 *numericentry.Widget
-	steps               *numericentry.Widget
-	typ                 *widget.Select
+	name                    *widget.Entry
+	unit                    *widget.SelectEntry
+	displayString           *widget.SelectEntry
+	symbolName              *widget.Select
+	symbolNameSecondary     *widget.Select
+	min, max, center, steps *numericentry.Widget
+	typ                     *widget.Select
 }
 
 func NewGaugeCreator(mw *MainWindow) *GaugeCreator {
@@ -46,11 +47,13 @@ func NewGaugeCreator(mw *MainWindow) *GaugeCreator {
 	g.ExtendBaseWidget(g)
 
 	g.entries.name = widget.NewEntry()
-	g.entries.unit = widget.NewEntry()
-	g.entries.displayString = widget.NewEntry()
-	g.entries.displayString.SetText("%.0f")
+	g.entries.unit = widget.NewSelectEntry([]string{"rpm", "mg/c", "km/h", "mph", "°C", "λ", "%"})
+
+	g.entries.displayString = widget.NewSelectEntry([]string{"%.0f", "%.1f", "%.2f", "%.3f", "%.4f", "%.5f"})
+
 	g.entries.symbolName = widget.NewSelect(mw.symbolList.Names(), func(s string) {
 	})
+
 	g.entries.symbolNameSecondary = widget.NewSelect(mw.symbolList.Names(), func(s string) {
 	})
 	g.entries.symbolNameSecondary.Disable()
@@ -59,168 +62,172 @@ func NewGaugeCreator(mw *MainWindow) *GaugeCreator {
 	g.entries.min.SetText("0")
 	g.entries.max = numericentry.New()
 	g.entries.max.SetText("100")
+
+	g.entries.center = numericentry.New()
+	g.entries.center.SetText("50")
+	g.entries.center.Disable()
+
 	g.entries.steps = numericentry.New()
 	g.entries.steps.SetText("10")
 
-	g.entries.typ = widget.NewSelect([]string{"Dial", "DualDial", "VBar", "Hbar", "CBar"}, func(s string) {
-		if s == "DualDial" {
-			g.entries.symbolNameSecondary.Enable()
-			g.form.Refresh()
-		} else {
+	g.entries.typ = widget.NewSelect([]string{"Dial", "DualDial", "VBar", "HBar", "CBar"}, func(s string) {
+		switch s {
+		case "Dial":
 			g.entries.symbolNameSecondary.Disable()
+			g.entries.center.Disable()
+			g.form.Refresh()
+		case "DualDial":
+			g.entries.symbolNameSecondary.Enable()
+			g.entries.center.Disable()
+			g.form.Refresh()
+		case "VBar":
+			g.entries.symbolNameSecondary.Disable()
+			g.entries.center.Disable()
+			g.form.Refresh()
+		case "HBar":
+			g.entries.symbolNameSecondary.Disable()
+			g.entries.center.Disable()
+			g.form.Refresh()
+		case "CBar":
+			g.entries.symbolNameSecondary.Disable()
+			g.entries.center.Enable()
 			g.form.Refresh()
 		}
 	})
 
+	typ := widget.NewFormItem("Type", g.entries.typ)
+	typ.HintText = "Select the type of gauge to create"
+
+	name := widget.NewFormItem("Name", g.entries.name)
+	name.HintText = "Name will be title of the gauge window"
+
+	unit := widget.NewFormItem("Unit", g.entries.unit)
+	unit.HintText = "Unit will be displayed at the bottom of the gauge"
+
+	dispstr := widget.NewFormItem("Display format", g.entries.displayString)
+	dispstr.HintText = "Select the number of decimals to display"
+
+	sym := widget.NewFormItem("Symbol", g.entries.symbolName)
+	sym2 := widget.NewFormItem("Secondary Symbol", g.entries.symbolNameSecondary)
+
+	min := widget.NewFormItem("Min value", g.entries.min)
+	max := widget.NewFormItem("Max value", g.entries.max)
+	center := widget.NewFormItem("Center value", g.entries.center)
+
+	steps := widget.NewFormItem("Steps", g.entries.steps)
+	steps.HintText = "Number of steps in the gauge"
+
 	g.form = widget.NewForm(
-		widget.NewFormItem("Type", g.entries.typ),
-		widget.NewFormItem("Name", g.entries.name),
-		widget.NewFormItem("Unit", g.entries.unit),
-		widget.NewFormItem("Display String", g.entries.displayString),
-		widget.NewFormItem("Symbol", g.entries.symbolName),
-		widget.NewFormItem("Secondary Symbol", g.entries.symbolNameSecondary),
-		widget.NewFormItem("Min value", g.entries.min),
-		widget.NewFormItem("Max value", g.entries.max),
-		widget.NewFormItem("Steps", g.entries.steps),
+		typ,
+		name,
+		unit,
+		dispstr,
+		sym,
+		sym2,
+		min,
+		max,
+		center,
+		steps,
 	)
 
-	g.form.SubmitText = "Create"
-
-	g.form.OnSubmit = g.onSubmit
+	g.container = container.NewBorder(
+		nil,
+		widget.NewButtonWithIcon("Create", theme.ContentAddIcon(), func() {
+			g.onSubmit()
+		}),
+		nil,
+		nil,
+		g.form,
+	)
 
 	return g
 }
 
-func (g *GaugeCreator) onSubmit() {
-	min, err := strconv.ParseFloat(g.entries.min.Text, 64)
+func float64or0(s string) float64 {
+	f, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		g.mw.Error(err)
-		return
+		return 0
 	}
-	max, err := strconv.ParseFloat(g.entries.max.Text, 64)
+	return f
+}
+func intor10(s string) int {
+	i, err := strconv.Atoi(s)
 	if err != nil {
-		g.mw.Error(err)
-		return
+		return 10
 	}
-	steps, err := strconv.ParseInt(g.entries.steps.Text, 10, 64)
-	if err != nil {
-		g.mw.Error(err)
-		return
-	}
+	return i
+}
 
+func (g *GaugeCreator) onSubmit() {
+	min := float64or0(g.entries.min.Text)
+	max := float64or0(g.entries.max.Text)
+	center := float64or0(g.entries.center.Text)
+	steps := intor10(g.entries.steps.Text)
+
+	var cancelFuncs []func()
+	var gauge fyne.CanvasObject
+
+	gaugeConfig := widgets.GaugeConfig{
+		Title:               g.entries.unit.Text,
+		DisplayString:       g.entries.displayString.Text,
+		Min:                 min,
+		Max:                 max,
+		Center:              center,
+		Steps:               int(steps),
+		MinSize:             fyne.NewSize(100, 100),
+		SymbolName:          g.entries.symbolName.Selected,
+		SymbolNameSecondary: g.entries.symbolNameSecondary.Selected,
+	}
 	switch g.entries.typ.Selected {
 	case "Dial":
-		dialCfg := widgets.GaugeConfig{
-			Title:         g.entries.unit.Text,
-			DisplayString: g.entries.displayString.Text,
-			Min:           min,
-			Max:           max,
-			Steps:         int(steps),
-			MinSize:       fyne.NewSize(100, 100),
-		}
-		d := dial.New(dialCfg)
-
-		cancel := ebus.SubscribeFunc(g.entries.symbolName.Selected, d.SetValue)
-
-		iw := newInnerWindow(g.entries.name.Text, d)
-		iw.CloseIntercept = func() {
-			cancel()
-			g.mw.wm.Remove(iw)
-		}
-		if !g.mw.wm.Add(iw) {
-			cancel()
-		}
+		gaugeConfig.Type = "Dial"
+		dial := dial.New(gaugeConfig)
+		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(g.entries.symbolName.Selected, dial.SetValue))
+		gauge = dial
 	case "DualDial":
-		dualDialCfg := widgets.GaugeConfig{
-			Title:         g.entries.unit.Text,
-			DisplayString: g.entries.displayString.Text,
-			Min:           min,
-			Max:           max,
-			Steps:         int(steps),
-			MinSize:       fyne.NewSize(100, 100),
-		}
-		dd := dualdial.New(dualDialCfg)
-
-		cancel := ebus.SubscribeFunc(g.entries.symbolName.Selected, dd.SetValue)
-		cancel2 := ebus.SubscribeFunc(g.entries.symbolNameSecondary.Selected, dd.SetValue2)
-
-		iw := newInnerWindow(g.entries.name.Text, dd)
-		iw.CloseIntercept = func() {
-			cancel()
-			cancel2()
-			g.mw.wm.Remove(iw)
-		}
-		if !g.mw.wm.Add(iw) {
-			cancel()
-			cancel2()
-		}
+		gaugeConfig.Type = "DualDial"
+		dualDial := dualdial.New(gaugeConfig)
+		cancelFuncs = append(cancelFuncs,
+			ebus.SubscribeFunc(g.entries.symbolName.Selected, dualDial.SetValue),
+			ebus.SubscribeFunc(g.entries.symbolNameSecondary.Selected, dualDial.SetValue2),
+		)
+		gauge = dualDial
 	case "VBar":
-		vbarConfig := widgets.GaugeConfig{
-			Title:   g.entries.unit.Text,
-			Min:     min,
-			Max:     max,
-			Steps:   int(steps),
-			MinSize: fyne.NewSize(100, 100),
-		}
-		vb := vbar.New(vbarConfig)
-
-		cancel := ebus.SubscribeFunc(g.entries.symbolName.Selected, vb.SetValue)
-
-		iw := newInnerWindow(g.entries.name.Text, vb)
-		iw.CloseIntercept = func() {
-			cancel()
-			g.mw.wm.Remove(iw)
-		}
-		if !g.mw.wm.Add(iw) {
-			cancel()
-		}
+		gaugeConfig.Type = "VBar"
+		gaugeConfig.MinSize = fyne.NewSize(50, 100)
+		vbar := vbar.New(gaugeConfig)
+		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(g.entries.symbolName.Selected, vbar.SetValue))
+		gauge = vbar
 	case "HBar":
-		hbarConfig := widgets.GaugeConfig{
-			Title:   g.entries.unit.Text,
-			Min:     min,
-			Max:     max,
-			Steps:   int(steps),
-			MinSize: fyne.NewSize(100, 100),
-		}
-		hb := hbar.New(hbarConfig)
-
-		cancel := ebus.SubscribeFunc(g.entries.symbolName.Selected, hb.SetValue)
-
-		iw := newInnerWindow(g.entries.name.Text, hb)
-
-		iw.CloseIntercept = func() {
-			cancel()
-			g.mw.wm.Remove(iw)
-		}
-		if !g.mw.wm.Add(iw) {
-			cancel()
-		}
+		gaugeConfig.Type = "HBar"
+		gaugeConfig.MinSize = fyne.NewSize(100, 50)
+		hbar := hbar.New(gaugeConfig)
+		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(g.entries.symbolName.Selected, hbar.SetValue))
+		gauge = hbar
 	case "CBar":
-		cbarConfig := widgets.GaugeConfig{
-			Title:   g.entries.unit.Text,
-			Min:     min,
-			Max:     max,
-			Steps:   int(steps),
-			MinSize: fyne.NewSize(100, 100),
-		}
-		cb := cbar.New(cbarConfig)
-
-		cancel := ebus.SubscribeFunc(g.entries.symbolName.Selected, cb.SetValue)
-
-		iw := newInnerWindow(cbarConfig.Title, cb)
-
-		iw.CloseIntercept = func() {
-			cancel()
-			g.mw.wm.Remove(iw)
-		}
-		if !g.mw.wm.Add(iw) {
-			cancel()
-		}
+		gaugeConfig.Type = "CBar"
+		gaugeConfig.MinSize = fyne.NewSize(100, 50)
+		cbar := cbar.New(gaugeConfig)
+		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(g.entries.symbolName.Selected, cbar.SetValue))
+		gauge = cbar
 	default:
 		g.mw.Error(errors.New("unknown gauge type"))
+		return
+	}
+	iw := newInnerWindow(g.entries.name.Text, gauge)
+	iw.CloseIntercept = func() {
+		for _, cancel := range cancelFuncs {
+			cancel()
+		}
+		g.mw.wm.Remove(iw)
+	}
+	if !g.mw.wm.Add(iw) {
+		for _, cancel := range cancelFuncs {
+			cancel()
+		}
 	}
 }
 
 func (g *GaugeCreator) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(g.form)
+	return widget.NewSimpleRenderer(g.container)
 }

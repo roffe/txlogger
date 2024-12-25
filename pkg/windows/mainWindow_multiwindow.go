@@ -13,6 +13,8 @@ import (
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/layout"
+	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/widgets/gauge"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
 
@@ -33,6 +35,8 @@ type windowHistory struct {
 	Maximized        bool
 	PreMaximizedPos  fyne.Position
 	PreMaximizedSize fyne.Size
+
+	GaugeConfig widgets.GaugeConfig `json:",omitempty"`
 }
 
 type windowManager struct {
@@ -82,15 +86,6 @@ func (wm *windowManager) Remove(w *innerWindow) {
 	title := w.Title()
 	delete(wm.open, title)
 	wm.MultipleWindows.Remove(w.InnerWindow)
-	/*
-		wm.history[title] = windowHistory{
-			position:         w.Position(),
-			size:             w.Size(),
-			maximized:        w.Maximized(),
-			preMaximizedPos:  w.PreMaximizedPos(),
-			preMaximizedSize: w.PreMaximizedSize(),
-		}
-	*/
 }
 
 func (wm *windowManager) Size() fyne.Size {
@@ -123,17 +118,6 @@ func (wm *windowManager) SaveLayout() error {
 	in := dialog.NewForm("Save Window Layout", "Save", "Cancel", items, callback, fyne.CurrentApp().Driver().AllWindows()[0])
 	in.Show()
 	fyne.CurrentApp().Driver().CanvasForObject(wm.MultipleWindows).Focus(input)
-	//go func() {
-	//	for i := 0; i < 30; i++ {
-	//		log.Println("focus", i)
-	//		time.Sleep(50 * time.Millisecond)
-	//		if c == nil {
-	//			continue
-	//		}
-	//		c.Focus(input)
-	//		return
-	//	}
-	//}()
 	return nil
 }
 
@@ -185,6 +169,7 @@ func (wm *windowManager) LoadLayout(name string) error {
 
 	var openMap bool
 	for _, h := range layout.Windows {
+
 		switch h.Title {
 		case "Settings":
 			wm.mw.openSettings()
@@ -196,11 +181,28 @@ func (wm *windowManager) LoadLayout(name string) error {
 			openMap = true
 		}
 
+		if h.GaugeConfig.Type != "" {
+			gauge, cancels := gauge.New(h.GaugeConfig)
+			iw := newInnerWindow(h.Title, gauge)
+			iw.CloseIntercept = func() {
+				for _, cancel := range cancels {
+					cancel()
+				}
+				wm.Remove(iw)
+			}
+			if !wm.Add(iw, h.Position) {
+				for _, cancel := range cancels {
+					cancel()
+				}
+			}
+			iw.Resize(h.Size)
+			continue
+		}
+
 		parts := strings.Split(h.Title, " ")
 		if len(parts) < 1 {
 			continue
 		}
-
 		if openMap {
 			wm.mw.openMap(symbol.ECUTypeFromString(layout.ECU), parts[0])
 		}
@@ -219,14 +221,21 @@ func (wm *windowManager) LoadLayout(name string) error {
 func (wm *windowManager) jsonLayout() ([]byte, error) {
 	var history []windowHistory
 	for title, w := range wm.open {
-		history = append(history, windowHistory{
+		if title == "Create gauge" {
+			continue
+		}
+		entry := windowHistory{
 			Title:            title,
 			Position:         w.Position(),
 			Size:             w.Size(),
 			Maximized:        w.Maximized(),
 			PreMaximizedPos:  w.PreMaximizedPos(),
 			PreMaximizedSize: w.PreMaximizedSize(),
-		})
+		}
+		if tt, ok := w.InnerWindow.Content().(widgets.Gauge); ok {
+			entry.GaugeConfig = tt.GetConfig()
+		}
+		history = append(history, entry)
 	}
 
 	b, err := json.Marshal(map[string]interface{}{

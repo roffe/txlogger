@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
@@ -52,10 +53,11 @@ func (s *Widget) UpdateBars(enabled bool) {
 }
 
 func (s *Widget) Names() []string {
-	names := make([]string, len(s.symbols))
+	names := make([]string, len(s.symbols)+1)
 	for i, s := range s.symbols {
 		names[i] = s.Name
 	}
+	names[len(names)-1] = datalogger.EXTERNALWBLSYM
 	sort.Strings(names)
 	return names
 }

@@ -58,6 +58,10 @@ func NewInnerWindow(title string, content fyne.CanvasObject) *InnerWindow {
 	return w
 }
 
+func (w *InnerWindow) Content() fyne.CanvasObject {
+	return w.content.Objects[0]
+}
+
 // MouseDown is called when the user presses the mouse button on the draggable corner.
 func (w *InnerWindow) MouseDown(*desktop.MouseEvent) {
 	if w.OnMouseDown != nil {
@@ -186,7 +190,7 @@ type innerWindowRenderer struct {
 
 func (i *innerWindowRenderer) Layout(size fyne.Size) {
 	// Calculate padding and base size
-	padding := i.win.Theme().Size(theme.SizeNamePadding)
+	padding := float32(2.0) //i.win.Theme().Size(theme.SizeNamePadding)
 	basePos := fyne.NewSquareOffsetPos(padding / 2)
 	contentSize := size.Subtract(fyne.NewSquareSize(padding))
 

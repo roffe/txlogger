@@ -146,6 +146,7 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 
 		oCtx: newSound(),
 	}
+
 	mw.wm = newWindowManager(mw)
 	mw.Window.SetPadded(true)
 

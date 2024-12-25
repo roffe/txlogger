@@ -16,13 +16,12 @@ import (
 
 type Dial struct {
 	widget.BaseWidget
-	title         string
 	displayString string
 
-	min, max float64
-	steps    float64
-	factor   float64
-	value    float64
+	cfg widgets.GaugeConfig
+
+	factor float64
+	value  float64
 	//highestObserved float64
 
 	needle *canvas.Line
@@ -51,18 +50,11 @@ type Dial struct {
 
 func New(cfg widgets.GaugeConfig) *Dial {
 	c := &Dial{
-		title:         cfg.Title,
-		min:           cfg.Min,
-		max:           cfg.Max,
-		steps:         30,
+		cfg:           cfg,
 		displayString: "%.0f",
 		minsize:       fyne.NewSize(100, 100),
 	}
 	c.ExtendBaseWidget(c)
-
-	if cfg.Steps > 0 {
-		c.steps = float64(cfg.Steps)
-	}
 
 	if cfg.DisplayString != "" {
 		c.displayString = cfg.DisplayString
@@ -72,7 +64,9 @@ func New(cfg widgets.GaugeConfig) *Dial {
 		c.minsize = cfg.MinSize
 	}
 
-	c.factor = c.max / c.steps
+	steps := float64(cfg.Steps)
+
+	c.factor = c.cfg.Max / steps
 
 	c.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 255}, StrokeWidth: 3}
 	c.cover = &canvas.Rectangle{FillColor: theme.Color(theme.ColorNameBackground)}
@@ -80,7 +74,7 @@ func New(cfg widgets.GaugeConfig) *Dial {
 	c.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 3}
 	//c.highestObservedMarker = &canvas.Line{StrokeColor: color.RGBA{R: 216, G: 250, B: 8, A: 0xFF}, StrokeWidth: 4}
 
-	c.titleText = &canvas.Text{Text: c.title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
+	c.titleText = &canvas.Text{Text: c.cfg.Title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
 	c.titleText.TextStyle.Monospace = true
 	c.titleText.Alignment = fyne.TextAlignCenter
 
@@ -88,8 +82,8 @@ func New(cfg widgets.GaugeConfig) *Dial {
 	c.displayText.TextStyle.Monospace = true
 	c.displayText.Alignment = fyne.TextAlignCenter
 
-	fac := float64(0xA5) / c.steps
-	for i := 0; i < int(c.steps+1); i++ {
+	fac := float64(0xA5) / float64(c.cfg.Steps)
+	for i := 0; i < c.cfg.Steps+1; i++ {
 		col := color.RGBA{byte(float64(i) * fac), 0x00, 0x00, 0xFF}
 		col.G = 0xA5 - col.R
 		pip := &canvas.Line{StrokeColor: col, StrokeWidth: 2}
@@ -97,16 +91,20 @@ func New(cfg widgets.GaugeConfig) *Dial {
 
 	}
 
-	totalRange := c.max - c.min
-	c.needleRotConst = common.Pi15 / (c.steps * (totalRange / c.steps))
-	c.lineRotConst = common.Pi15 / c.steps
+	totalRange := c.cfg.Max - c.cfg.Min
+	c.needleRotConst = common.Pi15 / (steps * (totalRange / steps))
+	c.lineRotConst = common.Pi15 / steps
 
 	return c
 }
 
+func (c *Dial) GetConfig() widgets.GaugeConfig {
+	return c.cfg
+}
+
 func (c *Dial) rotateNeedle(hand *canvas.Line, facePosition float64, offset, length float32) {
 	// Normalize the value to start from 0 regardless of minimum value
-	normalizedPosition := facePosition - c.min
+	normalizedPosition := facePosition - c.cfg.Min
 	if normalizedPosition < 0 {
 		normalizedPosition = 0
 	}
@@ -194,7 +192,7 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 
 	coverY := c.middle.Y + c.radius*common.OneSeventh*5
 	c.cover.Move(fyne.NewPos(0, coverY))
-	c.cover.Resize(fyne.NewSize(space.Width, space.Height-coverY))
+	c.cover.Resize(fyne.NewSize(space.Width, (space.Height-coverY)+1))
 
 	c.displayText.TextSize = c.radius * common.OneHalf
 	c.displayText.Text = fmt.Sprintf(c.displayString, c.value)

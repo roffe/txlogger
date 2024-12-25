@@ -1,10 +1,11 @@
 package multiwindow
 
 import (
-	"log"
 	"sync"
+	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
@@ -127,9 +128,7 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 	w.OnDragged = func(ev *fyne.DragEvent) {
 		if w.maximized {
 			mouseRatio := ev.Position.X / w.Size().Width
-			sz := w.MinSize()
-			log.Println(sz)
-			w.Resize(sz)
+			w.Resize(w.MinSize())
 			w.Move(fyne.NewPos(ev.AbsolutePosition.X-mouseRatio*w.MinSize().Width, w.Position().Y))
 			w.maximized = false
 			return
@@ -192,14 +191,34 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 		if !w.maximized {
 			w.preMaximizedSize = w.Size()
 			w.preMaximizedPos = w.Position()
-			w.Move(fyne.NewPos(0, 0))
-			w.Resize(m.Size())
+
+			am := canvas.NewPositionAnimation(w.Position(), fyne.NewPos(0, 0), 200*time.Millisecond, func(pos fyne.Position) {
+				w.Move(pos)
+			})
+			am.Start()
+
+			//w.Move(fyne.NewPos(0, 0))
+			rm := canvas.NewSizeAnimation(w.Size(), m.content.Size(), 200*time.Millisecond, func(sz fyne.Size) {
+				w.Resize(sz)
+			})
+			rm.Start()
+
+			//w.Resize(m.Size())
 		} else {
-			w.Move(w.preMaximizedPos)
+			am := canvas.NewPositionAnimation(w.Position(), w.preMaximizedPos, 200*time.Millisecond, func(pos fyne.Position) {
+				w.Move(pos)
+			})
+			am.Start()
+			//w.Move(w.preMaximizedPos)
 			if w.preMaximizedSize == w.Size() {
 				w.preMaximizedSize = w.MinSize()
 			}
-			w.Resize(w.preMaximizedSize)
+			rm := canvas.NewSizeAnimation(w.Size(), w.preMaximizedSize, 200*time.Millisecond, func(sz fyne.Size) {
+				w.Resize(sz)
+			})
+			rm.Start()
+			//w.Resize(w.preMaximizedSize)
+
 		}
 		w.maximized = !w.maximized
 		m.Raise(w)
