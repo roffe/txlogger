@@ -4,38 +4,60 @@ import (
 	"fmt"
 	"image/color"
 	"strconv"
+	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"github.com/roffe/txlogger/pkg/widgets/icon"
 )
 
-func knkDetSetter(obj *icon.Icon) func(float64) {
-	var lastVal float64
+func knkDetSetter(icon *icon.Icon) func(float64) {
+	var showTime time.Time
 	return func(value float64) {
-		if value == lastVal {
+
+		if value <= 0 && time.Since(showTime) > 5*time.Second {
+			icon.Hide()
 			return
 		}
-		if value > 0 {
-			kn := int(value)
-			knockValue := 0
-			if kn&1<<24 == 1<<24 {
-				knockValue += 1000
-			}
-			if kn&1<<16 == 1<<16 {
-				knockValue += 200
-			}
-			if kn&1<<8 == 1<<8 {
-				knockValue += 30
-			}
-			if kn&1 == 1 {
-				knockValue += 4
-			}
-			obj.SetText(strconv.Itoa(knockValue))
-			obj.Show()
-		} else {
-			obj.Hide()
+
+		if value <= 0 {
+			return
 		}
+
+		knockValue := uint32(value)
+		// log.Printf("knkDetSetter: %08X\n", knockValue)
+
+		knkCyl1 := uint8(knockValue & 0xFF000000 >> 24)
+		knkCyl2 := uint8(knockValue & 0x00FF0000 >> 16)
+		knkCyl3 := uint8(knockValue & 0xFF00 >> 8)
+		knkCyl4 := uint8(knockValue & 0xFF)
+
+		var knkStr strings.Builder
+
+		if knkCyl1 > 0 {
+			knkStr.WriteString("1")
+		} else {
+			knkStr.WriteString("-")
+		}
+		if knkCyl2 > 0 {
+			knkStr.WriteString("2")
+		} else {
+			knkStr.WriteString("-")
+		}
+		if knkCyl3 > 0 {
+			knkStr.WriteString("3")
+		} else {
+			knkStr.WriteString("-")
+		}
+		if knkCyl4 > 0 {
+			knkStr.WriteString("4")
+		} else {
+			knkStr.WriteString("-")
+		}
+		icon.SetText(knkStr.String())
+		icon.Show()
+		showTime = time.Now()
 	}
 }
 

@@ -128,6 +128,10 @@ func (s *CBar) SetValue(value float64) {
 	s.refresh()
 }
 
+func (s *CBar) SetValue2(value float64) {
+	s.SetValue(value)
+}
+
 func (s *CBar) refresh() {
 	s.displayText.Text = fmt.Sprintf(s.cfg.DisplayString, s.value)
 	s.displayText.Refresh()

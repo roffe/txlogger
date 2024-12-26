@@ -56,7 +56,8 @@ func main() {
 		case ".bin":
 			mw = windows.NewMainWindow(a, filename)
 		case ".t5l", ".t7l", ".t8l", ".csv":
-			windows.NewLogPlayer(a, filename, nil).ShowAndRun()
+			w := windows.NewLogPlayer(a, filename, nil)
+			w.ShowAndRun()
 			return
 		}
 	}

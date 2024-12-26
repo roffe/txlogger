@@ -182,7 +182,11 @@ func (wm *windowManager) LoadLayout(name string) error {
 		}
 
 		if h.GaugeConfig.Type != "" {
-			gauge, cancels := gauge.New(h.GaugeConfig)
+			gauge, cancels, err := gauge.New(h.GaugeConfig)
+			if err != nil {
+				wm.mw.Error(fmt.Errorf("failed to create gauge: %w", err))
+				continue
+			}
 			iw := newInnerWindow(h.Title, gauge)
 			iw.CloseIntercept = func() {
 				for _, cancel := range cancels {

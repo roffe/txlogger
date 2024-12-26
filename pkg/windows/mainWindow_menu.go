@@ -129,7 +129,8 @@ func (mw *MainWindow) playLog() {
 		mw.Error(err)
 		return
 	}
-	go NewLogPlayer(mw.app, filename, mw.fw)
+	lp := NewLogPlayer(mw.app, filename, mw.fw)
+	lp.ShowAndRun()
 }
 
 func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {

@@ -33,10 +33,6 @@ type Dashboard struct {
 	limpMode    *canvas.Image
 	knockIcon   *icon.Icon
 
-	//fullscreenBtn *widget.Button
-	//closeBtn      *widget.Button
-	//logBtn *widget.Button
-
 	//dbgBar *fyne.Container
 
 	logplayer bool
@@ -627,7 +623,7 @@ func layoutIcons(db *Dashboard, space fyne.Size, dims *dims) {
 
 	// Knock icon
 	db.knockIcon.Move(fyne.NewPos(
-		dims.centerX-(db.checkEngine.Size().Width*0.5)-(dims.sixthWidth*0.7),
+		db.gauges.pwm.Position().X+db.gauges.pwm.Size().Width,
 		dims.centerY-60,
 	))
 }

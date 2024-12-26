@@ -243,7 +243,8 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 			case ".bin":
 				mw.LoadSymbolsFromFile(filename)
 			case ".t5l", ".t7l", ".t8l", ".csv":
-				NewLogPlayer(a, filename, mw.fw).Show()
+				a := NewLogPlayer(a, filename, mw.fw)
+				a.Show()
 			}
 		}
 	})

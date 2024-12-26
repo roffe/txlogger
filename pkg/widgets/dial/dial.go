@@ -149,6 +149,10 @@ func (c *Dial) SetValue(value float64) {
 	*/
 }
 
+func (c *Dial) SetValue2(value float64) {
+	c.SetValue(value)
+}
+
 func (c *Dial) CreateRenderer() fyne.WidgetRenderer {
 	return &DialRenderer{Dial: c}
 }

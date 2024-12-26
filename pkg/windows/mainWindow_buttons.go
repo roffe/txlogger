@@ -60,7 +60,8 @@ func (mw *MainWindow) newLogplayerBtn() *widget.Button {
 			return
 		}
 
-		go NewLogPlayer(mw.app, filename, mw.fw)
+		lp := NewLogPlayer(mw.app, filename, mw.fw)
+		lp.Show()
 	})
 }
 
