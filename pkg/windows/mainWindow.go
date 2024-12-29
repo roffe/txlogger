@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -23,15 +24,20 @@ import (
 	"github.com/roffe/txlogger/pkg/capture"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
+	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu"
+	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/mainmenu"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
+	"github.com/roffe/txlogger/pkg/widgets/logplayer"
 	"github.com/roffe/txlogger/pkg/widgets/msglist"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
+	"github.com/roffe/txlogger/pkg/widgets/plotter"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
+	sdialog "github.com/sqweek/dialog"
 	"golang.org/x/net/context"
 )
 
@@ -255,6 +261,8 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 	}
 
 	var selEntry *widget.Select
+	var selEntryRefreshBtn *widget.Button
+
 	selEntry = widget.NewSelect(opts, func(s string) {
 		if s == "" {
 			return
@@ -265,11 +273,22 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 				mw.Error(err)
 			}
 			selEntry.ClearSelected()
+			selEntryRefreshBtn.Tapped(&fyne.PointEvent{})
 		default:
 			if err := mw.wm.LoadLayout(s); err != nil {
 				mw.Error(err)
 			}
 		}
+	})
+
+	selEntryRefreshBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
+		opts, err := listLayouts()
+		if err != nil {
+			mw.Error(err)
+			return
+		}
+		selEntry.SetOptions(opts)
+
 	})
 
 	mw.content = container.NewBorder(
@@ -316,9 +335,6 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 						mw.symbolList,
 					))
 					symbolListWindow.Icon = theme.ListIcon()
-					symbolListWindow.CloseIntercept = func() {
-						mw.wm.Remove(symbolListWindow)
-					}
 					mw.wm.Add(symbolListWindow)
 					//symbolListWindow.Resize(fyne.NewSize(800, 700))
 				}),
@@ -336,12 +352,12 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 						return
 					}
 					gs := NewGaugeCreator(mw)
-					iw := newInnerWindow("Create gauge", gs)
+					iw := newSystemWindow("Create gauge", gs)
 					iw.Icon = theme.ContentAddIcon()
-					iw.CloseIntercept = func() {
-						mw.wm.Remove(iw)
-					}
 					mw.wm.Add(iw)
+				}),
+				widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
+					mw.wm.CloseAll()
 				}),
 			),
 		),
@@ -352,26 +368,100 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 				nil,
 				nil,
 				nil,
-				widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
-					opts, err := listLayouts()
-					if err != nil {
-						mw.Error(err)
-						return
-					}
-					selEntry.SetOptions(opts)
-				}),
+				selEntryRefreshBtn,
 				selEntry,
 			),
-			container.NewGridWithColumns(4,
+			container.NewGridWithColumns(5,
 				mw.counters.capturedCounterLabel,
 				mw.counters.errorCounterLabel,
 				mw.counters.fpsLabel,
+				widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() {
+					//filename, err := sdialog.File().Filter("logfile", "t5l", "t7l", "t8l", "csv").SetStartDir(mw.settings.GetLogPath()).Load()
+					filename, err := sdialog.File().Filter("logfile", "t5l", "t7l", "t8l", "csv").Load()
+					if err != nil {
+						if err.Error() == "Cancelled" {
+							return
+						}
+						fyne.LogError("Error loading log file", err)
+						return
+					}
+
+					// Just filename, used for Window title
+					fp := filepath.Base(filename)
+
+					if mw.wm.HasWindow(fp) {
+						return
+					}
+
+					logz, err := logfile.Open(filename)
+					if err != nil {
+						fyne.LogError("Failed to open log file", err)
+						return
+					}
+
+					values := make(map[string][]float64)
+					order := make([]string, 0)
+					first := true
+					for {
+						if rec := logz.Next(); !rec.EOF {
+							for k, v := range rec.Values {
+								values[k] = append(values[k], v)
+								if first {
+									order = append(order, k)
+								}
+							}
+							first = false
+						} else {
+							break
+						}
+					}
+					logz.Seek(0)
+
+					sort.Strings(order)
+
+					plotterOpts := []plotter.PlotterOpt{
+						plotter.WithPlotResolutionFactor(1),
+						plotter.WithOrder(order),
+					}
+
+					plotter := plotter.NewPlotter(
+						values,
+						plotterOpts...,
+					)
+
+					lp := logplayer.New(logz, "pos_"+fp)
+					iw := newSystemWindow(fp, lp)
+					iw.Icon = theme.MediaPlayIcon()
+
+					iw.CloseIntercept = func() {
+						lp.Close()
+					}
+
+					iw.OnTappedIcon = func() {
+						if mw.wm.HasWindow("Plot " + fp) {
+							return
+						}
+
+						cancel := ebus.SubscribeFunc("pos_"+fp, func(v float64) {
+							plotter.Seek(int(v))
+						})
+
+						pw := newSystemWindow("Plot "+fp, plotter)
+						pw.CloseIntercept = func() {
+							cancel()
+						}
+						pw.Icon = theme.ColorChromaticIcon()
+						mw.wm.Add(pw)
+					}
+
+					mw.wm.Add(iw)
+				}),
 				widget.NewButtonWithIcon("Debug log", theme.InfoIcon(), func() {
 					if mw.wm.HasWindow("Debug log") {
 						return
 					}
 					dbl := msglist.New(mw.outputData)
-					debugWindow := newInnerWindow("Debug log", dbl)
+					debugWindow := newSystemWindow("Debug log", dbl)
 					debugWindow.Icon = theme.ContentCopyIcon()
 					debugWindow.OnTappedIcon = func() {
 						str, err := mw.outputData.Get()
@@ -381,9 +471,6 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 						}
 						fyne.CurrentApp().Clipboard().SetContent(strings.Join(str, "\n"))
 						dialog.ShowInformation("Debug log", "Content copied to clipboard", mw)
-					}
-					debugWindow.CloseIntercept = func() {
-						mw.wm.Remove(debugWindow)
 					}
 					xy := mw.wm.MultipleWindows.Size().Subtract(dbl.MinSize().AddWidthHeight(20, 60))
 					mw.wm.Add(debugWindow, fyne.NewPos(xy.Width, xy.Height))

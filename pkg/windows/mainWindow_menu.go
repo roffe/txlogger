@@ -29,9 +29,6 @@ func (mw *MainWindow) setupMenu() {
 			}
 			inner := newInnerWindow("Register EU0D", NewMyrtilosRegistration(mw))
 			inner.Icon = theme.InfoIcon()
-			inner.CloseIntercept = func() {
-				mw.wm.Remove(inner)
-			}
 			mw.wm.Add(inner)
 		}
 	}
@@ -54,9 +51,6 @@ func (mw *MainWindow) setupMenu() {
 				}
 				inner := newInnerWindow("About", About())
 				inner.Icon = theme.HelpIcon()
-				inner.CloseIntercept = func() {
-					mw.wm.Remove(inner)
-				}
 				mw.wm.Add(inner)
 			}),
 		),
@@ -73,9 +67,6 @@ func (mw *MainWindow) setupMenu() {
 					mw.settings.CanSettings.GetSerialPort(),
 				))
 				updater.Icon = theme.DownloadIcon()
-				updater.CloseIntercept = func() {
-					mw.wm.Remove(updater)
-				}
 				mw.wm.Add(updater)
 			}),
 		),
@@ -322,7 +313,6 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		for _, f := range cancelFuncs {
 			f()
 		}
-		mw.wm.Remove(mapWindow)
 	}
 	mw.wm.Add(mapWindow)
 }

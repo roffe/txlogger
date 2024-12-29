@@ -61,8 +61,23 @@ func (m *MultipleWindows) Add(w *InnerWindow, startPosition ...fyne.Position) {
 	m.raise(w)
 }
 
+/*
 // Remove removes the given window from the container.
 func (m *MultipleWindows) Remove(w *InnerWindow) {
+	m.propertyLock.Lock()
+	defer m.propertyLock.Unlock()
+	for i, ww := range m.Windows {
+		if ww == w {
+			m.Windows = append(m.Windows[:i], m.Windows[i+1:]...)
+			m.content.Remove(w)
+			m.refreshChildren()
+			return
+		}
+	}
+}
+*/
+
+func (m *MultipleWindows) remove(w *InnerWindow) {
 	m.propertyLock.Lock()
 	defer m.propertyLock.Unlock()
 	for i, ww := range m.Windows {
@@ -222,6 +237,10 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 		}
 		w.maximized = !w.maximized
 		m.Raise(w)
+	}
+
+	w.onClose = func() {
+		m.remove(w)
 	}
 }
 

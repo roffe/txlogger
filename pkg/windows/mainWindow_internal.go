@@ -39,9 +39,6 @@ func (mw *MainWindow) openSettings() {
 	}
 	inner := newInnerWindow("Settings", mw.settings)
 	inner.Icon = theme.SettingsIcon()
-	inner.CloseIntercept = func() {
-		mw.wm.Remove(inner)
-	}
 	mw.wm.Add(inner)
 }
 

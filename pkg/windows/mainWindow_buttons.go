@@ -169,7 +169,6 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 		db.Icon = theme.InfoIcon()
 		db.CloseIntercept = func() {
 			onClose()
-			mw.wm.Remove(db)
 		}
 		mw.wm.Add(db)
 	})

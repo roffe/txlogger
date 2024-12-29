@@ -43,6 +43,8 @@ type InnerWindow struct {
 	leftDrag         bool
 	preMaximizedSize fyne.Size
 	preMaximizedPos  fyne.Position
+
+	onClose func() `json:"-"`
 }
 
 // NewInnerWindow creates a new window border around the given `content`, displaying the `title` along the top.
@@ -54,7 +56,6 @@ func NewInnerWindow(title string, content fyne.CanvasObject) *InnerWindow {
 		bgFillColor: theme.ColorNameOverlayBackground,
 	}
 	w.ExtendBaseWidget(w)
-
 	return w
 }
 
@@ -92,7 +93,15 @@ func (w *InnerWindow) PreMaximizedPos() fyne.Position {
 }
 
 func (w *InnerWindow) Close() {
-	w.Hide()
+	// Call user defined close intercept
+	if f := w.CloseIntercept; f != nil {
+		f()
+	}
+
+	// Call system defined close intercept
+	if f := w.onClose; f != nil {
+		f()
+	}
 }
 
 func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
@@ -105,11 +114,7 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 		w.maxBtn.Disable()
 	}
 	w.closeBtn = &widget.Button{Icon: theme.WindowCloseIcon(), Importance: widget.LowImportance, OnTapped: func() {
-		if f := w.CloseIntercept; f != nil {
-			f()
-		} else {
-			w.Close()
-		}
+		w.Close()
 	}}
 
 	if w.Icon != nil {

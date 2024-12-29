@@ -219,7 +219,6 @@ func (g *GaugeCreator) onSubmit() {
 		for _, cancel := range cancelFuncs {
 			cancel()
 		}
-		g.mw.wm.Remove(iw)
 	}
 	if !g.mw.wm.Add(iw) {
 		for _, cancel := range cancelFuncs {

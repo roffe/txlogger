@@ -113,7 +113,7 @@ func (s *CBar) initializeBars() {
 }
 
 func (s *CBar) SetValue(value float64) {
-	if value == s.value {
+	if s == nil || value == s.value {
 		return
 	}
 

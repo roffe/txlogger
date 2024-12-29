@@ -6,7 +6,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-type Test struct {
+type TestWidget struct {
 	widget.BaseWidget
 
 	minsize fyne.Size
@@ -16,8 +16,8 @@ type Test struct {
 	container *fyne.Container
 }
 
-func NewTest(minSize fyne.Size) *Test {
-	t := &Test{
+func NewTest(minSize fyne.Size) *TestWidget {
+	t := &TestWidget{
 		minsize: minSize,
 		text:    widget.NewLabel("test"),
 	}
@@ -27,41 +27,45 @@ func NewTest(minSize fyne.Size) *Test {
 	return t.render()
 }
 
-func (t *Test) render() *Test {
+func (t *TestWidget) render() *TestWidget {
 
 	return t
 }
 
-func (t *Test) CreateRenderer() fyne.WidgetRenderer {
-	return &TestRenderer{
+func (t *TestWidget) CreateRenderer() fyne.WidgetRenderer {
+	return &TestWidgetRenderer{
 		t: t,
 	}
 }
 
-func (t *Test) SetValue(value float64) {
+func (t *TestWidget) SetValue(value float64) {
 	t.value = value
 }
 
-type TestRenderer struct {
-	t *Test
+func (t *TestWidget) SetValue2(value float64) {
+	t.value = value
 }
 
-func (tr *TestRenderer) Layout(space fyne.Size) {
+type TestWidgetRenderer struct {
+	t *TestWidget
+}
+
+func (tr *TestWidgetRenderer) Layout(space fyne.Size) {
 	tr.t.container.Resize(space)
 	// do stuff
 }
 
-func (tr *TestRenderer) MinSize() fyne.Size {
+func (tr *TestWidgetRenderer) MinSize() fyne.Size {
 	return tr.t.minsize
 }
 
-func (tr *TestRenderer) Refresh() {
+func (tr *TestWidgetRenderer) Refresh() {
 
 }
 
-func (tr *TestRenderer) Objects() []fyne.CanvasObject {
+func (tr *TestWidgetRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{tr.t.container}
 }
 
-func (tr *TestRenderer) Destroy() {
+func (tr *TestWidgetRenderer) Destroy() {
 }

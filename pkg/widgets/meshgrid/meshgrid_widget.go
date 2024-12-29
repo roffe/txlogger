@@ -310,7 +310,7 @@ func (m *meshgridRenderer) Layout(size fyne.Size) {
 }
 
 func (m *meshgridRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(250, 150)
+	return fyne.NewSize(200, 100)
 }
 
 func (m *meshgridRenderer) Refresh() {

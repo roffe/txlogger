@@ -224,7 +224,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 	//start := time.Now()
 	logz, err := logfile.Open(filename)
 	if err != nil {
-		log.Println(err)
+		fyne.LogError("Failed to open log file", err)
 		return lp
 	}
 	//log.Printf("Parsed %d records in %s", logz.Len(), time.Since(start))

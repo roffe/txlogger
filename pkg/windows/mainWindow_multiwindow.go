@@ -20,23 +20,39 @@ import (
 
 type innerWindow struct {
 	*multiwindow.InnerWindow
+	Persist    bool // Persist through layout changes
+	IgnoreSave bool // Ignore saving to layout
 }
 
+// newInnerWindow creates a new innerWindow that is not persisted and saved in layout
 func newInnerWindow(title string, content fyne.CanvasObject) *innerWindow {
 	return &innerWindow{
 		InnerWindow: multiwindow.NewInnerWindow(title, content),
 	}
 }
 
+// newSystemWindow creates a new innerWindow that is persisted and ignored in layout saving
+func newSystemWindow(title string, content fyne.CanvasObject) *innerWindow {
+	iw := &innerWindow{
+		InnerWindow: multiwindow.NewInnerWindow(title, content),
+	}
+	iw.Persist = true
+	iw.IgnoreSave = true
+	return iw
+}
+
+type windowRatio struct {
+	X, Y float64 // Position ratios
+	W, H float64 // Size ratios
+}
+
 type windowHistory struct {
 	Title            string
-	Position         fyne.Position
-	Size             fyne.Size
+	Ratios           windowRatio
 	Maximized        bool
-	PreMaximizedPos  fyne.Position
-	PreMaximizedSize fyne.Size
-
-	GaugeConfig widgets.GaugeConfig `json:",omitempty"`
+	PreMaximizedPos  windowRatio
+	PreMaximizedSize windowRatio
+	GaugeConfig      widgets.GaugeConfig `json:",omitempty"`
 }
 
 type windowManager struct {
@@ -44,7 +60,6 @@ type windowManager struct {
 	open    map[string]*innerWindow
 	history map[string]windowHistory
 	mu      sync.RWMutex
-
 	*multiwindow.MultipleWindows
 }
 
@@ -76,16 +91,38 @@ func (wm *windowManager) Add(w *innerWindow, startPosition ...fyne.Position) boo
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 	wm.open[w.Title()] = w
+
+	var foo func()
+	if w.CloseIntercept != nil {
+		foo = w.CloseIntercept
+		w.CloseIntercept = func() {
+			foo()
+			wm.remove(w)
+		}
+	} else {
+		w.CloseIntercept = func() {
+			wm.remove(w)
+		}
+	}
+
 	wm.MultipleWindows.Add(w.InnerWindow, startPosition...)
 	return true
 }
 
-func (wm *windowManager) Remove(w *innerWindow) {
+func (wm *windowManager) remove(w *innerWindow) {
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
-	title := w.Title()
-	delete(wm.open, title)
-	wm.MultipleWindows.Remove(w.InnerWindow)
+	delete(wm.open, w.Title())
+
+}
+
+func (wm *windowManager) CloseAll() {
+	for _, w := range wm.open {
+		if w.Persist {
+			continue
+		}
+		w.Close()
+	}
 }
 
 func (wm *windowManager) Size() fyne.Size {
@@ -159,17 +196,15 @@ func (wm *windowManager) LoadLayout(name string) error {
 		return fmt.Errorf("LoadLayout failed to decode window layout: %w", err)
 	}
 
-	for _, w := range wm.open {
-		w.Close()
-		wm.Remove(w)
-	}
+	wm.CloseAll()
 
 	wm.mw.selects.ecuSelect.SetSelected(layout.ECU)
 	wm.mw.selects.presetSelect.SetSelected(layout.Preset)
 
+	viewportSize := wm.Size()
 	var openMap bool
-	for _, h := range layout.Windows {
 
+	for _, h := range layout.Windows {
 		switch h.Title {
 		case "Settings":
 			wm.mw.openSettings()
@@ -192,14 +227,26 @@ func (wm *windowManager) LoadLayout(name string) error {
 				for _, cancel := range cancels {
 					cancel()
 				}
-				wm.Remove(iw)
 			}
-			if !wm.Add(iw, h.Position) {
+
+			// Convert ratios to absolute positions
+			position := fyne.NewPos(
+				float32(h.Ratios.X*float64(viewportSize.Width)),
+				float32(h.Ratios.Y*float64(viewportSize.Height)),
+			)
+
+			if !wm.Add(iw, position) {
 				for _, cancel := range cancels {
 					cancel()
 				}
 			}
-			iw.Resize(h.Size)
+
+			// Convert ratios to absolute size
+			size := fyne.NewSize(
+				float32(h.Ratios.W*float64(viewportSize.Width)),
+				float32(h.Ratios.H*float64(viewportSize.Height)),
+			)
+			iw.Resize(size)
 			continue
 		}
 
@@ -215,27 +262,65 @@ func (wm *windowManager) LoadLayout(name string) error {
 		if !found {
 			continue
 		}
-		w.Move(h.Position)
-		w.Resize(h.Size)
-		w.SetMaximized(h.Maximized, h.PreMaximizedPos, h.PreMaximizedSize)
+
+		// Convert ratios to absolute positions and sizes
+		position := fyne.NewPos(
+			float32(h.Ratios.X*float64(viewportSize.Width)),
+			float32(h.Ratios.Y*float64(viewportSize.Height)),
+		)
+		size := fyne.NewSize(
+			float32(h.Ratios.W*float64(viewportSize.Width)),
+			float32(h.Ratios.H*float64(viewportSize.Height)),
+		)
+
+		preMaxPos := fyne.NewPos(
+			float32(h.PreMaximizedPos.X*float64(viewportSize.Width)),
+			float32(h.PreMaximizedPos.Y*float64(viewportSize.Height)),
+		)
+		preMaxSize := fyne.NewSize(
+			float32(h.PreMaximizedSize.W*float64(viewportSize.Width)),
+			float32(h.PreMaximizedSize.H*float64(viewportSize.Height)),
+		)
+
+		w.Move(position)
+		w.Resize(size)
+		w.SetMaximized(h.Maximized, preMaxPos, preMaxSize)
 	}
 	return nil
 }
 
 func (wm *windowManager) jsonLayout() ([]byte, error) {
 	var history []windowHistory
+	viewportSize := wm.Size()
+
 	for title, w := range wm.open {
-		if title == "Create gauge" {
+		if w.IgnoreSave {
 			continue
 		}
+		pos := w.Position()
+		size := w.Size()
+		preMaxPos := w.PreMaximizedPos()
+		preMaxSize := w.PreMaximizedSize()
+
 		entry := windowHistory{
-			Title:            title,
-			Position:         w.Position(),
-			Size:             w.Size(),
-			Maximized:        w.Maximized(),
-			PreMaximizedPos:  w.PreMaximizedPos(),
-			PreMaximizedSize: w.PreMaximizedSize(),
+			Title: title,
+			Ratios: windowRatio{
+				X: float64(pos.X) / float64(viewportSize.Width),
+				Y: float64(pos.Y) / float64(viewportSize.Height),
+				W: float64(size.Width) / float64(viewportSize.Width),
+				H: float64(size.Height) / float64(viewportSize.Height),
+			},
+			Maximized: w.Maximized(),
+			PreMaximizedPos: windowRatio{
+				X: float64(preMaxPos.X) / float64(viewportSize.Width),
+				Y: float64(preMaxPos.Y) / float64(viewportSize.Height),
+			},
+			PreMaximizedSize: windowRatio{
+				W: float64(preMaxSize.Width) / float64(viewportSize.Width),
+				H: float64(preMaxSize.Height) / float64(viewportSize.Height),
+			},
 		}
+
 		if tt, ok := w.InnerWindow.Content().(widgets.Gauge); ok {
 			entry.GaugeConfig = tt.GetConfig()
 		}
@@ -245,7 +330,7 @@ func (wm *windowManager) jsonLayout() ([]byte, error) {
 	b, err := json.Marshal(map[string]interface{}{
 		"ecu":     wm.mw.selects.ecuSelect.Selected,
 		"preset":  wm.mw.selects.presetSelect.Selected,
-		"version": 1,
+		"version": 2, // Increment version to indicate ratio-based layout
 		"windows": history,
 	})
 	if err != nil {

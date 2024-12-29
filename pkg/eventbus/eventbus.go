@@ -121,6 +121,7 @@ func (e *Controller) Publish(topic string, data float64) error {
 
 // SubscribeFunc returns a function that can be used to unsubscribe the function
 func (e *Controller) SubscribeFunc(topic string, f func(float64)) (cancel func()) {
+	log.Println("SubscribeFunc", topic)
 	respChan := e.Subscribe(topic)
 	go func() {
 		for v := range respChan {
@@ -128,6 +129,7 @@ func (e *Controller) SubscribeFunc(topic string, f func(float64)) (cancel func()
 		}
 	}()
 	cancel = func() {
+		log.Println("UnsubscribeFunc", topic)
 		e.Unsubscribe(respChan)
 	}
 	return

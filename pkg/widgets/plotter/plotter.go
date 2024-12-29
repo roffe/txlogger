@@ -51,6 +51,8 @@ type Plotter struct {
 	mu sync.Mutex
 
 	hilightLine int
+
+	publishEBUSTopic string
 }
 
 type PlotterOpt func(*Plotter)
