@@ -2,6 +2,7 @@ package logplayer
 
 import (
 	"log"
+	"sort"
 	"sync"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
+	"github.com/roffe/txlogger/pkg/widgets/plotter"
 )
 
 type controlMsg struct {
@@ -39,18 +41,17 @@ type Logplayer struct {
 
 	logFile logfile.Logfile
 
-	playOnce             sync.Once
-	ebusTopicPublishTime bool
-	ebusTopic            string
+	playOnce sync.Once
 }
 
 type logplayerObjects struct {
+	plotter           *plotter.Plotter
 	restartBtn        *widget.Button
 	rewindBtn         *widget.Button
 	playbackToggleBtn *widget.Button
 	forwardBtn        *widget.Button
 	slider            *widget.Slider
-	posLabel          *widget.Label
+	timeLabel         *widget.Label
 	speedSelect       *widget.Select
 }
 
@@ -62,18 +63,13 @@ func New(logFile logfile.Logfile, topic string) *Logplayer {
 		objs: &logplayerObjects{
 			slider: widget.NewSlider(0, 100),
 		},
-		logFile:   logFile,
-		ebusTopic: topic,
+		logFile: logFile,
 	}
 	lp.ExtendBaseWidget(lp)
 
-	if topic != "" {
-		lp.ebusTopicPublishTime = true
-	}
-
 	lp.objs.slider.OnChanged = func(pos float64) {
 		lp.control(&controlMsg{Op: OpSeek, Pos: int(pos)})
-		log.Println("Seek pos", pos)
+		// log.Println("Seek pos", pos)
 	}
 	lp.objs.slider.Step = 1
 	lp.objs.slider.Max = float64(logFile.Len())
@@ -101,7 +97,7 @@ func New(logFile logfile.Logfile, topic string) *Logplayer {
 	})
 	lp.objs.speedSelect.Selected = "1x"
 
-	lp.objs.posLabel = widget.NewLabel("")
+	lp.objs.timeLabel = widget.NewLabel("")
 
 	lp.render()
 
@@ -147,26 +143,65 @@ func (l *Logplayer) render() {
 	l.objs.forwardBtn = widget.NewButtonWithIcon("", theme.MediaFastForwardIcon(), func() {
 		l.control(&controlMsg{Op: OpNext})
 	})
+
+	values := make(map[string][]float64)
+	order := make([]string, 0)
+	first := true
+	for {
+		if rec := l.logFile.Next(); !rec.EOF {
+			for k, v := range rec.Values {
+				values[k] = append(values[k], v)
+				if first {
+					order = append(order, k)
+				}
+			}
+			first = false
+		} else {
+			break
+		}
+	}
+	l.logFile.Seek(0)
+
+	sort.Strings(order)
+
+	plotterOpts := []plotter.PlotterOpt{
+		plotter.WithPlotResolutionFactor(1),
+		plotter.WithOrder(order),
+	}
+
+	l.objs.plotter = plotter.NewPlotter(
+		values,
+		plotterOpts...,
+	)
 }
 
 func (l *Logplayer) CreateRenderer() fyne.WidgetRenderer {
 	l.container = container.NewBorder(
+		nil,
 		container.NewBorder(
 			nil,
 			nil,
-			container.NewGridWithColumns(4,
+			container.NewGridWithColumns(3,
 				l.objs.rewindBtn,
 				l.objs.playbackToggleBtn,
 				l.objs.forwardBtn,
-				l.objs.restartBtn,
 			),
-			layout.NewFixedWidth(75, l.objs.speedSelect),
-			layout.NewFixedWidth(80, l.objs.posLabel),
+			nil,
+			container.NewBorder(
+				nil,
+				nil,
+				nil,
+				container.NewHBox(
+					layout.NewFixedWidth(85, l.objs.timeLabel),
+					l.objs.restartBtn,
+					layout.NewFixedWidth(75, l.objs.speedSelect),
+				),
+				l.objs.slider,
+			),
 		),
 		nil,
 		nil,
-		nil,
-		l.objs.slider,
+		l.objs.plotter,
 	)
 	return &LogplayerRenderer{
 		l: l,
@@ -238,9 +273,12 @@ func (l *Logplayer) playLog() {
 
 	// Playback loop with precise timing
 	targetFrameTime := time.Now()
+	logLen := l.logFile.Len() - 1
 
 	for !l.closed {
-		if l.logFile.Pos() >= l.logFile.Len() || (!l.playing && !playonce) {
+		currentPos := l.logFile.Pos()
+
+		if currentPos >= logLen || (!l.playing && !playonce) {
 			time.Sleep(10 * time.Millisecond)
 			continue
 		}
@@ -263,24 +301,19 @@ func (l *Logplayer) playLog() {
 				ebus.Publish(k, v)
 			}
 
-			currentPos := float64(l.logFile.Pos())
-
-			l.objs.slider.Value = currentPos
+			l.objs.slider.Value = float64(currentPos)
 			l.objs.slider.Refresh()
-			//l.objs.posLabel.SetText(strconv.Itoa(l.logFile.Pos()) + "/" + strconv.Itoa(l.logFile.Len()))
 
-			l.objs.posLabel.SetText(rec.Time.Format("15:04:05.00"))
-
-			if l.ebusTopicPublishTime {
-				ebus.Publish(l.ebusTopic, currentPos)
-			}
+			l.objs.timeLabel.SetText(rec.Time.Format("15:04:05.00"))
+			l.objs.plotter.Seek(currentPos)
 
 			// Reset target time if we're getting too far behind
 			if time.Since(targetFrameTime) > 100*time.Millisecond {
 				targetFrameTime = time.Now()
 			}
+		} else {
+			log.Println("EOF", currentPos, l.logFile.Len())
 		}
-
 		if playonce {
 			playonce = false
 		}

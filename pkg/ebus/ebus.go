@@ -1,6 +1,7 @@
 package ebus
 
 import (
+	"context"
 	"sync"
 
 	"github.com/roffe/txlogger/pkg/eventbus"
@@ -11,7 +12,7 @@ var eb *eventbus.Controller
 
 func init() {
 	once.Do(func() {
-		eb = eventbus.New()
+		eb = eventbus.New(&eventbus.DefaultConfig)
 	})
 }
 
@@ -38,6 +39,15 @@ func SubscribeFunc(topic string, f func(float64)) func() {
 
 func Subscribe(topic string) chan float64 {
 	return eb.Subscribe(topic)
+}
+
+func SubscribeWithContext(ctx context.Context, topic string) (chan float64, error) {
+	ch := eb.Subscribe(topic)
+	go func() {
+		<-ctx.Done()
+		eb.Unsubscribe(ch)
+	}()
+	return ch, nil
 }
 
 func Unsubscribe(channel chan float64) {

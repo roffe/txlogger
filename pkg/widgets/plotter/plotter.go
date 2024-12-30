@@ -162,7 +162,22 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		nil,
 		canvasImage,
 	)
-	p.split = container.NewHSplit(leading, container.NewVScroll(p.legend))
+	p.split = container.NewHSplit(
+		leading,
+		container.NewBorder(
+			nil,
+			container.NewGridWithColumns(1,
+				widget.NewButton("Toggle selected", func() {
+					for _, ts := range p.legendTexts {
+						ts.Tapped(&fyne.PointEvent{})
+					}
+				}),
+			),
+			nil,
+			nil,
+			container.NewVScroll(p.legend),
+		),
+	)
 	p.split.Offset = 0.90
 
 	p.overlayText = canvas.NewText("", color.White)

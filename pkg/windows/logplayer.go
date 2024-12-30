@@ -163,7 +163,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 
 		openMaps: make(map[string]fyne.Window),
 		symbols:  symbols,
-		ebus:     eventbus.New(),
+		ebus:     eventbus.New(&eventbus.DefaultConfig),
 
 		closed: false,
 
@@ -362,15 +362,15 @@ func (lp *LogPlayer) render() fyne.CanvasObject {
 			container.NewBorder(
 				nil,
 				nil,
-				container.NewGridWithColumns(3,
+				container.NewGridWithColumns(4,
 					lp.prevBtn,
 					lp.toggleBtn,
 					lp.nextBtn,
-				),
-				container.NewGridWithColumns(2,
 					lp.restartBtn,
-					layout.NewFixedWidth(75, lp.speedSelect),
 				),
+
+				layout.NewFixedWidth(75, lp.speedSelect),
+
 				container.NewBorder(
 					nil,
 					nil,
@@ -428,7 +428,7 @@ func (lp *LogPlayer) PlayLog(logz logfile.Logfile, posFactor float64) {
 	targetFrameTime := time.Now()
 
 	for !lp.closed {
-		if logz.Pos() >= logz.Len() || (!play && !playonce) {
+		if logz.Pos() >= logz.Len()-1 || (!play && !playonce) {
 			time.Sleep(10 * time.Millisecond)
 			continue
 		}

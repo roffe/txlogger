@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -24,7 +23,6 @@ import (
 	"github.com/roffe/txlogger/pkg/capture"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
-	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/mainmenu"
@@ -33,7 +31,6 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/logplayer"
 	"github.com/roffe/txlogger/pkg/widgets/msglist"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
-	"github.com/roffe/txlogger/pkg/widgets/plotter"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
@@ -399,59 +396,12 @@ func NewMainWindow(a fyne.App, filename string) *MainWindow {
 						return
 					}
 
-					values := make(map[string][]float64)
-					order := make([]string, 0)
-					first := true
-					for {
-						if rec := logz.Next(); !rec.EOF {
-							for k, v := range rec.Values {
-								values[k] = append(values[k], v)
-								if first {
-									order = append(order, k)
-								}
-							}
-							first = false
-						} else {
-							break
-						}
-					}
-					logz.Seek(0)
-
-					sort.Strings(order)
-
-					plotterOpts := []plotter.PlotterOpt{
-						plotter.WithPlotResolutionFactor(1),
-						plotter.WithOrder(order),
-					}
-
-					plotter := plotter.NewPlotter(
-						values,
-						plotterOpts...,
-					)
-
 					lp := logplayer.New(logz, "pos_"+fp)
 					iw := newSystemWindow(fp, lp)
 					iw.Icon = theme.MediaPlayIcon()
 
 					iw.CloseIntercept = func() {
 						lp.Close()
-					}
-
-					iw.OnTappedIcon = func() {
-						if mw.wm.HasWindow("Plot " + fp) {
-							return
-						}
-
-						cancel := ebus.SubscribeFunc("pos_"+fp, func(v float64) {
-							plotter.Seek(int(v))
-						})
-
-						pw := newSystemWindow("Plot "+fp, plotter)
-						pw.CloseIntercept = func() {
-							cancel()
-						}
-						pw.Icon = theme.ColorChromaticIcon()
-						mw.wm.Add(pw)
 					}
 
 					mw.wm.Add(iw)

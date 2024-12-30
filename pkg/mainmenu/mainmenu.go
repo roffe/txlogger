@@ -152,6 +152,7 @@ var T8SymbolsTuning = map[string][]string{
 		"IgnAbsCal.ST_EnableOctanMaps",
 	},
 	"Torque": {
+		"TrqMastCal.X_AccPedalMAP",
 		"TrqLimCal.Trq_ManGear",
 		"TrqLimCal.Trq_MaxEngineTab1",
 		"TrqLimCal.Trq_MaxEngineTab2",
