@@ -2,17 +2,19 @@ package windows
 
 import (
 	"fmt"
-	"sync"
+	"strings"
 	"time"
 
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
-	"github.com/roffe/txlogger/pkg/internal/snd"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
+	"github.com/roffe/txlogger/pkg/widgets/msglist"
 	sdialog "github.com/sqweek/dialog"
 )
 
@@ -21,15 +23,118 @@ func (mw *MainWindow) createButtons() {
 	mw.buttons.loadSymbolsEcuBtn = mw.loadSymbolsEcuBtnFunc()
 	mw.buttons.syncSymbolsBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), mw.SyncSymbols)
 	mw.buttons.dashboardBtn = mw.newDashboardBtn()
-	mw.buttons.logplayerBtn = mw.newLogplayerBtn()
+	// mw.buttons.logplayerBtn = mw.newLogplayerBtn()
 	mw.buttons.logBtn = mw.newLogBtn()
+	mw.buttons.openLogBtn = mw.newOpenLogBtn()
+	mw.buttons.layoutRefreshBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
+		mw.selects.layoutSelect.SetOptions(listLayouts())
+	})
+	mw.buttons.debugBtn = mw.newDebugBtn()
+	mw.buttons.symbolListBtn = mw.newSymbolListBtn()
+	mw.buttons.addGaugeBtn = mw.newaddGaugeBtn()
+}
+
+func (mw *MainWindow) newaddGaugeBtn() *widget.Button {
+	return widget.NewButtonWithIcon("", theme.ContentAddIcon(), func() {
+		if mw.wm.HasWindow("Create gauge") {
+			return
+		}
+		gs := NewGaugeCreator(mw)
+		iw := newSystemWindow("Create gauge", gs)
+		iw.Icon = theme.ContentAddIcon()
+		mw.wm.Add(iw)
+	})
+}
+
+func (mw *MainWindow) newSymbolListBtn() *widget.Button {
+	return widget.NewButtonWithIcon("Symbol list", theme.ListIcon(), func() {
+		if mw.wm.HasWindow("Symbol list") {
+			return
+		}
+		symbolListWindow := newSystemWindow("Symbol list", container.NewBorder(
+			container.NewGridWithRows(2,
+				container.NewHBox(
+					container.NewBorder(
+						nil,
+						nil,
+						widget.NewLabel("Preset"),
+						nil,
+						mw.selects.presetSelect,
+					),
+					widget.NewButtonWithIcon("Save", theme.DocumentSaveIcon(), mw.savePreset),
+					widget.NewButtonWithIcon("New", theme.DocumentCreateIcon(), mw.newPreset),
+					widget.NewButtonWithIcon("Export", theme.UploadIcon(), mw.exportPreset),
+					widget.NewButtonWithIcon("Import", theme.DownloadIcon(), mw.importPreset),
+					widget.NewButtonWithIcon("Delete", theme.DeleteIcon(), mw.deletePreset),
+					//layout.NewSpacer(),
+					//mw.buttons.loadSymbolsEcuBtn,
+				),
+				container.NewBorder(
+					nil,
+					nil,
+					widget.NewIcon(theme.SearchIcon()),
+					container.NewHBox(
+						mw.buttons.addSymbolBtn,
+						mw.buttons.syncSymbolsBtn,
+					),
+					mw.selects.symbolLookup,
+				),
+			),
+			nil,
+			nil,
+			nil,
+			mw.symbolList,
+		))
+		symbolListWindow.Icon = theme.ListIcon()
+		mw.wm.Add(symbolListWindow)
+		//symbolListWindow.Resize(fyne.NewSize(800, 700))
+	})
+}
+
+func (mw *MainWindow) newDebugBtn() *widget.Button {
+	return widget.NewButtonWithIcon("Debug log", theme.InfoIcon(), func() {
+		if mw.wm.HasWindow("Debug log") {
+			return
+		}
+		dbl := msglist.New(mw.outputData)
+		debugWindow := newSystemWindow("Debug log", dbl)
+		debugWindow.Icon = theme.ContentCopyIcon()
+		debugWindow.OnTappedIcon = func() {
+			str, err := mw.outputData.Get()
+			if err != nil {
+				mw.Error(err)
+				return
+			}
+			fyne.CurrentApp().Clipboard().SetContent(strings.Join(str, "\n"))
+			dialog.ShowInformation("Debug log", "Content copied to clipboard", mw)
+		}
+		xy := mw.wm.MultipleWindows.Size().Subtract(dbl.MinSize().AddWidthHeight(20, 60))
+		mw.wm.Add(debugWindow, fyne.NewPos(xy.Width, xy.Height))
+	})
+}
+
+func (mw *MainWindow) newOpenLogBtn() *widget.Button {
+	return widget.NewButtonWithIcon("Open log", theme.MediaFastForwardIcon(), func() {
+		go func() {
+			filename, err := sdialog.File().Filter("logfile", "t5l", "t7l", "t8l", "csv").Load()
+			if err != nil {
+				if err.Error() == "Cancelled" {
+					return
+				}
+				fyne.LogError("Error loading log file", err)
+				return
+			}
+
+			mw.LoadLogfile(filename)
+		}()
+	})
 }
 
 func (mw *MainWindow) addSymbolBtnFunc() *widget.Button {
 	return widget.NewButtonWithIcon("", theme.ContentAddIcon(), func() {
-		sym := mw.fw.GetByName(mw.symbolLookup.Text)
+		sym := mw.fw.GetByName(mw.selects.symbolLookup.Text)
 		if sym == nil {
-			mw.Error(fmt.Errorf("%q not found", mw.symbolLookup.Text))
+			mw.Error(fmt.Errorf("%q not found", mw.selects.symbolLookup.Text))
 			return
 		}
 		mw.symbolList.Add(sym)
@@ -49,8 +154,11 @@ func (mw *MainWindow) loadSymbolsEcuBtnFunc() *widget.Button {
 	})
 }
 
+/*
 func (mw *MainWindow) newLogplayerBtn() *widget.Button {
 	return widget.NewButtonWithIcon("Play log", theme.MediaFastForwardIcon(), func() {
+		//n := fyne.NewNotification("Not implemented", "test")
+		//mw.app.SendNotification(n)
 		filename, err := sdialog.File().Filter("logfile", "t5l", "t7l", "t8l", "csv").SetStartDir(mw.settings.GetLogPath()).Load()
 		if err != nil {
 			if err.Error() == "Cancelled" {
@@ -63,7 +171,9 @@ func (mw *MainWindow) newLogplayerBtn() *widget.Button {
 		lp := NewLogPlayer(mw.app, filename, mw.fw)
 		lp.Show()
 	})
+
 }
+*/
 
 func (mw *MainWindow) newLogBtn() *widget.Button {
 	return widget.NewButtonWithIcon("Start", theme.MediaPlayIcon(), func() {
@@ -102,21 +212,12 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 			for _, f := range cancelFuncs {
 				f()
 			}
-			if mw.dashboard != nil {
-				mw.dashboard.Close()
-			}
-			mw.dashboard = nil
-			mw.SetFullScreen(false)
-			mw.SetContent(mw.content)
-			mw.SetCloseIntercept(mw.CloseIntercept)
 		}
 
 		dbcfg := &dashboard.Config{
-			App:       mw.app,
-			Mw:        mw,
-			Logplayer: false,
-			//LogBtn:          mw.logBtn,
-			OnClose:         onClose,
+			App:             mw.app,
+			Mw:              mw,
+			Logplayer:       false,
 			UseMPH:          mw.settings.GetUseMPH(),
 			SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
 			HighAFR:         mw.settings.GetHighAFR(),
@@ -131,46 +232,45 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 			dbcfg.AirDemToString = datalogger.AirDemToStringT8
 		}
 
-		mw.dashboard = dashboard.NewDashboard(dbcfg)
+		db := dashboard.NewDashboard(dbcfg)
+
+		db.SetValue("CEL", 0)
+		db.SetValue("CRUISE", 0)
+		db.SetValue("LIMP", 0)
 
 		//for _, s := range mw.symbolList.Symbols() {
 		//	mw.dashboard.SetValue(s.Name, s.Float64())
 		//}
 
-		mw.SetCloseIntercept(func() {
-			onClose()
-		})
-
-		for _, m := range mw.dashboard.GetMetricNames() {
-			if m == "MAF.m_AirInlet" {
-				var once sync.Once
-				cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(m, func(f float64) {
-					if f >= 1800 {
-						once.Do(func() {
-							if mw.oCtx != nil {
-								if err := snd.Pedro(mw.oCtx); err != nil {
-									mw.Log("Pedro failed: " + err.Error())
-								}
-							}
-						})
-					}
-					mw.dashboard.SetValue(m, f)
-				}))
-				continue
-			}
+		for _, m := range db.GetMetricNames() {
+			//if m == "MAF.m_AirInlet" {
+			//	var once sync.Once
+			//	cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(m, func(f float64) {
+			//		if f >= 1800 {
+			//			once.Do(func() {
+			//				if mw.oCtx != nil {
+			//					if err := snd.Pedro(mw.oCtx); err != nil {
+			//						mw.Log("Pedro failed: " + err.Error())
+			//					}
+			//				}
+			//			})
+			//		}
+			//		db.SetValue(m, f)
+			//	}))
+			//	continue
+			//}
 
 			cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(m, func(f float64) {
-				mw.dashboard.SetValue(m, f)
+				db.SetValue(m, f)
 			}))
 		}
 
-		//mw.SetContent(mw.dashboard)
-		db := newInnerWindow("Dashboard", mw.dashboard)
-		db.Icon = theme.InfoIcon()
-		db.CloseIntercept = func() {
+		dbw := newInnerWindow("Dashboard", db)
+		dbw.Icon = theme.InfoIcon()
+		dbw.CloseIntercept = func() {
 			onClose()
 		}
-		mw.wm.Add(db)
+		mw.wm.Add(dbw)
 	})
 }
 
@@ -203,8 +303,6 @@ func (mw *MainWindow) startLogging() {
 				mw.symbolList.SetValue(sym.Name, f)
 			}))
 		}
-
-		//cancel = ebus.SubscribeAllFunc(mw.symbolList.SetValue)
 	} else {
 		mw.symbolList.Clear()
 	}
@@ -213,7 +311,6 @@ func (mw *MainWindow) startLogging() {
 		defer mw.Enable()
 		if err := mw.dlc.Start(); err != nil {
 			mw.Error(err)
-			return
 		}
 		for _, f := range cancelFuncs {
 			f()

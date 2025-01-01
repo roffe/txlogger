@@ -1,25 +1,81 @@
 package windows
 
 import (
-	"fmt"
+	"errors"
+	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
 	xwidget "fyne.io/x/fyne/widget"
+	"github.com/ebitengine/oto/v3"
+	"github.com/roffe/txlogger/pkg/debug"
 )
 
+// Remember that you should **not** create more than one context
+func newOtoContext() *oto.Context {
+	opts := &oto.NewContextOptions{
+		// Usually 44100 or 48000. Other values might cause distortions in Oto
+		SampleRate: 44100,
+		// Number of channels (aka locations) to play sounds from. Either 1 or 2.
+		// 1 is mono sound, and 2 is stereo (most speakers are stereo).
+		ChannelCount: 2,
+		// Format of the source. go-mp3's format is signed 16bit integers.
+		Format: oto.FormatSignedInt16LE,
+	}
+	otoCtx, readyChan, err := oto.NewContext(opts)
+	if err != nil {
+		panic("oto.NewContext failed: " + err.Error())
+	}
+	// It might take a bit for the hardware audio devices to be ready, so we wait on the channel.
+	select {
+	case <-readyChan:
+		return otoCtx
+	case <-time.After(5 * time.Second):
+		fyne.LogError("oto", errors.New("timeout waiting for audio device"))
+		return nil
+	}
+}
+
+func (mw *MainWindow) closeIntercept() {
+	if mw.dlc != nil {
+		mw.dlc.Close()
+		time.Sleep(500 * time.Millisecond)
+	}
+	debug.Close()
+	mw.Close()
+}
+
+func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
+	log.Println("Dropped", uris)
+	for _, u := range uris {
+		filename := u.Path()
+		switch strings.ToLower(path.Ext(filename)) {
+		case ".bin":
+			mw.LoadSymbolsFromFile(filename)
+		case ".t5l", ".t7l", ".t8l", ".csv":
+			go func() {
+				mw.LoadLogfile(filename)
+			}()
+		}
+	}
+}
+
 // list .json files in the folder layouts
-func listLayouts() ([]string, error) {
+func listLayouts() []string {
 	opts := []string{"Save Layout"}
 	files, err := os.ReadDir("layouts")
 	if err != nil {
 		if os.IsNotExist(err) {
-			return []string{}, nil
+			return opts
 		}
-		return nil, fmt.Errorf("failed to read layouts folder: %w", err)
+		fyne.LogError("Error reading layouts folder", err)
+		return opts
 	}
 	for _, f := range files {
 		if f.IsDir() {
@@ -30,7 +86,7 @@ func listLayouts() ([]string, error) {
 		}
 		opts = append(opts, strings.TrimSuffix(f.Name(), ".json"))
 	}
-	return opts, nil
+	return opts
 }
 
 func (mw *MainWindow) openSettings() {
@@ -71,15 +127,15 @@ func (mw *MainWindow) loadPrefs(filename string) {
 }
 
 func (mw *MainWindow) newSymbolnameTypeahead() {
-	mw.symbolLookup = xwidget.NewCompletionEntry([]string{})
-	mw.symbolLookup.PlaceHolder = "Search for symbol"
-	mw.symbolLookup.OnChanged = func(s string) {
+	mw.selects.symbolLookup = xwidget.NewCompletionEntry([]string{})
+	mw.selects.symbolLookup.PlaceHolder = "Search for symbol"
+	mw.selects.symbolLookup.OnChanged = func(s string) {
 		if mw.fw == nil {
 			return
 		}
 		// completion start for text length >= 3
 		if len(s) < 3 {
-			mw.symbolLookup.HideCompletion()
+			mw.selects.symbolLookup.HideCompletion()
 			return
 		}
 		// Get the list of possible completion
@@ -95,15 +151,15 @@ func (mw *MainWindow) newSymbolnameTypeahead() {
 		}
 		// no results
 		if len(results) == 0 {
-			mw.symbolLookup.HideCompletion()
+			mw.selects.symbolLookup.HideCompletion()
 			return
 		}
 		sort.Slice(results, func(i, j int) bool { return strings.ToLower(results[i]) < strings.ToLower(results[j]) })
 
 		// Show results
 		if len(results) > 0 {
-			mw.symbolLookup.SetOptions(results)
-			mw.symbolLookup.ShowCompletion()
+			mw.selects.symbolLookup.SetOptions(results)
+			mw.selects.symbolLookup.ShowCompletion()
 		}
 	}
 }

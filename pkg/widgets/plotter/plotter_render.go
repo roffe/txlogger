@@ -1,6 +1,8 @@
 package plotter
 
-import "fyne.io/fyne/v2"
+import (
+	"fyne.io/fyne/v2"
+)
 
 type plotterRenderer struct {
 	*Plotter

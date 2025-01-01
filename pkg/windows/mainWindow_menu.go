@@ -35,16 +35,6 @@ func (mw *MainWindow) setupMenu() {
 
 	leading := []*fyne.Menu{
 		fyne.NewMenu("File",
-			fyne.NewMenuItem("Load binary", mw.loadBinary),
-			fyne.NewMenuItem("Play log", mw.playLog),
-			fyne.NewMenuItem("Open log folder", func() {
-				if err := open.Run(mw.settings.GetLogPath()); err != nil {
-					mw.Error(fmt.Errorf("failed to open logs folder: %w", err))
-				}
-			}),
-			fyne.NewMenuItem("Settings", func() {
-				mw.openSettings()
-			}),
 			fyne.NewMenuItem("About", func() {
 				if mw.wm.HasWindow("About") {
 					return
@@ -53,14 +43,26 @@ func (mw *MainWindow) setupMenu() {
 				inner.Icon = theme.HelpIcon()
 				mw.wm.Add(inner)
 			}),
+			fyne.NewMenuItem("Open binary", mw.loadBinary),
+			fyne.NewMenuItem("Open log folder", func() {
+				if err := open.Run(mw.settings.GetLogPath()); err != nil {
+					mw.Error(fmt.Errorf("failed to open logs folder: %w", err))
+				}
+			}),
+			fyne.NewMenuItem("Settings", func() {
+				mw.openSettings()
+			}),
+			fyne.NewMenuItem("What's new", func() {
+				mw.showWhatsNew()
+			}),
 		),
-		fyne.NewMenu("Preset",
-			fyne.NewMenuItem("Save", mw.savePreset),
-			fyne.NewMenuItem("New", mw.newPreset),
-			fyne.NewMenuItem("Import", mw.importPreset),
-			fyne.NewMenuItem("Export", mw.exportPreset),
-			fyne.NewMenuItem("Delete", mw.deletePreset),
-		),
+		//fyne.NewMenu("Preset",
+		//	fyne.NewMenuItem("Save", mw.savePreset),
+		//	fyne.NewMenuItem("New", mw.newPreset),
+		//	fyne.NewMenuItem("Import", mw.importPreset),
+		//	fyne.NewMenuItem("Export", mw.exportPreset),
+		//	fyne.NewMenuItem("Delete", mw.deletePreset),
+		//),
 		fyne.NewMenu("Other",
 			fyne.NewMenuItem("Update txbridge firmware", func() {
 				updater := newInnerWindow("txbridge firmware updater", txupdater.New(
@@ -97,31 +99,20 @@ func (mw *MainWindow) loadBinary() {
 		mw.Error(errors.New("stop logging before loading a new binary"))
 		return
 	}
-	filename, err := sdialog.File().Filter("Binary file", "bin").Load()
-	if err != nil {
-		if err.Error() == "Cancelled" {
+	go func() {
+		filename, err := sdialog.File().Filter("Binary file", "bin").Load()
+		if err != nil {
+			if err.Error() == "Cancelled" {
+				return
+			}
+			mw.Error(err)
 			return
 		}
-		mw.Error(err)
-		return
-	}
-	if err := mw.LoadSymbolsFromFile(filename); err != nil {
-		mw.Error(err)
-		return
-	}
-}
-
-func (mw *MainWindow) playLog() {
-	filename, err := sdialog.File().Filter("logfile", "t5l", "t7l", "t8l", "csv").SetStartDir(mw.settings.GetLogPath()).Load()
-	if err != nil {
-		if err.Error() == "Cancelled" {
+		if err := mw.LoadSymbolsFromFile(filename); err != nil {
+			mw.Error(err)
 			return
 		}
-		mw.Error(err)
-		return
-	}
-	lp := NewLogPlayer(mw.app, filename, mw.fw)
-	lp.ShowAndRun()
+	}()
 }
 
 func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {

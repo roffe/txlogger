@@ -101,6 +101,11 @@ func (m *MultipleWindows) Refresh() {
 func (m *MultipleWindows) Raise(w *InnerWindow) {
 	m.propertyLock.Lock()
 	defer m.propertyLock.Unlock()
+
+	if o, ok := w.content.Objects[0].(fyne.Focusable); ok {
+		fyne.CurrentApp().Driver().CanvasForObject(w.content.Objects[0]).Focus(o)
+	}
+
 	m.raise(w)
 }
 

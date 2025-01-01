@@ -61,7 +61,6 @@ type Config struct {
 	Mw        fyne.Window
 	Logplayer bool
 	// LogBtn          *widget.Button
-	OnClose         func()
 	AirDemToString  func(float64) string
 	FCutToString    func(float64) string
 	UseMPH          bool

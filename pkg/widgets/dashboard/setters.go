@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image/color"
 	"strconv"
-	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -14,8 +13,9 @@ import (
 
 func knkDetSetter(icon *icon.Icon) func(float64) {
 	var showTime time.Time
-	return func(value float64) {
+	knkStr2 := make([]byte, 4)
 
+	return func(value float64) {
 		if value <= 0 && time.Since(showTime) > 5*time.Second {
 			icon.Hide()
 			return
@@ -33,29 +33,28 @@ func knkDetSetter(icon *icon.Icon) func(float64) {
 		knkCyl3 := uint8(knockValue & 0xFF00 >> 8)
 		knkCyl4 := uint8(knockValue & 0xFF)
 
-		var knkStr strings.Builder
-
 		if knkCyl1 > 0 {
-			knkStr.WriteString("1")
+			knkStr2[0] = '1'
 		} else {
-			knkStr.WriteString("-")
+			knkStr2[0] = '-'
 		}
 		if knkCyl2 > 0 {
-			knkStr.WriteString("2")
+			knkStr2[1] = '2'
+
 		} else {
-			knkStr.WriteString("-")
+			knkStr2[1] = '-'
 		}
 		if knkCyl3 > 0 {
-			knkStr.WriteString("3")
+			knkStr2[2] = '3'
 		} else {
-			knkStr.WriteString("-")
+			knkStr2[2] = '-'
 		}
 		if knkCyl4 > 0 {
-			knkStr.WriteString("4")
+			knkStr2[3] = '4'
 		} else {
-			knkStr.WriteString("-")
+			knkStr2[3] = '-'
 		}
-		icon.SetText(knkStr.String())
+		icon.SetText(string(knkStr2))
 		icon.Show()
 		showTime = time.Now()
 	}

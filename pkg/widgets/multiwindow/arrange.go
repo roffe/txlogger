@@ -287,7 +287,7 @@ func (p *PreservingArranger) Layout(maxSize fyne.Size, confined bool, windows []
 	gaps := p.findGaps(regions, maxSize)
 
 	// Distribute gaps to adjacent windows
-	p.distributeGaps(regions, gaps, maxSize)
+	p.distributeGaps(regions, gaps)
 
 	// Apply new sizes while preserving positions
 	for _, r := range regions {
@@ -383,7 +383,7 @@ func (p *PreservingArranger) findGaps(regions []region, maxSize fyne.Size) []reg
 	return gaps
 }
 
-func (p *PreservingArranger) distributeGaps(regions []region, gaps []region, maxSize fyne.Size) {
+func (p *PreservingArranger) distributeGaps(regions []region, gaps []region) {
 	for _, gap := range gaps {
 		// Find adjacent windows
 		adjacentWindows := make([]int, 0)

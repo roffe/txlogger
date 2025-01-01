@@ -14,6 +14,9 @@ import (
 	"github.com/roffe/txlogger/pkg/colors"
 )
 
+//var _ fyne.Focusable = (*Plotter)(nil)
+//var _ fyne.Tappable = (*Plotter)(nil)
+
 type PlotterControl interface {
 	Seek(int)
 }
@@ -38,8 +41,6 @@ type Plotter struct {
 	dataPointsToShow int
 	dataLength       int
 
-	Logplayer bool
-
 	widthFactor          float32
 	plotResolution       fyne.Size
 	plotResolutionFactor float32
@@ -48,11 +49,9 @@ type Plotter struct {
 
 	size fyne.Size
 
-	mu sync.Mutex
-
 	hilightLine int
 
-	publishEBUSTopic string
+	mu sync.Mutex
 }
 
 type PlotterOpt func(*Plotter)
@@ -153,14 +152,12 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 
 	p.dataPointsToShow = min(p.dataLength, 250.0)
 
-	canvasImage := container.New(&plotLayout{p: p}, p.canvasImage)
-
 	leading := container.NewBorder(
 		nil,
 		nil,
 		p.zoom,
 		nil,
-		canvasImage,
+		container.New(&plotLayout{p: p}, p.canvasImage),
 	)
 	p.split = container.NewHSplit(
 		leading,
@@ -184,6 +181,10 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 	p.overlayText.TextSize = 25
 
 	return p
+}
+
+func (p *Plotter) CreateRenderer() fyne.WidgetRenderer {
+	return &plotterRenderer{p}
 }
 
 func (p *Plotter) Seek(pos int) {
@@ -233,10 +234,6 @@ func (p *Plotter) refreshImage() {
 	p.canvasImage.Refresh()
 }
 
-func (p *Plotter) CreateRenderer() fyne.WidgetRenderer {
-	return &plotterRenderer{p}
-}
-
 type TimeSeries struct {
 	Name       string
 	Min        float64
@@ -260,8 +257,11 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 	}
 
 	switch name {
+	case "ActualIn.T_Engine", "ActualIn.T_AirInlet":
+		ts.Min = -20
+		ts.Max = 120
 	case "m_Request", "MAF.m_AirInlet", "AirMassMast.m_Request":
-		ts.Min, _ = findMinMaxFloat64(data)
+		ts.Min = 0
 		ts.Max = 2200
 	case "ActualIn.p_AirInlet", "In.p_AirInlet", "ActualIn.p_AirBefThrottle", "In.p_AirBefThrottle":
 		ts.Min = -1.0
@@ -269,6 +269,7 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 	default:
 		ts.Min, ts.Max = findMinMaxFloat64(data)
 	}
+
 	ts.valueRange = ts.Max - ts.Min
 
 	return ts

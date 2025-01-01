@@ -21,7 +21,6 @@ import (
 	"github.com/roffe/txlogger/pkg/eventbus"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
-	"github.com/roffe/txlogger/pkg/mainmenu"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/plotter"
 )
@@ -65,7 +64,7 @@ func (s *slider) TypedKey(key *fyne.KeyEvent) {
 type LogPlayer struct {
 	app fyne.App
 
-	menu *mainmenu.MainMenu
+	//menu *mainmenu.MainMenu
 
 	prevBtn    *widget.Button
 	toggleBtn  *widget.Button
@@ -192,12 +191,12 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 		lp.lambSymbolName = datalogger.EXTERNALWBLSYM
 	}
 
-	otherFunc := func(s string) {
-	}
+	//otherFunc := func(s string) {
+	//}
 
-	lp.menu = mainmenu.New(lp, []*fyne.Menu{
-		fyne.NewMenu("File"),
-	}, nil, lp.openMap, otherFunc)
+	//lp.menu = mainmenu.New(lp, []*fyne.Menu{
+	//	fyne.NewMenu("File"),
+	//}, nil, lp.openMap, otherFunc)
 
 	w.SetCloseIntercept(func() {
 		for _, c := range cancelFuncs {
@@ -284,7 +283,7 @@ func NewLogPlayer(a fyne.App, filename string, symbols symbol.SymbolCollection) 
 
 	lp.Canvas().SetOnTypedKey(lp.keyHandler)
 
-	w.SetMainMenu(lp.menu.GetMenu(lp.logType))
+	//w.SetMainMenu(lp.menu.GetMenu(lp.logType))
 
 	lp.setupPlot(logz)
 
@@ -351,7 +350,6 @@ func (lp *LogPlayer) setupPlot(logz logfile.Logfile) {
 		values,
 		plotterOpts...,
 	)
-	lp.plotter.Logplayer = true
 	//	log.Println("creating plotter took", time.Since(start))
 }
 

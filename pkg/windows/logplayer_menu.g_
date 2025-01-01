@@ -66,16 +66,6 @@ func (lp *LogPlayer) openMap(typ symbol.ECUType, symbolName string) {
 			}))
 		}
 
-		/*
-			cancelFuncs = append(cancelFuncs, lp.ebus.SubscribeFunc("Lambda.External", func(value float64) {
-				mv.SetValue("Lambda.External", value)
-			}))
-
-			cancelFuncs = append(cancelFuncs, lp.ebus.SubscribeFunc("DisplProt.LambdaScanner", func(value float64) {
-				mv.SetValue("DisplProt.LambdaScanner", value)
-			}))
-		*/
-
 		cancelFuncs = append(cancelFuncs, lp.ebus.SubscribeFunc(lp.lambSymbolName, func(value float64) {
 			mv.SetValue(lp.lambSymbolName, value)
 		}))

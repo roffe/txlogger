@@ -1,8 +1,16 @@
-# 1.0.20
+# 2.0.0
 
-  - Competely new UI! most windows & maps now opens inside the main window and is resizeable and arrangeable
-  - Reworked legend to have a more "fixed size" and value moved to the left
-  - Fixed scaling of IOFF x-axis when live viewing BstKnkCal.MaxAirmass on T8
+This is a huge milestone release. The user interface has been largely rewritten to allow inline windows, custom gauges and plotters to be created, moved around and have the layots saved & restored.
+
+
+- Competely new UI - most windows & maps now opens inside the main window and is resizeable and arrangeable
+- Reworked legend to have a more "fixed size" and value moved to the left
+- Fixed scaling of IOFF x-axis when live viewing BstKnkCal.MaxAirmass on T8
+- Added t8 pedal map to Torque menu
+- Added the possibility to add custom gauges and meters and build your own dashboard on the main screen
+- Added functionality to save "layouts" which can be a set of open maps and different configured gauges. These can then be easily swapped between when for example playing logs or live-tuning
+- Added "in-line" logplayer reachable from the play button in the bottom right corner.
+- Fixed bug where mReq and mAir could have different starting points in log plotter
 
 # 1.0.19
 
