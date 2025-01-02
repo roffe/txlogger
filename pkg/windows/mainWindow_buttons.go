@@ -15,6 +15,7 @@ import (
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/msglist"
+	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	sdialog "github.com/sqweek/dialog"
 )
 
@@ -36,11 +37,12 @@ func (mw *MainWindow) createButtons() {
 
 func (mw *MainWindow) newaddGaugeBtn() *widget.Button {
 	return widget.NewButtonWithIcon("", theme.ContentAddIcon(), func() {
-		if mw.wm.HasWindow("Create gauge") {
+		if w := mw.wm.HasWindow("Create gauge"); w != nil {
+			mw.wm.Raise(w)
 			return
 		}
 		gs := NewGaugeCreator(mw)
-		iw := newSystemWindow("Create gauge", gs)
+		iw := multiwindow.NewSystemWindow("Create gauge", gs)
 		iw.Icon = theme.ContentAddIcon()
 		mw.wm.Add(iw)
 	})
@@ -48,10 +50,11 @@ func (mw *MainWindow) newaddGaugeBtn() *widget.Button {
 
 func (mw *MainWindow) newSymbolListBtn() *widget.Button {
 	return widget.NewButtonWithIcon("Symbol list", theme.ListIcon(), func() {
-		if mw.wm.HasWindow("Symbol list") {
+		if w := mw.wm.HasWindow("Symbol list"); w != nil {
+			mw.wm.Raise(w)
 			return
 		}
-		symbolListWindow := newSystemWindow("Symbol list", container.NewBorder(
+		symbolListWindow := multiwindow.NewSystemWindow("Symbol list", container.NewBorder(
 			container.NewGridWithRows(2,
 				container.NewHBox(
 					container.NewBorder(
@@ -93,11 +96,12 @@ func (mw *MainWindow) newSymbolListBtn() *widget.Button {
 
 func (mw *MainWindow) newDebugBtn() *widget.Button {
 	return widget.NewButtonWithIcon("Debug log", theme.InfoIcon(), func() {
-		if mw.wm.HasWindow("Debug log") {
+		if w := mw.wm.HasWindow("Debug log"); w != nil {
+			mw.wm.Raise(w)
 			return
 		}
 		dbl := msglist.New(mw.outputData)
-		debugWindow := newSystemWindow("Debug log", dbl)
+		debugWindow := multiwindow.NewSystemWindow("Debug log", dbl)
 		debugWindow.Icon = theme.ContentCopyIcon()
 		debugWindow.OnTappedIcon = func() {
 			str, err := mw.outputData.Get()
@@ -108,7 +112,7 @@ func (mw *MainWindow) newDebugBtn() *widget.Button {
 			fyne.CurrentApp().Clipboard().SetContent(strings.Join(str, "\n"))
 			dialog.ShowInformation("Debug log", "Content copied to clipboard", mw)
 		}
-		xy := mw.wm.MultipleWindows.Size().Subtract(dbl.MinSize().AddWidthHeight(20, 60))
+		xy := mw.wm.Size().Subtract(dbl.MinSize().AddWidthHeight(20, 60))
 		mw.wm.Add(debugWindow, fyne.NewPos(xy.Width, xy.Height))
 	})
 }
@@ -202,7 +206,8 @@ func (mw *MainWindow) newLogBtn() *widget.Button {
 
 func (mw *MainWindow) newDashboardBtn() *widget.Button {
 	return widget.NewButtonWithIcon("Dashboard", theme.InfoIcon(), func() {
-		if mw.wm.HasWindow("Dashboard") {
+		if w := mw.wm.HasWindow("Dashboard"); w != nil {
+			mw.wm.Raise(w)
 			return
 		}
 
@@ -265,7 +270,7 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 			}))
 		}
 
-		dbw := newInnerWindow("Dashboard", db)
+		dbw := multiwindow.NewInnerWindow("Dashboard", db)
 		dbw.Icon = theme.InfoIcon()
 		dbw.CloseIntercept = func() {
 			onClose()

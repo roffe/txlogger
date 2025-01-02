@@ -14,6 +14,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/dial"
 	"github.com/roffe/txlogger/pkg/widgets/dualdial"
 	"github.com/roffe/txlogger/pkg/widgets/hbar"
+	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/numericentry"
 	"github.com/roffe/txlogger/pkg/widgets/vbar"
 )
@@ -167,7 +168,7 @@ func (g *GaugeCreator) onSubmit() {
 	var cancelFuncs []func()
 	var gauge fyne.CanvasObject
 
-	gaugeConfig := widgets.GaugeConfig{
+	gaugeConfig := &widgets.GaugeConfig{
 		Title:               g.entries.unit.Text,
 		DisplayString:       g.entries.displayString.Text,
 		Min:                 min,
@@ -214,7 +215,7 @@ func (g *GaugeCreator) onSubmit() {
 		g.mw.Error(errors.New("unknown gauge type"))
 		return
 	}
-	iw := newInnerWindow(g.entries.name.Text, gauge)
+	iw := multiwindow.NewInnerWindow(g.entries.name.Text, gauge)
 	iw.CloseIntercept = func() {
 		for _, cancel := range cancelFuncs {
 			cancel()

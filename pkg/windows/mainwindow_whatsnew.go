@@ -6,6 +6,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/assets"
+	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
 
 const (
@@ -21,12 +22,13 @@ func (mw *MainWindow) whatsNew() {
 }
 
 func (mw *MainWindow) showWhatsNew() {
-	if mw.wm.HasWindow("What's new") {
+	if w := mw.wm.HasWindow("What's new"); w != nil {
+		mw.wm.Raise(w)
 		return
 	}
 	md := widget.NewRichTextFromMarkdown(assets.WhatsNew)
 	md.Wrapping = fyne.TextWrapWord
-	iw := newSystemWindow("What's new", container.NewVScroll(md))
+	iw := multiwindow.NewSystemWindow("What's new", container.NewVScroll(md))
 	iw.Icon = theme.InfoIcon()
 	iw.Resize(fyne.NewSize(700, 400))
 	mw.wm.Add(iw)

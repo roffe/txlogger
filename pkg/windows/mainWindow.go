@@ -55,7 +55,7 @@ type MainWindow struct {
 	settings        *settings.SettingsWidget
 	statusText      *widget.Label
 	oCtx            *oto.Context
-	wm              *windowManager
+	wm              *multiwindow.MultipleWindows
 	content         *fyne.Container
 }
 
@@ -108,7 +108,30 @@ func NewMainWindow(app fyne.App, filename string) *MainWindow {
 		oCtx: newOtoContext(),
 	}
 
-	mw.wm = newWindowManager(mw)
+	mw.wm = multiwindow.NewMultipleWindows()
+	mw.wm.LockViewport = true
+
+	mw.wm.OnError = mw.Error
+	mw.wm.OpenMap = mw.openMap
+	mw.wm.SetECU = func(ecu string) {
+		mw.selects.ecuSelect.SetSelected(ecu)
+	}
+	mw.wm.SetPreset = func(preset string) {
+		mw.selects.presetSelect.SetSelected(preset)
+	}
+	mw.wm.GetECU = func() string {
+		return mw.selects.ecuSelect.Selected
+	}
+	mw.wm.GetPreset = func() string {
+		return mw.selects.presetSelect.Selected
+	}
+
+	mw.wm.WindowLoadHandlers = map[string]func(){
+		"Settings": mw.openSettings,
+		"Dashboard": func() {
+			mw.buttons.dashboardBtn.Tapped(&fyne.PointEvent{})
+		},
+	}
 
 	updateSymbols := func(syms []*symbol.Symbol) {
 		if mw.dlc != nil {
@@ -186,7 +209,7 @@ func (mw *MainWindow) render() {
 				mw.buttons.openLogBtn,
 				mw.buttons.dashboardBtn,
 				widget.NewButtonWithIcon("", theme.GridIcon(), func() {
-					mw.wm.MultipleWindows.Arrange(&multiwindow.GridArranger{})
+					mw.wm.Arrange(&multiwindow.GridArranger{})
 				}),
 				mw.buttons.addGaugeBtn,
 				widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
@@ -214,7 +237,7 @@ func (mw *MainWindow) render() {
 		),
 		nil,
 		nil,
-		mw.wm.MultipleWindows,
+		mw.wm,
 	)
 }
 
@@ -222,7 +245,8 @@ func (mw *MainWindow) LoadLogfile(filename string) {
 	// Just filename, used for Window title
 	fp := filepath.Base(filename)
 
-	if mw.wm.HasWindow(fp) {
+	if w := mw.wm.HasWindow(fp); w != nil {
+		mw.wm.Raise(w)
 		return
 	}
 
@@ -233,7 +257,7 @@ func (mw *MainWindow) LoadLogfile(filename string) {
 	}
 
 	lp := logplayer.New(logz)
-	iw := newSystemWindow(fp, lp)
+	iw := multiwindow.NewSystemWindow(fp, lp)
 	iw.Icon = theme.MediaPlayIcon()
 
 	iw.CloseIntercept = func() {

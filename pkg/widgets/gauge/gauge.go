@@ -12,7 +12,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/vbar"
 )
 
-func New(cfg widgets.GaugeConfig) (widgets.IGauge, []func(), error) {
+func New(cfg *widgets.GaugeConfig) (widgets.IGauge, []func(), error) {
 	switch cfg.Type {
 	case "Dial":
 		dial := dial.New(cfg)

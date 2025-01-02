@@ -159,23 +159,9 @@ func WithMeshView(meshView bool) MapViewerOption {
 	}
 }
 
-func WithWBL(enabled bool) MapViewerOption {
-	return func(mv *MapViewer) error {
-		mv.opts.showWBL = enabled
-		return nil
-	}
-}
-
 func WithEditable(editable bool) MapViewerOption {
 	return func(mv *MapViewer) error {
 		mv.opts.editable = editable
-		return nil
-	}
-}
-
-func WithWidebandSymbolName(lambdaName string) MapViewerOption {
-	return func(mv *MapViewer) error {
-		mv.lambdaName = lambdaName
 		return nil
 	}
 }

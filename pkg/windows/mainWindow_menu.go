@@ -24,10 +24,11 @@ func (mw *MainWindow) setupMenu() {
 	otherFunc := func(str string) {
 		switch str {
 		case "Register EU0D":
-			if mw.wm.HasWindow("Register EU0D") {
+			if w := mw.wm.HasWindow("Register EU0D"); w != nil {
+				mw.wm.Raise(w)
 				return
 			}
-			inner := newInnerWindow("Register EU0D", NewMyrtilosRegistration(mw))
+			inner := multiwindow.NewInnerWindow("Register EU0D", NewMyrtilosRegistration(mw))
 			inner.Icon = theme.InfoIcon()
 			mw.wm.Add(inner)
 		}
@@ -36,10 +37,11 @@ func (mw *MainWindow) setupMenu() {
 	leading := []*fyne.Menu{
 		fyne.NewMenu("File",
 			fyne.NewMenuItem("About", func() {
-				if mw.wm.HasWindow("About") {
+				if w := mw.wm.HasWindow("About"); w != nil {
+					mw.wm.Raise(w)
 					return
 				}
-				inner := newInnerWindow("About", About())
+				inner := multiwindow.NewInnerWindow("About", About())
 				inner.Icon = theme.HelpIcon()
 				mw.wm.Add(inner)
 			}),
@@ -65,7 +67,7 @@ func (mw *MainWindow) setupMenu() {
 		//),
 		fyne.NewMenu("Other",
 			fyne.NewMenuItem("Update txbridge firmware", func() {
-				updater := newInnerWindow("txbridge firmware updater", txupdater.New(
+				updater := multiwindow.NewInnerWindow("txbridge firmware updater", txupdater.New(
 					mw.settings.CanSettings.GetSerialPort(),
 				))
 				updater.Icon = theme.DownloadIcon()
@@ -77,16 +79,16 @@ func (mw *MainWindow) setupMenu() {
 	trailing := []*fyne.Menu{
 		fyne.NewMenu("Arrange",
 			fyne.NewMenuItem("Grid", func() {
-				mw.wm.MultipleWindows.Arrange(&multiwindow.GridArranger{})
+				mw.wm.Arrange(&multiwindow.GridArranger{})
 			}),
 			fyne.NewMenuItem("Floating", func() {
-				mw.wm.MultipleWindows.Arrange(&multiwindow.FloatingArranger{})
+				mw.wm.Arrange(&multiwindow.FloatingArranger{})
 			}),
 			fyne.NewMenuItem("Pack", func() {
-				mw.wm.MultipleWindows.Arrange(&multiwindow.PackArranger{})
+				mw.wm.Arrange(&multiwindow.PackArranger{})
 			}),
 			fyne.NewMenuItem("Preserve", func() {
-				mw.wm.MultipleWindows.Arrange(&multiwindow.PreservingArranger{})
+				mw.wm.Arrange(&multiwindow.PreservingArranger{})
 			}),
 		),
 	}
@@ -123,7 +125,8 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 	axis := symbol.GetInfo(typ, mapName)
 
-	if mw.wm.HasWindow(axis.Z + " - " + axis.ZDescription) {
+	if w := mw.wm.HasWindow(axis.Z + " - " + axis.ZDescription); w != nil {
+		mw.wm.Raise(w)
 		return
 	}
 
@@ -256,10 +259,8 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		mapviewer.WithSaveECUFunc(saveFunc),
 		mapviewer.WithSaveFileFunc(saveFileFunc),
 		mapviewer.WithMeshView(mw.settings.GetMeshView()),
-		mapviewer.WithWidebandSymbolName(mw.settings.GetWidebandSymbolName()),
 		mapviewer.WithEditable(true),
 		mapviewer.WithButtons(true),
-		//mapviewer.WithWBL(mw.settings.GetWidebandType() != "None"),
 		mapviewer.WithFollowCrosshair(mw.settings.GetCursorFollowCrosshair()),
 		mapviewer.WithAxisLabels(axis.XDescription, axis.YDescription, axis.ZDescription),
 	)
@@ -293,11 +294,11 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		p.Hide()
 	}
 
-	mapWindow := newInnerWindow(axis.Z+" - "+axis.ZDescription, mv)
+	mapWindow := multiwindow.NewInnerWindow(axis.Z+" - "+axis.ZDescription, mv)
 	mapWindow.Icon = theme.GridIcon()
 
 	mv.OnMouseDown = func() {
-		mw.wm.Raise(mapWindow.InnerWindow)
+		mw.wm.Raise(mapWindow)
 	}
 
 	mapWindow.CloseIntercept = func() {

@@ -19,7 +19,7 @@ type VBar struct {
 	displayText *canvas.Text
 	bars        []*canvas.Line
 
-	cfg widgets.GaugeConfig
+	cfg *widgets.GaugeConfig
 
 	value float64
 
@@ -34,7 +34,7 @@ type VBar struct {
 	}
 }
 
-func New(cfg widgets.GaugeConfig) *VBar {
+func New(cfg *widgets.GaugeConfig) *VBar {
 	s := &VBar{
 		cfg: cfg,
 	}
@@ -46,7 +46,7 @@ func New(cfg widgets.GaugeConfig) *VBar {
 	return s
 }
 
-func (s *VBar) GetConfig() widgets.GaugeConfig {
+func (s *VBar) GetConfig() *widgets.GaugeConfig {
 	return s.cfg
 }
 

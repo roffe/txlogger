@@ -89,14 +89,14 @@ func NewDashboard(cfg *Config) *Dashboard {
 		//logBtn:    cfg.LogBtn,
 		logplayer: cfg.Logplayer,
 		gauges: Gauges{
-			airmass: dualdial.New(widgets.GaugeConfig{
+			airmass: dualdial.New(&widgets.GaugeConfig{
 				Title:   "mg/c",
 				Min:     0,
 				Max:     2200,
 				Steps:   22,
 				MinSize: fyne.NewSize(100, 100),
 			}),
-			speed: dial.New(widgets.GaugeConfig{
+			speed: dial.New(&widgets.GaugeConfig{
 				Title:         speedometerText,
 				Min:           0,
 				Max:           300,
@@ -104,21 +104,21 @@ func NewDashboard(cfg *Config) *Dashboard {
 				DisplayString: "%.1f",
 				MinSize:       fyne.NewSize(100, 100),
 			}),
-			rpm: dial.New(widgets.GaugeConfig{
+			rpm: dial.New(&widgets.GaugeConfig{
 				Title:   "RPM",
 				Min:     0,
 				Max:     8000,
 				Steps:   20,
 				MinSize: fyne.NewSize(100, 100),
 			}),
-			iat: dial.New(widgets.GaugeConfig{
+			iat: dial.New(&widgets.GaugeConfig{
 				Title:   "IAT",
 				Min:     0,
 				Max:     80,
 				Steps:   16,
 				MinSize: fyne.NewSize(100, 100),
 			}),
-			pressure: dualdial.New(widgets.GaugeConfig{
+			pressure: dualdial.New(&widgets.GaugeConfig{
 				Title:         "MAP",
 				Min:           0,
 				Max:           3,
@@ -126,7 +126,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				DisplayString: "%.2f",
 				MinSize:       fyne.NewSize(100, 100),
 			}),
-			throttle: vbar.New(widgets.GaugeConfig{
+			throttle: vbar.New(&widgets.GaugeConfig{
 				Title:      "TPS",
 				Min:        0,
 				Max:        100,
@@ -134,7 +134,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				MinSize:    fyne.NewSize(50, 50),
 				ColorScale: widgets.TraditionalScale,
 			}),
-			pwm: vbar.New(widgets.GaugeConfig{
+			pwm: vbar.New(&widgets.GaugeConfig{
 				Title:      "PWM",
 				Min:        0,
 				Max:        100,
@@ -142,13 +142,13 @@ func NewDashboard(cfg *Config) *Dashboard {
 				MinSize:    fyne.NewSize(50, 50),
 				ColorScale: widgets.TraditionalScale,
 			}),
-			engineTemp: dial.New(widgets.GaugeConfig{
+			engineTemp: dial.New(&widgets.GaugeConfig{
 				Title: "tEng",
 				Min:   -20,
 				Max:   130,
 				Steps: 16,
 			}),
-			wblambda: cbar.New(widgets.GaugeConfig{
+			wblambda: cbar.New(&widgets.GaugeConfig{
 				Title:           "",
 				Min:             0.50,
 				Center:          1,
@@ -159,7 +159,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				DisplayTextSize: 20,
 				TextPosition:    widgets.TextAtTop,
 			}),
-			nblambda: cbar.New(widgets.GaugeConfig{
+			nblambda: cbar.New(&widgets.GaugeConfig{
 				Title:           "",
 				Min:             -25,
 				Center:          0,

@@ -7,7 +7,7 @@ import (
 )
 
 type Gauge interface {
-	GetConfig() GaugeConfig
+	GetConfig() *GaugeConfig
 }
 
 type GaugeConfig struct {

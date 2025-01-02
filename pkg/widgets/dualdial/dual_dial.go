@@ -17,7 +17,7 @@ import (
 type DualDial struct {
 	widget.BaseWidget
 
-	cfg widgets.GaugeConfig
+	cfg *widgets.GaugeConfig
 
 	titleText     *canvas.Text
 	displayString string
@@ -52,7 +52,7 @@ type DualDial struct {
 	buf1, buf2                 bytes.Buffer
 }
 
-func New(cfg widgets.GaugeConfig) *DualDial {
+func New(cfg *widgets.GaugeConfig) *DualDial {
 	s := &DualDial{
 		cfg:           cfg,
 		steps:         10,
@@ -107,7 +107,7 @@ func New(cfg widgets.GaugeConfig) *DualDial {
 	return s
 }
 
-func (c *DualDial) GetConfig() widgets.GaugeConfig {
+func (c *DualDial) GetConfig() *widgets.GaugeConfig {
 	return c.cfg
 }
 

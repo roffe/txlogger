@@ -30,6 +30,9 @@ type InnerWindow struct {
 	OnMouseDown                                         func()                `json:"-"`
 	Icon                                                fyne.Resource
 
+	Persist    bool // Persist through layout changes
+	IgnoreSave bool // Ignore saving to layout
+
 	icon                     fyne.CanvasObject
 	minBtn, maxBtn, closeBtn *widget.Button
 
@@ -54,6 +57,18 @@ func NewInnerWindow(title string, content fyne.CanvasObject) *InnerWindow {
 		title:       title,
 		content:     container.NewPadded(content),
 		bgFillColor: theme.ColorNameOverlayBackground,
+	}
+	w.ExtendBaseWidget(w)
+	return w
+}
+
+func NewSystemWindow(title string, content fyne.CanvasObject) *InnerWindow {
+	w := &InnerWindow{
+		title:       title,
+		content:     container.NewPadded(content),
+		bgFillColor: theme.ColorNameOverlayBackground,
+		Persist:     true,
+		IgnoreSave:  true,
 	}
 	w.ExtendBaseWidget(w)
 	return w

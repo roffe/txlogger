@@ -19,7 +19,7 @@ type CBar struct {
 	displayText *canvas.Text
 	bars        []*canvas.Line
 
-	cfg widgets.GaugeConfig
+	cfg *widgets.GaugeConfig
 
 	// Cached values
 	value float64
@@ -38,7 +38,7 @@ type CBar struct {
 	stepFactor       float32
 }
 
-func New(cfg widgets.GaugeConfig) *CBar {
+func New(cfg *widgets.GaugeConfig) *CBar {
 	if cfg.MinSize.Width == 0 {
 		cfg.MinSize.Width = 50
 	}
@@ -68,7 +68,7 @@ func New(cfg widgets.GaugeConfig) *CBar {
 	return s
 }
 
-func (s *CBar) GetConfig() widgets.GaugeConfig {
+func (s *CBar) GetConfig() *widgets.GaugeConfig {
 	return s.cfg
 }
 

@@ -18,7 +18,7 @@ type Dial struct {
 	widget.BaseWidget
 	displayString string
 
-	cfg widgets.GaugeConfig
+	cfg *widgets.GaugeConfig
 
 	factor float64
 	value  float64
@@ -48,7 +48,7 @@ type Dial struct {
 	buf bytes.Buffer
 }
 
-func New(cfg widgets.GaugeConfig) *Dial {
+func New(cfg *widgets.GaugeConfig) *Dial {
 	c := &Dial{
 		cfg:           cfg,
 		displayString: "%.0f",
@@ -98,7 +98,7 @@ func New(cfg widgets.GaugeConfig) *Dial {
 	return c
 }
 
-func (c *Dial) GetConfig() widgets.GaugeConfig {
+func (c *Dial) GetConfig() *widgets.GaugeConfig {
 	return c.cfg
 }
 

@@ -15,6 +15,7 @@ import (
 	xwidget "fyne.io/x/fyne/widget"
 	"github.com/ebitengine/oto/v3"
 	"github.com/roffe/txlogger/pkg/debug"
+	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
 
 // Remember that you should **not** create more than one context
@@ -90,10 +91,11 @@ func listLayouts() []string {
 }
 
 func (mw *MainWindow) openSettings() {
-	if mw.wm.HasWindow("Settings") {
+	if w := mw.wm.HasWindow("Settings"); w != nil {
+		mw.wm.Raise(w)
 		return
 	}
-	inner := newInnerWindow("Settings", mw.settings)
+	inner := multiwindow.NewInnerWindow("Settings", mw.settings)
 	inner.Icon = theme.SettingsIcon()
 	mw.wm.Add(inner)
 }

@@ -29,7 +29,7 @@ func knkDetSetter(icon *icon.Icon) func(float64) {
 		// log.Printf("knkDetSetter: %08X\n", knockValue)
 
 		knkCyl1 := uint8(knockValue & 0xFF000000 >> 24)
-		knkCyl2 := uint8(knockValue & 0x00FF0000 >> 16)
+		knkCyl2 := uint8(knockValue & 0xFF0000 >> 16)
 		knkCyl3 := uint8(knockValue & 0xFF00 >> 8)
 		knkCyl4 := uint8(knockValue & 0xFF)
 

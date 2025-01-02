@@ -257,6 +257,9 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 	}
 
 	switch name {
+	case "Out.X_AccPedal", "Out.X_AccPos":
+		ts.Min = 0
+		ts.Max = 100
 	case "ActualIn.T_Engine", "ActualIn.T_AirInlet":
 		ts.Min = -20
 		ts.Max = 120
@@ -266,6 +269,12 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 	case "ActualIn.p_AirInlet", "In.p_AirInlet", "ActualIn.p_AirBefThrottle", "In.p_AirBefThrottle":
 		ts.Min = -1.0
 		ts.Max = 3.0
+	case "IgnProt.fi_Offset":
+		ts.Min = -30
+		ts.Max = 10
+	case "Lambda.LambdaInt":
+		ts.Min = -25
+		ts.Max = 25
 	default:
 		ts.Min, ts.Max = findMinMaxFloat64(data)
 	}

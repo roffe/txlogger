@@ -3,7 +3,6 @@ package mapviewer
 import (
 	"fmt"
 	"image/color"
-	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -19,7 +18,6 @@ import (
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/widgets"
-	"github.com/roffe/txlogger/pkg/widgets/cbar"
 	"github.com/roffe/txlogger/pkg/widgets/grid"
 	"github.com/roffe/txlogger/pkg/widgets/meshgrid"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
@@ -93,9 +91,6 @@ type MapViewer struct {
 
 	popup *widget.PopUpMenu
 
-	lamb       *cbar.CBar
-	lambdaName string
-
 	widthFactor  float32
 	heightFactor float32
 
@@ -148,7 +143,7 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 
 	mv.content = mv.render()
 
-	log.Printf("MapViewer c: %d r: %d dlen: %d x: %s y: %s z: %s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom, mv.symbol.Name)
+	// log.Printf("MapViewer c: %d r: %d dlen: %d x: %s y: %s z: %s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom, mv.symbol.Name)
 	return mv, nil
 }
 
@@ -223,39 +218,12 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 	mv.innerView.Add(mv.valueTexts)
 	mv.innerView.Add(mv.selectionRect)
 
-	if mv.opts.showWBL {
-		mv.lamb = cbar.New(widgets.GaugeConfig{
-			Title:           "",
-			Min:             0.50,
-			Center:          1,
-			Max:             1.50,
-			Steps:           20,
-			MinSize:         fyne.NewSize(100, 25),
-			TextPosition:    widgets.TextAtCenter,
-			DisplayString:   "λ %.3f",
-			DisplayTextSize: 25,
-		})
-	}
-
 	buttons := mv.setupButtons()
 
 	if mv.symbol == nil || mv.numColumns == 1 && mv.numRows == 1 {
-		var btns fyne.CanvasObject
-		if mv.opts.showWBL {
-			btns = container.NewBorder(
-				mv.lamb,
-				nil,
-				nil,
-				nil,
-				buttons,
-			)
-		} else {
-			btns = buttons
-		}
-
 		return container.NewBorder(
 			nil,
-			btns,
+			buttons,
 			nil,
 			nil,
 			container.NewBorder(
@@ -268,22 +236,9 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		)
 	}
 
-	var mid fyne.CanvasObject
-	if mv.opts.showWBL {
-		mid = container.NewBorder(
-			mv.lamb,
-			nil,
-			nil,
-			nil,
-			buttons,
-		)
-	} else {
-		mid = buttons
-	}
-
 	mapview := container.NewBorder(
 		mv.xAxisLabelContainer,
-		mid,
+		nil,
 		mv.yAxisLabelContainer,
 		nil,
 		mv.innerView,
@@ -302,13 +257,25 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		if err == nil {
 			split := container.NewVSplit(
 				mapview,
-				mv.mesh,
+				container.NewBorder(
+					nil,
+					buttons,
+					nil,
+					nil,
+					mv.mesh,
+				),
 			)
 			split.Offset = 0.9
 			return split
 		}
 	}
-	return mapview
+	return container.NewBorder(
+		nil,
+		buttons,
+		nil,
+		nil,
+		mapview,
+	)
 }
 
 func (mv *MapViewer) setupButtons() fyne.CanvasObject {
@@ -375,10 +342,6 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 	}
 	if hit {
 		mv.setXY(mv.xValue, mv.yValue)
-	}
-
-	if name == mv.lambdaName {
-		mv.lamb.SetValue(value)
 	}
 }
 

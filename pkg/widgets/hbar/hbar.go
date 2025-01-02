@@ -18,7 +18,7 @@ type HBar struct {
 	titleText *canvas.Text
 	bars      []*canvas.Line
 
-	cfg widgets.GaugeConfig
+	cfg *widgets.GaugeConfig
 
 	value float64
 
@@ -31,7 +31,7 @@ type HBar struct {
 	oldSize fyne.Size
 }
 
-func New(cfg widgets.GaugeConfig) *HBar {
+func New(cfg *widgets.GaugeConfig) *HBar {
 	s := &HBar{
 		cfg: cfg,
 	}
@@ -46,7 +46,7 @@ func New(cfg widgets.GaugeConfig) *HBar {
 	return s
 }
 
-func (s *HBar) GetConfig() widgets.GaugeConfig {
+func (s *HBar) GetConfig() *widgets.GaugeConfig {
 	return s.cfg
 }
 

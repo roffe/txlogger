@@ -1,7 +1,6 @@
 package logplayer
 
 import (
-	"log"
 	"sort"
 	"sync"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/capture"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
@@ -95,15 +95,16 @@ func (l *Logplayer) Tapped(_ *fyne.PointEvent) {
 }
 
 func (l *Logplayer) FocusGained() {
-	log.Println("FocusGained")
 }
 
 func (l *Logplayer) FocusLost() {
-	log.Println("FocusLost")
 }
 
 func (l *Logplayer) TypedKey(ev *fyne.KeyEvent) {
 	switch ev.Name {
+	case fyne.KeyF12:
+		c := fyne.CurrentApp().Driver().CanvasForObject(l)
+		capture.Screenshot(c)
 	case fyne.KeyPlus:
 		l.objs.speedSelect.SetSelectedIndex(l.objs.speedSelect.SelectedIndex() + 1)
 	case fyne.KeyMinus:

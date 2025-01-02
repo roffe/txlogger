@@ -79,7 +79,9 @@ require (
 	github.com/soypat/cyw43439 v0.0.0-20241116210509-ae1ce0e084c5 // indirect
 	github.com/soypat/seqs v0.0.0-20240527012110-1201bab640ef // indirect
 	github.com/tinygo-org/pio v0.0.0-20240901140349-27cbe9d986eb // indirect
+	golang.design/x/clipboard v0.7.0
 	golang.org/x/exp v0.0.0-20241210194714-1829a127f884 // indirect
+	golang.org/x/exp/shiny v0.0.0-20230817173708-d852ddb80c63 // indirect
 )
 
 require (
