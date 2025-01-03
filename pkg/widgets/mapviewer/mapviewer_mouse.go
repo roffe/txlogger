@@ -2,6 +2,7 @@ package mapviewer
 
 import (
 	"math"
+	"slices"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/driver/desktop"
@@ -32,6 +33,7 @@ func (mv *MapViewer) MouseMoved(event *desktop.MouseEvent) {
 
 // MouseDown is called when a mouse button is pressed.
 func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
+	mv.lastModifier = event.Modifier
 	if mv.OnMouseDown != nil {
 		mv.OnMouseDown()
 	}
@@ -40,21 +42,16 @@ func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
 		return
 	}
 
-	for _, rect := range mv.zDataRects {
-		if rect.FillColor != rect.StrokeColor {
-			rect.FillColor = rect.StrokeColor
-			rect.Refresh()
+	if event.Modifier != fyne.KeyModifierControl {
+		for _, rect := range mv.zDataRects {
+			if rect.FillColor != rect.StrokeColor {
+				rect.FillColor = rect.StrokeColor
+				rect.Refresh()
+			}
 		}
 	}
 
-	//fyne.CurrentApp().Driver().CanvasForObject(mv).Focus(mv)
-
-	// Handle focusing and input buffer reset
 	mv.handleFocusAndInputBuffer()
-
-	//if event.Position.Y > mv.innerView.Size().Height {
-	//	return
-	//}
 
 	switch {
 	case event.Button == desktop.MouseButtonPrimary && event.Modifier == 0:
@@ -112,8 +109,20 @@ func (mv *MapViewer) handlePrimaryCtrlClick(event *desktop.MouseEvent) {
 	y := (float32(mv.numRows-mv.SelectedY-1) * cellHeight)
 
 	mv.updateCursorPositionAndSize(x, y, cellWidth, cellHeight)
-	mv.selectedCells = append(mv.selectedCells, mv.SelectedY*mv.numColumns+mv.selectedX)
-	mv.selecting = true
+
+	newCell := mv.SelectedY*mv.numColumns + mv.selectedX
+
+	// Check if cell is already selected
+	if index := slices.Index(mv.selectedCells, newCell); index != -1 {
+		// Remove cell if already selected
+		mv.selectedCells = append(mv.selectedCells[:index], mv.selectedCells[index+1:]...)
+		mv.zDataRects[newCell].FillColor = mv.zDataRects[newCell].StrokeColor
+	} else {
+		// Add new cell
+		mv.selectedCells = append(mv.selectedCells, newCell)
+		mv.zDataRects[newCell].FillColor = theme.Color(theme.ColorNameForegroundOnPrimary)
+	}
+	mv.zDataRects[newCell].Refresh()
 }
 
 // handlePrimaryClickWithShift handles the primary click with shift action.
@@ -179,22 +188,35 @@ func (mv *MapViewer) finalizeSelection(eventPos fyne.Position) {
 	nselectedX, nSelectedY := mv.calculateSelectionBounds(eventPos)
 	mv.updateSelection(nselectedX, nSelectedY)
 
-	// Calculate and store selected cells
+	// For Ctrl selections, we don't want to clear existing selections
+	if mv.lastModifier != fyne.KeyModifierControl {
+		mv.selectedCells = make([]int, 0)
+	}
+
 	topLeftX := min(mv.selectedX, nselectedX)
 	bottomRightX := max(mv.selectedX, nselectedX)
 	topLeftY := min(mv.SelectedY, nSelectedY)
 	bottomRightY := max(mv.SelectedY, nSelectedY)
 
-	mv.selectedCells = make([]int, 0)
 	for y := topLeftY; y <= bottomRightY; y++ {
 		for x := topLeftX; x <= bottomRightX; x++ {
 			zIndex := y*mv.numColumns + x
-			mv.selectedCells = append(mv.selectedCells, zIndex)
-			mv.zDataRects[zIndex].FillColor = theme.Color(theme.ColorNameForegroundOnPrimary)
+			if mv.lastModifier == fyne.KeyModifierControl {
+				// For Ctrl, toggle selection
+				if index := slices.Index(mv.selectedCells, zIndex); index != -1 {
+					mv.selectedCells = append(mv.selectedCells[:index], mv.selectedCells[index+1:]...)
+					mv.zDataRects[zIndex].FillColor = mv.zDataRects[zIndex].StrokeColor
+				} else {
+					mv.selectedCells = append(mv.selectedCells, zIndex)
+					mv.zDataRects[zIndex].FillColor = theme.Color(theme.ColorNameForegroundOnPrimary)
+				}
+			} else {
+				mv.selectedCells = append(mv.selectedCells, zIndex)
+				mv.zDataRects[zIndex].FillColor = theme.Color(theme.ColorNameForegroundOnPrimary)
+			}
 			mv.zDataRects[zIndex].Refresh()
 		}
 	}
-
 }
 
 func (mv *MapViewer) showPopupMenu(pos fyne.Position) {

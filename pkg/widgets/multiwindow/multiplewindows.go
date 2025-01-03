@@ -284,23 +284,23 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 		if !w.maximized {
 			w.preMaximizedSize = w.Size()
 			w.preMaximizedPos = w.Position()
-			am := canvas.NewPositionAnimation(w.Position(), fyne.NewPos(0, 0), 200*time.Millisecond, func(pos fyne.Position) {
+			am := canvas.NewPositionAnimation(w.Position(), fyne.NewPos(0, 0), 250*time.Millisecond, func(pos fyne.Position) {
 				w.Move(pos)
 			})
 			am.Start()
-			rm := canvas.NewSizeAnimation(w.Size(), m.content.Size(), 200*time.Millisecond, func(sz fyne.Size) {
+			rm := canvas.NewSizeAnimation(w.Size(), m.content.Size(), 250*time.Millisecond, func(sz fyne.Size) {
 				w.Resize(sz)
 			})
 			rm.Start()
 		} else {
-			am := canvas.NewPositionAnimation(w.Position(), w.preMaximizedPos, 200*time.Millisecond, func(pos fyne.Position) {
+			am := canvas.NewPositionAnimation(w.Position(), w.preMaximizedPos, 250*time.Millisecond, func(pos fyne.Position) {
 				w.Move(pos)
 			})
 			am.Start()
 			if w.preMaximizedSize == w.Size() {
 				w.preMaximizedSize = w.MinSize()
 			}
-			rm := canvas.NewSizeAnimation(w.Size(), w.preMaximizedSize, 200*time.Millisecond, func(sz fyne.Size) {
+			rm := canvas.NewSizeAnimation(w.Size(), w.preMaximizedSize, 250*time.Millisecond, func(sz fyne.Size) {
 				w.Resize(sz)
 			})
 			rm.Start()

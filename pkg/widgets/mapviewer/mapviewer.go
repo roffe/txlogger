@@ -88,6 +88,7 @@ type MapViewer struct {
 	// Mouse
 	mousePos      fyne.Position
 	selecting     bool
+	lastModifier  fyne.KeyModifier
 	selectedCells []int
 
 	// Keyboard
@@ -205,7 +206,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 
 	mv.selectionRect.CornerRadius = 4
 	mv.selectionRect.Resize(fyne.NewSize(34, 14))
-	mv.selectionRect.Hide()
+	//mv.selectionRect.Hide()
 
 	mv.innerView = container.NewStack(
 		mv.valueRects,
@@ -344,6 +345,7 @@ func (mv *MapViewer) Refresh() {
 		)
 		r := mv.zDataRects[i]
 		if col != r.FillColor {
+			r.StrokeColor = col
 			r.FillColor = col
 			r.Refresh()
 		}

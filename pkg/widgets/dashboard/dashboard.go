@@ -783,9 +783,9 @@ func (dr *DashboardRenderer) Objects() []fyne.CanvasObject {
 	cont := []fyne.CanvasObject{
 		dr.db.image.limpMode,
 		//db.dbgBar,
+		dr.db.image.taz,
 		dr.db.gauges.rpm,
 		dr.db.gauges.speed,
-		dr.db.image.taz,
 		dr.db.gauges.airmass,
 		dr.db.gauges.pressure,
 		dr.db.gauges.iat,

@@ -1,15 +1,13 @@
 package logplayer
 
 import (
-	"log"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/driver/desktop"
 )
 
 func (l *Logplayer) Tapped(_ *fyne.PointEvent) {
-	log.Println("Tapped")
 	fyne.CurrentApp().Driver().CanvasForObject(l).Focus(l)
+	l.objs.playbackToggleBtn.OnTapped()
 }
 
 func (l *Logplayer) MouseUp(event *desktop.MouseEvent) {

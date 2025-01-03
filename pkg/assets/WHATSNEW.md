@@ -1,7 +1,11 @@
 # 2.0.0
 
-This is a huge milestone release. The user interface has been largely rewritten to allow inline windows, custom gauges and plotters to be created, moved around and have the layots saved & restored.
+This is a huge milestone release. 
 
+The user interface has been competely revamped to allow inline windows, custom gauges and plotters to be created, moved around and layouts saved & restored.
+
+The logplayer has moved into the main UI and starts with a plotter & playback controls. You are then free to open a Dashboard if you want one or view the values in the symbol list.
+Or why not create your own gauges and make it just like you want :)
 
 - Competely new UI - most windows & maps now opens inside the main window and is resizeable and arrangeable
 - Reworked legend to have a more "fixed size" and value moved to the left
@@ -11,6 +15,19 @@ This is a huge milestone release. The user interface has been largely rewritten 
 - Added functionality to save "layouts" which can be a set of open maps and different configured gauges. These can then be easily swapped between when for example playing logs or live-tuning
 - Added "in-line" logplayer reachable from the play button in the bottom right corner.
 - Fixed bug where mReq and mAir could have different starting points in log plotter
+- Added EBUS monitor to see what messages are flying around in the internal bus
+- Now possible to select multiple different cells by holding CTRL and clicking
+- Logplayer rewritten to use a lot less CPU and be more responsive
+- This is now a single instance application. If you try to open log files from file associations when txlogger is running it will open them in the running instance instead
+- Drag & Drop support improved. The logplayer / plotter for the logfile will now open 
+- New settings dialogue
+- New default filename for logs. The filename will now be prefixed with the name of the binary you have loaded when logging.
+- Symbol preset management has now been moved into the symbollist dialogue
+- Moved txlogger firmware update shortcut to "File"
+- Added "What's new" to "File" menu to access this document
+- Added support to drag the plotter instead of having to use the slider to seek in the logfile
+
+
 
 # 1.0.19
 

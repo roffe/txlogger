@@ -150,10 +150,7 @@ func (l *Logplayer) TypedKey(ev *fyne.KeyEvent) {
 	case fyne.KeyRight:
 		l.controlChan <- &controlMsg{Op: OpNext}
 	case fyne.KeySpace:
-		l.objs.playbackToggleBtn.Tapped(&fyne.PointEvent{
-			Position:         fyne.NewPos(0, 0),
-			AbsolutePosition: fyne.NewPos(0, 0),
-		})
+		l.objs.playbackToggleBtn.OnTapped()
 	}
 }
 
