@@ -40,6 +40,7 @@ type LambdaProvider interface {
 }
 
 type Config struct {
+	FilenamePrefix string
 	ECU            string
 	Device         gocan.Adapter
 	Symbols        []*symbol.Symbol

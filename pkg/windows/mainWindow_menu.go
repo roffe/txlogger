@@ -54,6 +54,14 @@ func (mw *MainWindow) setupMenu() {
 			fyne.NewMenuItem("Settings", func() {
 				mw.openSettings()
 			}),
+			fyne.NewMenuItem("Update txbridge firmware", func() {
+				updater := multiwindow.NewInnerWindow("txbridge firmware updater", txupdater.New(
+					mw.settings.CanSettings.GetSerialPort(),
+				))
+				updater.Icon = theme.DownloadIcon()
+				updater.Resize(fyne.NewSize(400, 300))
+				mw.wm.Add(updater)
+			}),
 			fyne.NewMenuItem("What's new", func() {
 				mw.showWhatsNew()
 			}),
@@ -65,15 +73,7 @@ func (mw *MainWindow) setupMenu() {
 		//	fyne.NewMenuItem("Export", mw.exportPreset),
 		//	fyne.NewMenuItem("Delete", mw.deletePreset),
 		//),
-		fyne.NewMenu("Other",
-			fyne.NewMenuItem("Update txbridge firmware", func() {
-				updater := multiwindow.NewInnerWindow("txbridge firmware updater", txupdater.New(
-					mw.settings.CanSettings.GetSerialPort(),
-				))
-				updater.Icon = theme.DownloadIcon()
-				mw.wm.Add(updater)
-			}),
-		),
+
 	}
 
 	trailing := []*fyne.Menu{

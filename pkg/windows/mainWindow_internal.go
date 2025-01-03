@@ -15,6 +15,8 @@ import (
 	xwidget "fyne.io/x/fyne/widget"
 	"github.com/ebitengine/oto/v3"
 	"github.com/roffe/txlogger/pkg/debug"
+	"github.com/roffe/txlogger/pkg/ebus"
+	"github.com/roffe/txlogger/pkg/widgets/ebusmonitor"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
 
@@ -53,7 +55,7 @@ func (mw *MainWindow) closeIntercept() {
 }
 
 func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
-	log.Println("Dropped", uris)
+	log.Println("Dropped", p, uris)
 	for _, u := range uris {
 		filename := u.Path()
 		switch strings.ToLower(path.Ext(filename)) {
@@ -61,7 +63,7 @@ func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
 			mw.LoadSymbolsFromFile(filename)
 		case ".t5l", ".t7l", ".t8l", ".csv":
 			go func() {
-				mw.LoadLogfile(filename)
+				mw.LoadLogfile(filename, p.SubtractXY(250, 85))
 			}()
 		}
 	}
@@ -88,6 +90,21 @@ func listLayouts() []string {
 		opts = append(opts, strings.TrimSuffix(f.Name(), ".json"))
 	}
 	return opts
+}
+
+func (mw *MainWindow) openEBUSMonitor() {
+	if w := mw.wm.HasWindow("EBUS Monitor"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	mon := ebusmonitor.New()
+	eb := multiwindow.NewSystemWindow("EBUS Monitor", mon)
+	eb.Icon = theme.ComputerIcon()
+	ebus.SetOnMessage(mon.SetText)
+	eb.CloseIntercept = func() {
+		ebus.SetOnMessage(nil)
+	}
+	mw.wm.Add(eb)
 }
 
 func (mw *MainWindow) openSettings() {

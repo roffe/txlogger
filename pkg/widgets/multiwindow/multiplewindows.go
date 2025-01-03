@@ -2,23 +2,14 @@ package multiwindow
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
-	"os"
-	"strings"
 	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/txlogger/pkg/layout"
-	"github.com/roffe/txlogger/pkg/widgets"
-	"github.com/roffe/txlogger/pkg/widgets/gauge"
 )
 
 type WindowRatio struct {
@@ -32,13 +23,6 @@ type WindowProperties struct {
 	Maximized        bool
 	PreMaximizedPos  WindowRatio
 	PreMaximizedSize WindowRatio
-	GaugeConfig      *widgets.GaugeConfig `json:",omitempty"`
-}
-
-type LayoutFile struct {
-	ECU     string
-	Preset  string
-	Windows []WindowProperties
 }
 
 // MultipleWindows is a container that handles multiple `InnerWindow` containers.
@@ -55,14 +39,6 @@ type MultipleWindows struct {
 	openOffset fyne.Position
 
 	OnError func(error)
-
-	OpenMap   func(typ symbol.ECUType, mapName string)
-	GetECU    func() string
-	GetPreset func() string
-	SetECU    func(string)
-	SetPreset func(string)
-
-	WindowLoadHandlers map[string]func() `json:"-"`
 }
 
 // NewMultipleWindows creates a new `MultipleWindows` container to manage many inner windows.
@@ -71,8 +47,7 @@ type MultipleWindows struct {
 // field and calling `Refresh`.
 func NewMultipleWindows(wins ...*InnerWindow) *MultipleWindows {
 	m := &MultipleWindows{
-		Windows:            wins,
-		WindowLoadHandlers: make(map[string]func()),
+		Windows: wins,
 	}
 	m.ExtendBaseWidget(m)
 	return m
@@ -103,6 +78,13 @@ func (m *MultipleWindows) Add(w *InnerWindow, startPosition ...fyne.Position) bo
 			m.openOffset.Y = 0
 		}
 	} else if len(startPosition) == 1 {
+		if m.LockViewport {
+			size := w.Size()
+			bounds := m.content.Size()
+			startPosition[0].X = clamp32(startPosition[0].X, 0, bounds.Width-size.Width)
+			startPosition[0].Y = clamp32(startPosition[0].Y, 0, bounds.Height-size.Height)
+			bounds.Subtract(size).Max(startPosition[0])
+		}
 		w.Move(startPosition[0])
 	}
 
@@ -125,7 +107,6 @@ func (m *MultipleWindows) HasWindow(title string) *InnerWindow {
 func (m *MultipleWindows) CloseAll() {
 	windows := make([]*InnerWindow, len(m.Windows))
 	copy(windows, m.Windows)
-
 	for _, w := range windows {
 		if w.Persist {
 			// log.Println("Persist", w.Title())
@@ -220,10 +201,19 @@ func (m *MultipleWindows) refreshChildren() {
 func (m *MultipleWindows) setupChild(w *InnerWindow) {
 	w.OnDragged = func(ev *fyne.DragEvent) {
 		if w.maximized {
-			mouseRatio := ev.Position.X / w.Size().Width
-			w.Resize(w.MinSize())
-			w.Move(fyne.NewPos(ev.AbsolutePosition.X-mouseRatio*w.MinSize().Width, w.Position().Y))
+			//mouseRatio := ev.Position.X / w.Size().Width
+			//w.Resize(w.MinSize())
+			//w.Move(fyne.NewPos(ev.AbsolutePosition.X-mouseRatio*w.MinSize().Width, w.Position().Y))
 			w.maximized = false
+			ms := canvas.NewPositionAnimation(w.Position(), ev.Position.SubtractXY(w.preMaximizedSize.Width*0.5, 5), 10*time.Millisecond, func(pos fyne.Position) {
+				w.Move(pos)
+			})
+			ms.Start()
+			rs := canvas.NewSizeAnimation(w.Size(), w.MinSize(), 8*time.Millisecond, func(sz fyne.Size) {
+				w.Resize(sz)
+			})
+			rs.Start()
+
 			return
 		}
 
@@ -281,7 +271,6 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 			c := fyne.CurrentApp().Driver().CanvasForObject(w)
 			c.Focus(f)
 			c.SetOnTypedKey(f.TypedKey)
-
 		}
 		m.Raise(w)
 	}
@@ -320,162 +309,40 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 	}
 }
 
-func (m *MultipleWindows) SaveLayout() error {
-	m.propertyLock.Lock()
-	defer m.propertyLock.Unlock()
+func (m *MultipleWindows) LoadLayout(windows []WindowProperties) error {
+	viewportSize := m.Size()
+	for _, h := range windows {
+		for _, w := range m.Windows {
+			if w.Title() == h.Title {
+				// Convert ratios to absolute positions and sizes
+				position := fyne.NewPos(
+					float32(h.Ratios.X*float64(viewportSize.Width)),
+					float32(h.Ratios.Y*float64(viewportSize.Height)),
+				)
+				size := fyne.NewSize(
+					float32(h.Ratios.W*float64(viewportSize.Width)),
+					float32(h.Ratios.H*float64(viewportSize.Height)),
+				)
 
-	input := widget.NewEntry()
-	items := []*widget.FormItem{
-		widget.NewFormItem("Name", layout.NewFixedWidth(200, input)),
-	}
-
-	callback := func(b bool) {
-		if !b {
-			return
-		}
-		bb, err := m.jsonLayout()
-		if err != nil {
-			m.OnError(fmt.Errorf("failed to save layout: %w", err))
-			return
-		}
-		if err := writeLayout(input.Text, bb); err != nil {
-			m.OnError(fmt.Errorf("failed to save layout: %w", err))
-		}
-	}
-
-	in := dialog.NewForm("Save Window Layout", "Save", "Cancel", items, callback, fyne.CurrentApp().Driver().AllWindows()[0])
-	in.Show()
-	fyne.CurrentApp().Driver().CanvasForObject(m).Focus(input)
-	return nil
-}
-
-func writeLayout(name string, data []byte) error {
-	if f, err := os.Stat("layouts"); err != nil {
-		if os.IsNotExist(err) {
-			if err := os.Mkdir("layouts", 0777); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-	} else {
-		if !f.IsDir() {
-			return errors.New("layouts exists but is not a directory")
-		}
-		if err := os.WriteFile("layouts/"+name+".json", data, 0777); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (m *MultipleWindows) LoadLayout(name string) error {
-	b, err := os.ReadFile("layouts/" + name + ".json")
-	if err != nil {
-		return fmt.Errorf("LoadLayout failed to read file: %w", err)
-	}
-	var layout LayoutFile
-
-	if err := json.Unmarshal(b, &layout); err != nil {
-		return fmt.Errorf("LoadLayout failed to decode window layout: %w", err)
-	}
-
-	m.CloseAll()
-
-	viewportSize := m.content.Size()
-
-	m.SetECU(layout.ECU)
-	m.SetPreset(layout.Preset)
-
-	for _, h := range layout.Windows {
-		// log.Println("Load", h.Title)
-		openMap := true
-		if f, ok := m.WindowLoadHandlers[h.Title]; ok {
-			f()
-			openMap = false
-		}
-
-		if h.GaugeConfig != nil {
-			gauge, cancels, err := gauge.New(h.GaugeConfig)
-			if err != nil {
-				m.OnError(fmt.Errorf("failed to create gauge: %w", err))
-				continue
-			}
-			iw := NewInnerWindow(h.Title, gauge)
-			iw.CloseIntercept = func() {
-				for _, cancel := range cancels {
-					cancel()
-				}
-			}
-
-			// Convert ratios to absolute positions
-			position := fyne.NewPos(
-				float32(h.Ratios.X*float64(viewportSize.Width)),
-				float32(h.Ratios.Y*float64(viewportSize.Height)),
-			)
-
-			if !m.Add(iw, position) {
-				for _, cancel := range cancels {
-					cancel()
-				}
-			}
-
-			// Convert ratios to absolute size
-			size := fyne.NewSize(
-				float32(h.Ratios.W*float64(viewportSize.Width)),
-				float32(h.Ratios.H*float64(viewportSize.Height)),
-			)
-			iw.Resize(size)
-			continue
-		}
-
-		parts := strings.Split(h.Title, " ")
-		if len(parts) < 1 {
-			continue
-		}
-
-		if openMap {
-			m.OpenMap(symbol.ECUTypeFromString(layout.ECU), parts[0])
-		}
-
-		var w *InnerWindow
-		for _, wr := range m.Windows {
-			if wr.Title() == h.Title {
-				w = wr
+				preMaxPos := fyne.NewPos(
+					float32(h.PreMaximizedPos.X*float64(viewportSize.Width)),
+					float32(h.PreMaximizedPos.Y*float64(viewportSize.Height)),
+				)
+				preMaxSize := fyne.NewSize(
+					float32(h.PreMaximizedSize.W*float64(viewportSize.Width)),
+					float32(h.PreMaximizedSize.H*float64(viewportSize.Height)),
+				)
+				w.Move(position)
+				w.Resize(size)
+				w.SetMaximized(h.Maximized, preMaxPos, preMaxSize)
 				break
 			}
 		}
-		if w == nil {
-			continue
-		}
-
-		// Convert ratios to absolute positions and sizes
-		position := fyne.NewPos(
-			float32(h.Ratios.X*float64(viewportSize.Width)),
-			float32(h.Ratios.Y*float64(viewportSize.Height)),
-		)
-		size := fyne.NewSize(
-			float32(h.Ratios.W*float64(viewportSize.Width)),
-			float32(h.Ratios.H*float64(viewportSize.Height)),
-		)
-
-		preMaxPos := fyne.NewPos(
-			float32(h.PreMaximizedPos.X*float64(viewportSize.Width)),
-			float32(h.PreMaximizedPos.Y*float64(viewportSize.Height)),
-		)
-		preMaxSize := fyne.NewSize(
-			float32(h.PreMaximizedSize.W*float64(viewportSize.Width)),
-			float32(h.PreMaximizedSize.H*float64(viewportSize.Height)),
-		)
-
-		w.Move(position)
-		w.Resize(size)
-		w.SetMaximized(h.Maximized, preMaxPos, preMaxSize)
 	}
 	return nil
 }
 
-func (wm *MultipleWindows) jsonLayout() ([]byte, error) {
+func (wm *MultipleWindows) JsonLayout() ([]byte, error) {
 	var history []WindowProperties
 	viewportSize := wm.Size()
 
@@ -507,17 +374,10 @@ func (wm *MultipleWindows) jsonLayout() ([]byte, error) {
 			},
 		}
 
-		if tt, ok := w.Content().(widgets.Gauge); ok {
-			entry.GaugeConfig = tt.GetConfig()
-		}
 		history = append(history, entry)
 	}
 
-	b, err := json.Marshal(&LayoutFile{
-		ECU:     wm.GetECU(),
-		Preset:  wm.GetPreset(),
-		Windows: history,
-	})
+	b, err := json.Marshal(history)
 	if err != nil {
 		return nil, err
 	}

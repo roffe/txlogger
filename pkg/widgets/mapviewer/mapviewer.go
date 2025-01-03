@@ -3,6 +3,7 @@ package mapviewer
 import (
 	"fmt"
 	"image/color"
+	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -18,14 +19,15 @@ import (
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/widgets"
-	"github.com/roffe/txlogger/pkg/widgets/grid"
 	"github.com/roffe/txlogger/pkg/widgets/meshgrid"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
 )
 
 const (
-	minTextSize = 10
-	maxTextSize = 28
+	minTextSize             = 11
+	maxTextSize             = 28
+	oneThousandTwentyfourth = 1.0 / 1024
+	oneHundredTwentyeighth  = 1.0 / 128
 )
 
 type MapViewerInfo struct {
@@ -68,11 +70,10 @@ type MapViewer struct {
 	valueRects *fyne.Container
 	valueTexts *fyne.Container
 
-	grid *grid.Grid
-
 	selectionRect *canvas.Rectangle
 	crosshair     *canvas.Rectangle
-	zDataRects    []*canvas.Rectangle
+
+	zDataRects []*canvas.Rectangle
 
 	ipf interpolate.InterPolFunc
 
@@ -100,7 +101,6 @@ type MapViewer struct {
 type opts struct {
 	editable              bool
 	buttonsEnabled        bool
-	showWBL               bool
 	cursorFollowCrosshair bool
 	meshView              bool
 }
@@ -141,84 +141,79 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 		return nil, fmt.Errorf("MapViewer columns * rows != datalen")
 	}
 
-	mv.content = mv.render()
+	mv.crosshair = NewCrosshair(color.RGBA{165, 55, 253, 180}, 3)
+	mv.selectionRect = NewRectangle(color.RGBA{0x30, 0x70, 0xFF, 0xFF}, 3)
 
 	// log.Printf("MapViewer c: %d r: %d dlen: %d x: %s y: %s z: %s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom, mv.symbol.Name)
 	return mv, nil
 }
 
 func (mv *MapViewer) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(mv.content)
-	//return &mapViewerRenderer{mv: mv}
+	//return widget.NewSimpleRenderer(mv.content)
+	mv.content = mv.render()
+	return &mapViewerRenderer{mv: mv}
 }
 
-var _ fyne.WidgetRenderer = (*mapViewerRenderer)(nil)
-
-type mapViewerRenderer struct {
-	mv      *MapViewer
-	oldSize fyne.Size
+type movingRectsLayout struct {
+	mv *MapViewer
 }
 
-func (r *mapViewerRenderer) Layout(size fyne.Size) {
-	if size == r.oldSize {
-		return
+func (mr *movingRectsLayout) MinSize(_ []fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(0, 0)
+}
+
+func (mr *movingRectsLayout) Layout(_ []fyne.CanvasObject, size fyne.Size) {
+	// Calculate shared factors
+	mr.mv.widthFactor = mr.mv.innerView.Size().Width / float32(mr.mv.numColumns)
+	mr.mv.heightFactor = mr.mv.innerView.Size().Height / float32(mr.mv.numRows)
+
+	// Calculate and update text sizes
+	newTextSize := calculateTextSize(mr.mv.widthFactor, mr.mv.heightFactor)
+	for _, text := range mr.mv.textValues {
+		if text.TextSize != newTextSize {
+			text.TextSize = newTextSize
+			//text.Refresh()
+		}
 	}
-	r.oldSize = size
-	r.mv.content.Resize(size)
-}
 
-func (r *mapViewerRenderer) MinSize() fyne.Size {
-	return r.mv.content.MinSize()
-}
-
-func (r *mapViewerRenderer) Refresh() {
-}
-
-func (r *mapViewerRenderer) Destroy() {
-}
-
-func (r *mapViewerRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.mv.content}
-}
-
-func calculateTextSize(widthFactor, heightFactor float32) float32 {
-	cellSize := fyne.Min(widthFactor, heightFactor)
-
-	// Scale text size relative to cell size, but with a more conservative ratio
-	// Reduced from 0.6 to 0.4 to prevent overflow
-	baseTextSize := float64(cellSize * 0.5)
-
-	if baseTextSize < minTextSize {
-		return minTextSize
-	}
-	if baseTextSize > maxTextSize {
-		return maxTextSize
-	}
-	return float32(math.Ceil(baseTextSize))
+	// Position and resize crosshair
+	mr.mv.crosshair.Resize(fyne.NewSize(mr.mv.widthFactor, mr.mv.heightFactor))
+	mr.mv.crosshair.Move(
+		fyne.NewPos(
+			float32(mr.mv.xIndex)*mr.mv.widthFactor,
+			float32(float64(mr.mv.numRows)-1-mr.mv.yIndex)*mr.mv.heightFactor,
+		),
+	)
+	mr.mv.resizeCursor()
+	mr.mv.updateCursor()
 }
 
 func (mv *MapViewer) render() fyne.CanvasObject {
-	minSize := fyne.NewSize(float32(mv.numColumns*30), float32(max(mv.numRows, 2)*14))
+
 	// y must be created before x as it's width is used to calculate x's offset
 	mv.createYAxis()
 	mv.createXAxis()
-	mv.createZdata(minSize)
-	mv.createTextValues(minSize)
+	mv.createZdata()
+	mv.createTextValues()
 
-	mv.crosshair = NewCrosshair(color.RGBA{165, 55, 253, 180}, 3)
-	mv.selectionRect = NewRectangle(color.RGBA{0x30, 0x70, 0xB3, 235}, 4)
-	mv.selectionRect.Resize(fyne.NewSize(1, 1))
+	mv.crosshair.CornerRadius = 2
+	mv.crosshair.Resize(fyne.NewSize(34, 14))
+	mv.crosshair.Hide()
 
-	mv.grid = grid.New(mv.numColumns, mv.numRows)
+	mv.selectionRect.CornerRadius = 4
+	mv.selectionRect.Resize(fyne.NewSize(34, 14))
+	mv.selectionRect.Hide()
 
-	mv.innerView = container.New(&mapLayout{mv: mv, minSize: minSize})
-	mv.innerView.Add(mv.valueRects)
-	mv.innerView.Add(mv.crosshair)
-	mv.innerView.Add(mv.grid)
-	mv.innerView.Add(mv.valueTexts)
-	mv.innerView.Add(mv.selectionRect)
+	mv.innerView = container.NewStack(
+		mv.valueRects,
+		container.New(&movingRectsLayout{mv: mv},
+			mv.crosshair,
+			mv.selectionRect,
+		),
+		mv.valueTexts,
+	)
 
-	buttons := mv.setupButtons()
+	buttons := mv.createButtons()
 
 	if mv.symbol == nil || mv.numColumns == 1 && mv.numRows == 1 {
 		return container.NewBorder(
@@ -278,38 +273,6 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 	)
 }
 
-func (mv *MapViewer) setupButtons() fyne.CanvasObject {
-	if mv.opts.buttonsEnabled {
-		return container.NewGridWithColumns(4,
-			widget.NewButtonWithIcon("Load File", theme.DocumentIcon(), func() {
-				if mv.symbol != nil {
-					mv.zData = mv.symbol.Ints()
-					mv.Refresh()
-				}
-			}),
-			widget.NewButtonWithIcon("Save File", theme.DocumentSaveIcon(), func() {
-				mv.funcs.saveFileFunc(mv.zData)
-			}),
-			widget.NewButtonWithIcon("Load ECU", theme.DownloadIcon(), func() {
-				p := progressmodal.New(mv, "Loading map from ECU")
-				p.Show()
-				mv.funcs.loadECUFunc()
-				p.Stop()
-				p.Hide()
-			}),
-			widget.NewButtonWithIcon("Save ECU", theme.UploadIcon(), func() {
-				p := progressmodal.New(mv, "Saving map to ECU")
-				p.Show()
-				mv.funcs.saveECUFunc(mv.zData)
-				p.Stop()
-				p.Hide()
-			}),
-		)
-	} else {
-		return container.NewWithoutLayout()
-	}
-}
-
 func (mv *MapViewer) Info() MapViewerInfo {
 	return MapViewerInfo{
 		XLen:  mv.numColumns,
@@ -341,14 +304,13 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 		hit = true
 	}
 	if hit {
+		if mv.crosshair.Hidden {
+			mv.crosshair.Resize(fyne.NewSize(mv.widthFactor, mv.heightFactor))
+			mv.crosshair.Show()
+		}
 		mv.setXY(mv.xValue, mv.yValue)
 	}
 }
-
-const (
-	oneThousandTwentyfourth = 1.0 / 1024
-	oneHundredTwentyeighth  = 1.0 / 128
-)
 
 func (mv *MapViewer) SetCellText(idx int, value int) {
 	textValue := strconv.FormatFloat((float64(value)*mv.zCorrFac)+mv.zCorrOffset, 'f', getPrecission(mv.zCorrFac), 64)
@@ -362,6 +324,161 @@ func (mv *MapViewer) SetZ(zData []int) {
 	mv.zData = zData
 	mv.numData = len(zData)
 	mv.Refresh()
+}
+
+func (mv *MapViewer) Refresh() {
+	log.Println("MapViewer Refresh")
+	mv.min, mv.max = findMinMax(mv.zData)
+	for i, tv := range mv.zData {
+		mv.SetCellText(i, tv)
+	}
+	for idx, r := range mv.zDataRects {
+		col := widgets.GetColorInterpolation((float64(mv.min)*mv.zCorrFac)+mv.zCorrOffset,
+			(float64(mv.max)*mv.zCorrFac)+mv.zCorrOffset,
+			(float64(mv.zData[idx])*mv.zCorrFac)+mv.zCorrOffset,
+		)
+		if col != r.FillColor {
+			r.FillColor = col
+			r.Refresh()
+		}
+	}
+
+	if mv.mesh != nil {
+		mv.mesh.SetMin((float64(mv.min) * mv.zCorrFac) + mv.zCorrOffset)
+		mv.mesh.SetMax((float64(mv.max) * mv.zCorrFac) + mv.zCorrOffset)
+		var values []float64
+		for _, v := range mv.zData {
+			values = append(values, (float64(v)*mv.zCorrFac)+mv.zCorrOffset)
+		}
+		mv.mesh.LoadFloat64s(values)
+	}
+}
+
+func (mv *MapViewer) createYAxis() {
+	mv.yAxisLabelContainer = container.New(&layout.Vertical{})
+	if mv.numRows >= 1 {
+		for i := mv.numRows - 1; i >= 0; i-- {
+			text := &canvas.Text{
+				Alignment: fyne.TextAlignCenter,
+				Text:      strconv.FormatFloat((float64(mv.yData[i])*mv.yCorrFac)+mv.xCorrOffset, 'f', getPrecission(mv.yCorrFac), 64),
+				TextSize:  minTextSize + 2,
+			}
+			mv.yAxisTexts = append(mv.yAxisTexts, text)
+			mv.yAxisLabelContainer.Add(text)
+		}
+	}
+}
+
+func (mv *MapViewer) createXAxis() {
+	mv.xAxisLabelContainer = container.New(&layout.Horizontal{Offset: mv.yAxisLabelContainer})
+	if mv.numColumns >= 1 {
+		for i := 0; i < mv.numColumns; i++ {
+			text := &canvas.Text{
+				Alignment: fyne.TextAlignCenter,
+				Text:      strconv.FormatFloat((float64(mv.xData[i])*mv.xCorrFac)+mv.xCorrOffset, 'f', getPrecission(mv.xCorrFac), 64),
+				TextSize:  minTextSize + 2,
+			}
+			mv.xAxisTexts = append(mv.xAxisTexts, text)
+			mv.xAxisLabelContainer.Add(text)
+		}
+	}
+}
+
+func (mv *MapViewer) createTextValues() {
+	mv.valueTexts = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.33))
+	for _, v := range mv.zData {
+		text := &canvas.Text{
+			Text:      strconv.FormatFloat((float64(v)*mv.zCorrFac)+mv.zCorrOffset, 'f', getPrecission(mv.zCorrFac), 64),
+			TextSize:  minTextSize,
+			Color:     color.Black,
+			Alignment: fyne.TextAlignCenter,
+		}
+		mv.textValues = append(mv.textValues, text)
+		mv.valueTexts.Add(text)
+	}
+}
+
+func (mv *MapViewer) createZdata() {
+	mv.valueRects = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.33))
+	minCorrected := (float64(mv.min) * mv.zCorrFac) + mv.zCorrOffset
+	maxCorrected := (float64(mv.max) * mv.zCorrFac) + mv.zCorrOffset
+	// Calculate the colors for each cell based on data
+	for _, v := range mv.zData {
+		value := (float64(v) * mv.zCorrFac) + mv.zCorrOffset
+		color := widgets.GetColorInterpolation(minCorrected, maxCorrected, value)
+		rect := &canvas.Rectangle{FillColor: color, StrokeColor: color, StrokeWidth: 0}
+		rect.SetMinSize(fyne.NewSize(34, 14))
+		mv.zDataRects = append(mv.zDataRects, rect)
+		mv.valueRects.Add(rect)
+	}
+}
+
+func (mv *MapViewer) setXY(xValue, yValue int) error {
+	mv.xValue = xValue
+	mv.yValue = yValue
+
+	xIdx, yIdx, _, err := mv.ipf(mv.xData, mv.yData, mv.zData, xValue, yValue)
+	if err != nil {
+		return err
+	}
+
+	if yIdx < 0 {
+		yIdx = 0
+	} else if yIdx > float64(mv.numRows-1) {
+		yIdx = float64(mv.numRows - 1)
+	}
+	if xIdx < 0 {
+		xIdx = 0
+	} else if xIdx > float64(mv.numColumns-1) {
+		xIdx = float64(mv.numColumns - 1)
+	}
+	mv.xIndex = xIdx
+	mv.yIndex = yIdx
+
+	mv.crosshair.Move(
+		fyne.NewPos(
+			float32(xIdx)*mv.widthFactor,
+			float32(float64(mv.numRows-1)-yIdx)*mv.heightFactor,
+		),
+	)
+	if mv.opts.cursorFollowCrosshair {
+		mv.selectedX = int(math.Round(xIdx))
+		mv.SelectedY = int(math.Round(yIdx))
+		mv.updateCursor()
+	}
+	return nil
+}
+
+func (mv *MapViewer) createButtons() *fyne.Container {
+	if mv.opts.buttonsEnabled {
+		return container.NewGridWithColumns(4,
+			widget.NewButtonWithIcon("Load File", theme.DocumentIcon(), func() {
+				if mv.symbol != nil {
+					mv.zData = mv.symbol.Ints()
+					mv.Refresh()
+				}
+			}),
+			widget.NewButtonWithIcon("Save File", theme.DocumentSaveIcon(), func() {
+				mv.funcs.saveFileFunc(mv.zData)
+			}),
+			widget.NewButtonWithIcon("Load ECU", theme.DownloadIcon(), func() {
+				p := progressmodal.New(mv, "Loading map from ECU")
+				p.Show()
+				mv.funcs.loadECUFunc()
+				p.Stop()
+				p.Hide()
+			}),
+			widget.NewButtonWithIcon("Save ECU", theme.UploadIcon(), func() {
+				p := progressmodal.New(mv, "Saving map to ECU")
+				p.Show()
+				mv.funcs.saveECUFunc(mv.zData)
+				p.Stop()
+				p.Hide()
+			}),
+		)
+	} else {
+		return container.NewWithoutLayout()
+	}
 }
 
 func (mv *MapViewer) resizeCursor() {
@@ -410,35 +527,33 @@ func (mv *MapViewer) resizeCursor() {
 	}
 }
 
-func (mv *MapViewer) Size() fyne.Size {
-	return mv.content.Size()
+var _ fyne.WidgetRenderer = (*mapViewerRenderer)(nil)
+
+type mapViewerRenderer struct {
+	mv      *MapViewer
+	oldSize fyne.Size
 }
 
-func (mv *MapViewer) Refresh() {
-	mv.min, mv.max = findMinMax(mv.zData)
-	for i, tv := range mv.zData {
-		mv.SetCellText(i, tv)
+func (r *mapViewerRenderer) Layout(size fyne.Size) {
+	if size == r.oldSize {
+		return
 	}
-	for idx, r := range mv.zDataRects {
-		col := widgets.GetColorInterpolation((float64(mv.min)*mv.zCorrFac)+mv.zCorrOffset,
-			(float64(mv.max)*mv.zCorrFac)+mv.zCorrOffset,
-			(float64(mv.zData[idx])*mv.zCorrFac)+mv.zCorrOffset,
-		)
-		if col != r.FillColor {
-			r.FillColor = col
-			r.Refresh()
-		}
-	}
+	r.oldSize = size
+	r.mv.content.Resize(size)
+}
 
-	if mv.mesh != nil {
-		mv.mesh.SetMin((float64(mv.min) * mv.zCorrFac) + mv.zCorrOffset)
-		mv.mesh.SetMax((float64(mv.max) * mv.zCorrFac) + mv.zCorrOffset)
-		var values []float64
-		for _, v := range mv.zData {
-			values = append(values, (float64(v)*mv.zCorrFac)+mv.zCorrOffset)
-		}
-		mv.mesh.LoadFloat64s(values)
-	}
+func (r *mapViewerRenderer) MinSize() fyne.Size {
+	return r.mv.content.MinSize()
+}
+
+func (r *mapViewerRenderer) Refresh() {
+}
+
+func (r *mapViewerRenderer) Destroy() {
+}
+
+func (r *mapViewerRenderer) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{r.mv.content}
 }
 
 func getPrecission(corrFac float64) int {
@@ -458,101 +573,20 @@ func getPrecission(corrFac float64) int {
 	return precission
 }
 
-func (mv *MapViewer) createTextValues(minsize fyne.Size) {
-	mv.valueTexts = container.New(&layout.Grid{Cols: mv.numColumns, Rows: mv.numRows, Text: true, MinimumSize: minsize})
-	for _, v := range mv.zData {
-		text := &canvas.Text{
-			Text:     strconv.FormatFloat((float64(v)*mv.zCorrFac)+mv.zCorrOffset, 'f', getPrecission(mv.zCorrFac), 64),
-			TextSize: minTextSize,
-			Color:    color.Black,
-		}
-		mv.textValues = append(mv.textValues, text)
-		mv.valueTexts.Add(text)
-	}
-}
+func calculateTextSize(widthFactor, heightFactor float32) float32 {
+	cellSize := fyne.Min(widthFactor, heightFactor)
 
-func (mv *MapViewer) createYAxis() {
-	mv.yAxisLabelContainer = container.New(&layout.Vertical{})
-	if mv.numRows >= 1 {
-		for i := mv.numRows - 1; i >= 0; i-- {
-			text := &canvas.Text{
-				Alignment: fyne.TextAlignCenter,
-				Text:      strconv.FormatFloat((float64(mv.yData[i])*mv.yCorrFac)+mv.xCorrOffset, 'f', getPrecission(mv.yCorrFac), 64),
-				TextSize:  minTextSize + 2,
-			}
+	// Scale text size relative to cell size, but with a more conservative ratio
+	// Reduced from 0.6 to 0.4 to prevent overflow
+	baseTextSize := float64(cellSize * 0.5)
 
-			mv.yAxisTexts = append(mv.yAxisTexts, text)
-			mv.yAxisLabelContainer.Add(text)
-		}
+	if baseTextSize < minTextSize {
+		return minTextSize
 	}
-}
-
-func (mv *MapViewer) createXAxis() {
-	mv.xAxisLabelContainer = container.New(&layout.Horizontal{Offset: mv.yAxisLabelContainer})
-	if mv.numColumns >= 1 {
-		for i := 0; i < mv.numColumns; i++ {
-			text := &canvas.Text{
-				Alignment: fyne.TextAlignCenter,
-				Text:      strconv.FormatFloat((float64(mv.xData[i])*mv.xCorrFac)+mv.xCorrOffset, 'f', getPrecission(mv.xCorrFac), 64),
-				TextSize:  minTextSize + 2,
-			}
-			mv.xAxisTexts = append(mv.xAxisTexts, text)
-			mv.xAxisLabelContainer.Add(text)
-		}
+	if baseTextSize > maxTextSize {
+		return maxTextSize
 	}
-}
-
-func (mv *MapViewer) createZdata(minsize fyne.Size) {
-	mv.valueRects = container.New(&layout.Grid{Cols: mv.numColumns, Rows: mv.numRows, MinimumSize: minsize})
-	minCorrected := (float64(mv.min) * mv.zCorrFac) + mv.zCorrOffset
-	maxCorrected := (float64(mv.max) * mv.zCorrFac) + mv.zCorrOffset
-	// Calculate the colors for each cell based on data
-	for y := 0; y < mv.numRows; y++ {
-		for x := 0; x < mv.numColumns; x++ {
-			index := y*mv.numColumns + x
-			value := (float64(mv.zData[index]) * mv.zCorrFac) + mv.zCorrOffset
-			color := widgets.GetColorInterpolation(minCorrected, maxCorrected, value)
-			rect := &canvas.Rectangle{FillColor: color}
-			mv.zDataRects = append(mv.zDataRects, rect)
-			mv.valueRects.Add(rect)
-		}
-	}
-}
-
-func (mv *MapViewer) setXY(xValue, yValue int) error {
-	mv.xValue = xValue
-	mv.yValue = yValue
-
-	xIdx, yIdx, _, err := mv.ipf(mv.xData, mv.yData, mv.zData, xValue, yValue)
-	if err != nil {
-		return err
-	}
-
-	if yIdx < 0 {
-		yIdx = 0
-	} else if yIdx > float64(mv.numRows-1) {
-		yIdx = float64(mv.numRows - 1)
-	}
-	if xIdx < 0 {
-		xIdx = 0
-	} else if xIdx > float64(mv.numColumns-1) {
-		xIdx = float64(mv.numColumns - 1)
-	}
-	mv.xIndex = xIdx
-	mv.yIndex = yIdx
-
-	mv.crosshair.Move(
-		fyne.NewPos(
-			float32(xIdx)*mv.widthFactor,
-			float32(float64(mv.numRows-1)-yIdx)*mv.heightFactor,
-		),
-	)
-	if mv.opts.cursorFollowCrosshair {
-		mv.selectedX = int(math.Round(xIdx))
-		mv.SelectedY = int(math.Round(yIdx))
-		mv.updateCursor()
-	}
-	return nil
+	return float32(math.Ceil(baseTextSize))
 }
 
 func findMinMax(data []int) (int, int) {

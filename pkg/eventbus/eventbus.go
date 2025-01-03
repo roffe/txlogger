@@ -43,6 +43,8 @@ type Controller struct {
 
 	closeOnce sync.Once
 	quit      chan struct{}
+
+	onMessage func(string, float64)
 }
 
 type newSub struct {
@@ -71,16 +73,33 @@ func New(cfg *Config) *Controller {
 	)
 
 	go c.run()
+
 	return c
 }
 
+func (e *Controller) SetOnMessage(f func(string, float64)) {
+	e.onMessage = f
+}
+
 func (e *Controller) run() {
+	//var wg sync.WaitGroup
+	//
+	//for i := 0; i < 5; i++ {
+	//	wg.Add(1)
+	//	go e.run2(i, &wg)
+	//}
+
+	//outer:
 	for {
 		select {
 		case <-e.quit:
 			e.cleanup()
+			//break outer
 			return
 		case msg := <-e.incoming:
+			if f := e.onMessage; f != nil {
+				f(msg.Topic, msg.Data)
+			}
 			e.handleMessage(msg)
 		case sub := <-e.sub:
 			e.handleSubscription(sub)
@@ -88,11 +107,30 @@ func (e *Controller) run() {
 			e.handleUnsubscription(unsub)
 		}
 	}
+	//log.Println("Waiting for goroutines to finish")
+	//wg.Wait()
+	//log.Println("All goroutines finished")
+
+}
+
+func (e *Controller) run2(i int, wg *sync.WaitGroup) {
+	log.Println("Starting ebus worker", i)
+	defer wg.Done()
+	for {
+		select {
+		case <-e.quit:
+			return
+		case msg := <-e.incoming:
+			if f := e.onMessage; f != nil {
+				f(msg.Topic, msg.Data)
+			}
+			e.handleMessage(msg)
+		}
+	}
 }
 
 func (e *Controller) handleMessage(msg EBusMessage) {
 	e.cache.Set(msg.Topic, msg.Data, ttlcache.DefaultTTL)
-
 	// Get subscribers
 	if value, ok := e.subs.Load(msg.Topic); ok {
 		if subs, ok := value.([]chan float64); ok {
@@ -105,7 +143,6 @@ func (e *Controller) handleMessage(msg EBusMessage) {
 			}
 		}
 	}
-
 	// Process aggregators
 	e.aggregatorLock.RLock()
 	if aggregators, exists := e.aggregatorIndex[msg.Topic]; exists {
@@ -138,7 +175,6 @@ func (e *Controller) handleUnsubscription(unsub chan float64) {
 	e.subs.Range(func(key, value interface{}) bool {
 		topic := key.(string)
 		subs := value.([]chan float64)
-
 		for i, sub := range subs {
 			if sub == unsub {
 				newSubs := append(subs[:i], subs[i+1:]...)

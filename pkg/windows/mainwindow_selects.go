@@ -13,13 +13,13 @@ func (mw *MainWindow) createSelects() {
 		}
 		switch s {
 		case "Save Layout":
-			if err := mw.wm.SaveLayout(); err != nil {
+			if err := mw.SaveLayout(); err != nil {
 				mw.Error(err)
 			}
 			mw.selects.layoutSelect.ClearSelected()
 			mw.buttons.layoutRefreshBtn.Tapped(&fyne.PointEvent{})
 		default:
-			if err := mw.wm.LoadLayout(s); err != nil {
+			if err := mw.LoadLayout(s); err != nil {
 				mw.Error(err)
 			}
 		}

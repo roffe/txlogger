@@ -14,8 +14,9 @@ import (
 	"github.com/roffe/txlogger/pkg/colors"
 )
 
-//var _ fyne.Focusable = (*Plotter)(nil)
-//var _ fyne.Tappable = (*Plotter)(nil)
+// var _ fyne.Focusable = (*Plotter)(nil)
+// var _ fyne.Tappable = (*Plotter)(nil)
+var _ fyne.Draggable = (*Plotter)(nil)
 
 type PlotterControl interface {
 	Seek(int)
@@ -51,7 +52,9 @@ type Plotter struct {
 
 	hilightLine int
 
-	mu sync.Mutex
+	mu        sync.Mutex
+	OnDragged func(event *fyne.DragEvent)
+	OnTapped  func(event *fyne.PointEvent)
 }
 
 type PlotterOpt func(*Plotter)
@@ -275,6 +278,9 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 	case "Lambda.LambdaInt":
 		ts.Min = -25
 		ts.Max = 25
+	case "ECMStat.p_Diff":
+		ts.Min = -1
+		ts.Max = 2
 	default:
 		ts.Min, ts.Max = findMinMaxFloat64(data)
 	}

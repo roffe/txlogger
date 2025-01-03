@@ -37,10 +37,19 @@ func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
 		mv.OnMouseDown()
 	}
 
-	fyne.CurrentApp().Driver().CanvasForObject(mv).Focus(mv)
 	if event.Position.Y > mv.xAxisLabelContainer.Size().Height+mv.innerView.Size().Height {
 		return
 	}
+
+	for _, rect := range mv.zDataRects {
+		if rect.FillColor != rect.StrokeColor {
+			rect.FillColor = rect.StrokeColor
+			rect.Refresh()
+		}
+	}
+
+	//fyne.CurrentApp().Driver().CanvasForObject(mv).Focus(mv)
+
 	// Handle focusing and input buffer reset
 	mv.handleFocusAndInputBuffer()
 
@@ -50,9 +59,17 @@ func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
 
 	switch {
 	case event.Button == desktop.MouseButtonPrimary && event.Modifier == 0:
+		if mv.selectionRect.Hidden {
+			mv.selectionRect.Resize(fyne.NewSize(mv.widthFactor, mv.heightFactor))
+			mv.selectionRect.Show()
+		}
 		mv.handlePrimaryClick(event)
 
 	case event.Button == desktop.MouseButtonPrimary && event.Modifier == fyne.KeyModifierShift:
+		if mv.selectionRect.Hidden {
+			mv.selectionRect.Resize(fyne.NewSize(mv.widthFactor, mv.heightFactor))
+			mv.selectionRect.Show()
+		}
 		mv.handlePrimaryClickWithShift(event)
 
 	case event.Button == desktop.MouseButtonPrimary && event.Modifier == fyne.KeyModifierControl:
@@ -65,7 +82,7 @@ func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
 
 // MouseUp is called when a mouse button is released.
 func (mv *MapViewer) MouseUp(event *desktop.MouseEvent) {
-
+	mv.selectionRect.Hide()
 	if event.Button == desktop.MouseButtonPrimary && mv.selecting {
 		mv.finalizeSelection(event.Position)
 	}
@@ -158,8 +175,11 @@ func (mv *MapViewer) finalizeSelection(eventPos fyne.Position) {
 		for x := topLeftX; x <= bottomRightX; x++ {
 			zIndex := y*mv.numColumns + x
 			mv.selectedCells = append(mv.selectedCells, zIndex)
+			mv.zDataRects[zIndex].FillColor = theme.Color(theme.ColorNameForegroundOnPrimary)
+			mv.zDataRects[zIndex].Refresh()
 		}
 	}
+
 }
 
 func (mv *MapViewer) showPopupMenu(pos fyne.Position) {

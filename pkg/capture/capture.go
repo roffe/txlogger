@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"image/png"
 	"log"
-	"strings"
 
 	"fyne.io/fyne/v2"
 	"golang.design/x/clipboard"
@@ -24,10 +23,6 @@ func Screenshot(c fyne.Canvas) {
 		log.Println(err)
 		return
 	}
-	var image strings.Builder
-	image.WriteString("image/jpeg")
-	image.Write(buff.Bytes())
-
 	log.Println("Copied to clipboard")
 	clipboard.Write(clipboard.FmtImage, buff.Bytes())
 }

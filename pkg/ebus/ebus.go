@@ -53,3 +53,7 @@ func SubscribeWithContext(ctx context.Context, topic string) (chan float64, erro
 func Unsubscribe(channel chan float64) {
 	eb.Unsubscribe(channel)
 }
+
+func SetOnMessage(f func(string, float64)) {
+	eb.SetOnMessage(f)
+}

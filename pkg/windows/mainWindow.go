@@ -16,7 +16,6 @@ import (
 	xwidget "fyne.io/x/fyne/widget"
 	"github.com/ebitengine/oto/v3"
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/txlogger/pkg/capture"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ecu"
@@ -67,16 +66,16 @@ type mainWindowSelects struct {
 }
 
 type mainWindowButtons struct {
-	debugBtn          *widget.Button
-	addSymbolBtn      *widget.Button
-	logBtn            *widget.Button
-	loadSymbolsEcuBtn *widget.Button
-	syncSymbolsBtn    *widget.Button
-	dashboardBtn      *widget.Button
-	openLogBtn        *widget.Button
-	layoutRefreshBtn  *widget.Button
-	symbolListBtn     *widget.Button
-	addGaugeBtn       *widget.Button
+	debugBtn     *widget.Button
+	addSymbolBtn *widget.Button
+	logBtn       *widget.Button
+	// loadSymbolsEcuBtn *widget.Button
+	syncSymbolsBtn   *widget.Button
+	dashboardBtn     *widget.Button
+	openLogBtn       *widget.Button
+	layoutRefreshBtn *widget.Button
+	symbolListBtn    *widget.Button
+	addGaugeBtn      *widget.Button
 }
 
 type mainWindowCounters struct {
@@ -112,26 +111,6 @@ func NewMainWindow(app fyne.App, filename string) *MainWindow {
 	mw.wm.LockViewport = true
 
 	mw.wm.OnError = mw.Error
-	mw.wm.OpenMap = mw.openMap
-	mw.wm.SetECU = func(ecu string) {
-		mw.selects.ecuSelect.SetSelected(ecu)
-	}
-	mw.wm.SetPreset = func(preset string) {
-		mw.selects.presetSelect.SetSelected(preset)
-	}
-	mw.wm.GetECU = func() string {
-		return mw.selects.ecuSelect.Selected
-	}
-	mw.wm.GetPreset = func() string {
-		return mw.selects.presetSelect.Selected
-	}
-
-	mw.wm.WindowLoadHandlers = map[string]func(){
-		"Settings": mw.openSettings,
-		"Dashboard": func() {
-			mw.buttons.dashboardBtn.Tapped(&fyne.PointEvent{})
-		},
-	}
 
 	updateSymbols := func(syms []*symbol.Symbol) {
 		if mw.dlc != nil {
@@ -165,13 +144,6 @@ func NewMainWindow(app fyne.App, filename string) *MainWindow {
 
 	mw.SetOnDropped(mw.onDropped)
 	mw.SetCloseIntercept(mw.closeIntercept)
-
-	mw.Window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
-		switch ev.Name {
-		case fyne.KeyF12:
-			capture.Screenshot(mw.Canvas())
-		}
-	})
 
 	mw.render()
 
@@ -227,11 +199,14 @@ func (mw *MainWindow) render() {
 				mw.buttons.layoutRefreshBtn,
 				mw.selects.layoutSelect,
 			),
-			container.NewGridWithColumns(4,
-				mw.counters.capturedCounterLabel,
-				mw.counters.errorCounterLabel,
-				mw.counters.fpsLabel,
-				mw.buttons.debugBtn,
+			container.NewHBox(
+				container.NewGridWithColumns(4,
+					mw.counters.capturedCounterLabel,
+					mw.counters.errorCounterLabel,
+					mw.counters.fpsLabel,
+					mw.buttons.debugBtn,
+				),
+				widget.NewButtonWithIcon("", theme.ComputerIcon(), mw.openEBUSMonitor),
 			),
 			mw.statusText,
 		),
@@ -241,7 +216,7 @@ func (mw *MainWindow) render() {
 	)
 }
 
-func (mw *MainWindow) LoadLogfile(filename string) {
+func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position) {
 	// Just filename, used for Window title
 	fp := filepath.Base(filename)
 
@@ -252,7 +227,7 @@ func (mw *MainWindow) LoadLogfile(filename string) {
 
 	logz, err := logfile.Open(filename)
 	if err != nil {
-		fyne.LogError("Failed to open log file", err)
+		mw.Error(fmt.Errorf("Failed to open log file: %w", err))
 		return
 	}
 
@@ -264,7 +239,7 @@ func (mw *MainWindow) LoadLogfile(filename string) {
 		lp.Close()
 	}
 
-	mw.wm.Add(iw)
+	mw.wm.Add(iw, p)
 }
 
 func (mw *MainWindow) Log(s string) {
@@ -281,7 +256,7 @@ func (mw *MainWindow) Error(err error) {
 func (mw *MainWindow) Disable() {
 	mw.buttonsDisabled = true
 	mw.buttons.addSymbolBtn.Disable()
-	mw.buttons.loadSymbolsEcuBtn.Disable()
+	//mw.buttons.loadSymbolsEcuBtn.Disable()
 	mw.buttons.syncSymbolsBtn.Disable()
 	if !mw.loggingRunning {
 		mw.buttons.logBtn.Disable()
@@ -294,7 +269,7 @@ func (mw *MainWindow) Disable() {
 func (mw *MainWindow) Enable() {
 	mw.buttonsDisabled = false
 	mw.buttons.addSymbolBtn.Enable()
-	mw.buttons.loadSymbolsEcuBtn.Enable()
+	//mw.buttons.loadSymbolsEcuBtn.Enable()
 	mw.buttons.syncSymbolsBtn.Enable()
 	mw.buttons.logBtn.Enable()
 	mw.selects.ecuSelect.Enable()
@@ -375,6 +350,7 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	mw.app.Preferences().SetString(prefsLastBinFile, filename)
 	mw.selects.ecuSelect.SetSelected(ecuType.String())
 	mw.fw = symbols
+	mw.filename = filename
 	mw.SyncSymbols()
 	return nil
 }

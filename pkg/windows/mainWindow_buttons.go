@@ -2,6 +2,7 @@ package windows
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -21,7 +22,7 @@ import (
 
 func (mw *MainWindow) createButtons() {
 	mw.buttons.addSymbolBtn = mw.addSymbolBtnFunc()
-	mw.buttons.loadSymbolsEcuBtn = mw.loadSymbolsEcuBtnFunc()
+	//mw.buttons.loadSymbolsEcuBtn = mw.loadSymbolsEcuBtnFunc()
 	mw.buttons.syncSymbolsBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), mw.SyncSymbols)
 	mw.buttons.dashboardBtn = mw.newDashboardBtn()
 	// mw.buttons.logplayerBtn = mw.newLogplayerBtn()
@@ -54,6 +55,19 @@ func (mw *MainWindow) newSymbolListBtn() *widget.Button {
 			mw.wm.Raise(w)
 			return
 		}
+
+		var cancelFuncs []func()
+		if mw.settings.GetLivePreview() {
+			for _, sym := range mw.symbolList.Symbols() {
+				cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(sym.Name, func(f float64) {
+					mw.symbolList.SetValue(sym.Name, f)
+				}))
+			}
+		} else {
+			mw.symbolList.Clear()
+		}
+		mw.symbolList.UpdateBars(mw.settings.GetRealtimeBars())
+
 		symbolListWindow := multiwindow.NewSystemWindow("Symbol list", container.NewBorder(
 			container.NewGridWithRows(2,
 				container.NewHBox(
@@ -89,6 +103,11 @@ func (mw *MainWindow) newSymbolListBtn() *widget.Button {
 			mw.symbolList,
 		))
 		symbolListWindow.Icon = theme.ListIcon()
+		symbolListWindow.CloseIntercept = func() {
+			for _, f := range cancelFuncs {
+				f()
+			}
+		}
 		mw.wm.Add(symbolListWindow)
 		//symbolListWindow.Resize(fyne.NewSize(800, 700))
 	})
@@ -129,7 +148,7 @@ func (mw *MainWindow) newOpenLogBtn() *widget.Button {
 				return
 			}
 
-			mw.LoadLogfile(filename)
+			mw.LoadLogfile(filename, fyne.Position{})
 		}()
 	})
 }
@@ -145,6 +164,7 @@ func (mw *MainWindow) addSymbolBtnFunc() *widget.Button {
 	})
 }
 
+/*
 func (mw *MainWindow) loadSymbolsEcuBtnFunc() *widget.Button {
 	return widget.NewButtonWithIcon("Load from ECU", theme.DownloadIcon(), func() {
 		mw.Disable()
@@ -157,6 +177,7 @@ func (mw *MainWindow) loadSymbolsEcuBtnFunc() *widget.Button {
 		}()
 	})
 }
+*/
 
 /*
 func (mw *MainWindow) newLogplayerBtn() *widget.Button {
@@ -200,7 +221,6 @@ func (mw *MainWindow) newLogBtn() *widget.Button {
 			v.Skip = false
 		}
 		mw.startLogging()
-		mw.symbolList.UpdateBars(mw.settings.GetRealtimeBars())
 	})
 }
 
@@ -299,26 +319,10 @@ func (mw *MainWindow) startLogging() {
 	mw.buttons.logBtn.SetText("Stop")
 	mw.Disable()
 
-	//var cancel func()
-	var cancelFuncs []func()
-
-	if mw.settings.GetLivePreview() {
-		for _, sym := range mw.symbolList.Symbols() {
-			cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(sym.Name, func(f float64) {
-				mw.symbolList.SetValue(sym.Name, f)
-			}))
-		}
-	} else {
-		mw.symbolList.Clear()
-	}
-
 	go func() {
 		defer mw.Enable()
 		if err := mw.dlc.Start(); err != nil {
 			mw.Error(err)
-		}
-		for _, f := range cancelFuncs {
-			f()
 		}
 		mw.dlc = nil
 		mw.loggingRunning = false
@@ -329,6 +333,7 @@ func (mw *MainWindow) startLogging() {
 
 func (mw *MainWindow) newDataLogger(device gocan.Adapter) (datalogger.IClient, error) {
 	return datalogger.New(datalogger.Config{
+		FilenamePrefix: strings.TrimSuffix(filepath.Base(mw.filename), filepath.Ext(mw.filename)),
 		ECU:            mw.selects.ecuSelect.Selected,
 		Device:         device,
 		Symbols:        mw.symbolList.Symbols(),

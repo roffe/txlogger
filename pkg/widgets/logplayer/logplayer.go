@@ -1,6 +1,7 @@
 package logplayer
 
 import (
+	"log"
 	"sort"
 	"sync"
 	"time"
@@ -32,6 +33,7 @@ type controlMsg struct {
 
 var _ fyne.Widget = (*Logplayer)(nil)
 var _ fyne.Focusable = (*Logplayer)(nil)
+
 var _ fyne.Tappable = (*Logplayer)(nil)
 
 type Logplayer struct {
@@ -91,6 +93,7 @@ func (l *Logplayer) Close() {
 }
 
 func (l *Logplayer) Tapped(_ *fyne.PointEvent) {
+	log.Println("Tapped")
 	fyne.CurrentApp().Driver().CanvasForObject(l).Focus(l)
 }
 
@@ -245,6 +248,22 @@ func (l *Logplayer) render() {
 		values,
 		plotterOpts...,
 	)
+
+	l.objs.plotter.OnDragged = func(event *fyne.DragEvent) {
+		pos := float64(int(l.objs.positionSlider.Value) - int(event.Dragged.DX))
+		if pos < 0 {
+			pos = 0
+		}
+		if pos > l.objs.positionSlider.Max {
+			pos = l.objs.positionSlider.Max
+		}
+		l.control(&controlMsg{Op: OpSeek, Pos: int(pos)})
+	}
+
+	//l.objs.plotter.OnTapped = func(event *fyne.PointEvent) {
+	//	log.Println("Tapped")
+	//	fyne.CurrentApp().Driver().CanvasForObject(l).SetOnTypedKey(l.TypedKey)
+	//}
 }
 
 func (l *Logplayer) CreateRenderer() fyne.WidgetRenderer {

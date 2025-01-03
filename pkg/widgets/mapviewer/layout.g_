@@ -45,7 +45,6 @@ func (l *mapLayout) Layout(_ []fyne.CanvasObject, size fyne.Size) {
 		}
 	*/
 
-	l.mv.grid.Resize(size)
 	l.mv.valueRects.Resize(size)
 	l.mv.valueTexts.Resize(size)
 

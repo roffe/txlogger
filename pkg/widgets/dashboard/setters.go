@@ -74,7 +74,7 @@ func showHider(obj fyne.CanvasObject) func(float64) {
 	}
 }
 
-func ioffSetter(obj *canvas.Text) func(float64) {
+func ioffSetter(obj *canvas.Text, icon *canvas.Image) func(float64) {
 	var buf []byte
 	var lastVal float64
 	return func(value float64) {
@@ -89,10 +89,12 @@ func ioffSetter(obj *canvas.Text) func(float64) {
 		switch {
 		case value >= 0:
 			obj.Color = color.RGBA{R: 0, G: 0xFF, B: 0, A: 0xFF}
+			icon.Hide()
 		case value < 0 && value >= -3:
 			obj.Color = color.RGBA{R: 0xFF, G: 0xA5, B: 0, A: 0xFF}
 		case value < -3:
 			obj.Color = color.RGBA{R: 0xFF, G: 0, B: 0, A: 0xFF}
+			icon.Show()
 		}
 		obj.Refresh()
 		lastVal = value

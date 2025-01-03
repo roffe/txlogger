@@ -109,13 +109,13 @@ func (w *InnerWindow) PreMaximizedPos() fyne.Position {
 
 func (w *InnerWindow) Close() {
 	// Call user defined close intercept
-	if f := w.CloseIntercept; f != nil {
-		f()
+	if w.CloseIntercept != nil {
+		w.CloseIntercept()
 	}
 
 	// Call system defined close intercept
-	if f := w.onClose; f != nil {
-		f()
+	if w.onClose != nil {
+		w.onClose()
 	}
 }
 
@@ -164,6 +164,7 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 	v := fyne.CurrentApp().Settings().ThemeVariant()
 	w.bg = canvas.NewRectangle(th.Color(theme.ColorNameOverlayBackground, v))
 	contentBG := canvas.NewRectangle(th.Color(theme.ColorNameBackground, v))
+
 	leftCorner := newDraggableCorner(w, true)
 	rightCorner := newDraggableCorner(w, false)
 
@@ -267,6 +268,7 @@ func (i *innerWindowRenderer) Refresh() {
 	i.bg.Refresh()
 	i.contentBG.FillColor = th.Color(theme.ColorNameBackground, v)
 	i.contentBG.Refresh()
+
 	i.bar.Refresh()
 	title := i.bar.Objects[0].(*draggableLabel)
 	title.SetText(i.win.title)

@@ -4,8 +4,18 @@ import (
 	"fyne.io/fyne/v2"
 )
 
+// func (p *Plotter) Tapped(event *fyne.PointEvent) {
+// 	log.Println("Tapped")
+// 	if f := p.OnTapped; f != nil {
+// 		f(event)
+// 	}
+// }
+
 func (p *Plotter) Dragged(event *fyne.DragEvent) {
 	//p.sel.SetValue(p.sel.Value - float64(event.Dragged.DX))
+	if f := p.OnDragged; f != nil {
+		f(event)
+	}
 
 }
 

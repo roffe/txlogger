@@ -7,9 +7,12 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/wbl/aem"
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
@@ -61,16 +64,29 @@ type SettingsWidget struct {
 	container             *container.AppTabs
 
 	// WBL Specific
+	wblPortLabel                *widget.Label
 	wblPortSelect               *widget.Select
 	wblPortRefreshButton        *widget.Button
+	minimumVoltageWidebandLabel *widget.Label
 	minimumVoltageWidebandEntry *widget.Entry
+	maximumVoltageWidebandLabel *widget.Label
 	maximumVoltageWidebandEntry *widget.Entry
+	lowAFRLabel                 *widget.Label
 	lowAFREntry                 *widget.Entry
+	highAFRLabel                *widget.Label
 	highAFREntry                *widget.Entry
-	minimumVoltageWideband      float64
-	maximumVoltageWideband      float64
-	lowAFR                      float64
-	highAFR                     float64
+
+	minimumVoltageWideband float64
+	maximumVoltageWideband float64
+	lowAFR                 float64
+	highAFR                float64
+
+	//images
+	mtxl        *canvas.Image
+	lc2         *canvas.Image
+	uego        *canvas.Image
+	lambdatocan *canvas.Image
+	t7          *canvas.Image
 
 	widget.BaseWidget
 }
@@ -208,6 +224,7 @@ func New(cfg *Config) *SettingsWidget {
 
 	sw.CanSettings = cansettings.NewCanSettingsWidget(app)
 
+	sw.wblPortLabel = widget.NewLabel("WBL Port")
 	sw.wblPortSelect = widget.NewSelect(append([]string{"txbridge", "CAN"}, sw.CanSettings.ListPorts()...), func(s string) {
 		app.Preferences().SetString(prefsWBLPort, s)
 	})
@@ -217,6 +234,7 @@ func New(cfg *Config) *SettingsWidget {
 		sw.wblPortSelect.Refresh()
 	})
 
+	sw.minimumVoltageWidebandLabel = widget.NewLabel("Minimum voltage")
 	sw.minimumVoltageWidebandEntry = widget.NewEntry()
 	sw.minimumVoltageWidebandEntry.Validator = func(s string) error {
 		val, err := positiveFloatValidator(s)
@@ -228,6 +246,7 @@ func New(cfg *Config) *SettingsWidget {
 		return nil
 	}
 
+	sw.maximumVoltageWidebandLabel = widget.NewLabel("Maximum voltage")
 	sw.maximumVoltageWidebandEntry = widget.NewEntry()
 	sw.maximumVoltageWidebandEntry.Validator = func(s string) error {
 		val, err := positiveFloatValidator(s)
@@ -239,6 +258,7 @@ func New(cfg *Config) *SettingsWidget {
 		return nil
 	}
 
+	sw.lowAFRLabel = widget.NewLabel("Low AFR")
 	sw.lowAFREntry = widget.NewEntry()
 	sw.lowAFREntry.Validator = func(s string) error {
 		val, err := positiveFloatValidator(s)
@@ -250,6 +270,7 @@ func New(cfg *Config) *SettingsWidget {
 		return nil
 	}
 
+	sw.highAFRLabel = widget.NewLabel("High AFR")
 	sw.highAFREntry = widget.NewEntry()
 	sw.highAFREntry.Validator = func(s string) error {
 		val, err := positiveFloatValidator(s)
@@ -262,151 +283,163 @@ func New(cfg *Config) *SettingsWidget {
 	}
 
 	tabs := container.NewAppTabs()
-	tabs.Append(container.NewTabItem("General", container.NewHSplit(
-		container.NewVBox(
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewIcon(theme.InfoIcon()),
-				nil,
-				sw.autoLoad,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewIcon(theme.WarningIcon()),
-				nil,
-				sw.autoSave,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewIcon(theme.MoveUpIcon()),
-				nil,
-				sw.cursorFollowCrosshair,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewIcon(theme.SearchIcon()),
-				nil,
-				container.NewVBox(
-					sw.livePreview,
-					sw.realtimeBars,
-				),
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewIcon(theme.ViewFullScreenIcon()),
-				nil,
-				sw.meshView,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewIcon(theme.InfoIcon()),
-				nil,
-				sw.useMPH,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewIcon(theme.InfoIcon()),
-				nil,
-				sw.swapRPMandSpeed,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				//widget.NewIcon(theme.ZoomFitIcon()),
-				widget.NewLabel("Plot resolution"),
-				nil,
-				sw.plotResolution,
-			),
+
+	tabs.Append(container.NewTabItem("CAN", sw.CanSettings))
+
+	tabs.Append(container.NewTabItem("Logging", container.NewVBox(
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewLabel("Logging rate (Hz)"),
+			sw.freqValue,
+			sw.freqSlider,
 		),
-		container.NewVBox(
-			sw.CanSettings,
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewLabel("Logging rate (Hz)"),
-				sw.freqValue,
-				sw.freqSlider,
-			),
-			widget.NewSeparator(),
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewLabel("Log format"),
-				nil,
-				sw.logFormat,
-			),
-			container.NewBorder(
-				nil,
-				container.NewGridWithColumns(2,
-					widget.NewButtonWithIcon("Reset", theme.ContentClearIcon(), func() {
-						sw.logPath.SetText(datalogger.LOGPATH)
-						fyne.CurrentApp().Preferences().SetString(prefsLogPath, datalogger.LOGPATH)
-					}),
-					widget.NewButtonWithIcon("Browse", theme.FileIcon(), func() {
-						dir, err := sdialog.Directory().Title("Select log folder").Browse()
-						if err != nil {
-							if errors.Is(err, sdialog.ErrCancelled) {
-								return
-							}
-							log.Println(err)
+		widget.NewSeparator(),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewLabel("Log format"),
+			nil,
+			sw.logFormat,
+		),
+		container.NewBorder(
+			nil,
+			container.NewGridWithColumns(2,
+				widget.NewButtonWithIcon("Reset", theme.ContentClearIcon(), func() {
+					sw.logPath.SetText(datalogger.LOGPATH)
+					fyne.CurrentApp().Preferences().SetString(prefsLogPath, datalogger.LOGPATH)
+				}),
+				widget.NewButtonWithIcon("Browse", theme.FileIcon(), func() {
+					dir, err := sdialog.Directory().Title("Select log folder").Browse()
+					if err != nil {
+						if errors.Is(err, sdialog.ErrCancelled) {
 							return
 						}
-						sw.logPath.SetText(dir)
-						fyne.CurrentApp().Preferences().SetString(prefsLogPath, dir)
-					}),
-				),
-				widget.NewLabel("Log folder"),
-				nil,
-				sw.logPath,
+						log.Println(err)
+						return
+					}
+					sw.logPath.SetText(dir)
+					fyne.CurrentApp().Preferences().SetString(prefsLogPath, dir)
+				}),
 			),
+			widget.NewLabel("Log folder"),
+			nil,
+			sw.logPath,
 		),
 	)))
+
+	tabs.Append(container.NewTabItem("General", container.NewVBox(
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewIcon(theme.InfoIcon()),
+			nil,
+			sw.autoLoad,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewIcon(theme.WarningIcon()),
+			nil,
+			sw.autoSave,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewIcon(theme.MoveUpIcon()),
+			nil,
+			sw.cursorFollowCrosshair,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewIcon(theme.SearchIcon()),
+			nil,
+			container.NewVBox(
+				sw.livePreview,
+				sw.realtimeBars,
+			),
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewIcon(theme.ViewFullScreenIcon()),
+			nil,
+			sw.meshView,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			//widget.NewIcon(theme.ZoomFitIcon()),
+			widget.NewLabel("Plot resolution"),
+			nil,
+			sw.plotResolution,
+		),
+	)))
+
+	sw.mtxl = newImageFromResource("mtx-l")
+	sw.lc2 = newImageFromResource("lc-2")
+	sw.uego = newImageFromResource("uego")
+	sw.lambdatocan = newImageFromResource("lambdatocan")
+	sw.t7 = newImageFromResource("t7")
 
 	wblSel := sw.newWBLSelector()
 
 	tabs.Append(container.NewTabItem("WBL", container.NewVBox(
+		container.NewHBox(layout.NewSpacer(), sw.mtxl, sw.lc2, sw.uego, sw.lambdatocan, sw.t7, layout.NewSpacer()),
 		wblSel,
 		container.NewBorder(
 			nil,
 			nil,
-			widget.NewLabel("WBL Port"),
+			sw.wblPortLabel,
 			sw.wblPortRefreshButton,
 			sw.wblPortSelect,
 		),
 		container.NewBorder(
 			nil,
 			nil,
-			widget.NewLabel("Minimum voltage"),
+			sw.minimumVoltageWidebandLabel,
 			nil,
 			sw.minimumVoltageWidebandEntry,
 		),
 		container.NewBorder(
 			nil,
 			nil,
-			widget.NewLabel("Maximum voltage"),
+			sw.maximumVoltageWidebandLabel,
 			nil,
 			sw.maximumVoltageWidebandEntry,
 		),
 		container.NewBorder(
 			nil,
 			nil,
-			widget.NewLabel("Low AFR"),
+			sw.lowAFRLabel,
 			nil,
 			sw.lowAFREntry,
 		),
 		container.NewBorder(
 			nil,
 			nil,
-			widget.NewLabel("High AFR"),
+			sw.highAFRLabel,
 			nil,
 			sw.highAFREntry,
+		),
+	)))
+
+	tabs.Append(container.NewTabItem("Dashboard", container.NewVBox(
+		widget.NewLabel("Dashboard settings"),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewIcon(theme.InfoIcon()),
+			nil,
+			sw.swapRPMandSpeed,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewIcon(theme.InfoIcon()),
+			nil,
+			sw.useMPH,
 		),
 	)))
 
@@ -414,6 +447,30 @@ func New(cfg *Config) *SettingsWidget {
 
 	sw.loadPrefs()
 	return sw
+}
+
+func newImageFromResource(name string) *canvas.Image {
+	var img *canvas.Image
+	switch name {
+	case "mtx-l":
+		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.MtxL))
+		img.SetMinSize(fyne.NewSize(224, 224))
+	case "lc-2":
+		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.Lc2))
+		img.SetMinSize(fyne.NewSize(400, 224))
+	case "uego":
+		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.Uego))
+		img.SetMinSize(fyne.NewSize(315, 224))
+	case "lambdatocan":
+		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.LambdaToCan))
+		img.SetMinSize(fyne.NewSize(481, 224))
+	case "t7":
+		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.T7))
+		img.SetMinSize(fyne.NewSize(320, 224))
+	}
+	img.FillMode = canvas.ImageFillContain
+	img.ScaleMode = canvas.ImageScaleSmooth
+	return img
 }
 
 func (sw *SettingsWidget) newLogFormat() *widget.Select {
@@ -432,6 +489,68 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 	}, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsLambdaSource, s)
 		fyne.CurrentApp().Preferences().SetString(prefsWidebandSymbolName, sw.GetWidebandSymbolName())
+		var ecuSet bool
+		switch s {
+		case "ECU":
+			sw.mtxl.Hide()
+			sw.lc2.Hide()
+			sw.uego.Hide()
+			sw.lambdatocan.Hide()
+			sw.t7.Show()
+			ecuSet = true
+		case ecumaster.ProductString:
+			sw.mtxl.Hide()
+			sw.lc2.Hide()
+			sw.uego.Hide()
+			sw.lambdatocan.Show()
+			sw.t7.Hide()
+		case innovate.ProductString:
+			sw.mtxl.Show()
+			sw.lc2.Show()
+			sw.uego.Hide()
+			sw.lambdatocan.Hide()
+			sw.t7.Hide()
+		case aem.ProductString:
+			sw.mtxl.Hide()
+			sw.lc2.Hide()
+			sw.uego.Show()
+			sw.lambdatocan.Hide()
+			sw.t7.Hide()
+		default:
+			sw.mtxl.Hide()
+			sw.lc2.Hide()
+			sw.uego.Hide()
+			sw.lambdatocan.Hide()
+			sw.t7.Hide()
+		}
+
+		if ecuSet {
+			sw.wblPortLabel.Hide()
+			sw.wblPortSelect.Hide()
+			sw.wblPortRefreshButton.Hide()
+			sw.minimumVoltageWidebandLabel.Show()
+			sw.maximumVoltageWidebandLabel.Show()
+			sw.lowAFRLabel.Show()
+			sw.highAFRLabel.Show()
+			sw.minimumVoltageWidebandEntry.Show()
+			sw.maximumVoltageWidebandEntry.Show()
+			sw.lowAFREntry.Show()
+			sw.highAFREntry.Show()
+		} else {
+			sw.wblPortLabel.Show()
+			sw.wblPortSelect.Show()
+			sw.wblPortRefreshButton.Show()
+			sw.minimumVoltageWidebandLabel.Hide()
+			sw.maximumVoltageWidebandLabel.Hide()
+			sw.lowAFRLabel.Hide()
+			sw.highAFRLabel.Hide()
+			sw.minimumVoltageWidebandEntry.Hide()
+			sw.maximumVoltageWidebandEntry.Hide()
+			sw.lowAFREntry.Hide()
+			sw.highAFREntry.Hide()
+		}
+
+		sw.container.Refresh()
 	})
 	return container.NewBorder(
 		nil,
@@ -460,7 +579,7 @@ func (sw *SettingsWidget) newMeshView() *widget.Check {
 }
 
 func (sw *SettingsWidget) newAutoUpdateLoad() *widget.Check {
-	return widget.NewCheck("Load maps from ECU when logging", func(b bool) {
+	return widget.NewCheck("Load maps from ECU when connected", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsAutoUpdateLoadEcu, b)
 	})
 }
