@@ -1,7 +1,6 @@
 package mapviewer
 
 import (
-	"log"
 	"math"
 
 	"fyne.io/fyne/v2"
@@ -73,7 +72,11 @@ func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
 		mv.handlePrimaryClickWithShift(event)
 
 	case event.Button == desktop.MouseButtonPrimary && event.Modifier == fyne.KeyModifierControl:
-		log.Println("Control")
+		if mv.selectionRect.Hidden {
+			mv.selectionRect.Resize(fyne.NewSize(mv.widthFactor, mv.heightFactor))
+			mv.selectionRect.Show()
+		}
+		mv.handlePrimaryCtrlClick(event)
 
 	case event.Button == desktop.MouseButtonSecondary && event.Modifier == 0:
 		mv.handleSecondaryClick(event)
@@ -98,6 +101,18 @@ func (mv *MapViewer) handlePrimaryClick(event *desktop.MouseEvent) {
 
 	mv.updateCursorPositionAndSize(x, y, cellWidth, cellHeight)
 	mv.selectedCells = []int{mv.SelectedY*mv.numColumns + mv.selectedX}
+	mv.selecting = true
+}
+
+func (mv *MapViewer) handlePrimaryCtrlClick(event *desktop.MouseEvent) {
+	mv.selectedX, mv.SelectedY = mv.calculateSelectionBounds(event.Position)
+
+	cellWidth, cellHeight := mv.calculateCellDimensions()
+	x := (float32(mv.selectedX) * cellWidth)
+	y := (float32(mv.numRows-mv.SelectedY-1) * cellHeight)
+
+	mv.updateCursorPositionAndSize(x, y, cellWidth, cellHeight)
+	mv.selectedCells = append(mv.selectedCells, mv.SelectedY*mv.numColumns+mv.selectedX)
 	mv.selecting = true
 }
 

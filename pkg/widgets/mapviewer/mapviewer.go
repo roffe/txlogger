@@ -3,7 +3,6 @@ package mapviewer
 import (
 	"fmt"
 	"image/color"
-	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
@@ -35,6 +35,10 @@ type MapViewerInfo struct {
 	XLen, YLen, ZLen    int
 	XFrom, YFrom        string
 }
+
+var _ fyne.Focusable = (*MapViewer)(nil)
+var _ fyne.Tappable = (*MapViewer)(nil)
+var _ desktop.Mouseable = (*MapViewer)(nil)
 
 type MapViewer struct {
 	widget.BaseWidget
@@ -143,7 +147,6 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 
 	mv.crosshair = NewCrosshair(color.RGBA{165, 55, 253, 180}, 3)
 	mv.selectionRect = NewRectangle(color.RGBA{0x30, 0x70, 0xFF, 0xFF}, 3)
-
 	// log.Printf("MapViewer c: %d r: %d dlen: %d x: %s y: %s z: %s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom, mv.symbol.Name)
 	return mv, nil
 }
@@ -196,7 +199,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 	mv.createZdata()
 	mv.createTextValues()
 
-	mv.crosshair.CornerRadius = 2
+	mv.crosshair.CornerRadius = 4
 	mv.crosshair.Resize(fyne.NewSize(34, 14))
 	mv.crosshair.Hide()
 
@@ -327,29 +330,27 @@ func (mv *MapViewer) SetZ(zData []int) {
 }
 
 func (mv *MapViewer) Refresh() {
-	log.Println("MapViewer Refresh")
+	values := make([]float64, len(mv.zData))
 	mv.min, mv.max = findMinMax(mv.zData)
-	for i, tv := range mv.zData {
-		mv.SetCellText(i, tv)
-	}
-	for idx, r := range mv.zDataRects {
-		col := widgets.GetColorInterpolation((float64(mv.min)*mv.zCorrFac)+mv.zCorrOffset,
-			(float64(mv.max)*mv.zCorrFac)+mv.zCorrOffset,
-			(float64(mv.zData[idx])*mv.zCorrFac)+mv.zCorrOffset,
+	min := (float64(mv.min) * mv.zCorrFac) + mv.zCorrOffset
+	max := (float64(mv.max) * mv.zCorrFac) + mv.zCorrOffset
+	for i, v := range mv.zData {
+		mv.SetCellText(i, v)
+		values[i] = (float64(v) * mv.zCorrFac) + mv.zCorrOffset
+		col := widgets.GetColorInterpolation(
+			min,
+			max,
+			values[i],
 		)
+		r := mv.zDataRects[i]
 		if col != r.FillColor {
 			r.FillColor = col
 			r.Refresh()
 		}
 	}
-
 	if mv.mesh != nil {
-		mv.mesh.SetMin((float64(mv.min) * mv.zCorrFac) + mv.zCorrOffset)
-		mv.mesh.SetMax((float64(mv.max) * mv.zCorrFac) + mv.zCorrOffset)
-		var values []float64
-		for _, v := range mv.zData {
-			values = append(values, (float64(v)*mv.zCorrFac)+mv.zCorrOffset)
-		}
+		mv.mesh.SetMin(min)
+		mv.mesh.SetMax(max)
 		mv.mesh.LoadFloat64s(values)
 	}
 }

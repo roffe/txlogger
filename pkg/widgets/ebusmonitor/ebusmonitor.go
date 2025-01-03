@@ -35,7 +35,7 @@ func New() *Widget {
 }
 
 func (t *Widget) render() *Widget {
-	t.container = container.NewAdaptiveGrid(5)
+	t.container = container.NewAdaptiveGrid(4)
 	return t
 }
 
@@ -82,7 +82,7 @@ func (tr *WidgetRenderer) Layout(space fyne.Size) {
 }
 
 func (tr *WidgetRenderer) MinSize() fyne.Size {
-	return tr.t.container.MinSize()
+	return fyne.NewSize(150, 75)
 }
 
 func (tr *WidgetRenderer) Refresh() {

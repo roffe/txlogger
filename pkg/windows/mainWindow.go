@@ -227,7 +227,7 @@ func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position) {
 
 	logz, err := logfile.Open(filename)
 	if err != nil {
-		mw.Error(fmt.Errorf("Failed to open log file: %w", err))
+		mw.Error(fmt.Errorf("failed to open log file: %w", err))
 		return
 	}
 
@@ -235,6 +235,9 @@ func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position) {
 	iw := multiwindow.NewSystemWindow(fp, lp)
 	iw.Icon = theme.MediaPlayIcon()
 
+	lp.OnMouseDown = func() {
+		mw.wm.Raise(iw)
+	}
 	iw.CloseIntercept = func() {
 		lp.Close()
 	}

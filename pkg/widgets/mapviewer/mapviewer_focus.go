@@ -9,9 +9,6 @@ import (
 	"github.com/roffe/txlogger/pkg/debug"
 )
 
-var _ fyne.Focusable = (*MapViewer)(nil)
-var _ fyne.Tappable = (*MapViewer)(nil)
-
 func (mw *MapViewer) Tapped(_ *fyne.PointEvent) {
 	fyne.CurrentApp().Driver().CanvasForObject(mw).Focus(mw)
 }

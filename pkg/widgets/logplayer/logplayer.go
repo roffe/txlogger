@@ -1,13 +1,13 @@
 package logplayer
 
 import (
-	"log"
 	"sort"
 	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/capture"
@@ -33,8 +33,8 @@ type controlMsg struct {
 
 var _ fyne.Widget = (*Logplayer)(nil)
 var _ fyne.Focusable = (*Logplayer)(nil)
-
 var _ fyne.Tappable = (*Logplayer)(nil)
+var _ desktop.Mouseable = (*Logplayer)(nil)
 
 type Logplayer struct {
 	widget.BaseWidget
@@ -53,6 +53,10 @@ type Logplayer struct {
 
 	logFile  logfile.Logfile
 	playOnce sync.Once
+
+	OnMouseDown func()
+
+	focused bool
 }
 
 type logplayerObjects struct {
@@ -92,15 +96,16 @@ func (l *Logplayer) Close() {
 	})
 }
 
-func (l *Logplayer) Tapped(_ *fyne.PointEvent) {
-	log.Println("Tapped")
-	fyne.CurrentApp().Driver().CanvasForObject(l).Focus(l)
-}
-
 func (l *Logplayer) FocusGained() {
+	l.focused = true
 }
 
 func (l *Logplayer) FocusLost() {
+	l.focused = false
+}
+
+func (l *Logplayer) Focused() bool {
+	return l.focused
 }
 
 func (l *Logplayer) TypedKey(ev *fyne.KeyEvent) {
@@ -481,53 +486,5 @@ func NewSlider() *slider {
 func (s *slider) TypedKey(key *fyne.KeyEvent) {
 	if s.typedKey != nil {
 		s.typedKey(key)
-	}
-}
-
-func keyHandler(controlChan chan *controlMsg, slider *slider, playButton *widget.Button, sel *widget.Select) func(ev *fyne.KeyEvent) {
-	return func(ev *fyne.KeyEvent) {
-		switch ev.Name {
-		case fyne.KeyPlus:
-			sel.SetSelectedIndex(sel.SelectedIndex() + 1)
-		case fyne.KeyMinus:
-			sel.SetSelectedIndex(sel.SelectedIndex() - 1)
-		case fyne.KeyEnter:
-			sel.SetSelected("1x")
-		case fyne.KeyReturn, fyne.KeyHome:
-			controlChan <- &controlMsg{Op: OpSeek, Pos: 0}
-		case fyne.KeyPageUp:
-			pos := int(slider.Value) + 100
-			if pos < 0 {
-				pos = 0
-			}
-			controlChan <- &controlMsg{Op: OpSeek, Pos: pos}
-		case fyne.KeyUp:
-			pos := int(slider.Value) + 12
-			if pos < 0 {
-				pos = 0
-			}
-			controlChan <- &controlMsg{Op: OpSeek, Pos: pos}
-		case fyne.KeyDown:
-			pos := int(slider.Value) - 12
-			if pos < 0 {
-				pos = 0
-			}
-			controlChan <- &controlMsg{Op: OpSeek, Pos: pos}
-		case fyne.KeyPageDown:
-			pos := int(slider.Value) - 100
-			if pos < 0 {
-				pos = 0
-			}
-			controlChan <- &controlMsg{Op: OpSeek, Pos: pos}
-		case fyne.KeyLeft:
-			controlChan <- &controlMsg{Op: OpPrev}
-		case fyne.KeyRight:
-			controlChan <- &controlMsg{Op: OpNext}
-		case fyne.KeySpace:
-			playButton.Tapped(&fyne.PointEvent{
-				Position:         fyne.NewPos(0, 0),
-				AbsolutePosition: fyne.NewPos(0, 0),
-			})
-		}
 	}
 }
