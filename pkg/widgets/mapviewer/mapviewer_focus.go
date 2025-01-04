@@ -28,7 +28,7 @@ func (mw *MapViewer) Focused() bool {
 
 func (mv *MapViewer) TypedRune(r rune) {
 	// print out the rune
-	//	log.Println("TypedRune", string(r))
+	// log.Println("TypedRune", string(r))
 }
 
 func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
