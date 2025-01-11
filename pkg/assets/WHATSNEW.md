@@ -19,7 +19,7 @@ Or why not create your own gauges and make it just like you want :)
 - Now possible to select multiple different cells by holding CTRL and clicking
 - Logplayer rewritten to use a lot less CPU and be more responsive
 - This is now a single instance application. If you try to open log files from file associations when txlogger is running it will open them in the running instance instead
-- Drag & Drop support improved. The logplayer / plotter for the logfile will now open 
+- Drag & Drop support improved. The logplayer / plotter for the logfile will now open under the mousepointer where it was dropped
 - New settings dialogue
 - New default filename for logs. The filename will now be prefixed with the name of the binary you have loaded when logging.
 - Symbol preset management has now been moved into the symbollist dialogue

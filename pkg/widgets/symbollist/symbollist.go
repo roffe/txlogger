@@ -1,7 +1,6 @@
 package symbollist
 
 import (
-	"fmt"
 	"image/color"
 	"sort"
 	"strconv"
@@ -182,7 +181,7 @@ func (s *Widget) Symbols() []*symbol.Symbol {
 }
 
 func (s *Widget) MinSize() fyne.Size {
-	return fyne.NewSize(750, 400)
+	return fyne.NewSize(500, 400)
 }
 
 func (s *Widget) CreateRenderer() fyne.WidgetRenderer {
@@ -201,7 +200,7 @@ func (s *Widget) CreateRenderer() fyne.WidgetRenderer {
 	factor := widget.NewLabel("Factor")
 	factor.TextStyle = fyne.TextStyle{Bold: true}
 
-	header := container.New(&headerLayout{}, widget.NewLabel(""), name, value, num, typ, factor, widget.NewLabel(""))
+	header := container.New(&headerLayout{}, widget.NewLabel(""), name, value, num /* typ,*/, factor, widget.NewLabel(""))
 
 	return widget.NewSimpleRenderer(container.NewBorder(
 		header,
@@ -238,12 +237,12 @@ func (h *headerLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
 
 type SymbolWidgetEntry struct {
 	widget.BaseWidget
-	symbol                 *symbol.Symbol
-	copyName               *widget.Button
-	symbolName             *widget.Label
-	symbolValue            *widget.Label
-	symbolNumber           *widget.Label
-	symbolType             *widget.Label
+	symbol       *symbol.Symbol
+	copyName     *widget.Button
+	symbolName   *widget.Label
+	symbolValue  *widget.Label
+	symbolNumber *widget.Label
+	//symbolType             *widget.Label
 	symbolCorrectionfactor *widget.Entry
 	deleteBTN              *widget.Button
 	valueBar               *canvas.Rectangle
@@ -269,7 +268,7 @@ func NewSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry
 	sw.symbolName = widget.NewLabel(sw.symbol.Name)
 	sw.symbolValue = widget.NewLabel("---")
 	sw.symbolNumber = widget.NewLabel(strconv.Itoa(sw.symbol.Number))
-	sw.symbolType = widget.NewLabel(fmt.Sprintf("%02X", sw.symbol.Type))
+	//sw.symbolType = widget.NewLabel(fmt.Sprintf("%02X", sw.symbol.Type))
 	sw.symbolCorrectionfactor = widget.NewEntry()
 
 	sw.symbolCorrectionfactor.OnChanged = func(s string) {
@@ -323,13 +322,13 @@ func (sw *SymbolWidgetEntry) CreateRenderer() fyne.WidgetRenderer {
 }
 
 var sz = []float32{
-	.04, // copy
+	.05, // copy
 	.32, // name
-	.18, // value
+	.20, // value
 	.12, // number
 	.14, // correctionfactor
-	.07, // type
-	.04, // deletebtn
+	//.07, // type
+	.06, // deletebtn
 }
 
 func sumFloat32(a []float32) float32 {
@@ -357,9 +356,9 @@ func (s *symbolWidgetEntryRenderer) Layout(size fyne.Size) {
 	s.symbolName.Resize(fyne.NewSize(size.Width*sz[1], size.Height))
 	s.symbolValue.Resize(fyne.NewSize(size.Width*sz[2], size.Height))
 	s.symbolNumber.Resize(fyne.NewSize(size.Width*sz[3], size.Height))
-	s.symbolType.Resize(fyne.NewSize(size.Width*sz[4], size.Height))
-	s.symbolCorrectionfactor.Resize(fyne.NewSize(size.Width*sz[5], size.Height))
-	s.deleteBTN.Resize(fyne.NewSize(size.Width*sz[6], size.Height))
+	//s.symbolType.Resize(fyne.NewSize(size.Width*sz[4], size.Height))
+	s.symbolCorrectionfactor.Resize(fyne.NewSize(size.Width*sz[4], size.Height))
+	s.deleteBTN.Resize(fyne.NewSize(size.Width*sz[5], size.Height))
 
 	var x float32
 
@@ -376,8 +375,8 @@ func (s *symbolWidgetEntryRenderer) Layout(size fyne.Size) {
 	s.symbolNumber.Move(fyne.NewPos(x, 0))
 	x += s.symbolNumber.Size().Width + padd
 
-	s.symbolType.Move(fyne.NewPos(x, 0))
-	x += s.symbolType.Size().Width + padd
+	// s.symbolType.Move(fyne.NewPos(x, 0))
+	// x += s.symbolType.Size().Width + padd
 
 	s.symbolCorrectionfactor.Move(fyne.NewPos(x, 0))
 	x += s.symbolCorrectionfactor.Size().Width + padd
@@ -396,7 +395,7 @@ func (s *symbolWidgetEntryRenderer) Objects() []fyne.CanvasObject {
 		s.symbolName,
 		s.symbolValue,
 		s.symbolNumber,
-		s.symbolType,
+		//s.symbolType,
 		s.symbolCorrectionfactor,
 		s.deleteBTN,
 	}

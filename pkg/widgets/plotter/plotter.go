@@ -5,7 +5,10 @@ import (
 	"image"
 	"image/color"
 	"log"
+	"sort"
 	"sync"
+	"unicode"
+	"unicode/utf8"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -100,7 +103,7 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		for k := range values {
 			p.valueOrder = append(p.valueOrder, k)
 		}
-		//sort.Strings(p.valueOrder)
+		sort.Slice(p.valueOrder, func(i, j int) bool { return lessCaseInsensitive(p.valueOrder[i], p.valueOrder[j]) })
 	}
 
 	for n, k := range p.valueOrder {
@@ -167,7 +170,7 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		container.NewBorder(
 			nil,
 			container.NewGridWithColumns(1,
-				widget.NewButton("Toggle selected", func() {
+				widget.NewButton("Toggle visible", func() {
 					for _, ts := range p.legendTexts {
 						ts.Tapped(&fyne.PointEvent{})
 					}
@@ -184,6 +187,32 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 	p.overlayText.TextSize = 25
 
 	return p
+}
+
+func lessCaseInsensitive(s, t string) bool {
+	for {
+		if len(t) == 0 {
+			return false
+		}
+		if len(s) == 0 {
+			return true
+		}
+		c, sizec := utf8.DecodeRuneInString(s)
+		d, sized := utf8.DecodeRuneInString(t)
+
+		lowerc := unicode.ToLower(c)
+		lowerd := unicode.ToLower(d)
+
+		if lowerc < lowerd {
+			return true
+		}
+		if lowerc > lowerd {
+			return false
+		}
+
+		s = s[sizec:]
+		t = t[sized:]
+	}
 }
 
 func (p *Plotter) CreateRenderer() fyne.WidgetRenderer {

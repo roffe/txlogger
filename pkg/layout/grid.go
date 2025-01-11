@@ -11,35 +11,29 @@ type Grid struct {
 }
 
 func (g *Grid) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	// Skip if size hasn't changed and avoid unnecessary calculations
 	if size == g.lastSize {
 		return
 	}
 	g.lastSize = size
 
-	// Calculate total padding needed for each dimension
-	totalPaddingWidth := float32(g.Cols*2) * g.Padding
-	totalPaddingHeight := float32(g.Rows*2) * g.Padding
+	// Pre-calculate common values outside the loops
+	padding2 := g.Padding * 2
+	cellWidth := (size.Width - float32(g.Cols)*padding2) / float32(g.Cols)
+	cellHeight := (size.Height - float32(g.Rows)*padding2) / float32(g.Rows)
 
-	// Calculate available space after padding
-	availableWidth := size.Width - totalPaddingWidth
-	availableHeight := size.Height - totalPaddingHeight
+	// Calculate base positions once
+	baseY := size.Height - cellHeight - g.Padding
 
-	cellWidth := availableWidth / float32(g.Cols)
-	cellHeight := availableHeight / float32(g.Rows)
+	for i, obj := range objects[:min(len(objects), g.Rows*g.Cols)] {
+		row := i / g.Cols
+		col := i % g.Cols
 
-	for i := 0; i < g.Rows; i++ {
-		for j := 0; j < g.Cols; j++ {
-			idx := (i * g.Cols) + j
-			if idx >= len(objects) {
-				return
-			}
-			obj := objects[idx]
-			xPosition := float32(j)*cellWidth + float32(j*2+1)*g.Padding
-			yPosition := size.Height - (float32(i+1) * cellHeight) - float32(i*2+1)*g.Padding
-			obj.Move(fyne.NewPos(xPosition, yPosition))
-			obj.Resize(fyne.NewSize(cellWidth, cellHeight))
-
-		}
+		obj.Move(fyne.NewPos(
+			float32(col)*(cellWidth+padding2)+g.Padding,
+			baseY-float32(row)*(cellHeight+padding2),
+		))
+		obj.Resize(fyne.NewSize(cellWidth, cellHeight))
 	}
 }
 

@@ -15,6 +15,8 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
+	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmmod"
+	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmstatus"
 	"github.com/roffe/txlogger/pkg/widgets/txupdater"
 	"github.com/skratchdot/open-golang/open"
 	sdialog "github.com/sqweek/dialog"
@@ -46,6 +48,17 @@ func (mw *MainWindow) setupMenu() {
 				mw.wm.Add(inner)
 			}),
 			fyne.NewMenuItem("Open binary", mw.loadBinary),
+			fyne.NewMenuItem("Open log", func() {
+				filename, err := sdialog.File().Filter("Log file", "csv", "t5l", "t7l", "t8l").Load()
+				if err != nil {
+					if err.Error() == "Cancelled" {
+						return
+					}
+					mw.Error(err)
+					return
+				}
+				mw.LoadLogfile(filename, fyne.NewPos(10, 10))
+			}),
 			fyne.NewMenuItem("Open log folder", func() {
 				if err := open.Run(mw.settings.GetLogPath()); err != nil {
 					mw.Error(fmt.Errorf("failed to open logs folder: %w", err))
@@ -137,6 +150,39 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	}
 
 	symZ := mw.fw.GetByName(axis.Z)
+
+	if axis.X == "Pwm_ind_trot!" {
+		xData = xData[:8]
+	}
+
+	// Special cases
+	switch mapName {
+	case "Pgm_mod!":
+		pgm := pgmmod.New()
+		pgm.LoadFunc = func() ([]byte, error) {
+			return symZ.Bytes(), nil
+		}
+		pgm.Set(symZ.Bytes())
+		mapWindow := multiwindow.NewInnerWindow("Pgm_mod!", pgm)
+		mapWindow.Icon = theme.GridIcon()
+		mw.wm.Add(mapWindow)
+		return
+	case "Pgm_status":
+		if w := mw.wm.HasWindow("Pgm_status"); w != nil {
+			return
+		}
+		pgs := pgmstatus.New()
+		cancel := ebus.SubscribeFunc("Pgm_status", pgs.Set)
+		iw := multiwindow.NewInnerWindow("Pgm_status", pgs)
+		iw.Icon = theme.InfoIcon()
+		iw.CloseIntercept = func() {
+			if cancel != nil {
+				cancel()
+			}
+		}
+		mw.wm.Add(iw)
+		return
+	}
 
 	var mv *mapviewer.MapViewer
 
@@ -235,11 +281,6 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		mw.Log(fmt.Sprintf("Saved %s", axis.Z))
 	}
 
-	if axis.X == "Pwm_ind_trot!" {
-		xData = xData[:8]
-
-	}
-
 	mv, err = mapviewer.New(
 		mapviewer.WithSymbol(symZ),
 		mapviewer.WithXData(xData),
@@ -269,24 +310,6 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		return
 	}
 
-	var cancelFuncs []func()
-
-	if axis.XFrom != "" {
-		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.XFrom, func(value float64) {
-			mv.SetValue(axis.XFrom, value)
-		}))
-	}
-
-	if axis.YFrom != "" {
-		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.YFrom, func(value float64) {
-			mv.SetValue(axis.YFrom, value)
-		}))
-	}
-
-	cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(mw.settings.GetWidebandSymbolName(), func(value float64) {
-		mv.SetValue(mw.settings.GetWidebandSymbolName(), value)
-	}))
-
 	if mw.settings.GetAutoLoad() && mw.dlc != nil {
 		p := progressmodal.New(mw.Window.Content(), "Loading "+axis.Z)
 		p.Show()
@@ -301,10 +324,23 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		mw.wm.Raise(mapWindow)
 	}
 
+	var cancelFuncs []func()
+	if axis.XFrom != "" {
+		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.XFrom, func(value float64) {
+			mv.SetValue(axis.XFrom, value)
+		}))
+	}
+	if axis.YFrom != "" {
+		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.YFrom, func(value float64) {
+			mv.SetValue(axis.YFrom, value)
+		}))
+	}
 	mapWindow.CloseIntercept = func() {
 		for _, f := range cancelFuncs {
 			f()
 		}
 	}
+
 	mw.wm.Add(mapWindow)
+
 }

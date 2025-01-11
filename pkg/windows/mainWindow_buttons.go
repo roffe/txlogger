@@ -21,11 +21,11 @@ import (
 )
 
 func (mw *MainWindow) createButtons() {
-	mw.buttons.addSymbolBtn = mw.addSymbolBtnFunc()
+	// mw.buttons.logplayerBtn = mw.newLogplayerBtn()
 	//mw.buttons.loadSymbolsEcuBtn = mw.loadSymbolsEcuBtnFunc()
+	mw.buttons.addSymbolBtn = mw.addSymbolBtnFunc()
 	mw.buttons.syncSymbolsBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), mw.SyncSymbols)
 	mw.buttons.dashboardBtn = mw.newDashboardBtn()
-	// mw.buttons.logplayerBtn = mw.newLogplayerBtn()
 	mw.buttons.logBtn = mw.newLogBtn()
 	mw.buttons.openLogBtn = mw.newOpenLogBtn()
 	mw.buttons.layoutRefreshBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
@@ -56,36 +56,27 @@ func (mw *MainWindow) newSymbolListBtn() *widget.Button {
 			return
 		}
 
-		var cancelFuncs []func()
-		if mw.settings.GetLivePreview() {
-			for _, sym := range mw.symbolList.Symbols() {
-				cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(sym.Name, func(f float64) {
-					mw.symbolList.SetValue(sym.Name, f)
-				}))
-			}
-		} else {
-			mw.symbolList.Clear()
-		}
 		mw.symbolList.UpdateBars(mw.settings.GetRealtimeBars())
-
 		symbolListWindow := multiwindow.NewSystemWindow("Symbol list", container.NewBorder(
-			container.NewGridWithRows(2,
-				container.NewHBox(
-					container.NewBorder(
-						nil,
-						nil,
-						widget.NewLabel("Preset"),
-						nil,
-						mw.selects.presetSelect,
-					),
-					widget.NewButtonWithIcon("Save", theme.DocumentSaveIcon(), mw.savePreset),
-					widget.NewButtonWithIcon("New", theme.DocumentCreateIcon(), mw.newPreset),
-					widget.NewButtonWithIcon("Export", theme.UploadIcon(), mw.exportPreset),
-					widget.NewButtonWithIcon("Import", theme.DownloadIcon(), mw.importPreset),
-					widget.NewButtonWithIcon("Delete", theme.DeleteIcon(), mw.deletePreset),
-					//layout.NewSpacer(),
-					//mw.buttons.loadSymbolsEcuBtn,
+			nil,
+			container.NewBorder(
+				nil,
+				nil,
+				nil,
+				container.NewGridWithColumns(5,
+					widget.NewButtonWithIcon("", theme.DocumentSaveIcon(), mw.savePreset),
+					widget.NewButtonWithIcon("", theme.DocumentCreateIcon(), mw.newPreset),
+					widget.NewButtonWithIcon("", theme.UploadIcon(), mw.exportPreset),
+					widget.NewButtonWithIcon("", theme.DownloadIcon(), mw.importPreset),
+					widget.NewButtonWithIcon("", theme.DeleteIcon(), mw.deletePreset),
 				),
+				mw.selects.presetSelect,
+			),
+			//layout.NewSpacer(),
+			//mw.buttons.loadSymbolsEcuBtn,
+			nil,
+			nil,
+			container.NewBorder(
 				container.NewBorder(
 					nil,
 					nil,
@@ -96,20 +87,35 @@ func (mw *MainWindow) newSymbolListBtn() *widget.Button {
 					),
 					mw.selects.symbolLookup,
 				),
+				nil,
+				nil,
+				nil,
+				mw.symbolList,
 			),
-			nil,
-			nil,
-			nil,
-			mw.symbolList,
 		))
 		symbolListWindow.Icon = theme.ListIcon()
+
+		var cancelFuncs []func()
+		if mw.settings.GetLivePreview() {
+			for _, sym := range mw.symbolList.Symbols() {
+				cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(sym.Name, func(f float64) {
+					mw.symbolList.SetValue(sym.Name, f)
+				}))
+			}
+		} else {
+			mw.symbolList.Clear()
+		}
 		symbolListWindow.CloseIntercept = func() {
 			for _, f := range cancelFuncs {
 				f()
 			}
 		}
+
 		mw.wm.Add(symbolListWindow)
-		//symbolListWindow.Resize(fyne.NewSize(800, 700))
+		if mw.startup {
+			symbolListWindow.Resize(fyne.NewSize(510, 654))
+			symbolListWindow.Move(fyne.NewPos(0, 0))
+		}
 	})
 }
 
@@ -137,19 +143,19 @@ func (mw *MainWindow) newDebugBtn() *widget.Button {
 }
 
 func (mw *MainWindow) newOpenLogBtn() *widget.Button {
-	return widget.NewButtonWithIcon("Open log", theme.MediaFastForwardIcon(), func() {
-		go func() {
-			filename, err := sdialog.File().Filter("logfile", "t5l", "t7l", "t8l", "csv").Load()
-			if err != nil {
-				if err.Error() == "Cancelled" {
-					return
-				}
-				fyne.LogError("Error loading log file", err)
+	return widget.NewButtonWithIcon("Open log in new Window", theme.MediaFastForwardIcon(), func() {
+		//go func() {
+		filename, err := sdialog.File().Filter("logfile", "t5l", "t7l", "t8l", "csv").Load()
+		if err != nil {
+			if err.Error() == "Cancelled" {
 				return
 			}
+			fyne.LogError("Error loading log file", err)
+			return
+		}
 
-			mw.LoadLogfile(filename, fyne.Position{})
-		}()
+		mw.LoadLogfileCombined(filename, fyne.Position{})
+		//}()
 	})
 }
 
@@ -231,17 +237,7 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 			return
 		}
 
-		var cancelFuncs []func()
-
-		onClose := func() {
-			for _, f := range cancelFuncs {
-				f()
-			}
-		}
-
 		dbcfg := &dashboard.Config{
-			App:             mw.app,
-			Mw:              mw,
 			Logplayer:       false,
 			UseMPH:          mw.settings.GetUseMPH(),
 			SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
@@ -258,15 +254,11 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 		}
 
 		db := dashboard.NewDashboard(dbcfg)
-
 		db.SetValue("CEL", 0)
 		db.SetValue("CRUISE", 0)
 		db.SetValue("LIMP", 0)
 
-		//for _, s := range mw.symbolList.Symbols() {
-		//	mw.dashboard.SetValue(s.Name, s.Float64())
-		//}
-
+		var cancelFuncs []func()
 		for _, m := range db.GetMetricNames() {
 			//if m == "MAF.m_AirInlet" {
 			//	var once sync.Once
@@ -292,10 +284,30 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 
 		dbw := multiwindow.NewInnerWindow("Dashboard", db)
 		dbw.Icon = theme.InfoIcon()
+
+		dbcfg.FullscreenFunc = func(b bool) {
+			if b {
+				mw.SetMainMenu(nil)
+				mw.Window.SetContent(db)
+				mw.SetFullScreen(true)
+			} else {
+				mw.SetMainMenu(mw.menu.GetMenu(mw.selects.ecuSelect.Selected))
+				mw.Window.SetContent(mw.content)
+				dbw.Close()
+				mw.buttons.dashboardBtn.OnTapped()
+				mw.SetFullScreen(false)
+			}
+		}
+
 		dbw.CloseIntercept = func() {
-			onClose()
+			for _, f := range cancelFuncs {
+				f()
+			}
 		}
 		mw.wm.Add(dbw)
+		if mw.startup {
+			dbw.Move(fyne.NewPos(512, 0))
+		}
 	})
 }
 
@@ -307,7 +319,7 @@ func (mw *MainWindow) startLogging() {
 		return
 	}
 
-	mw.dlc, err = mw.newDataLogger(device)
+	mw.dlc, err = newDataLogger(mw, device)
 	if err != nil {
 		mw.Error(err)
 		return
@@ -331,7 +343,7 @@ func (mw *MainWindow) startLogging() {
 	}()
 }
 
-func (mw *MainWindow) newDataLogger(device gocan.Adapter) (datalogger.IClient, error) {
+func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, error) {
 	return datalogger.New(datalogger.Config{
 		FilenamePrefix: strings.TrimSuffix(filepath.Base(mw.filename), filepath.Ext(mw.filename)),
 		ECU:            mw.selects.ecuSelect.Selected,

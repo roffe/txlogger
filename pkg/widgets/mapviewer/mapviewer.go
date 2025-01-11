@@ -388,7 +388,7 @@ func (mv *MapViewer) createXAxis() {
 }
 
 func (mv *MapViewer) createTextValues() {
-	mv.valueTexts = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.33))
+	mv.valueTexts = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.4))
 	for _, v := range mv.zData {
 		text := &canvas.Text{
 			Text:      strconv.FormatFloat((float64(v)*mv.zCorrFac)+mv.zCorrOffset, 'f', getPrecission(mv.zCorrFac), 64),

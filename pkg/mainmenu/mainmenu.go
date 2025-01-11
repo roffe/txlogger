@@ -8,12 +8,19 @@ import (
 )
 
 var T5SymbolsTuningOrder = []string{
+	"Options",
 	// "Injectors",
 	// "Fuel",
+	// "Ignition",
 	// "Boost",
+	// "Idle",
+	"Diagnostics",
 }
 
 var T5SymbolsTuning = map[string][]string{
+	"Options": {
+		"Pgm_mod!",
+	},
 	"Injectors": {
 		"Inj_konst!",
 		"Batt_korr_tab!",
@@ -21,8 +28,25 @@ var T5SymbolsTuning = map[string][]string{
 	"Fuel": {
 		"Insp_mat!",
 	},
+	"Ignition": {
+		"Ign_map_0!",
+	},
 	"Boost": {
 		"Tryck_mat!",
+		"Reg_kon_mat!",
+		"P_fors!",
+		"I_fors!",
+		"D_fors!",
+		"Regl_tryck_fgm!",
+		"Regl_tryck_sgm!",
+	},
+	"Idle": {
+		"Idle_rpm_tab!",
+		"Ign_idle_angle!",
+		"Idle_fuel_korr!",
+	},
+	"Diagnostics": {
+		"Pgm_status",
 	},
 }
 

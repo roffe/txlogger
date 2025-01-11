@@ -14,8 +14,11 @@ var initOnce sync.Once
 var fh *os.File
 
 func start() {
-	var err error
-	fh, err = os.OpenFile("debug.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		log.Println("error getting user home dir: %w", err)
+	}
+	fh, err = os.OpenFile(filepath.Join(dir, "txlogger.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Printf("error opening file: %v", err)
 	}

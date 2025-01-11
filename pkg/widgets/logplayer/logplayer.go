@@ -1,7 +1,6 @@
 package logplayer
 
 import (
-	"sort"
 	"sync"
 	"time"
 
@@ -11,7 +10,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/capture"
-	"github.com/roffe/txlogger/pkg/ebus"
+	"github.com/roffe/txlogger/pkg/eventbus"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/widgets/plotter"
@@ -38,6 +37,8 @@ var _ desktop.Mouseable = (*Logplayer)(nil)
 
 type Logplayer struct {
 	widget.BaseWidget
+
+	cfg *Config
 
 	minsize     fyne.Size
 	controlChan chan *controlMsg
@@ -70,18 +71,25 @@ type logplayerObjects struct {
 	speedSelect       *widget.Select
 }
 
-func New(logFile logfile.Logfile) *Logplayer {
+type Config struct {
+	EBus       *eventbus.Controller
+	Logfile    logfile.Logfile
+	TimeSetter func(time.Time)
+}
+
+func New(cfg *Config) *Logplayer {
 	lp := &Logplayer{
+		cfg:         cfg,
 		container:   container.NewWithoutLayout(),
 		minsize:     fyne.NewSize(150, 50),
 		controlChan: make(chan *controlMsg, 10),
-		playChan:    make(chan struct{}, 1),
-		pauseChan:   make(chan struct{}, 1),
+		playChan:    make(chan struct{}, 2),
+		pauseChan:   make(chan struct{}, 2),
 		state:       stateStopped,
 		objs: &logplayerObjects{
 			positionSlider: widget.NewSlider(0, 100),
 		},
-		logFile: logFile,
+		logFile: cfg.Logfile,
 	}
 	lp.ExtendBaseWidget(lp)
 
@@ -222,28 +230,28 @@ func (l *Logplayer) render() {
 	})
 
 	values := make(map[string][]float64)
-	order := make([]string, 0)
-	first := true
+	//order := make([]string, 0)
+	// first := true
 	for {
 		if rec := l.logFile.Next(); !rec.EOF {
 			for k, v := range rec.Values {
 				values[k] = append(values[k], v)
-				if first {
-					order = append(order, k)
-				}
+				//if first {
+				//	order = append(order, k)
+				//}
 			}
-			first = false
+			//first = false
 		} else {
 			break
 		}
 	}
 	l.logFile.Seek(0)
 
-	sort.Strings(order)
+	//sort.Strings(order)
 
 	plotterOpts := []plotter.PlotterOpt{
 		plotter.WithPlotResolutionFactor(1),
-		plotter.WithOrder(order),
+		//plotter.WithOrder(order),
 	}
 
 	l.objs.plotter = plotter.NewPlotter(
@@ -377,11 +385,14 @@ func (l *Logplayer) playLog() {
 				l.logFile.Seek(op.Pos)
 				if rec := l.logFile.Next(); !rec.EOF {
 					for k, v := range rec.Values {
-						ebus.Publish(k, v)
+						l.cfg.EBus.Publish(k, v)
 					}
 					l.objs.positionSlider.Value = float64(op.Pos)
 					l.objs.positionSlider.Refresh()
 					l.objs.timeLabel.SetText(rec.Time.Format("15:04:05.00"))
+					if f := l.cfg.TimeSetter; f != nil {
+						f(rec.Time)
+					}
 					l.objs.plotter.Seek(op.Pos)
 					// Seek back one position since we just read the record
 					l.logFile.Seek(op.Pos)
@@ -398,14 +409,17 @@ func (l *Logplayer) playLog() {
 				// Update plotter and UI immediately regardless of playback state
 				if rec := l.logFile.Next(); !rec.EOF {
 					for k, v := range rec.Values {
-						ebus.Publish(k, v)
+						l.cfg.EBus.Publish(k, v)
 					}
 					l.objs.positionSlider.Value = float64(pos)
 					l.objs.positionSlider.Refresh()
 					l.objs.timeLabel.SetText(rec.Time.Format("15:04:05.00"))
-					l.objs.plotter.Seek(pos)
+					if f := l.cfg.TimeSetter; f != nil {
+						f(rec.Time)
+					}
+					l.objs.plotter.Seek(pos + 1)
 					// Seek back one position since we just read the record
-					l.logFile.Seek(pos)
+					//l.logFile.Seek(pos)
 				}
 				if l.state == statePlaying {
 					timer.Reset(0)
@@ -413,14 +427,16 @@ func (l *Logplayer) playLog() {
 			case OpNext:
 				pos := l.logFile.Pos()
 				if pos < logLen {
-					l.logFile.Seek(pos)
 					if rec := l.logFile.Next(); !rec.EOF {
 						for k, v := range rec.Values {
-							ebus.Publish(k, v)
+							l.cfg.EBus.Publish(k, v)
 						}
 						l.objs.positionSlider.Value = float64(pos + 1)
 						l.objs.positionSlider.Refresh()
 						l.objs.timeLabel.SetText(rec.Time.Format("15:04:05.00"))
+						if f := l.cfg.TimeSetter; f != nil {
+							f(rec.Time)
+						}
 						l.objs.plotter.Seek(pos + 1)
 					}
 				}
@@ -450,12 +466,15 @@ func (l *Logplayer) playLog() {
 			if rec := l.logFile.Next(); !rec.EOF {
 				// Update all values atomically
 				for k, v := range rec.Values {
-					ebus.Publish(k, v)
+					l.cfg.EBus.Publish(k, v)
 				}
 
 				l.objs.positionSlider.Value = float64(currentPos)
 				l.objs.positionSlider.Refresh()
 				l.objs.timeLabel.SetText(rec.Time.Format("15:04:05.00"))
+				if f := l.cfg.TimeSetter; f != nil {
+					f(rec.Time)
+				}
 				l.objs.plotter.Seek(currentPos)
 
 				// Schedule next frame

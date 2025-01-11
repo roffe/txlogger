@@ -58,7 +58,7 @@ type msgListRenderer struct {
 }
 
 func (r *msgListRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(300, 400)
+	return fyne.NewSize(300, 200)
 }
 
 func (r *msgListRenderer) Layout(size fyne.Size) {

@@ -6,7 +6,6 @@
         name="txlogger"
         type="win32"
     />
-    <description>data logging for automobile use</description>
     <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
         <security>
             <requestedPrivileges>

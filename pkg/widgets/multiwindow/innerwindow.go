@@ -74,6 +74,10 @@ func NewSystemWindow(title string, content fyne.CanvasObject) *InnerWindow {
 	return w
 }
 
+func (w *InnerWindow) Container() *fyne.Container {
+	return w.content
+}
+
 func (w *InnerWindow) Content() fyne.CanvasObject {
 	return w.content.Objects[0]
 }
@@ -175,7 +179,6 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 
 func (w *InnerWindow) SetContent(obj fyne.CanvasObject) {
 	w.content.Objects[0] = obj
-
 	w.content.Refresh()
 }
 

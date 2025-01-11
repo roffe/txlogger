@@ -3,6 +3,7 @@ package windows
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -19,9 +20,12 @@ import (
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
+	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/mainmenu"
+	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
+	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/logplayer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
@@ -56,7 +60,9 @@ type MainWindow struct {
 	statusText      *widget.Label
 	oCtx            *oto.Context
 	wm              *multiwindow.MultipleWindows
-	content         *fyne.Container
+	// tabs            *container.AppTabs
+	content *fyne.Container
+	startup bool
 }
 
 type mainWindowSelects struct {
@@ -157,44 +163,111 @@ func NewMainWindow(app fyne.App, filename string) *MainWindow {
 	mw.whatsNew()
 
 	ctrlEnter := &desktop.CustomShortcut{KeyName: fyne.KeyReturn, Modifier: fyne.KeyModifierControl}
+	altEnter := &desktop.CustomShortcut{KeyName: fyne.KeyReturn, Modifier: fyne.KeyModifierAlt}
+	ctrl1 := &desktop.CustomShortcut{KeyName: fyne.Key1, Modifier: fyne.KeyModifierControl}
+	ctrl2 := &desktop.CustomShortcut{KeyName: fyne.Key2, Modifier: fyne.KeyModifierControl}
+	ctrl3 := &desktop.CustomShortcut{KeyName: fyne.Key3, Modifier: fyne.KeyModifierControl}
+	ctrl4 := &desktop.CustomShortcut{KeyName: fyne.Key4, Modifier: fyne.KeyModifierControl}
+
 	mw.Window.Canvas().AddShortcut(ctrlEnter, func(shortcut fyne.Shortcut) {
 		mw.wm.Arrange(&multiwindow.GridArranger{})
 	})
+
+	mw.Window.Canvas().AddShortcut(altEnter, func(shortcut fyne.Shortcut) {
+		mw.Window.SetFullScreen(!mw.Window.FullScreen())
+	})
+
+	mw.Window.Canvas().AddShortcut(ctrl1, func(shortcut fyne.Shortcut) {
+		log.Println("ctrl1")
+		mw.openSettings()
+	})
+
+	mw.Window.Canvas().AddShortcut(ctrl2, func(shortcut fyne.Shortcut) {
+		log.Println("ctrl2")
+		mw.buttons.symbolListBtn.OnTapped()
+	})
+
+	mw.Window.Canvas().AddShortcut(ctrl3, func(shortcut fyne.Shortcut) {
+		log.Println("ctrl3")
+	})
+
+	mw.Window.Canvas().AddShortcut(ctrl4, func(shortcut fyne.Shortcut) {
+		log.Println("ctrl4")
+	})
+
+	mw.startup = true
+	mw.buttons.symbolListBtn.OnTapped()
+	mw.buttons.dashboardBtn.OnTapped()
+	mw.startup = false
 
 	return mw
 }
 
 func (mw *MainWindow) render() {
-	mw.content = container.NewBorder(
-		container.NewBorder(
-			nil,
-			nil,
-			container.NewHBox(
-				container.NewBorder(
-					nil,
-					nil,
-					widget.NewLabel("ECU"),
-					nil,
-					mw.selects.ecuSelect,
+	/*
+		mw.tabs = container.NewAppTabs(
+			container.NewTabItem("Symbols", container.NewBorder(
+				container.NewGridWithRows(2,
+					container.NewHBox(
+						container.NewBorder(
+							nil,
+							nil,
+							widget.NewLabel("Preset"),
+							nil,
+							mw.selects.presetSelect,
+						),
+						widget.NewButtonWithIcon("", theme.DocumentSaveIcon(), mw.savePreset),
+						widget.NewButtonWithIcon("", theme.DocumentCreateIcon(), mw.newPreset),
+						widget.NewButtonWithIcon("", theme.UploadIcon(), mw.exportPreset),
+						widget.NewButtonWithIcon("", theme.DownloadIcon(), mw.importPreset),
+						widget.NewButtonWithIcon("", theme.DeleteIcon(), mw.deletePreset),
+					),
+					container.NewBorder(
+						nil,
+						nil,
+						widget.NewIcon(theme.SearchIcon()),
+						container.NewHBox(
+							mw.buttons.addSymbolBtn,
+							mw.buttons.syncSymbolsBtn,
+						),
+						mw.selects.symbolLookup,
+					),
 				),
-				widget.NewSeparator(),
-				mw.buttons.symbolListBtn,
-				mw.buttons.logBtn,
+				nil,
+				nil,
+				nil,
+				mw.symbolList,
+			)),
+			container.NewTabItem("Settings", mw.settings),
+			container.NewTabItem("Open Windows", mw.wm),
+		)
+	*/
+
+	mw.content = container.NewBorder(
+		container.NewHBox(
+			container.NewBorder(
+				nil,
+				nil,
+				widget.NewLabel("ECU"),
+				nil,
+				mw.selects.ecuSelect,
 			),
-			nil,
-			container.NewHBox(
-				//mw.buttons.logplayerBtn,
-				mw.buttons.openLogBtn,
-				mw.buttons.dashboardBtn,
-				widget.NewButtonWithIcon("", theme.GridIcon(), func() {
-					mw.wm.Arrange(&multiwindow.GridArranger{})
-				}),
-				mw.buttons.addGaugeBtn,
-				widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
-					mw.wm.CloseAll()
-				}),
-			),
+			widget.NewSeparator(),
+			mw.buttons.symbolListBtn,
+			mw.buttons.logBtn,
+
+			//mw.buttons.logplayerBtn,
+			mw.buttons.openLogBtn,
+			mw.buttons.dashboardBtn,
+			widget.NewButtonWithIcon("", theme.GridIcon(), func() {
+				mw.wm.Arrange(&multiwindow.GridArranger{})
+			}),
+			mw.buttons.addGaugeBtn,
+			widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
+				mw.wm.CloseAll()
+			}),
 		),
+
 		container.NewBorder(
 			nil,
 			nil,
@@ -219,7 +292,100 @@ func (mw *MainWindow) render() {
 		nil,
 		nil,
 		mw.wm,
+		// mw.tabs,
 	)
+}
+func (mw *MainWindow) LoadLogfileCombined(filename string, p fyne.Position) {
+	// Just filename, used for Window title
+	fp := filepath.Base(filename)
+
+	// if w := mw.wm.HasWindow(fp); w != nil {
+	// 	mw.wm.Raise(w)
+	// 	return
+	// }
+
+	logz, err := logfile.Open(filename)
+	if err != nil {
+		mw.Error(fmt.Errorf("failed to open log file: %w", err))
+		return
+	}
+
+	dbcfg := &dashboard.Config{
+		Logplayer:       true,
+		UseMPH:          mw.settings.GetUseMPH(),
+		SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
+		HighAFR:         mw.settings.GetHighAFR(),
+		LowAFR:          mw.settings.GetLowAFR(),
+		WidebandSymbol:  mw.settings.GetWidebandSymbolName(),
+	}
+
+	rec := logz.Next()
+	if !rec.EOF {
+		for k := range rec.Values {
+			if k == "AirMassMast.m_Request" {
+				dbcfg.AirDemToString = datalogger.AirDemToStringT8
+				break
+			} else if k == "Lufttemp" {
+				//T5
+				break
+			} else {
+				dbcfg.AirDemToString = datalogger.AirDemToStringT7
+				break
+			}
+		}
+	}
+	logz.Seek(0)
+
+	switch mw.selects.ecuSelect.Selected {
+	case "T7":
+		dbcfg.AirDemToString = datalogger.AirDemToStringT7
+	case "T8":
+		dbcfg.AirDemToString = datalogger.AirDemToStringT8
+	}
+
+	cpCfg := &combinedlogplayer.CombinedLogplayerConfig{
+		Logfile: logz,
+		DBcfg:   dbcfg,
+	}
+
+	cp := combinedlogplayer.New(cpCfg)
+	//iw := multiwindow.NewSystemWindow(fp, cp)
+	//iw.Icon = theme.MediaPlayIcon()
+
+	/*
+		dbcfg.FullscreenFunc = func(b bool) {
+			if b {
+				mw.SetMainMenu(nil)
+				mw.Window.SetContent(cp)
+				mw.SetFullScreen(true)
+			} else {
+				mw.SetMainMenu(mw.menu.GetMenu(mw.selects.ecuSelect.Selected))
+				mw.Window.SetContent(mw.content)
+				cp.Close()
+				//mw.buttons.dashboardBtn.OnTapped()
+				mw.SetFullScreen(false)
+				iw.SetContent(cp)
+			}
+		}
+	*/
+
+	//cp.OnMouseDown = func() {
+	//	mw.wm.Raise(iw)
+	//}
+
+	//iw.CloseIntercept = func() {
+	//	cp.Close()
+	//}
+
+	w := mw.app.NewWindow(fp)
+	w.SetContent(cp)
+	w.SetCloseIntercept(func() {
+		cp.Close()
+		w.Close()
+	})
+	w.Canvas().SetOnTypedKey(cp.TypedKey)
+	w.Show()
+	//mw.wm.Add(iw, p)
 }
 
 func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position) {
@@ -237,7 +403,10 @@ func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position) {
 		return
 	}
 
-	lp := logplayer.New(logz)
+	lp := logplayer.New(&logplayer.Config{
+		EBus:    ebus.CONTROLLER,
+		Logfile: logz,
+	})
 	iw := multiwindow.NewSystemWindow(fp, lp)
 	iw.Icon = theme.MediaPlayIcon()
 

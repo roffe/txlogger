@@ -22,13 +22,11 @@ func NewTest(minSize fyne.Size) *TestWidget {
 		text:    widget.NewLabel("test"),
 	}
 	t.ExtendBaseWidget(t)
-
-	t.container = container.NewWithoutLayout(t.text)
 	return t.render()
 }
 
 func (t *TestWidget) render() *TestWidget {
-
+	t.container = container.NewStack(t.text)
 	return t
 }
 

@@ -8,6 +8,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/common"
@@ -30,6 +31,7 @@ type Dashboard struct {
 	image  Images
 	gauges Gauges
 
+	fullscreenBtn *widget.Button
 	//dbgBar *fyne.Container
 
 	logplayer bool
@@ -61,21 +63,17 @@ type Gauges struct {
 }
 
 type Config struct {
-	App       fyne.App
-	Mw        fyne.Window
-	Logplayer bool
-	// LogBtn          *widget.Button
+	Logplayer       bool
 	AirDemToString  func(float64) string
-	FCutToString    func(float64) string
 	UseMPH          bool
 	SwapRPMandSpeed bool
 	HighAFR         float64
 	LowAFR          float64
 	WidebandSymbol  string
 	MetricRouter    map[string]func(float64)
+	FullscreenFunc  func(bool)
 }
 
-// func NewDashboard(a fyne.App, mw fyne.Window, logplayer bool, logBtn *widget.Button, onClose func()) *Dashboard {
 func NewDashboard(cfg *Config) *Dashboard {
 	if cfg.AirDemToString == nil {
 		cfg.AirDemToString = func(f float64) string {
@@ -89,8 +87,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 	}
 
 	db := &Dashboard{
-		cfg: cfg,
-		//logBtn:    cfg.LogBtn,
+		cfg:       cfg,
 		logplayer: cfg.Logplayer,
 		gauges: Gauges{
 			airmass: dualdial.New(&widgets.GaugeConfig{
@@ -228,16 +225,18 @@ func NewDashboard(cfg *Config) *Dashboard {
 
 	db.metricRouter = db.createRouter()
 
-	return db
-}
-
-func (db *Dashboard) CreateRenderer() fyne.WidgetRenderer {
-
-	// db.closeBtn = widget.NewButtonWithIcon("Back", theme.NavigateBackIcon(), func() {
-	// 	if db.cfg.OnClose != nil {
-	// 		db.cfg.OnClose()
-	// 	}
-	// })
+	var isFullscreen bool
+	db.fullscreenBtn = widget.NewButtonWithIcon("", theme.ViewFullScreenIcon(), func() {
+		if db.cfg.FullscreenFunc != nil {
+			isFullscreen = !isFullscreen
+			db.cfg.FullscreenFunc(isFullscreen)
+			if true {
+				db.fullscreenBtn.SetText("Exit Fullscreen")
+			} else {
+				db.fullscreenBtn.SetText("Fullscreen")
+			}
+		}
+	})
 
 	if db.cfg.Logplayer {
 		db.text.time = canvas.NewText("00:00:00.00", color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF})
@@ -264,9 +263,12 @@ func (db *Dashboard) CreateRenderer() fyne.WidgetRenderer {
 	db.image.taz.FillMode = canvas.ImageFillContain
 	db.image.taz.SetMinSize(fyne.NewSize(110, 85))
 	db.image.taz.Resize(fyne.NewSize(110, 85))
-	return &DashboardRenderer{
-		db: db,
-	}
+
+	return db
+}
+
+func (db *Dashboard) CreateRenderer() fyne.WidgetRenderer {
+	return &DashboardRenderer{db: db}
 }
 
 func (db *Dashboard) GetMetricNames() []string {
@@ -532,7 +534,6 @@ type dims struct {
 }
 
 func layoutMainDials(db *Dashboard, space fyne.Size, dims *dims) {
-
 	left := db.gauges.pwm.Position().X + db.gauges.pwm.Size().Width
 	right := db.gauges.throttle.Position().X
 	width := right - left
@@ -640,7 +641,10 @@ func layoutIcons(db *Dashboard, space fyne.Size, dims *dims) {
 	))
 
 	// Taz icon
-	db.image.taz.Resize(fyne.NewSize(dims.sixthWidth, dims.sixthWidth+16))
+
+	asd := fyne.Min(dims.sixthWidth, dims.thirdHeight)
+
+	db.image.taz.Resize(fyne.NewSize(asd, asd+16))
 	db.image.taz.Move(fyne.NewPos(
 		dims.centerX-db.image.taz.Size().Width*0.58,
 		dims.centerY-db.image.taz.Size().Height,
@@ -648,9 +652,10 @@ func layoutIcons(db *Dashboard, space fyne.Size, dims *dims) {
 }
 
 func layoutButtons(db *Dashboard, space fyne.Size, dims *dims) {
-	if db.logplayer {
-		db.text.time.Move(fyne.NewPos(dims.centerX-100, space.Height*common.OneHalfSix))
-	}
+	//move dr.fullscreenBtn to bottom right
+
+	db.fullscreenBtn.Resize(fyne.NewSize(dims.sixthWidth, dims.tenthHeight))
+	db.fullscreenBtn.Move(fyne.NewPos(space.Width-dims.sixthWidth, space.Height-dims.tenthHeight))
 }
 
 func layoutTexts(db *Dashboard, space fyne.Size, dims *dims) {
@@ -714,11 +719,17 @@ func layoutTexts(db *Dashboard, space fyne.Size, dims *dims) {
 	// Time text for logplayer (small)
 	if db.logplayer {
 		db.text.time.TextSize = dims.smallTextSize
-		db.text.time.Move(fyne.NewPos(
-			dims.centerX-(db.text.time.MinSize().Width*0.5),
-			space.Height*common.OneHalfSix,
-		))
+		db.text.time.Move(
+			fyne.NewPos(
+				dims.centerX-(db.text.time.MinSize().Width*0.5),
+				space.Height*common.OneHalfSix,
+			),
+		)
 	}
+
+	//if db.logplayer {
+	//	db.text.time.Move(fyne.NewPos(dims.centerX-100, space.Height*common.OneHalfSix))
+	//}
 }
 
 type DashboardRenderer struct {
@@ -782,7 +793,6 @@ func (dr *DashboardRenderer) Destroy() {
 func (dr *DashboardRenderer) Objects() []fyne.CanvasObject {
 	cont := []fyne.CanvasObject{
 		dr.db.image.limpMode,
-		//db.dbgBar,
 		dr.db.image.taz,
 		dr.db.gauges.rpm,
 		dr.db.gauges.speed,
@@ -790,14 +800,11 @@ func (dr *DashboardRenderer) Objects() []fyne.CanvasObject {
 		dr.db.gauges.pressure,
 		dr.db.gauges.iat,
 		dr.db.gauges.engineTemp,
-
 		dr.db.text.ign,
 		dr.db.text.ioff,
 		dr.db.text.idc,
 		dr.db.text.amul,
-
 		dr.db.text.activeAirDem,
-
 		dr.db.gauges.nblambda,
 		dr.db.gauges.wblambda,
 		dr.db.gauges.throttle,
@@ -805,6 +812,7 @@ func (dr *DashboardRenderer) Objects() []fyne.CanvasObject {
 		dr.db.image.checkEngine,
 		dr.db.text.cruise,
 		dr.db.image.knockIcon,
+		dr.db.fullscreenBtn,
 	}
 
 	if dr.db.logplayer {

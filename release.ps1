@@ -1,5 +1,5 @@
 Remove-Item "txlogger.exe" -ErrorAction Continue
-Remove-Item "setup.exe" -ErrorAction SilentlyContinue
+Remove-Item "install.exe" -ErrorAction SilentlyContinue
 Remove-Item "txlogger.zip" -ErrorAction SilentlyContinue
 Remove-Item "setup.zip" -ErrorAction SilentlyContinue
 
@@ -11,19 +11,19 @@ $env:CGO_ENABLED = "1"
 $env:CC = "C:\\mingw32\\bin\i686-w64-mingw32-gcc.exe"
 $env:CXX = "C:\\mingw32\\bin\i686-w64-mingw32-g++.exe"
 
-Invoke-Expression "rsrc -arch 386 -manifest manifest.xml"
 Write-Host "Building txlogger.exe"
+# Invoke-Expression "rsrc -arch 386 -manifest manifest.xml"
 Invoke-Expression "copy $Env:USERPROFILE\Documents\PlatformIO\Projects\txbridge\.pio\build\esp32dev\firmware.bin .\pkg\ota\"
 Invoke-Expression "fyne package -tags combi --release"
-Remove-Item "rsrc_windows_386.syso" -ErrorAction SilentlyContinue
+# Remove-Item "rsrc_windows_386.syso" -ErrorAction SilentlyContinue
 
 
-Write-Host "Building setup.exe"
+Write-Host "Building install.exe"
 
-$ifpPath = (Get-Location).Path + "\installer.ifp"
-Start-Process -FilePath "C:\Program Files (x86)\solicus\InstallForge\bin\ifbuilderenvx86.exe" -ArgumentList $ifpPath -WorkingDirectory (Get-Location).Path -Wait
-if (-not (Test-Path "setup.exe")) {
-    Write-Host "setup.exe not found. Exiting."
+$ifpPath = (Get-Location).Path + "\installer.nsi"
+Start-Process -FilePath "C:\Program Files (x86)\NSIS\makensis.exe" -ArgumentList $ifpPath -WorkingDirectory (Get-Location).Path -Wait
+if (-not (Test-Path "install.exe")) {
+    Write-Host "install.exe not found. Exiting."
     exit
 }
 
@@ -35,7 +35,7 @@ $winRarArgs = "a -m5 -afzip $outputZip $filesToAdd"
 
 Start-Process -FilePath $winRarPath -ArgumentList $winRarArgs -NoNewWindow -Wait
 
-$filesToAdd = "setup.exe"
+$filesToAdd = "install.exe"
 $outputZip = "setup.zip"
 $winRarArgs = "a -m5 -afzip $outputZip $filesToAdd"
 
@@ -43,4 +43,4 @@ Start-Process -FilePath $winRarPath -ArgumentList $winRarArgs -NoNewWindow -Wait
 
 Write-Host "Zip files created successfully."
 
-Invoke-Expression "scp debug.bat libusb-1.0.dll txlogger.exe txlogger.zip setup.zip roffe@roffe.nu:/webroot/roffe/public_html/txlogger"
+# Invoke-Expression "scp debug.bat libusb-1.0.dll txlogger.exe txlogger.zip setup.zip roffe@roffe.nu:/webroot/roffe/public_html/txlogger"

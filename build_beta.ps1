@@ -5,11 +5,11 @@ $env:CGO_ENABLED = "1"
 $env:CC = "C:\\mingw32\\bin\\gcc.exe"
 $env:CXX = "C:\\mingw32\\bin\\gcc.exe"
 
-Invoke-Expression "rsrc -arch 386 -manifest manifest.xml"
+# Invoke-Expression "rsrc -arch 386 -manifest manifest.xml"
 Invoke-Expression "copy $Env:USERPROFILE\Documents\PlatformIO\Projects\txbridge\.pio\build\esp32dev\firmware.bin .\pkg\ota\"
 Invoke-Expression "go generate ./..."
 Invoke-Expression "fyne package -tags combi --release"
-Remove-Item "rsrc_windows_386.syso" -ErrorAction SilentlyContinue
+# Remove-Item "rsrc_windows_386.syso" -ErrorAction SilentlyContinue
 
 # gtk3_x86-windows
 # $env:PKG_CONFIG_PATH = "/vcpkg/packages/libusb_x86-windows/lib/pkgconfig:/vcpkg/packages/gtk3_x86-windows/lib/pkgconfig:/vcpkg/packages/pango_x86-windows/lib/pkgconfig"

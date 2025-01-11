@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"encoding/gob"
 	"errors"
 	"flag"
@@ -13,8 +14,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-
-	_ "embed"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -52,6 +51,7 @@ func main() {
 	}
 
 	if workDirectory != "" {
+		log.Println("changing working directory to", workDirectory)
 		if err := os.Chdir(workDirectory); err != nil {
 			log.Println(err)
 		}
@@ -287,7 +287,7 @@ func (m txTheme) Size(name fyne.ThemeSizeName) float32 {
 	case theme.SizeNameLineSpacing:
 		return 4
 	case theme.SizeNamePadding: // 2
-		return 4
+		return 2
 	case theme.SizeNameScrollBar: // 8
 		return 16
 	case theme.SizeNameScrollBarSmall:

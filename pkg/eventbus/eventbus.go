@@ -17,7 +17,7 @@ type Config struct {
 	CacheTTL          time.Duration
 }
 
-var DefaultConfig = Config{
+var DefaultConfig = &Config{
 	IncomingBuffer:    1000,
 	SubscribeBuffer:   100,
 	UnsubscribeBuffer: 100,
@@ -54,7 +54,7 @@ type newSub struct {
 
 func New(cfg *Config) *Controller {
 	if cfg == nil {
-		cfg = &DefaultConfig
+		cfg = DefaultConfig
 	}
 
 	c := &Controller{

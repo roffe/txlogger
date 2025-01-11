@@ -62,9 +62,14 @@ func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
 		case ".bin":
 			mw.LoadSymbolsFromFile(filename)
 		case ".t5l", ".t7l", ".t8l", ".csv":
-			go func() {
-				mw.LoadLogfile(filename, p.SubtractXY(250, 85))
-			}()
+			// Check if we dropped it on the open log button
+			// log.Println(mw.buttons.openLogBtn.Position(), mw.buttons.openLogBtn.Size())
+			if p.X >= mw.buttons.openLogBtn.Position().X && p.X <= mw.buttons.openLogBtn.Position().X+mw.buttons.openLogBtn.Size().Width &&
+				p.Y >= mw.buttons.openLogBtn.Position().Y+30 && p.Y <= mw.buttons.openLogBtn.Position().Y+30+mw.buttons.openLogBtn.Size().Height {
+				mw.LoadLogfileCombined(filename, p)
+			} else {
+				go mw.LoadLogfile(filename, p)
+			}
 		}
 	}
 }
@@ -180,5 +185,9 @@ func (mw *MainWindow) newSymbolnameTypeahead() {
 			mw.selects.symbolLookup.SetOptions(results)
 			mw.selects.symbolLookup.ShowCompletion()
 		}
+	}
+
+	mw.selects.symbolLookup.OnSubmitted = func(s string) {
+		log.Println("Submitted", s)
 	}
 }
