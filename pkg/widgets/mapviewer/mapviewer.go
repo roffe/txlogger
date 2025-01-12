@@ -149,6 +149,12 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 	mv.crosshair = NewCrosshair(color.RGBA{165, 55, 253, 180}, 3)
 	mv.selectionRect = NewRectangle(color.RGBA{0x30, 0x70, 0xFF, 0xFF}, 3)
 	// log.Printf("MapViewer c: %d r: %d dlen: %d x: %s y: %s z: %s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom, mv.symbol.Name)
+
+	mv.createYAxis()
+	mv.createXAxis()
+	mv.createZdata()
+	mv.createTextValues()
+
 	return mv, nil
 }
 
@@ -176,7 +182,7 @@ func (mr *movingRectsLayout) Layout(_ []fyne.CanvasObject, size fyne.Size) {
 	for _, text := range mr.mv.textValues {
 		if text.TextSize != newTextSize {
 			text.TextSize = newTextSize
-			//text.Refresh()
+			text.Refresh()
 		}
 	}
 
@@ -195,10 +201,6 @@ func (mr *movingRectsLayout) Layout(_ []fyne.CanvasObject, size fyne.Size) {
 func (mv *MapViewer) render() fyne.CanvasObject {
 
 	// y must be created before x as it's width is used to calculate x's offset
-	mv.createYAxis()
-	mv.createXAxis()
-	mv.createZdata()
-	mv.createTextValues()
 
 	mv.crosshair.CornerRadius = 4
 	mv.crosshair.Resize(fyne.NewSize(34, 14))
@@ -485,49 +487,65 @@ func (mv *MapViewer) createButtons() *fyne.Container {
 }
 
 func (mv *MapViewer) resizeCursor() {
-	// Position and resize cursor
-	if mv.selectedX >= 0 {
-		if len(mv.selectedCells) > 1 {
-			mv := mv
-			// if multiple cells are selected, we need to calculate the bounding box
-			// of the selection area
-			minX := mv.numColumns
-			maxX := 0
-			minY := mv.numRows
-			maxY := 0
-			for _, cell := range mv.selectedCells {
-				x := cell % mv.numColumns
-				y := cell / mv.numColumns
-				if x < minX {
-					minX = x
-				}
-				if x > maxX {
-					maxX = x
-				}
-				if y < minY {
-					minY = y
-				}
-				if y > maxY {
-					maxY = y
-				}
-			}
-			topLeftX := float32(minX) * mv.widthFactor
-			topLeftY := float32(mv.numRows-1-maxY) * mv.heightFactor
-			width := float32(maxX-minX+1) * mv.widthFactor
-			height := float32(maxY-minY+1) * mv.heightFactor
-			mv.selectionRect.Resize(fyne.NewSize(width+1, height+1))
-			mv.selectionRect.Move(fyne.NewPos(topLeftX-1, topLeftY))
-
-		} else {
-			mv.selectionRect.Resize(fyne.NewSize(mv.widthFactor+1, mv.heightFactor+1))
-			mv.selectionRect.Move(
-				fyne.NewPos(
-					(float32(mv.selectedX)*mv.widthFactor)-1,
-					(float32(mv.numRows-1-mv.SelectedY) * mv.heightFactor),
-				),
-			)
-		}
+	// Early return if no selection
+	if mv.selectedX < 0 {
+		return
 	}
+
+	var pos fyne.Position
+	var size fyne.Size
+
+	// Handle multiple cell selection
+	if len(mv.selectedCells) > 1 {
+		// Pre-calculate divisor to avoid repeated division operations
+		colDivisor := float32(mv.numColumns)
+
+		// Initialize bounds using first cell to avoid unnecessary comparisons
+		firstCell := mv.selectedCells[0]
+		minX := firstCell % mv.numColumns
+		maxX := minX
+		minY := int(float32(firstCell) / colDivisor)
+		maxY := minY
+
+		// Find bounds in a single pass
+		for i := 1; i < len(mv.selectedCells); i++ {
+			cell := mv.selectedCells[i]
+			x := cell % mv.numColumns
+			y := int(float32(cell) / colDivisor)
+
+			if x < minX {
+				minX = x
+			} else if x > maxX {
+				maxX = x
+			}
+
+			if y < minY {
+				minY = y
+			} else if y > maxY {
+				maxY = y
+			}
+		}
+
+		// Calculate position and size once
+		topLeftX := float32(minX) * mv.widthFactor
+		topLeftY := float32(mv.numRows-1-maxY) * mv.heightFactor
+		width := float32(maxX-minX+1) * mv.widthFactor
+		height := float32(maxY-minY+1) * mv.heightFactor
+
+		pos = fyne.NewPos(topLeftX-1, topLeftY)
+		size = fyne.NewSize(width+1, height+1)
+	} else {
+		// Single cell selection
+		pos = fyne.NewPos(
+			(float32(mv.selectedX)*mv.widthFactor)-1,
+			(float32(mv.numRows-1-mv.SelectedY) * mv.heightFactor),
+		)
+		size = fyne.NewSize(mv.widthFactor+1, mv.heightFactor+1)
+	}
+
+	// Batch UI updates
+	mv.selectionRect.Resize(size)
+	mv.selectionRect.Move(pos)
 }
 
 var _ fyne.WidgetRenderer = (*mapViewerRenderer)(nil)

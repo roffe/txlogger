@@ -33,7 +33,7 @@ func (mw *MainWindow) savePreset() {
 
 func (mw *MainWindow) newPreset() {
 	presetName := widget.NewEntry()
-	dialog.NewForm("Create new preset         ", "Create", "Cancel", []*widget.FormItem{
+	dialog.NewForm("Create new preset", "Create", "Cancel", []*widget.FormItem{
 		widget.NewFormItem("name", presetName),
 	},
 		func(create bool) {

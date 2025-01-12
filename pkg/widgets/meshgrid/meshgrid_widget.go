@@ -363,38 +363,45 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 					neighborDepthFactor := (neighborVertex.Z - minZ) / zRange
 					neighborBaseColor := m.getColorInterpolation(neighborValue)
 					neighborEnhancedColor := m.enhanceLineColor(neighborBaseColor, neighborDepthFactor)
-
-					// For diagonal lines, darken the colors and reduce thickness
-					if n.di == 1 && n.dj == -1 {
-						// Darken both colors by reducing their values
-						enhancedColor = color.RGBA{
-							R: uint8(float64(enhancedColor.R) * 0.7),
-							G: uint8(float64(enhancedColor.G) * 0.7),
-							B: uint8(float64(enhancedColor.B) * 0.7),
-							A: enhancedColor.A,
+					m.drawLine(img,
+						image.Point{x1, y1},
+						image.Point{x2, y2},
+						0, 0,
+						enhancedColor,
+						neighborEnhancedColor)
+					/*
+						// For diagonal lines, darken the colors and reduce thickness
+						if n.di == 1 && n.dj == -1 {
+							// Darken both colors by reducing their values
+							enhancedColor = color.RGBA{
+								R: uint8(float64(enhancedColor.R) * 0.7),
+								G: uint8(float64(enhancedColor.G) * 0.7),
+								B: uint8(float64(enhancedColor.B) * 0.7),
+								A: enhancedColor.A,
+							}
+							neighborEnhancedColor = color.RGBA{
+								R: uint8(float64(neighborEnhancedColor.R) * 0.7),
+								G: uint8(float64(neighborEnhancedColor.G) * 0.7),
+								B: uint8(float64(neighborEnhancedColor.B) * 0.7),
+								A: neighborEnhancedColor.A - 90,
+							}
+							// Draw diagonal lines with -1 thickness (thinner than regular lines)
+							m.drawLine(img,
+								image.Point{x1, y1},
+								image.Point{x2, y2},
+								-1, 0, // Reduced thickness for diagonals
+								enhancedColor,
+								neighborEnhancedColor)
+						} else {
+							// Regular lines remain unchanged
+							m.drawLine(img,
+								image.Point{x1, y1},
+								image.Point{x2, y2},
+								0, 0,
+								enhancedColor,
+								neighborEnhancedColor)
 						}
-						neighborEnhancedColor = color.RGBA{
-							R: uint8(float64(neighborEnhancedColor.R) * 0.7),
-							G: uint8(float64(neighborEnhancedColor.G) * 0.7),
-							B: uint8(float64(neighborEnhancedColor.B) * 0.7),
-							A: neighborEnhancedColor.A - 90,
-						}
-						// Draw diagonal lines with -1 thickness (thinner than regular lines)
-						m.drawLine(img,
-							image.Point{x1, y1},
-							image.Point{x2, y2},
-							-1, 0, // Reduced thickness for diagonals
-							enhancedColor,
-							neighborEnhancedColor)
-					} else {
-						// Regular lines remain unchanged
-						m.drawLine(img,
-							image.Point{x1, y1},
-							image.Point{x2, y2},
-							0, 0,
-							enhancedColor,
-							neighborEnhancedColor)
-					}
+					*/
 				}
 			}
 		}

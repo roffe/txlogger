@@ -57,16 +57,17 @@ type SettingsWidget struct {
 	realtimeBars          *widget.Check
 	logFormat             *widget.Select
 	logPath               *widget.Label
-	wblSource             *widget.Select
 	useMPH                *widget.Check
 	swapRPMandSpeed       *widget.Check
 	plotResolution        *widget.Select
 	container             *container.AppTabs
 
 	// WBL Specific
+	wblSource                   *widget.Select
 	wblPortLabel                *widget.Label
 	wblPortSelect               *widget.Select
 	wblPortRefreshButton        *widget.Button
+	warningLabel                *widget.Label
 	minimumVoltageWidebandLabel *widget.Label
 	minimumVoltageWidebandEntry *widget.Entry
 	maximumVoltageWidebandLabel *widget.Label
@@ -101,8 +102,10 @@ func (sw *SettingsWidget) GetWidebandSymbolName() string {
 		switch sw.cfg.EcuSelect.Selected {
 		case "T5":
 			return "AD_EGR"
-		case "T7", "T8":
+		case "T7":
 			return "DisplProt.LambdaScanner"
+		case "T8":
+			return "LambdaScan.LambdaScanner"
 		default:
 			return "None"
 		}
@@ -233,6 +236,8 @@ func New(cfg *Config) *SettingsWidget {
 		sw.wblPortSelect.Options = append([]string{"txbridge", "CAN"}, sw.CanSettings.ListPorts()...)
 		sw.wblPortSelect.Refresh()
 	})
+
+	sw.warningLabel = widget.NewLabel("The settings below ONLY applies to T5")
 
 	sw.minimumVoltageWidebandLabel = widget.NewLabel("Minimum voltage")
 	sw.minimumVoltageWidebandEntry = widget.NewEntry()
@@ -388,6 +393,7 @@ func New(cfg *Config) *SettingsWidget {
 	tabs.Append(container.NewTabItem("WBL", container.NewVBox(
 		container.NewHBox(layout.NewSpacer(), sw.mtxl, sw.lc2, sw.uego, sw.lambdatocan, sw.t7, layout.NewSpacer()),
 		wblSel,
+		sw.warningLabel,
 		container.NewBorder(
 			nil,
 			nil,
@@ -490,6 +496,7 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 		fyne.CurrentApp().Preferences().SetString(prefsLambdaSource, s)
 		fyne.CurrentApp().Preferences().SetString(prefsWidebandSymbolName, sw.GetWidebandSymbolName())
 		var ecuSet bool
+		var portSelect bool
 		switch s {
 		case "ECU":
 			sw.mtxl.Hide()
@@ -498,36 +505,49 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 			sw.lambdatocan.Hide()
 			sw.t7.Show()
 			ecuSet = true
+			portSelect = false
 		case ecumaster.ProductString:
 			sw.mtxl.Hide()
 			sw.lc2.Hide()
 			sw.uego.Hide()
 			sw.lambdatocan.Show()
 			sw.t7.Hide()
+			portSelect = true
 		case innovate.ProductString:
 			sw.mtxl.Show()
 			sw.lc2.Show()
 			sw.uego.Hide()
 			sw.lambdatocan.Hide()
 			sw.t7.Hide()
+			portSelect = true
 		case aem.ProductString:
 			sw.mtxl.Hide()
 			sw.lc2.Hide()
 			sw.uego.Show()
 			sw.lambdatocan.Hide()
 			sw.t7.Hide()
+			portSelect = true
 		default:
 			sw.mtxl.Hide()
 			sw.lc2.Hide()
 			sw.uego.Hide()
 			sw.lambdatocan.Hide()
 			sw.t7.Hide()
+			portSelect = false
 		}
 
-		if ecuSet {
+		if portSelect {
+			sw.wblPortLabel.Show()
+			sw.wblPortSelect.Show()
+			sw.wblPortRefreshButton.Show()
+		} else {
 			sw.wblPortLabel.Hide()
 			sw.wblPortSelect.Hide()
 			sw.wblPortRefreshButton.Hide()
+		}
+
+		if ecuSet {
+			sw.warningLabel.Show()
 			sw.minimumVoltageWidebandLabel.Show()
 			sw.maximumVoltageWidebandLabel.Show()
 			sw.lowAFRLabel.Show()
@@ -537,9 +557,7 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 			sw.lowAFREntry.Show()
 			sw.highAFREntry.Show()
 		} else {
-			sw.wblPortLabel.Show()
-			sw.wblPortSelect.Show()
-			sw.wblPortRefreshButton.Show()
+			sw.warningLabel.Hide()
 			sw.minimumVoltageWidebandLabel.Hide()
 			sw.maximumVoltageWidebandLabel.Hide()
 			sw.lowAFRLabel.Hide()

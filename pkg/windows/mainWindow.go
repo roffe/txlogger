@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
@@ -18,6 +19,7 @@ import (
 	xwidget "fyne.io/x/fyne/widget"
 	"github.com/ebitengine/oto/v3"
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ebus"
@@ -42,6 +44,34 @@ const (
 	prefsSelectedPreset = "selectedPreset"
 )
 
+var _ fyne.Tappable = (*secretText)(nil)
+
+type secretText struct {
+	*widget.Label
+	tappedTimes int
+	SecretFunc  func()
+}
+
+func (s *secretText) Tapped(*fyne.PointEvent) {
+	s.tappedTimes++
+	//	log.Println("tapped", s.tappedTimes)
+	if s.tappedTimes >= 10 {
+		t := fyne.NewStaticResource("taz.png", assets.Taz)
+		cv := canvas.NewImageFromResource(t)
+		cv.SetMinSize(fyne.NewSize(0, 0))
+		cont := container.NewStack(cv)
+		s.tappedTimes = 0
+		if f := s.SecretFunc; f != nil {
+			f()
+		}
+		dialog.ShowCustom("You found the secret", "Leif", cont, fyne.CurrentApp().Driver().AllWindows()[0])
+		an := canvas.NewSizeAnimation(fyne.NewSize(0, 0), fyne.NewSize(370, 386), time.Second, func(size fyne.Size) {
+			cv.Resize(size)
+		})
+		an.Start()
+	}
+}
+
 type MainWindow struct {
 	fyne.Window
 	app             fyne.App
@@ -57,12 +87,11 @@ type MainWindow struct {
 	dlc             datalogger.IClient
 	buttonsDisabled bool
 	settings        *settings.SettingsWidget
-	statusText      *widget.Label
+	statusText      *secretText
 	oCtx            *oto.Context
 	wm              *multiwindow.MultipleWindows
-	// tabs            *container.AppTabs
-	content *fyne.Container
-	startup bool
+	content         *fyne.Container
+	startup         bool
 }
 
 type mainWindowSelects struct {
@@ -109,7 +138,7 @@ func NewMainWindow(app fyne.App, filename string) *MainWindow {
 		selects: &mainWindowSelects{},
 		buttons: &mainWindowButtons{},
 
-		statusText: widget.NewLabel("Harder, Better, Faster, Stronger"),
+		statusText: &secretText{Label: widget.NewLabel("Harder, Better, Faster, Stronger")},
 
 		oCtx: newOtoContext(),
 	}
@@ -376,7 +405,6 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, p fyne.Position) {
 	//iw.CloseIntercept = func() {
 	//	cp.Close()
 	//}
-
 	w := mw.app.NewWindow(fp)
 	w.SetContent(cp)
 	w.SetCloseIntercept(func() {
@@ -384,7 +412,7 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, p fyne.Position) {
 		w.Close()
 	})
 	w.Canvas().SetOnTypedKey(cp.TypedKey)
-	w.Show()
+	fyne.Do(w.Show)
 	//mw.wm.Add(iw, p)
 }
 
