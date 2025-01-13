@@ -441,7 +441,7 @@ func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position) {
 	lp.OnMouseDown = func() {
 		mw.wm.Raise(iw)
 	}
-	iw.CloseIntercept = func() {
+	iw.OnClose = func() {
 		lp.Close()
 	}
 

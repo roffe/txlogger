@@ -175,7 +175,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		cancel := ebus.SubscribeFunc("Pgm_status", pgs.Set)
 		iw := multiwindow.NewInnerWindow("Pgm_status", pgs)
 		iw.Icon = theme.InfoIcon()
-		iw.CloseIntercept = func() {
+		iw.OnClose = func() {
 			if cancel != nil {
 				cancel()
 			}
@@ -335,7 +335,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			mv.SetValue(axis.YFrom, value)
 		}))
 	}
-	mapWindow.CloseIntercept = func() {
+	mapWindow.OnClose = func() {
 		for _, f := range cancelFuncs {
 			f()
 		}

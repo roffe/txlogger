@@ -105,7 +105,7 @@ func (mw *MainWindow) newSymbolListBtn() *widget.Button {
 		} else {
 			mw.symbolList.Clear()
 		}
-		symbolListWindow.CloseIntercept = func() {
+		symbolListWindow.OnClose = func() {
 			for _, f := range cancelFuncs {
 				f()
 			}
@@ -238,6 +238,7 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 		}
 
 		dbcfg := &dashboard.Config{
+			EBus:            ebus.CONTROLLER,
 			Logplayer:       false,
 			UseMPH:          mw.settings.GetUseMPH(),
 			SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
@@ -299,10 +300,11 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 			}
 		}
 
-		dbw.CloseIntercept = func() {
+		dbw.OnClose = func() {
 			for _, f := range cancelFuncs {
 				f()
 			}
+			db.Close()
 		}
 		mw.wm.Add(dbw)
 		if mw.startup {

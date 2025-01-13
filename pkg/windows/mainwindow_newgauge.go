@@ -216,7 +216,7 @@ func (g *GaugeCreator) onSubmit() {
 		return
 	}
 	iw := multiwindow.NewInnerWindow(g.entries.name.Text, gauge)
-	iw.CloseIntercept = func() {
+	iw.OnClose = func() {
 		for _, cancel := range cancelFuncs {
 			cancel()
 		}

@@ -110,7 +110,7 @@ func (sw *SettingsWidget) GetWidebandSymbolName() string {
 			return "None"
 		}
 	case ecumaster.ProductString, innovate.ProductString, aem.ProductString:
-		return datalogger.EXTERNALWBLSYM
+		return datalogger.EXTERNALWBLSYM // Lambda.External
 	default:
 		return "None"
 	}

@@ -106,7 +106,7 @@ func (mw *MainWindow) openEBUSMonitor() {
 	eb := multiwindow.NewSystemWindow("EBUS Monitor", mon)
 	eb.Icon = theme.ComputerIcon()
 	ebus.SetOnMessage(mon.SetText)
-	eb.CloseIntercept = func() {
+	eb.OnClose = func() {
 		ebus.SetOnMessage(nil)
 	}
 	mw.wm.Add(eb)

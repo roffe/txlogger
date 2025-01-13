@@ -167,7 +167,7 @@ func (mw *MainWindow) LoadLayout(name string) error {
 				continue
 			}
 			iw := multiwindow.NewInnerWindow(h.Title, gauge)
-			iw.CloseIntercept = func() {
+			iw.OnClose = func() {
 				for _, cancel := range cancelFuncs {
 					cancel()
 				}

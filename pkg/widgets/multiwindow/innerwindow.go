@@ -24,7 +24,7 @@ type InnerWindow struct {
 	//	- On Darwin this will be `widget.ButtonAlignLeading`
 	//	- On all other OS this will be `widget.ButtonAlignTrailing`
 	ButtonAlignment                                     widget.ButtonAlign
-	CloseIntercept                                      func()                `json:"-"`
+	OnClose                                             func()                `json:"-"`
 	OnDragged, OnResized                                func(*fyne.DragEvent) `json:"-"`
 	OnMinimized, OnMaximized, OnTappedBar, OnTappedIcon func()                `json:"-"`
 	OnMouseDown                                         func()                `json:"-"`
@@ -113,8 +113,8 @@ func (w *InnerWindow) PreMaximizedPos() fyne.Position {
 
 func (w *InnerWindow) Close() {
 	// Call user defined close intercept
-	if w.CloseIntercept != nil {
-		w.CloseIntercept()
+	if w.OnClose != nil {
+		w.OnClose()
 	}
 
 	// Call system defined close intercept

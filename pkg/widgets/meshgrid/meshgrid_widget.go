@@ -76,7 +76,7 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 		zlabel: zlabel,
 	}
 
-	m.createVertices(400, 400)
+	m.createVertices(fyne.Min(float32(m.cols), 1), fyne.Min(float32(m.rows), 1))
 
 	m.scaleMeshgrid(0.3)
 
@@ -191,7 +191,7 @@ func (m *Meshgrid) SetFloat642(idx int, value float64) {
 	m.values[idx] = value
 	m.zmin, m.zmax, m.zrange = findMinMaxRange(m.values)
 	m.vertices[idx/m.cols][idx%m.cols].Z = ((value - m.zmin) / m.zrange) * m.depth // Normalize to [0, 1]
-	m.createVertices(400, 400)
+	m.createVertices(fyne.Min(float32(m.cols), 1), fyne.Min(float32(m.rows), 1))
 	m.refresh()
 }
 
@@ -216,7 +216,7 @@ func (m *Meshgrid) LoadFloat64s(floats []float64) {
 	oldPanY := m.panY
 
 	// Reset vertices with new values
-	m.createVertices(400, 400)
+	m.createVertices(fyne.Min(float32(m.cols), 1), fyne.Min(float32(m.rows), 1))
 
 	// Calculate the true center of the mesh using original coordinates
 	var sumX, sumY, sumZ float64
