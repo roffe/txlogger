@@ -238,7 +238,6 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 		}
 
 		dbcfg := &dashboard.Config{
-			EBus:            ebus.CONTROLLER,
 			Logplayer:       false,
 			UseMPH:          mw.settings.GetUseMPH(),
 			SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
