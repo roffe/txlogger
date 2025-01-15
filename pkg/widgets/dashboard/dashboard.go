@@ -253,14 +253,17 @@ func NewDashboard(cfg *Config) *Dashboard {
 	db.image.taz.Hide()
 
 	db.image.checkEngine.FillMode = canvas.ImageFillContain
+	db.image.checkEngine.ScaleMode = canvas.ImageScalePixels
 	db.image.checkEngine.SetMinSize(fyne.NewSize(110, 85))
 	db.image.checkEngine.Resize(fyne.NewSize(110, 85))
 
 	db.image.limpMode.FillMode = canvas.ImageFillContain
+	db.image.limpMode.ScaleMode = canvas.ImageScalePixels
 	db.image.limpMode.SetMinSize(fyne.NewSize(110, 85))
 	db.image.limpMode.Resize(fyne.NewSize(110, 85))
 
 	db.image.taz.FillMode = canvas.ImageFillContain
+	db.image.taz.ScaleMode = canvas.ImageScalePixels
 	db.image.taz.SetMinSize(fyne.NewSize(110, 85))
 	db.image.taz.Resize(fyne.NewSize(110, 85))
 
@@ -781,7 +784,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 }
 
 func (dr *DashboardRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(500, 300)
+	return fyne.Size{Width: 480, Height: 300}
 }
 
 func (dr *DashboardRenderer) Refresh() {

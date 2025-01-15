@@ -1,7 +1,3 @@
-;NSIS Modern User Interface
-;Start Menu Folder Selection Example Script
-;Written by Joost Verburg
-
 ;--------------------------------
 ;Include Modern UI
 

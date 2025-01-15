@@ -218,7 +218,6 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 				w.Resize(sz)
 			})
 			rs.Start()
-
 			return
 		}
 
@@ -228,7 +227,7 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 			bounds := m.content.Size()
 			newPos.X = clamp32(newPos.X, 0, bounds.Width-size.Width)
 			newPos.Y = clamp32(newPos.Y, 0, bounds.Height-size.Height)
-			bounds.Subtract(size).Max(newPos)
+			//bounds.Subtract(size).Max(newPos)
 		}
 		w.Move(newPos)
 	}

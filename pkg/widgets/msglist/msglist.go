@@ -13,7 +13,9 @@ var _ fyne.Widget = (*MsgList)(nil)
 
 type MsgList struct {
 	widget.BaseWidget
-	msgs binding.StringList
+	msgs     binding.StringList
+	output   *widget.List
+	listener binding.DataListener
 }
 
 func New(data binding.StringList) *MsgList {
@@ -21,11 +23,8 @@ func New(data binding.StringList) *MsgList {
 		msgs: data,
 	}
 	m.ExtendBaseWidget(m)
-	return m
-}
 
-func (m *MsgList) CreateRenderer() fyne.WidgetRenderer {
-	output := widget.NewListWithData(
+	m.output = widget.NewListWithData(
 		m.msgs,
 		func() fyne.CanvasObject {
 			w := widget.NewLabel("")
@@ -44,9 +43,18 @@ func (m *MsgList) CreateRenderer() fyne.WidgetRenderer {
 		},
 	)
 
+	m.listener = binding.NewDataListener(func() {
+		m.output.ScrollToBottom()
+	})
+
+	return m
+}
+
+func (m *MsgList) CreateRenderer() fyne.WidgetRenderer {
+	m.msgs.AddListener(m.listener)
 	return &msgListRenderer{
 		m:         m,
-		container: container.NewVScroll(output),
+		container: container.NewVScroll(m.output),
 	}
 }
 
@@ -70,9 +78,11 @@ func (r *msgListRenderer) Objects() []fyne.CanvasObject {
 }
 
 func (r *msgListRenderer) Refresh() {
+
 }
 
 func (r *msgListRenderer) Destroy() {
+	r.m.msgs.RemoveListener(r.m.listener)
 }
 
 func (r *msgListRenderer) FocusGained() {

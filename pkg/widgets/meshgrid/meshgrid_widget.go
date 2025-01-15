@@ -17,6 +17,8 @@ type Vertex struct {
 	X, Y, Z    float64 // Transformed coordinates for rendering
 }
 
+var _ fyne.Widget = (*Meshgrid)(nil)
+
 type Meshgrid struct {
 	widget.BaseWidget
 
@@ -29,7 +31,6 @@ type Meshgrid struct {
 	vertices [][]Vertex
 
 	lastMouseX, lastMouseY float32
-	isDragging             bool
 
 	image *canvas.Image
 	size  fyne.Size
@@ -42,7 +43,6 @@ type Meshgrid struct {
 	panX, panY     float64 // Add pan offset tracking
 
 	mousePosition image.Point
-	showCrosshair bool
 
 	xlabel, ylabel, zlabel string
 }
@@ -324,6 +324,7 @@ func (m *meshgridRenderer) Objects() []fyne.CanvasObject {
 }
 
 func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
+	//	log.Println("drawMeshgridLines")
 	img := image.NewRGBA(image.Rect(0, 0, int(m.size.Width), int(m.size.Height)))
 
 	// Find the min and max Z values after projection for depth scaling
@@ -363,52 +364,53 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 					neighborDepthFactor := (neighborVertex.Z - minZ) / zRange
 					neighborBaseColor := m.getColorInterpolation(neighborValue)
 					neighborEnhancedColor := m.enhanceLineColor(neighborBaseColor, neighborDepthFactor)
-					m.drawLine(img,
-						image.Point{x1, y1},
-						image.Point{x2, y2},
-						0, 0,
-						enhancedColor,
-						neighborEnhancedColor)
 					/*
-						// For diagonal lines, darken the colors and reduce thickness
-						if n.di == 1 && n.dj == -1 {
-							// Darken both colors by reducing their values
-							enhancedColor = color.RGBA{
-								R: uint8(float64(enhancedColor.R) * 0.7),
-								G: uint8(float64(enhancedColor.G) * 0.7),
-								B: uint8(float64(enhancedColor.B) * 0.7),
-								A: enhancedColor.A,
-							}
-							neighborEnhancedColor = color.RGBA{
-								R: uint8(float64(neighborEnhancedColor.R) * 0.7),
-								G: uint8(float64(neighborEnhancedColor.G) * 0.7),
-								B: uint8(float64(neighborEnhancedColor.B) * 0.7),
-								A: neighborEnhancedColor.A - 90,
-							}
-							// Draw diagonal lines with -1 thickness (thinner than regular lines)
-							m.drawLine(img,
-								image.Point{x1, y1},
-								image.Point{x2, y2},
-								-1, 0, // Reduced thickness for diagonals
-								enhancedColor,
-								neighborEnhancedColor)
-						} else {
-							// Regular lines remain unchanged
-							m.drawLine(img,
-								image.Point{x1, y1},
-								image.Point{x2, y2},
-								0, 0,
-								enhancedColor,
-								neighborEnhancedColor)
-						}
+						m.drawLine(img,
+							image.Point{x1, y1},
+							image.Point{x2, y2},
+							0, 0,
+							enhancedColor,
+							neighborEnhancedColor)
 					*/
+
+					// For diagonal lines, darken the colors and reduce thickness
+					if n.di == 1 && n.dj == -1 {
+						// Darken both colors by reducing their values
+						enhancedColor = color.RGBA{
+							R: uint8(float64(enhancedColor.R) * 0.7),
+							G: uint8(float64(enhancedColor.G) * 0.7),
+							B: uint8(float64(enhancedColor.B) * 0.7),
+							A: enhancedColor.A,
+						}
+						neighborEnhancedColor = color.RGBA{
+							R: uint8(float64(neighborEnhancedColor.R) * 0.7),
+							G: uint8(float64(neighborEnhancedColor.G) * 0.7),
+							B: uint8(float64(neighborEnhancedColor.B) * 0.7),
+							A: neighborEnhancedColor.A - 90,
+						}
+						// Draw diagonal lines with -1 thickness (thinner than regular lines)
+						m.drawLine(img,
+							image.Point{x1, y1},
+							image.Point{x2, y2},
+							-1, 0, // Reduced thickness for diagonals
+							enhancedColor,
+							neighborEnhancedColor)
+					} else {
+						// Regular lines remain unchanged
+						m.drawLine(img,
+							image.Point{x1, y1},
+							image.Point{x2, y2},
+							0, 0,
+							enhancedColor,
+							neighborEnhancedColor)
+					}
+
 				}
 			}
 		}
 	}
 
-	// Draw crosshair if needed
-	if m.showCrosshair {
+	/*
 		// Draw horizontal and vertical lines
 		crosshairSize := 10
 		crosshairColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
@@ -429,7 +431,6 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 					}
 				}
 			}
-
 			// Draw the value text
 			m.drawText(img, valueText,
 				m.mousePosition.X+3, m.mousePosition.Y-2-boxHeight+12,
@@ -447,8 +448,7 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 			image.Point{m.mousePosition.X, m.mousePosition.Y - crosshairSize},
 			image.Point{m.mousePosition.X, m.mousePosition.Y + crosshairSize},
 			0, 0, crosshairColor, crosshairColor)
-
-	}
+	*/
 
 	// Draw the axis indicator after the mesh
 	m.drawAxisIndicator(img)

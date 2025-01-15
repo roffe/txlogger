@@ -2,15 +2,16 @@ package datalogger
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/adapter"
 	"github.com/roffe/txlogger/pkg/wbl/aem"
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
+	"github.com/roffe/txlogger/pkg/wbl/plx"
 )
 
 type WBLConfig struct {
@@ -75,9 +76,19 @@ func NewWBL(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 			// defer wblSub.Close()
 			go func() {
 				for msg := range wblSub.C() {
-					// create a float from the 2 first bytes in the message
-					lambda := float64(binary.BigEndian.Uint16(msg.Data()[0:2])) / 100
-					wblClient.SetLambda(lambda)
+					if msg == nil {
+						cfg.Log("wbl nil message")
+						return
+					}
+					// create a float from the message
+					f, err := strconv.ParseFloat(string(msg.Data()), 64)
+					if err != nil {
+						cfg.Log("could not decode WBL value")
+						continue
+					}
+
+					//lambda := float64(binary.BigEndian.Uint16(msg.Data()[0:2])) / 100
+					wblClient.SetLambda(f / 10)
 				}
 			}()
 		} else if cfg.Port == "CAN" {
@@ -91,6 +102,37 @@ func NewWBL(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 			}()
 		} else {
 			cfg.Log("Starting AEM serial client")
+			if err := wblClient.Start(ctx); err != nil {
+				return nil, err
+			}
+		}
+		return wblClient, nil
+
+	case plx.ProductString:
+		wblClient, err := plx.NewIMFDClient(cfg.Port, nil, cfg.Log)
+		if err != nil {
+			return nil, err
+		}
+		if cfg.Txbridge {
+			if err := cl.SendFrame(adapter.SystemMsg, []byte{'w', 1, 'p', 'p'}, gocan.Outgoing); err != nil {
+				return nil, err
+			}
+			wblSub := cl.Subscribe(ctx, adapter.SystemMsgWBLReading)
+
+			go func() {
+				for msg := range wblSub.C() {
+					if msg == nil {
+						cfg.Log("wbl nil message")
+						return
+					}
+					// log.Printf("plx: %X\n", msg.Data())
+					if err := wblClient.Parse(msg.Data()); err != nil {
+						cfg.Log(err.Error())
+						log.Println(err)
+					}
+				}
+			}()
+		} else {
 			if err := wblClient.Start(ctx); err != nil {
 				return nil, err
 			}

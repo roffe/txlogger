@@ -47,6 +47,7 @@ func LogRaw(msg string) {
 		}
 	}
 	fh.WriteString(msg + "\n")
+	log.Println(msg)
 }
 func Close() {
 	fh.Sync()

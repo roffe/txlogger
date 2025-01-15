@@ -311,10 +311,14 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	}
 
 	if mw.settings.GetAutoLoad() && mw.dlc != nil {
-		p := progressmodal.New(mw.Window.Content(), "Loading "+axis.Z)
+		p := progressmodal.New(mw.Window.Canvas(), "Loading "+axis.Z)
 		p.Show()
-		loadFunc()
-		p.Hide()
+		go func() {
+			loadFunc()
+			fyne.Do(func() {
+				p.Hide()
+			})
+		}()
 	}
 
 	mapWindow := multiwindow.NewInnerWindow(axis.Z+" - "+axis.ZDescription, mv)

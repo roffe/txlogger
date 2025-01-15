@@ -39,6 +39,14 @@ cloud.google.com/go/storage v1.10.0/go.mod h1:FLPqc6j+Ki4BU591ie1oL6qBQGu2Bl/tZ9
 dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7gZCb22OMCxBHrMx7a5I7Hp++hsVxbQ4BYO7hU=
 fyne.io/fyne/v2 v2.5.3-rc7.0.20250112143715-4a30df3bdcfe h1:z2AOcsFRfpRxE8+SCB6P6Gk9owSLbr3Wy9d+IsPJF/A=
 fyne.io/fyne/v2 v2.5.3-rc7.0.20250112143715-4a30df3bdcfe/go.mod h1:6/uEYg4FEhspAcWgsokutm9wFMHDNSYuEHCKTYWSho8=
+fyne.io/fyne/v2 v2.5.3-rc7.0.20250113152421-91e0a96bb55c h1:geQkLg3HqIv3vPwMdzC/zWS3XbwzY1my82Usw8wqBew=
+fyne.io/fyne/v2 v2.5.3-rc7.0.20250113152421-91e0a96bb55c/go.mod h1:6/uEYg4FEhspAcWgsokutm9wFMHDNSYuEHCKTYWSho8=
+fyne.io/fyne/v2 v2.5.3-rc7.0.20250113190319-4773721e7aa5 h1:IFw2UPoZX2CKZQYEfvWz/MTj2ATVqk1ZvWHNIUPTd4E=
+fyne.io/fyne/v2 v2.5.3-rc7.0.20250113190319-4773721e7aa5/go.mod h1:6/uEYg4FEhspAcWgsokutm9wFMHDNSYuEHCKTYWSho8=
+fyne.io/fyne/v2 v2.5.3-rc7.0.20250114053056-d7eeddc678de h1:giUvh1T5X3jeltcrRpuueFqL4EZolKC9LopOFZG/LwU=
+fyne.io/fyne/v2 v2.5.3-rc7.0.20250114053056-d7eeddc678de/go.mod h1:6/uEYg4FEhspAcWgsokutm9wFMHDNSYuEHCKTYWSho8=
+fyne.io/fyne/v2 v2.5.3 h1:k6LjZx6EzRZhClsuzy6vucLZBstdH2USDGHSGWq8ly8=
+fyne.io/fyne/v2 v2.5.3/go.mod h1:0GOXKqyvNwk3DLmsFu9v0oYM0ZcD1ysGnlHCerKoAmo=
 fyne.io/systray v1.11.0 h1:D9HISlxSkx+jHSniMBR6fCFOUjk1x/OOOJLa9lJYAKg=
 fyne.io/systray v1.11.0/go.mod h1:RVwqP9nYMo7h5zViCBHri2FgjXF7H2cub7MAq4NSoLs=
 fyne.io/x/fyne v0.0.0-20240803204126-8b5b5bfe65ef h1:5qFhIzsvwmIybR4GlmENHHjOkQB5XsRZ6ujO0ktnsl4=

@@ -13,7 +13,7 @@ type ProgressModal struct {
 	pb *widget.ProgressBarInfinite
 }
 
-func New(obj fyne.CanvasObject, message string) *ProgressModal {
+func New(c fyne.Canvas, message string) *ProgressModal {
 	bobrK := canvas.NewImageFromResource(fyne.NewStaticResource("bobr.jpg", assets.Bobr))
 	bobrK.SetMinSize(fyne.NewSize(150, 150))
 	bobrK.FillMode = canvas.ImageFillOriginal
@@ -21,7 +21,7 @@ func New(obj fyne.CanvasObject, message string) *ProgressModal {
 	pb := widget.NewProgressBarInfinite()
 	msg := container.NewBorder(bobrK, pb, nil, nil, widget.NewLabel(message))
 	return &ProgressModal{
-		p:  widget.NewModalPopUp(msg, fyne.CurrentApp().Driver().CanvasForObject(obj)),
+		p:  widget.NewModalPopUp(msg, c),
 		pb: pb,
 	}
 }

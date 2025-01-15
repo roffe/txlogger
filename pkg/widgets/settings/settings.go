@@ -17,6 +17,7 @@ import (
 	"github.com/roffe/txlogger/pkg/wbl/aem"
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
+	"github.com/roffe/txlogger/pkg/wbl/plx"
 	"github.com/roffe/txlogger/pkg/widgets/cansettings"
 	sdialog "github.com/sqweek/dialog"
 )
@@ -88,6 +89,7 @@ type SettingsWidget struct {
 	uego        *canvas.Image
 	lambdatocan *canvas.Image
 	t7          *canvas.Image
+	plx         *canvas.Image
 
 	widget.BaseWidget
 }
@@ -109,7 +111,7 @@ func (sw *SettingsWidget) GetWidebandSymbolName() string {
 		default:
 			return "None"
 		}
-	case ecumaster.ProductString, innovate.ProductString, aem.ProductString:
+	case ecumaster.ProductString, innovate.ProductString, aem.ProductString, plx.ProductString:
 		return datalogger.EXTERNALWBLSYM // Lambda.External
 	default:
 		return "None"
@@ -387,11 +389,14 @@ func New(cfg *Config) *SettingsWidget {
 	sw.uego = newImageFromResource("uego")
 	sw.lambdatocan = newImageFromResource("lambdatocan")
 	sw.t7 = newImageFromResource("t7")
+	sw.plx = newImageFromResource("plx")
 
 	wblSel := sw.newWBLSelector()
 
 	tabs.Append(container.NewTabItem("WBL", container.NewVBox(
-		container.NewHBox(layout.NewSpacer(), sw.mtxl, sw.lc2, sw.uego, sw.lambdatocan, sw.t7, layout.NewSpacer()),
+		container.NewHBox(
+			layout.NewSpacer(), sw.mtxl, sw.lc2, sw.uego, sw.lambdatocan, sw.t7, sw.plx, layout.NewSpacer(),
+		),
 		wblSel,
 		sw.warningLabel,
 		container.NewBorder(
@@ -473,9 +478,12 @@ func newImageFromResource(name string) *canvas.Image {
 	case "t7":
 		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.T7))
 		img.SetMinSize(fyne.NewSize(320, 224))
+	case "plx":
+		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.PLXSMAFR))
+		img.SetMinSize(fyne.NewSize(470, 224))
 	}
 	img.FillMode = canvas.ImageFillContain
-	img.ScaleMode = canvas.ImageScaleSmooth
+	img.ScaleMode = canvas.ImageScalePixels
 	return img
 }
 
@@ -492,6 +500,7 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 		ecumaster.ProductString,
 		innovate.ProductString,
 		aem.ProductString,
+		plx.ProductString,
 	}, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsLambdaSource, s)
 		fyne.CurrentApp().Preferences().SetString(prefsWidebandSymbolName, sw.GetWidebandSymbolName())
@@ -504,6 +513,7 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 			sw.uego.Hide()
 			sw.lambdatocan.Hide()
 			sw.t7.Show()
+			sw.plx.Hide()
 			ecuSet = true
 			portSelect = false
 		case ecumaster.ProductString:
@@ -512,13 +522,15 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 			sw.uego.Hide()
 			sw.lambdatocan.Show()
 			sw.t7.Hide()
-			portSelect = true
+			sw.plx.Hide()
+			portSelect = false
 		case innovate.ProductString:
 			sw.mtxl.Show()
 			sw.lc2.Show()
 			sw.uego.Hide()
 			sw.lambdatocan.Hide()
 			sw.t7.Hide()
+			sw.plx.Hide()
 			portSelect = true
 		case aem.ProductString:
 			sw.mtxl.Hide()
@@ -526,6 +538,15 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 			sw.uego.Show()
 			sw.lambdatocan.Hide()
 			sw.t7.Hide()
+			sw.plx.Hide()
+			portSelect = true
+		case plx.ProductString:
+			sw.mtxl.Hide()
+			sw.lc2.Hide()
+			sw.uego.Hide()
+			sw.lambdatocan.Hide()
+			sw.t7.Hide()
+			sw.plx.Show()
 			portSelect = true
 		default:
 			sw.mtxl.Hide()
@@ -533,6 +554,7 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 			sw.uego.Hide()
 			sw.lambdatocan.Hide()
 			sw.t7.Hide()
+			sw.plx.Hide()
 			portSelect = false
 		}
 

@@ -12,14 +12,13 @@ import (
 //	return desktop.CrosshairCursor
 //}
 
+var _ desktop.Hoverable = (*Meshgrid)(nil)
+
 func (m *Meshgrid) MouseIn(_ *desktop.MouseEvent) {
-	m.showCrosshair = true
-	m.refresh()
 }
 
 // Add this method to clear crosshair when mouse leaves
 func (m *Meshgrid) MouseOut() {
-
 }
 
 /*
@@ -42,49 +41,41 @@ func (m *Meshgrid) DragEnd() {
 }
 */
 
+const (
+	rotationScale = 0.5
+	rollScale     = 0.3
+	panScale      = 0.5
+)
+
 func (m *Meshgrid) MouseMoved(event *desktop.MouseEvent) {
 	m.mousePosition = image.Point{X: int(event.Position.X), Y: int(event.Position.Y)}
-	m.showCrosshair = true
 
 	dx := float64(event.Position.X - m.lastMouseX)
 	dy := float64(event.Position.Y - m.lastMouseY)
 
-	const (
-		rotationScale = 0.5
-		rollScale     = 0.3
-		panScale      = 0.5
-	)
-
-	if m.isDragging {
-		if event.Button&desktop.MouseButtonPrimary == desktop.MouseButtonPrimary {
-			m.rotateMeshgrid(0, dy*rotationScale, dx*rotationScale)
-		} else if event.Button&desktop.MouseButtonSecondary == desktop.MouseButtonSecondary {
-			roll := (dx + dy) * rollScale
-			m.rotateMeshgrid(-roll, 0, 0)
-		} else if event.Button&desktop.MouseButtonTertiary == desktop.MouseButtonTertiary {
-			m.panMeshgrid(dx*panScale, dy*panScale)
-		}
+	if event.Button&desktop.MouseButtonPrimary == desktop.MouseButtonPrimary {
+		m.rotateMeshgrid(0, dy*rotationScale, dx*rotationScale)
+		m.refresh()
+	} else if event.Button&desktop.MouseButtonSecondary == desktop.MouseButtonSecondary {
+		roll := (dx + dy) * rollScale
+		m.rotateMeshgrid(-roll, 0, 0)
+		m.refresh()
+	} else if event.Button&desktop.MouseButtonTertiary == desktop.MouseButtonTertiary {
+		m.panMeshgrid(dx*panScale, dy*panScale)
+		m.refresh()
 	}
 
 	m.lastMouseX = event.Position.X
 	m.lastMouseY = event.Position.Y
 
-	m.refresh()
 }
 
 func (m *Meshgrid) MouseDown(event *desktop.MouseEvent) {
-	if event.Button&desktop.MouseButtonPrimary == desktop.MouseButtonPrimary ||
-		event.Button&desktop.MouseButtonSecondary == desktop.MouseButtonSecondary ||
-		event.Button&desktop.MouseButtonTertiary == desktop.MouseButtonTertiary {
-		m.isDragging = true
-	}
-	m.lastMouseX = event.Position.X
-	m.lastMouseY = event.Position.Y
+
 }
 
 // MouseUp is called when a mouse button is released
 func (m *Meshgrid) MouseUp(event *desktop.MouseEvent) {
-	m.isDragging = false
 }
 
 func (m *Meshgrid) Scrolled(event *fyne.ScrollEvent) {

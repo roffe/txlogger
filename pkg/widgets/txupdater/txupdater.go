@@ -3,7 +3,6 @@ package txupdater
 import (
 	"fmt"
 	"log"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -19,6 +18,7 @@ type TxUpdater struct {
 	progressbar *widget.ProgressBar
 	updateBtn   *widget.Button
 	container   *fyne.Container
+	listener    binding.DataListener
 
 	widget.BaseWidget
 }
@@ -56,33 +56,30 @@ func New(port string) *TxUpdater {
 
 	t.updateBtn = widget.NewButton("Update", func() {
 		t.updateBtn.Disable()
-		defer func() {
-			go func() {
-				time.Sleep(100 * time.Millisecond)
-				t.output.ScrollToBottom()
-			}()
-		}()
-
-		cfg := ota.Config{
-			Port: t.port,
-			Logfunc: func(v ...any) {
-				defer func() {
-					go func() {
-						time.Sleep(100 * time.Millisecond)
-						t.output.ScrollToBottom()
-					}()
-				}()
-				t.outputData.Append(fmt.Sprint(v...))
-			},
-			ProgressFunc: t.progressbar.SetValue,
-		}
 		go func() {
-			defer t.updateBtn.Enable()
-			if err := ota.UpdateOTA(cfg); err != nil {
-				t.outputData.Append(fmt.Sprint("Error: ", err))
+			defer fyne.Do(t.updateBtn.Enable)
+			if err := ota.UpdateOTA(ota.Config{
+				Port: t.port,
+				Logfunc: func(v ...any) {
+					fyne.Do(func() {
+						t.outputData.Append(fmt.Sprint(v...))
+					})
+				},
+				ProgressFunc: func(progress float64) {
+					fyne.Do(func() {
+						t.progressbar.SetValue(progress)
+					})
+				},
+			}); err != nil {
+				fyne.Do(func() {
+					t.outputData.Append(fmt.Sprint("Error: ", err))
+				})
 			}
 		}()
+	})
 
+	t.listener = binding.NewDataListener(func() {
+		t.output.ScrollToBottom()
 	})
 
 	t.render()
@@ -106,5 +103,30 @@ func (tu *TxUpdater) render() *TxUpdater {
 }
 
 func (tu *TxUpdater) CreateRenderer() fyne.WidgetRenderer {
+	tu.outputData.AddListener(tu.listener)
 	return widget.NewSimpleRenderer(tu.container)
+}
+
+type TxUpdaterRenderer struct {
+	t *TxUpdater
+}
+
+func (tr *TxUpdaterRenderer) Layout(space fyne.Size) {
+	tr.t.container.Resize(space)
+}
+
+func (tr *TxUpdaterRenderer) MinSize() fyne.Size {
+	return tr.t.container.MinSize()
+}
+
+func (tr *TxUpdaterRenderer) Refresh() {
+
+}
+
+func (tr *TxUpdaterRenderer) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{tr.t.container}
+}
+
+func (tr *TxUpdaterRenderer) Destroy() {
+	tr.t.outputData.RemoveListener(tr.t.listener)
 }

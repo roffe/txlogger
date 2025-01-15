@@ -36,9 +36,13 @@ type MapViewerInfo struct {
 	XFrom, YFrom        string
 }
 
-var _ fyne.Focusable = (*MapViewer)(nil)
-var _ fyne.Tappable = (*MapViewer)(nil)
-var _ desktop.Mouseable = (*MapViewer)(nil)
+var (
+	//  _ fyne.Tappable = (*MapViewer)(nil)
+	_ fyne.Focusable    = (*MapViewer)(nil)
+	_ desktop.Mouseable = (*MapViewer)(nil)
+	_ desktop.Hoverable = (*MapViewer)(nil)
+	_ fyne.Draggable    = (*MapViewer)(nil)
+)
 
 type MapViewer struct {
 	widget.BaseWidget
@@ -157,6 +161,19 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 
 	return mv, nil
 }
+
+// Dragged is called when the user drags the window.
+func (mv *MapViewer) Dragged(ev *fyne.DragEvent) {
+	moveEvent := &desktop.MouseEvent{}
+	moveEvent.Position = ev.Position
+	if mv.selecting {
+		moveEvent.Button = desktop.MouseButtonPrimary
+	}
+	mv.MouseMoved(moveEvent)
+}
+
+// DragEnd is called when the user stops dragging the window.
+func (mv *MapViewer) DragEnd() {}
 
 func (mv *MapViewer) CreateRenderer() fyne.WidgetRenderer {
 	//return widget.NewSimpleRenderer(mv.content)
@@ -467,18 +484,20 @@ func (mv *MapViewer) createButtons() *fyne.Container {
 				mv.funcs.saveFileFunc(mv.zData)
 			}),
 			widget.NewButtonWithIcon("Load ECU", theme.DownloadIcon(), func() {
-				p := progressmodal.New(mv, "Loading map from ECU")
+				p := progressmodal.New(fyne.CurrentApp().Driver().AllWindows()[0].Canvas(), "Loading map from ECU")
 				p.Show()
-				mv.funcs.loadECUFunc()
-				p.Stop()
-				p.Hide()
+				go func() {
+					mv.funcs.loadECUFunc()
+					fyne.Do(p.Hide)
+				}()
 			}),
 			widget.NewButtonWithIcon("Save ECU", theme.UploadIcon(), func() {
-				p := progressmodal.New(mv, "Saving map to ECU")
+				p := progressmodal.New(fyne.CurrentApp().Driver().AllWindows()[0].Canvas(), "Saving map to ECU")
 				p.Show()
-				mv.funcs.saveECUFunc(mv.zData)
-				p.Stop()
-				p.Hide()
+				go func() {
+					mv.funcs.saveECUFunc(mv.zData)
+					fyne.Do(p.Hide)
+				}()
 			}),
 		)
 	} else {

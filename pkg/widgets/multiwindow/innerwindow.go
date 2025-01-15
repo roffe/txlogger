@@ -1,6 +1,7 @@
 package multiwindow
 
 import (
+	"log"
 	"runtime"
 
 	"fyne.io/fyne/v2"
@@ -12,7 +13,13 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-var _ fyne.Widget = (*InnerWindow)(nil)
+var (
+	_ fyne.Draggable     = (*InnerWindow)(nil)
+	_ fyne.Widget        = (*InnerWindow)(nil)
+	_ desktop.Mouseable  = (*InnerWindow)(nil)
+	_ desktop.Hoverable  = (*InnerWindow)(nil)
+	_ desktop.Cursorable = (*InnerWindow)(nil)
+)
 
 // InnerWindow defines a container that wraps content in a window border - that can then be placed inside
 // a regular container/canvas.
@@ -78,9 +85,28 @@ func (w *InnerWindow) Container() *fyne.Container {
 	return w.content
 }
 
+func (w *InnerWindow) Cursor() desktop.Cursor {
+	return desktop.DefaultCursor
+}
+
 func (w *InnerWindow) Content() fyne.CanvasObject {
 	return w.content.Objects[0]
 }
+
+// Dragged is called when the user drags the window.
+func (w *InnerWindow) Dragged(ev *fyne.DragEvent) {}
+
+// DragEnd is called when the user stops dragging the window.
+func (w *InnerWindow) DragEnd() {}
+
+// MouseIn is called when the mouse enters the window.
+func (w *InnerWindow) MouseIn(*desktop.MouseEvent) {}
+
+// MouseOut is called when the mouse leaves the window.
+func (w *InnerWindow) MouseOut() {}
+
+// MouseMoved is called when the mouse moves over the window.
+func (w *InnerWindow) MouseMoved(*desktop.MouseEvent) {}
 
 // MouseDown is called when the user presses the mouse button on the draggable corner.
 func (w *InnerWindow) MouseDown(*desktop.MouseEvent) {
@@ -90,7 +116,11 @@ func (w *InnerWindow) MouseDown(*desktop.MouseEvent) {
 }
 
 // MouseUp is called when the user releases the mouse button on the draggable corner.
-func (w *InnerWindow) MouseUp(*desktop.MouseEvent) {
+func (w *InnerWindow) MouseUp(ev *desktop.MouseEvent) {
+	log.Println("MouseUp", ev)
+	//if o, ok := w.Content().(desktop.Mouseable); ok {
+	//	o.MouseUp(ev)
+	//}
 }
 
 func (w *InnerWindow) Maximized() bool {
@@ -279,6 +309,7 @@ func (i *innerWindowRenderer) Refresh() {
 }
 
 var _ desktop.Mouseable = (*draggableLabel)(nil)
+var _ fyne.Draggable = (*draggableLabel)(nil)
 
 type draggableLabel struct {
 	widget.Label

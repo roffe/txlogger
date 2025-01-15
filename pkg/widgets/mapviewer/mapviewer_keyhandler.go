@@ -51,6 +51,7 @@ func (mv *MapViewer) copy() {
 		copyString.WriteString(fmt.Sprintf("%d:%d:%d:"+copyPasteSeparator, x, y, mv.zData[cell]))
 	}
 	fyne.CurrentApp().Clipboard().SetContent(copyString.String())
+	//fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(copyString.String())
 }
 
 func (mv *MapViewer) paste() {
@@ -58,6 +59,7 @@ func (mv *MapViewer) paste() {
 		return
 	}
 	cb := fyne.CurrentApp().Clipboard().Content()
+	//cb := fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().Content()
 	split := strings.Split(cb, copyPasteSeparator)
 	for i, part := range split {
 		if len(part) < 3 {
@@ -160,15 +162,17 @@ func (mv *MapViewer) updateCells() {
 	}
 
 	slices.Sort(mv.selectedCells)
-	updates := []updateBlock{{mv.selectedCells[0], mv.selectedCells[0], []int{mv.zData[mv.selectedCells[0]]}}}
+	updates := []*updateBlock{
+		{mv.selectedCells[0], mv.selectedCells[0], []int{mv.zData[mv.selectedCells[0]]}},
+	}
 	for _, cell := range mv.selectedCells[1:] {
 		data := mv.zData[cell]
-		last := &updates[len(updates)-1]
+		last := updates[len(updates)-1]
 		if cell-1 == last.end {
 			last.end = cell
 			last.data = append(last.data, data)
 		} else {
-			updates = append(updates, updateBlock{cell, cell, []int{data}})
+			updates = append(updates, &updateBlock{cell, cell, []int{data}})
 		}
 	}
 
@@ -180,7 +184,7 @@ func (mv *MapViewer) updateCells() {
 	mv.partialSync(updates)
 }
 
-func (mv *MapViewer) shouldFullSync(updates []updateBlock) bool {
+func (mv *MapViewer) shouldFullSync(updates []*updateBlock) bool {
 	var lenUpdates int
 	for _, update := range updates {
 		lenUpdates += len(update.data)
@@ -192,7 +196,7 @@ func (mv *MapViewer) fullSync() {
 	mv.funcs.saveECUFunc(mv.zData)
 }
 
-func (mv *MapViewer) partialSync(updates []updateBlock) {
+func (mv *MapViewer) partialSync(updates []*updateBlock) {
 	for _, update := range updates {
 		mv.funcs.updateECUFunc(update.idx, update.data)
 	}

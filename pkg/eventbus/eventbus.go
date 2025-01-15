@@ -224,28 +224,28 @@ func (e *Controller) Publish(topic string, data float64) error {
 	case e.incoming <- EBusMessage{Topic: topic, Data: data}:
 		return nil
 	default:
-		return errors.New("publish channel full")
+		return errors.New(topic + "publish channel full")
 	}
 }
 
 // SubscribeFunc returns a function that can be used to unsubscribe the function
-func (e *Controller) SubscribeFunc(topic string, f func(float64)) (cancel func()) {
+func (e *Controller) SubscribeFunc(topic string, fn func(float64)) (cancel func()) {
 	// log.Println("SubscribeFunc", topic)
 	respChan := e.Subscribe(topic)
 	go func() {
 		for v := range respChan {
-			f(v)
+			fn(v)
 		}
 	}()
 	cancel = func() {
-		// log.Println("UnsubscribeFunc", topic)
+		//log.Println("UnsubscribeFunc", topic)
 		e.Unsubscribe(respChan)
 	}
 	return
 }
 
 func (e *Controller) Subscribe(topic string) chan float64 {
-	// log.Println("Subscribe", topic)
+	//log.Println("Subscribe", topic)
 	respChan := make(chan float64, 10)
 	e.sub <- newSub{topic: topic, resp: respChan}
 	return respChan

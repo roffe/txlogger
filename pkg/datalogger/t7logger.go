@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -43,8 +44,8 @@ func NewT7(cfg Config, lw LogWriter) (IClient, error) {
 	return &T7Client{
 		Config:     cfg,
 		symbolChan: make(chan []*symbol.Symbol, 1),
-		updateChan: make(chan *WriteRequest, 1),
-		readChan:   make(chan *ReadRequest, 1),
+		updateChan: make(chan *WriteRequest, 10),
+		readChan:   make(chan *ReadRequest, 10),
 		quitChan:   make(chan struct{}),
 		sysvars:    NewThreadSafeMap(),
 		lw:         lw,
@@ -54,7 +55,7 @@ func NewT7(cfg Config, lw LogWriter) (IClient, error) {
 func (c *T7Client) Close() {
 	c.closeOnce.Do(func() {
 		close(c.quitChan)
-		//time.Sleep(200 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 	})
 }
 
@@ -127,7 +128,7 @@ func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client)
 func (c *T7Client) onError(err error) {
 	c.errCount++
 	c.errPerSecond++
-	c.ErrorCounter.Set(c.errCount)
+	c.ErrorCounter.SetText("Err: 0")
 	c.OnMessage(err.Error())
 }
 
@@ -297,7 +298,7 @@ func (c *T7Client) Start() error {
 				c.OnMessage("Stopped logging..")
 				return nil
 			case <-secondTicker.C:
-				c.FpsCounter.Set(cps)
+				c.FpsCounter.SetText("Cps: " + strconv.Itoa(cps))
 				if c.errPerSecond > 5 {
 					c.errPerSecond = 0
 					return fmt.Errorf("too many errors per second")
@@ -414,10 +415,13 @@ func (c *T7Client) Start() error {
 					}
 
 					if write.Length > 0 {
-						c.updateChan <- write
+						select {
+						case c.updateChan <- write:
+						default:
+							log.Println("kisskorv updateChan full")
+						}
 						continue
 					}
-
 					write.Complete(nil)
 					continue
 				}
@@ -484,7 +488,7 @@ func (c *T7Client) Start() error {
 				count++
 				cps++
 				if count%15 == 0 {
-					c.CaptureCounter.Set(count)
+					c.CaptureCounter.SetText("Cap: " + strconv.Itoa(count))
 				}
 			case msg := <-tx.C():
 				if msg == nil {
@@ -562,7 +566,7 @@ func (c *T7Client) Start() error {
 				count++
 				cps++
 				if count%15 == 0 {
-					c.CaptureCounter.Set(count)
+					// fyne.Do(func() { c.CaptureCounter.Set(count) })
 				}
 			}
 		}

@@ -14,14 +14,16 @@ import (
 func knkDetSetter(icon *icon.Icon) func(float64) {
 	var showTime time.Time
 	knkStr2 := make([]byte, 4)
-
+	var oldValue float64
 	return func(value float64) {
 		if value <= 0 && time.Since(showTime) > 5*time.Second {
 			icon.Hide()
 			return
 		}
-
 		if value <= 0 {
+			return
+		}
+		if value == oldValue {
 			return
 		}
 
@@ -66,6 +68,7 @@ func showHider(obj fyne.CanvasObject) func(float64) {
 		if value == oldValue {
 			return
 		}
+		oldValue = value
 		if value == 1 {
 			obj.Show()
 		} else {

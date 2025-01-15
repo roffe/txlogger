@@ -11,6 +11,10 @@ import (
 	"go.bug.st/serial"
 )
 
+const (
+	ProductString = "PLX iMFD Serial Protocol"
+)
+
 /*
 +--------------------------+-------------------+
 |          Sensor          | Address (Decimal) |

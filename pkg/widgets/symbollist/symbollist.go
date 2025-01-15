@@ -13,31 +13,46 @@ import (
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/datalogger"
+	"github.com/roffe/txlogger/pkg/eventbus"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
 type Widget struct {
 	widget.BaseWidget
-	symbols    []*symbol.Symbol
+
+	cfg *Config
+
 	entryMap   map[string]*SymbolWidgetEntry
 	entries    []*SymbolWidgetEntry
 	container  *fyne.Container
 	scroll     *container.Scroll
-	mu         sync.Mutex
 	updateBars bool
 	onUpdate   func([]*symbol.Symbol)
 	w          fyne.Window
+
+	subs map[string]func()
+
+	mu sync.Mutex
 }
 
-func New(w fyne.Window, updateFunc func([]*symbol.Symbol), symbols ...*symbol.Symbol) *Widget {
+type Config struct {
+	EBus       *eventbus.Controller
+	Window     fyne.Window
+	UpdateFunc func([]*symbol.Symbol)
+	Symbols    []*symbol.Symbol
+}
+
+func New(cfg *Config) *Widget {
 	sl := &Widget{
+		cfg:      cfg,
 		entryMap: make(map[string]*SymbolWidgetEntry),
-		onUpdate: updateFunc,
-		w:        w,
+		onUpdate: cfg.UpdateFunc,
+		w:        cfg.Window,
+		subs:     make(map[string]func()),
 	}
 	sl.ExtendBaseWidget(sl)
 	sl.render()
-	sl.LoadSymbols(symbols...)
+	sl.LoadSymbols(cfg.Symbols...)
 	return sl
 }
 
@@ -52,8 +67,8 @@ func (s *Widget) UpdateBars(enabled bool) {
 }
 
 func (s *Widget) Names() []string {
-	names := make([]string, len(s.symbols)+1)
-	for i, s := range s.symbols {
+	names := make([]string, len(s.cfg.Symbols)+1)
+	for i, s := range s.cfg.Symbols {
 		names[i] = s.Name
 	}
 	names[len(names)-1] = datalogger.EXTERNALWBLSYM
@@ -122,27 +137,37 @@ func (s *Widget) Add(symbols ...*symbol.Symbol) {
 		if _, found := s.entryMap[sym.Name]; found {
 			continue
 		}
+
+		cancel := s.cfg.EBus.SubscribeFunc(sym.Name, func(value float64) {
+			s.SetValue(sym.Name, value)
+		})
+		s.subs[sym.Name] = cancel
+
 		deleteFunc := func(sw *SymbolWidgetEntry) {
 			s.mu.Lock()
 			defer s.mu.Unlock()
 			for i, e := range s.entries {
 				if e == sw {
-					s.symbols = append(s.symbols[:i], s.symbols[i+1:]...)
+					s.cfg.Symbols = append(s.cfg.Symbols[:i], s.cfg.Symbols[i+1:]...)
 					s.entries = append(s.entries[:i], s.entries[i+1:]...)
 					delete(s.entryMap, sw.symbol.Name)
+					if cancel, found := s.subs[sw.symbol.Name]; found {
+						cancel()
+						delete(s.subs, sw.symbol.Name)
+					}
 					s.container.Remove(sw)
-					s.onUpdate(s.symbols)
+					s.onUpdate(s.cfg.Symbols)
 					break
 				}
 			}
 		}
 		entry := NewSymbolWidgetEntry(sym, deleteFunc)
-		s.symbols = append(s.symbols, sym)
+		s.cfg.Symbols = append(s.cfg.Symbols, sym)
 		s.entries = append(s.entries, entry)
 		s.container.Add(entry)
 		s.entryMap[sym.Name] = entry
 	}
-	s.onUpdate(s.symbols)
+	s.onUpdate(s.cfg.Symbols)
 }
 
 func (s *Widget) Clear() {
@@ -155,10 +180,14 @@ func (s *Widget) clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.container.RemoveAll()
-	s.symbols = s.symbols[:0]
+	s.cfg.Symbols = s.cfg.Symbols[:0]
 	s.entries = s.entries[:0]
+	for _, cancel := range s.subs {
+		cancel()
+	}
 	clear(s.entryMap)
-	s.onUpdate(s.symbols)
+	clear(s.subs)
+	s.onUpdate(s.cfg.Symbols)
 }
 
 func (s *Widget) LoadSymbols(symbols ...*symbol.Symbol) {
@@ -169,19 +198,19 @@ func (s *Widget) LoadSymbols(symbols ...*symbol.Symbol) {
 func (s *Widget) Count() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return len(s.symbols)
+	return len(s.cfg.Symbols)
 }
 
 func (s *Widget) Symbols() []*symbol.Symbol {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := make([]*symbol.Symbol, len(s.symbols))
-	copy(out, s.symbols)
+	out := make([]*symbol.Symbol, len(s.cfg.Symbols))
+	copy(out, s.cfg.Symbols)
 	return out
 }
 
 func (s *Widget) MinSize() fyne.Size {
-	return fyne.NewSize(500, 400)
+	return fyne.Size{Width: 480, Height: 221}
 }
 
 func (s *Widget) CreateRenderer() fyne.WidgetRenderer {
@@ -263,7 +292,8 @@ func NewSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry
 	}
 	sw.ExtendBaseWidget(sw)
 	sw.copyName = widget.NewButtonWithIcon("", theme.ContentCopyIcon(), func() {
-		fyne.CurrentApp().Clipboard().SetContent(sym.Name)
+		//fyne.CurrentApp().Clipboard().SetContent(sym.Name)
+		fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(sym.Name)
 	})
 	sw.symbolName = widget.NewLabel(sw.symbol.Name)
 	sw.symbolValue = widget.NewLabel("---")

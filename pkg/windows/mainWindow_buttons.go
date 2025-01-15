@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -95,26 +94,28 @@ func (mw *MainWindow) newSymbolListBtn() *widget.Button {
 		))
 		symbolListWindow.Icon = theme.ListIcon()
 
-		var cancelFuncs []func()
-		if mw.settings.GetLivePreview() {
-			for _, sym := range mw.symbolList.Symbols() {
-				cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(sym.Name, func(f float64) {
-					mw.symbolList.SetValue(sym.Name, f)
-				}))
-			}
-		} else {
-			mw.symbolList.Clear()
-		}
-		symbolListWindow.OnClose = func() {
-			for _, f := range cancelFuncs {
-				f()
-			}
-		}
+		// Fixa så livepreview values kan togglas på/av. med nya ui't så funkar det inte som det ska
+
+		//var cancelFuncs []func()
+		//if mw.settings.GetLivePreview() {
+		//	for _, sym := range mw.symbolList.Symbols() {
+		//		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(sym.Name, func(f float64) {
+		//			mw.symbolList.SetValue(sym.Name, f)
+		//		}))
+		//	}
+		//} else {
+		//	mw.symbolList.Clear()
+		//}
+		//symbolListWindow.OnClose = func() {
+		//	for _, f := range cancelFuncs {
+		//		f()
+		//	}
+		//}
 
 		mw.wm.Add(symbolListWindow)
 		if mw.startup {
-			symbolListWindow.Resize(fyne.NewSize(510, 654))
 			symbolListWindow.Move(fyne.NewPos(0, 0))
+			symbolListWindow.Resize(fyne.NewSize(500, 550))
 		}
 	})
 }
@@ -135,6 +136,7 @@ func (mw *MainWindow) newDebugBtn() *widget.Button {
 				return
 			}
 			fyne.CurrentApp().Clipboard().SetContent(strings.Join(str, "\n"))
+			//fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(strings.Join(str, "\n"))
 			dialog.ShowInformation("Debug log", "Content copied to clipboard", mw)
 		}
 		xy := mw.wm.Size().Subtract(dbl.MinSize().AddWidthHeight(20, 60))
@@ -144,18 +146,18 @@ func (mw *MainWindow) newDebugBtn() *widget.Button {
 
 func (mw *MainWindow) newOpenLogBtn() *widget.Button {
 	return widget.NewButtonWithIcon("Open log in new Window", theme.MediaFastForwardIcon(), func() {
-		//go func() {
-		filename, err := sdialog.File().Filter("logfile", "t5l", "t7l", "t8l", "csv").Load()
-		if err != nil {
-			if err.Error() == "Cancelled" {
+		go func() {
+			filename, err := sdialog.File().Filter("logfile", "t5l", "t7l", "t8l", "csv").Load()
+			if err != nil {
+				if err.Error() == "Cancelled" {
+					return
+				}
+				fyne.LogError("Error loading log file", err)
 				return
 			}
-			fyne.LogError("Error loading log file", err)
-			return
-		}
 
-		mw.LoadLogfileCombined(filename, fyne.Position{})
-		//}()
+			mw.LoadLogfileCombined(filename, fyne.Position{})
+		}()
 	})
 }
 
@@ -211,7 +213,6 @@ func (mw *MainWindow) newLogBtn() *widget.Button {
 		if mw.loggingRunning {
 			if mw.dlc != nil {
 				mw.dlc.Close()
-				time.Sleep(200 * time.Millisecond)
 			}
 			return
 		}
@@ -307,11 +308,10 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 		}
 		mw.wm.Add(dbw)
 		if mw.startup {
-			dbw.Move(fyne.NewPos(512, 0))
+			dbw.Move(fyne.NewPos(500, 0))
 		}
 	})
 }
-
 func (mw *MainWindow) startLogging() {
 	device, err := mw.settings.CanSettings.GetAdapter(mw.selects.ecuSelect.Selected, mw.Log)
 	if err != nil {
@@ -328,19 +328,21 @@ func (mw *MainWindow) startLogging() {
 
 	mw.loggingRunning = true
 
-	mw.buttons.logBtn.SetIcon(theme.MediaStopIcon())
+	mw.buttons.logBtn.Icon = theme.MediaStopIcon()
 	mw.buttons.logBtn.SetText("Stop")
 	mw.Disable()
 
 	go func() {
-		defer mw.Enable()
 		if err := mw.dlc.Start(); err != nil {
 			mw.Error(err)
 		}
-		mw.dlc = nil
 		mw.loggingRunning = false
-		mw.buttons.logBtn.SetIcon(theme.MediaPlayIcon())
-		mw.buttons.logBtn.SetText("Start")
+		mw.dlc = nil
+		fyne.Do(func() {
+			mw.Enable()
+			mw.buttons.logBtn.Icon = theme.MediaPlayIcon()
+			mw.buttons.logBtn.SetText("Start")
+		})
 	}()
 }
 
@@ -352,9 +354,9 @@ func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, er
 		Symbols:        mw.symbolList.Symbols(),
 		Rate:           mw.settings.GetFreq(),
 		OnMessage:      mw.Log,
-		CaptureCounter: mw.counters.captureCounter,
-		ErrorCounter:   mw.counters.errorCounter,
-		FpsCounter:     mw.counters.fpsCounter,
+		CaptureCounter: mw.counters.capturedCounterLabel,
+		ErrorCounter:   mw.counters.errorCounterLabel,
+		FpsCounter:     mw.counters.fpsCounterLabel,
 		LogFormat:      mw.settings.GetLogFormat(),
 		LogPath:        mw.settings.GetLogPath(),
 		WidebandConfig: datalogger.WidebandConfig{

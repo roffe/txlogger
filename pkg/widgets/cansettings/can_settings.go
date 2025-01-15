@@ -21,6 +21,8 @@ const (
 	prefsPort    = "port"
 	prefsSpeed   = "speed"
 	prefsDebug   = "debug"
+
+	minimumtxbridgeVersion = "1.0.4"
 )
 
 var portSpeeds = []string{"9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600", "1mbit", "2mbit", "3mbit"}
@@ -174,6 +176,10 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 		}
 		canRate = 500
 	}
+	var minimumVersion string
+	if cs.adapterSelector.Selected == "txbridge" {
+		minimumVersion = minimumtxbridgeVersion
+	}
 
 	return adapter.New(
 		cs.adapterSelector.Selected,
@@ -187,6 +193,7 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 			OnError: func(err error) {
 				logger(err.Error())
 			},
+			MinimumFirmwareVersion: minimumVersion,
 		},
 	)
 }

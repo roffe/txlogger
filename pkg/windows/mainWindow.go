@@ -115,12 +115,12 @@ type mainWindowButtons struct {
 }
 
 type mainWindowCounters struct {
-	captureCounter       binding.Int
+	//captureCounter       binding.Int
 	capturedCounterLabel *widget.Label
-	errorCounter         binding.Int
-	errorCounterLabel    *widget.Label
-	fpsCounter           binding.Int
-	fpsLabel             *widget.Label
+	//errorCounter         binding.Int
+	errorCounterLabel *widget.Label
+	//fpsCounter           binding.Int
+	fpsCounterLabel *widget.Label
 }
 
 func NewMainWindow(app fyne.App, filename string) *MainWindow {
@@ -130,9 +130,9 @@ func NewMainWindow(app fyne.App, filename string) *MainWindow {
 		outputData: binding.NewStringList(),
 
 		counters: &mainWindowCounters{
-			captureCounter: binding.NewInt(),
-			errorCounter:   binding.NewInt(),
-			fpsCounter:     binding.NewInt(),
+			//captureCounter: binding.NewInt(),
+			//errorCounter:   binding.NewInt(),
+			//fpsCounter:     binding.NewInt(),
 		},
 
 		selects: &mainWindowSelects{},
@@ -159,7 +159,11 @@ func NewMainWindow(app fyne.App, filename string) *MainWindow {
 		}
 	}
 
-	mw.symbolList = symbollist.New(mw, updateSymbols)
+	mw.symbolList = symbollist.New(&symbollist.Config{
+		EBus:       ebus.CONTROLLER,
+		Window:     mw,
+		UpdateFunc: updateSymbols,
+	})
 
 	mw.setupMenu()
 
@@ -185,7 +189,7 @@ func NewMainWindow(app fyne.App, filename string) *MainWindow {
 
 	mw.SetPadded(true)
 	mw.SetContent(mw.content)
-	mw.Resize(fyne.NewSize(1024, 768))
+	mw.Resize(fyne.NewSize(1000, 700))
 	mw.CenterOnScreen()
 	mw.SetMaster()
 
@@ -311,7 +315,7 @@ func (mw *MainWindow) render() {
 				container.NewGridWithColumns(4,
 					mw.counters.capturedCounterLabel,
 					mw.counters.errorCounterLabel,
-					mw.counters.fpsLabel,
+					mw.counters.fpsCounterLabel,
 					mw.buttons.debugBtn,
 				),
 				widget.NewButtonWithIcon("", theme.ComputerIcon(), mw.openEBUSMonitor),
@@ -413,7 +417,9 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, p fyne.Position) {
 	})
 	w.Canvas().SetOnTypedKey(cp.TypedKey)
 	fyne.Do(w.Show)
+	//w.Show()
 	//mw.wm.Add(iw, p)
+	mw.Log("loaded log file " + filename + " in combined logplayer")
 }
 
 func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position) {
@@ -446,17 +452,24 @@ func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position) {
 	}
 
 	mw.wm.Add(iw, p)
+
+	mw.Log("loaded log file " + filename)
 }
 
 func (mw *MainWindow) Log(s string) {
 	debug.Log(s)
-	mw.outputData.Append(s)
+	//go fyne.Do(func() {
+	//	mw.outputData.Append(s)
+	//})
 }
 
 func (mw *MainWindow) Error(err error) {
 	debug.Log("error:" + err.Error())
-	mw.outputData.Append(err.Error())
-	dialog.ShowError(err, mw)
+	//go fyne.Do(func() {
+	//	mw.outputData.Append(err.Error())
+	//	dialog.ShowError(err, mw.Window)
+	//})
+	//log.Printf("error: %s", err)
 }
 
 func (mw *MainWindow) Disable() {
@@ -515,7 +528,7 @@ func (mw *MainWindow) LoadSymbolsFromECU() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	p := progressmodal.New(mw.Window.Content(), "Loading symbols from ECU")
+	p := progressmodal.New(mw.Window.Canvas(), "Loading symbols from ECU")
 	p.Show()
 	defer p.Hide()
 

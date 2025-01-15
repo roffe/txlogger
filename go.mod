@@ -18,7 +18,7 @@ require (
 )
 
 require (
-	fyne.io/fyne/v2 v2.5.3-rc7.0.20250112143715-4a30df3bdcfe
+	fyne.io/fyne/v2 v2.5.3-rc7.0.20250115190419-964a877510ad
 	fyne.io/systray v1.11.0 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
@@ -95,6 +95,8 @@ require (
 	tinygo.org/x/bluetooth v0.10.0 // indirect
 )
 
-// replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
+replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
 
 replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
+
+replace fyne.io/fyne/v2 => C:\Users\flejd\go\src\github.com\andydotxyz\fyne

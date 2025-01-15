@@ -130,6 +130,16 @@ func main() {
 		}
 	}
 
+	/*
+		sig := make(chan os.Signal, 2)
+		signal.Notify(sig, syscall.SIGINT)
+		go func() {
+			<-sig
+			rdebug.PrintStack()
+			mw.Close()
+		}()
+	*/
+
 	//go updateCheck(a, mw)
 
 	mw.ShowAndRun()

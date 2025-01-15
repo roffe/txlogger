@@ -9,17 +9,21 @@ import (
 	"github.com/roffe/txlogger/pkg/debug"
 )
 
-func (mw *MapViewer) Tapped(_ *fyne.PointEvent) {
-	fyne.CurrentApp().Driver().CanvasForObject(mw).Focus(mw)
-}
-
-func (mw *MapViewer) TappedSecondary(_ *fyne.PointEvent) {
-}
+//func (mw *MapViewer) Tapped(_ *fyne.PointEvent) {
+//	log.Println("Tapped")
+//	fyne.CurrentApp().Driver().CanvasForObject(mw).Focus(mw)
+//}
+//
+//func (mw *MapViewer) TappedSecondary(_ *fyne.PointEvent) {
+//	log.Println("TappedSecondary")
+//}
 
 func (mw *MapViewer) FocusGained() {
+	//log.Println("FocusGained")
 	mw.focused = true
 }
 func (mw *MapViewer) FocusLost() {
+	//log.Println("FocusLost")
 	mw.focused = false
 }
 func (mw *MapViewer) Focused() bool {

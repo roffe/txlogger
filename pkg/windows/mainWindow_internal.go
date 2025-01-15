@@ -48,7 +48,6 @@ func newOtoContext() *oto.Context {
 func (mw *MainWindow) closeIntercept() {
 	if mw.dlc != nil {
 		mw.dlc.Close()
-		time.Sleep(500 * time.Millisecond)
 	}
 	debug.Close()
 	mw.Close()
