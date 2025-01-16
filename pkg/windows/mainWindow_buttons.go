@@ -135,8 +135,8 @@ func (mw *MainWindow) newDebugBtn() *widget.Button {
 				mw.Error(err)
 				return
 			}
-			fyne.CurrentApp().Clipboard().SetContent(strings.Join(str, "\n"))
-			//fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(strings.Join(str, "\n"))
+			//fyne.CurrentApp().Clipboard().SetContent(strings.Join(str, "\n"))
+			fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(strings.Join(str, "\n"))
 			dialog.ShowInformation("Debug log", "Content copied to clipboard", mw)
 		}
 		xy := mw.wm.Size().Subtract(dbl.MinSize().AddWidthHeight(20, 60))
@@ -255,9 +255,6 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 		}
 
 		db := dashboard.NewDashboard(dbcfg)
-		db.SetValue("CEL", 0)
-		db.SetValue("CRUISE", 0)
-		db.SetValue("LIMP", 0)
 
 		var cancelFuncs []func()
 		for _, m := range db.GetMetricNames() {
@@ -338,11 +335,11 @@ func (mw *MainWindow) startLogging() {
 		}
 		mw.loggingRunning = false
 		mw.dlc = nil
-		fyne.Do(func() {
-			mw.Enable()
-			mw.buttons.logBtn.Icon = theme.MediaPlayIcon()
-			mw.buttons.logBtn.SetText("Start")
-		})
+		//fyne.Do(func() {
+		mw.Enable()
+		mw.buttons.logBtn.Icon = theme.MediaPlayIcon()
+		mw.buttons.logBtn.SetText("Start")
+		//})
 	}()
 }
 

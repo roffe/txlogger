@@ -346,7 +346,9 @@ func (mv *MapViewer) SetCellText(idx int, value int) {
 func (mv *MapViewer) SetZ(zData []int) {
 	mv.zData = zData
 	mv.numData = len(zData)
+	//fyne.Do(func() {
 	mv.Refresh()
+	//})
 }
 
 func (mv *MapViewer) Refresh() {
@@ -488,7 +490,9 @@ func (mv *MapViewer) createButtons() *fyne.Container {
 				p.Show()
 				go func() {
 					mv.funcs.loadECUFunc()
-					fyne.Do(p.Hide)
+					//fyne.Do(func() {
+					p.Hide()
+					//})
 				}()
 			}),
 			widget.NewButtonWithIcon("Save ECU", theme.UploadIcon(), func() {
@@ -496,7 +500,10 @@ func (mv *MapViewer) createButtons() *fyne.Container {
 				p.Show()
 				go func() {
 					mv.funcs.saveECUFunc(mv.zData)
-					fyne.Do(p.Hide)
+					//fyne.Do(func() {
+					p.Hide()
+					//})
+
 				}()
 			}),
 		)

@@ -223,6 +223,10 @@ func NewDashboard(cfg *Config) *Dashboard {
 	}
 	db.ExtendBaseWidget(db)
 
+	db.text.cruise.Hide()
+	db.image.checkEngine.Hide()
+	db.image.limpMode.Hide()
+
 	db.metricRouter = db.createRouter()
 
 	var isFullscreen bool

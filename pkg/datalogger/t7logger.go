@@ -566,7 +566,7 @@ func (c *T7Client) Start() error {
 				count++
 				cps++
 				if count%15 == 0 {
-					// fyne.Do(func() { c.CaptureCounter.Set(count) })
+					//c.CaptureCounter.Set(count)
 				}
 			}
 		}

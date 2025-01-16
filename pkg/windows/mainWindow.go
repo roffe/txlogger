@@ -182,7 +182,7 @@ func NewMainWindow(app fyne.App, filename string) *MainWindow {
 		mw.SetTitle("No symbols loaded")
 	}
 
-	mw.SetOnDropped(mw.onDropped)
+	mw.Window.SetOnDropped(mw.onDropped)
 	mw.SetCloseIntercept(mw.closeIntercept)
 
 	mw.render()
@@ -410,13 +410,17 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, p fyne.Position) {
 	//	cp.Close()
 	//}
 	w := mw.app.NewWindow(fp)
-	w.SetContent(cp)
+
 	w.SetCloseIntercept(func() {
 		cp.Close()
 		w.Close()
 	})
 	w.Canvas().SetOnTypedKey(cp.TypedKey)
-	fyne.Do(w.Show)
+	//fyne.Do(func() {
+	w.SetContent(cp)
+	w.Show()
+	//})
+
 	//w.Show()
 	//mw.wm.Add(iw, p)
 	mw.Log("loaded log file " + filename + " in combined logplayer")
@@ -459,15 +463,15 @@ func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position) {
 func (mw *MainWindow) Log(s string) {
 	debug.Log(s)
 	//go fyne.Do(func() {
-	//	mw.outputData.Append(s)
+	mw.outputData.Append(s)
 	//})
 }
 
 func (mw *MainWindow) Error(err error) {
 	debug.Log("error:" + err.Error())
-	//go fyne.Do(func() {
-	//	mw.outputData.Append(err.Error())
-	//	dialog.ShowError(err, mw.Window)
+	// go fyne.Do(func() {
+	mw.outputData.Append(err.Error())
+	dialog.ShowError(err, mw.Window)
 	//})
 	//log.Printf("error: %s", err)
 }

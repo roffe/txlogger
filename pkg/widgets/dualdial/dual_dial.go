@@ -143,11 +143,13 @@ func (c *DualDial) SetValue(value float64) {
 		return
 	}
 	c.value = value
+	//fyne.Do(func() {
 	c.rotateNeedle(c.needle, value)
 	c.buf1.Reset()
 	fmt.Fprintf(&c.buf1, c.displayString, value)
 	c.displayText.Text = c.buf1.String()
 	c.displayText.Refresh()
+	//})
 }
 
 func (c *DualDial) SetValue2(value float64) {
@@ -155,11 +157,13 @@ func (c *DualDial) SetValue2(value float64) {
 		return
 	}
 	c.value2 = value
+	//fyne.Do(func() {
 	c.rotateNeedle(c.needle2, value)
 	c.buf2.Reset()
 	fmt.Fprintf(&c.buf2, c.displayString, value)
 	c.displayText2.Text = c.buf2.String()
 	c.displayText2.Refresh()
+	//})
 }
 
 func (c *DualDial) CreateRenderer() fyne.WidgetRenderer {

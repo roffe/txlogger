@@ -1,7 +1,6 @@
 package multiwindow
 
 import (
-	"log"
 	"runtime"
 
 	"fyne.io/fyne/v2"
@@ -117,7 +116,7 @@ func (w *InnerWindow) MouseDown(*desktop.MouseEvent) {
 
 // MouseUp is called when the user releases the mouse button on the draggable corner.
 func (w *InnerWindow) MouseUp(ev *desktop.MouseEvent) {
-	log.Println("MouseUp", ev)
+	// log.Println("MouseUp", ev)
 	//if o, ok := w.Content().(desktop.Mouseable); ok {
 	//	o.MouseUp(ev)
 	//}

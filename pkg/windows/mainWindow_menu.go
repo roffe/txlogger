@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -67,7 +68,7 @@ func (mw *MainWindow) setupMenu() {
 			fyne.NewMenuItem("Settings", func() {
 				mw.openSettings()
 			}),
-			fyne.NewMenuItem("Update txbridge firmware", func() {
+			fyne.NewMenuItem("Update txbridge", func() {
 				updater := multiwindow.NewInnerWindow("txbridge firmware updater", txupdater.New(
 					mw.settings.CanSettings.GetSerialPort(),
 				))
@@ -129,6 +130,8 @@ func (mw *MainWindow) loadBinary() {
 		}
 	}()
 }
+
+var openMapLock sync.Mutex
 
 func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	if mw.fw == nil {
@@ -311,13 +314,17 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	}
 
 	if mw.settings.GetAutoLoad() && mw.dlc != nil {
-		p := progressmodal.New(mw.Window.Canvas(), "Loading "+axis.Z)
-		p.Show()
 		go func() {
+			openMapLock.Lock()
+			defer openMapLock.Unlock()
+			p := progressmodal.New(mw.Window.Canvas(), "Loading "+axis.Z)
+			// fyne.Do(func() {
+			p.Show()
+			// })
 			loadFunc()
-			fyne.Do(func() {
-				p.Hide()
-			})
+			// fyne.Do(func() {
+			p.Hide()
+			// })
 		}()
 	}
 

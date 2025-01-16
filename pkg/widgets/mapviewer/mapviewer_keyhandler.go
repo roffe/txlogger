@@ -50,16 +50,16 @@ func (mv *MapViewer) copy() {
 		}
 		copyString.WriteString(fmt.Sprintf("%d:%d:%d:"+copyPasteSeparator, x, y, mv.zData[cell]))
 	}
-	fyne.CurrentApp().Clipboard().SetContent(copyString.String())
-	//fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(copyString.String())
+	//fyne.CurrentApp().Clipboard().SetContent(copyString.String())
+	fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(copyString.String())
 }
 
 func (mv *MapViewer) paste() {
 	if !mv.opts.editable {
 		return
 	}
-	cb := fyne.CurrentApp().Clipboard().Content()
-	//cb := fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().Content()
+	//cb := fyne.CurrentApp().Clipboard().Content()
+	cb := fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().Content()
 	split := strings.Split(cb, copyPasteSeparator)
 	for i, part := range split {
 		if len(part) < 3 {

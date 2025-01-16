@@ -6,7 +6,7 @@ import (
 )
 
 func (l *Logplayer) Tapped(_ *fyne.PointEvent) {
-	fyne.CurrentApp().Driver().CanvasForObject(l).Focus(l)
+	// fyne.CurrentApp().Driver().CanvasForObject(l).Focus(l)
 	l.objs.playbackToggleBtn.OnTapped()
 }
 

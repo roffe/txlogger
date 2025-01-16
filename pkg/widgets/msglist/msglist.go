@@ -1,8 +1,6 @@
 package msglist
 
 import (
-	"log"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
@@ -83,21 +81,4 @@ func (r *msgListRenderer) Refresh() {
 
 func (r *msgListRenderer) Destroy() {
 	r.m.msgs.RemoveListener(r.m.listener)
-}
-
-func (r *msgListRenderer) FocusGained() {
-	log.Println("FocusGained")
-}
-
-func (r *msgListRenderer) FocusLost() {
-	log.Println("FocusLost")
-
-}
-
-func (r *msgListRenderer) TypedKey(key *fyne.KeyEvent) {
-
-}
-
-func (r *msgListRenderer) TypedRune(ru rune) {
-
 }

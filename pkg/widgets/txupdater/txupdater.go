@@ -57,23 +57,24 @@ func New(port string) *TxUpdater {
 	t.updateBtn = widget.NewButton("Update", func() {
 		t.updateBtn.Disable()
 		go func() {
-			defer fyne.Do(t.updateBtn.Enable)
+			//defer fyne.Do(t.updateBtn.Enable)
+			defer t.updateBtn.Enable()
 			if err := ota.UpdateOTA(ota.Config{
 				Port: t.port,
 				Logfunc: func(v ...any) {
-					fyne.Do(func() {
-						t.outputData.Append(fmt.Sprint(v...))
-					})
+					//fyne.Do(func() {
+					t.outputData.Append(fmt.Sprint(v...))
+					//})
 				},
 				ProgressFunc: func(progress float64) {
-					fyne.Do(func() {
-						t.progressbar.SetValue(progress)
-					})
+					//fyne.Do(func() {
+					t.progressbar.SetValue(progress)
+					//})
 				},
 			}); err != nil {
-				fyne.Do(func() {
-					t.outputData.Append(fmt.Sprint("Error: ", err))
-				})
+				//fyne.Do(func() {
+				t.outputData.Append(fmt.Sprint("Error: ", err))
+				//})
 			}
 		}()
 	})

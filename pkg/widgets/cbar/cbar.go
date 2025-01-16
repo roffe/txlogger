@@ -167,7 +167,6 @@ func (s *CBar) refresh() {
 
 	titleX := s.lastSize.Width*0.5 - s.titleText.MinSize().Width*0.5
 	displayX := s.lastSize.Width*0.5 - s.displayText.MinSize().Width*0.5
-
 	s.titleText.Move(fyne.NewPos(titleX, s.lastSize.Height-30))
 	s.displayText.Move(fyne.NewPos(displayX, y))
 }

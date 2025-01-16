@@ -1,7 +1,6 @@
 package mapviewer
 
 import (
-	"log"
 	"math"
 	"slices"
 
@@ -85,7 +84,7 @@ func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
 
 // MouseUp is called when a mouse button is released.
 func (mv *MapViewer) MouseUp(event *desktop.MouseEvent) {
-	log.Println("MouseUp", event)
+	// log.Println("MouseUp", event)
 	mv.selectionRect.Hide()
 	if event.Button == desktop.MouseButtonPrimary && mv.selecting {
 		mv.finalizeSelection(event.Position)
@@ -187,7 +186,7 @@ func (mv *MapViewer) handleFocusAndInputBuffer() {
 
 // finalizeSelection finalizes the selection process.
 func (mv *MapViewer) finalizeSelection(eventPos fyne.Position) {
-	log.Println("finalizeSelection")
+	// log.Println("finalizeSelection")
 	mv.selecting = false
 
 	nselectedX, nSelectedY := mv.calculateSelectionBounds(eventPos)

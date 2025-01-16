@@ -102,12 +102,13 @@ func (s *VBar) SetValue(value float64) {
 	s.bar.FillColor = fillColor
 
 	valueHeightFactor := float32(value) * s.layoutValues.heightFactor
+
 	s.bar.Resize(fyne.NewSize(s.size.Width-s.layoutValues.twoEight, valueHeightFactor))
 	s.bar.Move(fyne.NewPos(s.layoutValues.diameterEight, s.size.Height-valueHeightFactor))
-
 	// Format number directly without conversion
 	s.displayText.Text = strconv.FormatFloat(value, 'f', 0, 64)
 	s.displayText.Refresh()
+
 }
 
 func (s *VBar) SetValue2(value float64) {

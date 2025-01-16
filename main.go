@@ -23,6 +23,9 @@ import (
 	"github.com/roffe/txlogger/pkg/ipc"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/windows"
+
+	"net/http"
+	_ "net/http/pprof"
 )
 
 var (
@@ -36,6 +39,10 @@ func init() {
 }
 
 func main() {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
 	socketFile := filepath.Join(os.TempDir(), "txlogger.sock")
 	if fileExists(socketFile) {
 		if !ping(socketFile) {

@@ -40,9 +40,6 @@ func New(cfg *CombinedLogplayerConfig) *Widget {
 	bus := eventbus.New(eventbus.DefaultConfig)
 
 	db := dashboard.NewDashboard(cfg.DBcfg)
-	db.SetValue("CEL", 0)
-	db.SetValue("CRUISE", 0)
-	db.SetValue("LIMP", 0)
 
 	for _, name := range db.GetMetricNames() {
 		cancel := bus.SubscribeFunc(name, func(f float64) {

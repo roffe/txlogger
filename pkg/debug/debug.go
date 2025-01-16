@@ -39,15 +39,11 @@ func Log(msg string) {
 
 func LogRaw(msg string) {
 	if fh == nil {
-		var err error
-		fh, err = os.OpenFile("debug.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-		if err == nil {
-			log.Println("error opening file: %w", err)
-			return
-		}
+		log.Println("debug file not open")
+		return
 	}
 	fh.WriteString(msg + "\n")
-	log.Println(msg)
+	fmt.Println(msg)
 }
 func Close() {
 	fh.Sync()

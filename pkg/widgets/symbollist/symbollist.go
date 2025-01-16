@@ -93,23 +93,35 @@ func (s *Widget) SetValue(name string, value float64) {
 			col := widgets.GetColorInterpolation(val.min, val.max, value)
 			col.A = 30
 			val.valueBar.FillColor = col
+			//fyne.Do(func() {
 			val.valueBar.Resize(fyne.NewSize(factor*100, 26))
+			//})
 		}
 		switch val.symbol.Correctionfactor {
 		case 1:
+			//fyne.Do(func() {
 			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 0, 64))
+			//})
 			return
 		case 0.1:
+			//fyne.Do(func() {
 			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 1, 64))
+			//})
 			return
 		case 0.01:
+			//fyne.Do(func() {
 			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 2, 64))
+			//})
 			return
 		case 0.001:
+			//fyne.Do(func() {
 			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 3, 64))
+			//})
 			return
 		default:
+			//fyne.Do(func() {
 			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 2, 64))
+			//})
 			return
 		}
 	}

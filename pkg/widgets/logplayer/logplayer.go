@@ -269,11 +269,6 @@ func (l *Logplayer) render() {
 		}
 		l.control(&controlMsg{Op: OpSeek, Pos: int(pos)})
 	}
-
-	//l.objs.plotter.OnTapped = func(event *fyne.PointEvent) {
-	//	log.Println("Tapped")
-	//	fyne.CurrentApp().Driver().CanvasForObject(l).SetOnTypedKey(l.TypedKey)
-	//}
 }
 
 func (l *Logplayer) CreateRenderer() fyne.WidgetRenderer {
@@ -387,13 +382,17 @@ func (l *Logplayer) playLog() {
 					for k, v := range rec.Values {
 						l.cfg.EBus.Publish(k, v)
 					}
+					//fyne.Do(func() {
 					l.objs.positionSlider.Value = float64(op.Pos)
 					l.objs.positionSlider.Refresh()
 					l.objs.timeLabel.SetText(rec.Time.Format("15:04:05.00"))
+					//})
 					if f := l.cfg.TimeSetter; f != nil {
 						f(rec.Time)
 					}
+					//fyne.Do(func() {
 					l.objs.plotter.Seek(op.Pos)
+					//})
 					// Seek back one position since we just read the record
 					l.logFile.Seek(op.Pos)
 				}
@@ -417,7 +416,9 @@ func (l *Logplayer) playLog() {
 					if f := l.cfg.TimeSetter; f != nil {
 						f(rec.Time)
 					}
+					//fyne.Do(func() {
 					l.objs.plotter.Seek(pos + 1)
+					//})
 					// Seek back one position since we just read the record
 					//l.logFile.Seek(pos)
 				}
@@ -437,7 +438,9 @@ func (l *Logplayer) playLog() {
 						if f := l.cfg.TimeSetter; f != nil {
 							f(rec.Time)
 						}
+						//fyne.Do(func() {
 						l.objs.plotter.Seek(pos + 1)
+						//})
 					}
 				}
 				if l.state == statePlaying {
@@ -470,12 +473,18 @@ func (l *Logplayer) playLog() {
 				}
 
 				l.objs.positionSlider.Value = float64(currentPos)
+
+				//fyne.Do(func() {
 				l.objs.positionSlider.Refresh()
 				l.objs.timeLabel.SetText(rec.Time.Format("15:04:05.00"))
+				//})
+
 				if f := l.cfg.TimeSetter; f != nil {
 					f(rec.Time)
 				}
+				//fyne.Do(func() {
 				l.objs.plotter.Seek(currentPos)
+				//})
 
 				// Schedule next frame
 				nextDelay := time.Duration(float64(rec.DelayTillNext)*speedMultiplier) * time.Millisecond

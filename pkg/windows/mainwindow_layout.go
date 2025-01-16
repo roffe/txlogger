@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/gauge"
@@ -52,7 +54,7 @@ func (mw *MainWindow) SaveLayout() error {
 
 	in := dialog.NewForm("Save Window Layout", "Save", "Cancel", items, callback, fyne.CurrentApp().Driver().AllWindows()[0])
 	in.Show()
-	fyne.CurrentApp().Driver().CanvasForObject(mw.wm).Focus(input)
+	mw.Window.Canvas().Focus(input)
 
 	return nil
 }
@@ -132,22 +134,30 @@ func (mw *MainWindow) jsonLayout() ([]byte, error) {
 }
 
 func (mw *MainWindow) LoadLayout(name string) error {
-	b, err := os.ReadFile("layouts/" + name + ".json")
+
+	fname := filepath.Join("layouts", name+".json")
+	debug.Log("LoadLayout: " + fname)
+	b, err := os.ReadFile(fname)
 	if err != nil {
 		return fmt.Errorf("LoadLayout failed to read file: %w", err)
 	}
-	var layout LayoutFile
 
+	var layout LayoutFile
 	if err := json.Unmarshal(b, &layout); err != nil {
 		return fmt.Errorf("LoadLayout failed to decode window layout: %w", err)
 	}
 
+	debug.Log("Close all windows")
 	mw.wm.CloseAll()
 
-	mw.selects.ecuSelect.SetSelected(layout.ECU)
-	mw.selects.presetSelect.SetSelected(layout.Preset)
+	debug.Log("Set ECU and Preset")
+	if mw.dlc == nil {
+		mw.selects.ecuSelect.SetSelected(layout.ECU)
+		mw.selects.presetSelect.SetSelected(layout.Preset)
+	}
 
 	for _, h := range layout.Windows {
+		debug.Log("Create window: " + h.Title)
 		var openMap bool
 		switch h.Title {
 		case "Settings":
