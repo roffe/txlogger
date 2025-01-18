@@ -27,7 +27,7 @@ func New(data binding.StringList) *MsgList {
 		func() fyne.CanvasObject {
 			w := widget.NewLabel("")
 			w.Alignment = fyne.TextAlignLeading
-			w.Truncation = fyne.TextTruncateEllipsis
+			//w.Truncation = fyne.TextTruncateEllipsis
 			return w
 		},
 		func(item binding.DataItem, obj fyne.CanvasObject) {

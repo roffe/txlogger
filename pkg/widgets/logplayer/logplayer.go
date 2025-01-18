@@ -390,9 +390,8 @@ func (l *Logplayer) playLog() {
 					if f := l.cfg.TimeSetter; f != nil {
 						f(rec.Time)
 					}
-					//fyne.Do(func() {
 					l.objs.plotter.Seek(op.Pos)
-					//})
+
 					// Seek back one position since we just read the record
 					l.logFile.Seek(op.Pos)
 				}
@@ -416,9 +415,7 @@ func (l *Logplayer) playLog() {
 					if f := l.cfg.TimeSetter; f != nil {
 						f(rec.Time)
 					}
-					//fyne.Do(func() {
 					l.objs.plotter.Seek(pos + 1)
-					//})
 					// Seek back one position since we just read the record
 					//l.logFile.Seek(pos)
 				}
@@ -438,9 +435,7 @@ func (l *Logplayer) playLog() {
 						if f := l.cfg.TimeSetter; f != nil {
 							f(rec.Time)
 						}
-						//fyne.Do(func() {
 						l.objs.plotter.Seek(pos + 1)
-						//})
 					}
 				}
 				if l.state == statePlaying {
@@ -482,10 +477,7 @@ func (l *Logplayer) playLog() {
 				if f := l.cfg.TimeSetter; f != nil {
 					f(rec.Time)
 				}
-				//fyne.Do(func() {
 				l.objs.plotter.Seek(currentPos)
-				//})
-
 				// Schedule next frame
 				nextDelay := time.Duration(float64(rec.DelayTillNext)*speedMultiplier) * time.Millisecond
 				timer.Reset(nextDelay)

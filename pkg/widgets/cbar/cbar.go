@@ -125,7 +125,10 @@ func (s *CBar) SetValue(value float64) {
 	}
 
 	s.value = value
+
+	//fyne.Do(func() {
 	s.refresh()
+	//})
 }
 
 func (s *CBar) SetValue2(value float64) {

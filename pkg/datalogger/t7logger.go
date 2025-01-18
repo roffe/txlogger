@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -128,7 +127,7 @@ func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client)
 func (c *T7Client) onError(err error) {
 	c.errCount++
 	c.errPerSecond++
-	c.ErrorCounter.SetText("Err: 0")
+	c.ErrorCounter(0)
 	c.OnMessage(err.Error())
 }
 
@@ -298,7 +297,7 @@ func (c *T7Client) Start() error {
 				c.OnMessage("Stopped logging..")
 				return nil
 			case <-secondTicker.C:
-				c.FpsCounter.SetText("Cps: " + strconv.Itoa(cps))
+				c.FpsCounter(cps)
 				if c.errPerSecond > 5 {
 					c.errPerSecond = 0
 					return fmt.Errorf("too many errors per second")
@@ -488,7 +487,7 @@ func (c *T7Client) Start() error {
 				count++
 				cps++
 				if count%15 == 0 {
-					c.CaptureCounter.SetText("Cap: " + strconv.Itoa(count))
+					c.CaptureCounter(count)
 				}
 			case msg := <-tx.C():
 				if msg == nil {

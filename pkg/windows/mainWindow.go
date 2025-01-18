@@ -426,7 +426,7 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, p fyne.Position) {
 	mw.Log("loaded log file " + filename + " in combined logplayer")
 }
 
-func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position) {
+func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position, fromDropped bool) {
 	// Just filename, used for Window title
 	fp := filepath.Base(filename)
 
@@ -454,8 +454,14 @@ func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position) {
 	iw.OnClose = func() {
 		lp.Close()
 	}
+	if fromDropped {
+		//fyne.Do(func() {
+		mw.wm.Add(iw, p)
+		//})
+	} else {
+		mw.wm.Add(iw, p)
 
-	mw.wm.Add(iw, p)
+	}
 
 	mw.Log("loaded log file " + filename)
 }
@@ -469,7 +475,7 @@ func (mw *MainWindow) Log(s string) {
 
 func (mw *MainWindow) Error(err error) {
 	debug.Log("error:" + err.Error())
-	// go fyne.Do(func() {
+	//go fyne.Do(func() {
 	mw.outputData.Append(err.Error())
 	dialog.ShowError(err, mw.Window)
 	//})

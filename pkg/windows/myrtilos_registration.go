@@ -71,9 +71,9 @@ func NewMyrtilosRegistration(mw *MainWindow) fyne.Widget {
 	mr.btn = widget.NewButtonWithIcon("Register", theme.InfoIcon(), func() {
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			// fyne.Do(func() {
+			//fyne.Do(func() {
 			mr.output.ScrollToBottom()
-			// })
+			//})
 		}()
 		key, err := hex.DecodeString(mr.input.Text)
 		if err != nil {
@@ -104,7 +104,7 @@ func (mr *MyrtilosRegistration) register(key []byte) error {
 	l := func(s string) {
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			// fyne.Do(func() {
+			//fyne.Do(func() {
 			mr.output.ScrollToBottom()
 			//})
 		}()

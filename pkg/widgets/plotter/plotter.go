@@ -229,19 +229,16 @@ func (p *Plotter) Seek(pos int) {
 		p.plotStartPos = min(int(offsetPosition), p.dataLength)
 	}
 	p.cursorPos = pos
-	p.updateLegend()
-	p.updateCursor()
-	p.refreshImage()
-}
-
-func (p *Plotter) updateLegend() {
 	for i, v := range p.valueOrder {
 		valueIndex := min(p.dataLength, p.cursorPos)
 		obj := p.legendTexts[i]
+		//fyne.Do(func() {
 		obj.value.Text = fmt.Sprintf("%g", p.values[v][valueIndex])
-		p.legendTexts[i].value.Refresh()
+		obj.Refresh()
+		//})
 	}
-
+	p.updateCursor()
+	p.refreshImage()
 }
 
 func (p *Plotter) refreshImage() {
@@ -264,6 +261,7 @@ func (p *Plotter) refreshImage() {
 
 	p.canvasImage.Image = img
 	p.canvasImage.Refresh()
+
 }
 
 type TimeSeries struct {
@@ -385,7 +383,11 @@ func (p *Plotter) updateCursor() {
 
 	p.cursor.Position1 = fyne.NewPos(xOffset, 0)
 	p.cursor.Position2 = fyne.NewPos(xOffset+1, plotSize.Height)
+
+	//fyne.Do(func() {
 	p.cursor.Refresh()
+	//})
+
 }
 
 // Helper functions

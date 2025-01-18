@@ -79,7 +79,7 @@ func (m *MultipleWindows) Add(w *InnerWindow, startPosition ...fyne.Position) bo
 		}
 	} else if len(startPosition) == 1 {
 		if m.LockViewport {
-			size := w.Size()
+			size := w.MinSize()
 			bounds := m.content.Size()
 			startPosition[0].X = clamp32(startPosition[0].X, 0, bounds.Width-size.Width)
 			startPosition[0].Y = clamp32(startPosition[0].Y, 0, bounds.Height-size.Height)

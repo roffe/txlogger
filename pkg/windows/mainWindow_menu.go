@@ -58,7 +58,7 @@ func (mw *MainWindow) setupMenu() {
 					mw.Error(err)
 					return
 				}
-				mw.LoadLogfile(filename, fyne.NewPos(10, 10))
+				mw.LoadLogfile(filename, fyne.NewPos(10, 10), false)
 			}),
 			fyne.NewMenuItem("Open log folder", func() {
 				if err := open.Run(mw.settings.GetLogPath()); err != nil {
@@ -318,13 +318,13 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			openMapLock.Lock()
 			defer openMapLock.Unlock()
 			p := progressmodal.New(mw.Window.Canvas(), "Loading "+axis.Z)
-			// fyne.Do(func() {
+			//fyne.Do(func() {
 			p.Show()
-			// })
+			//})
 			loadFunc()
-			// fyne.Do(func() {
+			//fyne.Do(func() {
 			p.Hide()
-			// })
+			//})
 		}()
 	}
 

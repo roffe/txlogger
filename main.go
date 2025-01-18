@@ -117,7 +117,7 @@ func main() {
 						mw.LoadSymbolsFromFile(msg.Data)
 					}
 					if strings.HasSuffix(msg.Data, ".t5l") || strings.HasSuffix(msg.Data, ".t7l") || strings.HasSuffix(msg.Data, ".t8l") || strings.HasSuffix(msg.Data, ".csv") {
-						mw.LoadLogfile(msg.Data, fyne.Position{})
+						mw.LoadLogfile(msg.Data, fyne.Position{}, true)
 					}
 				}
 			}()
@@ -133,7 +133,7 @@ func main() {
 		case ".bin":
 			mw = windows.NewMainWindow(a, filename)
 		case ".t5l", ".t7l", ".t8l", ".csv":
-			mw.LoadLogfile(filename, fyne.Position{})
+			mw.LoadLogfile(filename, fyne.Position{}, false)
 		}
 	}
 

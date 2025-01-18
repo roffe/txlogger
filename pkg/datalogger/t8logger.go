@@ -9,7 +9,6 @@ import (
 	"log"
 	"math"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -134,7 +133,7 @@ const lastPresentInterval = 3500 * time.Millisecond
 func (c *T8Client) onError(err error) {
 	c.errCount++
 	c.errPerSecond++
-	c.ErrorCounter.SetText("Err: " + strconv.Itoa(c.errCount))
+	c.ErrorCounter(c.errCount)
 	c.OnMessage(err.Error())
 }
 
@@ -183,7 +182,7 @@ func (c *T8Client) Start() error {
 	// sort order
 	sort.StringSlice(order).Sort()
 
-	c.ErrorCounter.SetText("Err: 0")
+	c.ErrorCounter(0)
 
 	errPerSecond := 0
 
@@ -238,7 +237,7 @@ func (c *T8Client) Start() error {
 				case <-gctx.Done():
 					return nil
 				case <-secondTicker.C:
-					c.FpsCounter.SetText("Cps: " + strconv.Itoa(cps))
+					c.FpsCounter(cps)
 					cps = 0
 					if errPerSecond > 10 {
 						return errors.New("too many errors, reconnecting")
@@ -399,7 +398,7 @@ func (c *T8Client) Start() error {
 					cps++
 					count++
 					if count%10 == 0 {
-						c.CaptureCounter.SetText("Cap: " + strconv.Itoa(count))
+						c.CaptureCounter(count)
 					}
 					testerPresent()
 				case msg := <-tx.C():
@@ -452,7 +451,7 @@ func (c *T8Client) Start() error {
 					cps++
 					count++
 					if count%10 == 0 {
-						c.CaptureCounter.SetText("Cap: " + strconv.Itoa(count))
+						c.CaptureCounter(count)
 					}
 					testerPresent()
 				}

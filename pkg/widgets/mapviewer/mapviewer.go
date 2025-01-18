@@ -327,11 +327,13 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 		hit = true
 	}
 	if hit {
+		//fyne.Do(func() {
 		if mv.crosshair.Hidden {
 			mv.crosshair.Resize(fyne.NewSize(mv.widthFactor, mv.heightFactor))
 			mv.crosshair.Show()
 		}
 		mv.setXY(mv.xValue, mv.yValue)
+		//})
 	}
 }
 

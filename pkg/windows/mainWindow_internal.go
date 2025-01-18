@@ -67,7 +67,7 @@ func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
 				p.Y >= mw.buttons.openLogBtn.Position().Y+30 && p.Y <= mw.buttons.openLogBtn.Position().Y+30+mw.buttons.openLogBtn.Size().Height {
 				go mw.LoadLogfileCombined(filename, p)
 			} else {
-				go mw.LoadLogfile(filename, p)
+				go mw.LoadLogfile(filename, p, true)
 			}
 		}
 	}

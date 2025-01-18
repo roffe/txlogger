@@ -57,8 +57,8 @@ func New(port string) *TxUpdater {
 	t.updateBtn = widget.NewButton("Update", func() {
 		t.updateBtn.Disable()
 		go func() {
-			//defer fyne.Do(t.updateBtn.Enable)
 			defer t.updateBtn.Enable()
+			//defer fyne.Do(t.updateBtn.Enable)
 			if err := ota.UpdateOTA(ota.Config{
 				Port: t.port,
 				Logfunc: func(v ...any) {

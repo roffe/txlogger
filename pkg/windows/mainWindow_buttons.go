@@ -3,6 +3,7 @@ package windows
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -351,11 +352,23 @@ func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, er
 		Symbols:        mw.symbolList.Symbols(),
 		Rate:           mw.settings.GetFreq(),
 		OnMessage:      mw.Log,
-		CaptureCounter: mw.counters.capturedCounterLabel,
-		ErrorCounter:   mw.counters.errorCounterLabel,
-		FpsCounter:     mw.counters.fpsCounterLabel,
-		LogFormat:      mw.settings.GetLogFormat(),
-		LogPath:        mw.settings.GetLogPath(),
+		CaptureCounter: func(i int) {
+			//fyne.Do(func() {
+			mw.counters.capturedCounterLabel.SetText("Cap: " + strconv.Itoa(i))
+			//})
+		},
+		ErrorCounter: func(i int) {
+			//fyne.Do(func() {
+			mw.counters.errorCounterLabel.SetText("Err: " + strconv.Itoa(i))
+			//})
+		},
+		FpsCounter: func(i int) {
+			//fyne.Do(func() {
+			mw.counters.fpsCounterLabel.SetText("Fps: " + strconv.Itoa(i))
+			//})
+		},
+		LogFormat: mw.settings.GetLogFormat(),
+		LogPath:   mw.settings.GetLogPath(),
 		WidebandConfig: datalogger.WidebandConfig{
 			Type:                   mw.settings.GetWidebandType(),
 			Port:                   mw.settings.GetWidebandPort(),

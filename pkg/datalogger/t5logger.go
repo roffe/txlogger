@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strconv"
 	"sync"
 	"time"
 
@@ -179,7 +178,7 @@ func (c *T5Client) Start() error {
 				c.OnMessage("Stopped logging..")
 				return nil
 			case <-secondTicker.C:
-				c.FpsCounter.SetText("Cps: " + strconv.Itoa(cps))
+				c.FpsCounter(cps)
 				if c.errPerSecond > 5 {
 					c.errPerSecond = 0
 					return fmt.Errorf("too many errors per second")
@@ -224,7 +223,7 @@ func (c *T5Client) Start() error {
 				count++
 				cps++
 				if count%15 == 0 {
-					c.CaptureCounter.SetText("Cap: " + strconv.Itoa(count))
+					c.CaptureCounter(count)
 				}
 			case msg := <-tx.C():
 				if msg == nil {
@@ -283,7 +282,7 @@ func (c *T5Client) Start() error {
 				count++
 				cps++
 				if count%15 == 0 {
-					c.CaptureCounter.SetText("Cap: " + strconv.Itoa(count))
+					c.CaptureCounter(count)
 				}
 			}
 		}
@@ -302,7 +301,7 @@ func (c *T5Client) Start() error {
 func (c *T5Client) onError(err error) {
 	c.errCount++
 	c.errPerSecond++
-	c.ErrorCounter.SetText("Err: " + strconv.Itoa(c.errCount))
+	c.ErrorCounter(c.errCount)
 	c.OnMessage(err.Error())
 }
 

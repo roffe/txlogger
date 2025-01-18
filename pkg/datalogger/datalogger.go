@@ -6,7 +6,6 @@ import (
 	"log"
 	"time"
 
-	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 )
@@ -46,9 +45,9 @@ type Config struct {
 	Symbols        []*symbol.Symbol
 	Rate           int
 	OnMessage      func(string)
-	CaptureCounter *widget.Label
-	ErrorCounter   *widget.Label
-	FpsCounter     *widget.Label
+	CaptureCounter func(int)
+	ErrorCounter   func(int)
+	FpsCounter     func(int)
 	LogFormat      string
 	LogPath        string
 	WidebandConfig WidebandConfig
@@ -105,9 +104,9 @@ func New(cfg Config) (IClient, error) {
 }
 
 func (d *Client) Start() error {
-	d.cfg.ErrorCounter.SetText("Err: 0")
-	d.cfg.CaptureCounter.SetText("Cap: 0")
-	d.cfg.FpsCounter.SetText("Fps: 0")
+	d.cfg.ErrorCounter(0)
+	d.cfg.CaptureCounter(0)
+	d.cfg.FpsCounter(0)
 	return d.IClient.Start()
 }
 
