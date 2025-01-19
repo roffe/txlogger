@@ -20,6 +20,7 @@ import (
 // var _ fyne.Focusable = (*Plotter)(nil)
 // var _ fyne.Tappable = (*Plotter)(nil)
 var _ fyne.Draggable = (*Plotter)(nil)
+var _ fyne.Widget = (*Plotter)(nil)
 
 type PlotterControl interface {
 	Seek(int)
@@ -87,6 +88,9 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		hilightLine:          -1,
 	}
 	p.ExtendBaseWidget(p)
+
+	l := widget.NewLabel("Cursor")
+	l.Truncation = fyne.TextTruncateOff
 
 	p.canvasImage.FillMode = canvas.ImageFillStretch
 	p.canvasImage.ScaleMode = canvas.ImageScaleFastest

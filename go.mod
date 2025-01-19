@@ -99,4 +99,4 @@ replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
 
 replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
 
-// replace fyne.io/fyne/v2 => C:\Users\flejd\go\src\github.com\Jacalz\fyne
+replace fyne.io/fyne/v2 => C:\Users\flejd\go\src\github.com\roffe\fyne
