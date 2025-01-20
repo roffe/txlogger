@@ -321,6 +321,8 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 			mv.yValue = int(value * 1000)
 		} else if name == "Out.X_AccPedal" {
 			mv.yValue = int(value * 10)
+		} else if name == "Rpm" {
+			mv.yValue = int(value * 0.1)
 		} else {
 			mv.yValue = int(value)
 		}
@@ -328,6 +330,7 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 	}
 	if hit {
 		//fyne.Do(func() {
+		//log.Printf("MapViewer SetValue x(%s): %d y(%s): %d", mv.xFrom, mv.xValue, mv.yFrom, mv.yValue)
 		if mv.crosshair.Hidden {
 			mv.crosshair.Resize(fyne.NewSize(mv.widthFactor, mv.heightFactor))
 			mv.crosshair.Show()

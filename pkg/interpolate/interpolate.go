@@ -5,6 +5,7 @@ import (
 )
 
 type InterPolFunc func(xAxis, yAxis, data []int, xValue, yValue int) (float64, float64, float64, error)
+type InterPolFunc64 func(xAxis, yAxis, data []float64, xValue, yValue float64) (float64, float64, float64, error)
 
 // Helper function to clamp offset values
 func clamp(offset, max int) int {
@@ -74,6 +75,61 @@ func Interpolate(xAxis, yAxis, data []int, xValue, yValue int) (float64, float64
 	interpolatedX1 := (1.0-xFrac)*values[2] + xFrac*values[3]
 	interpolatedValue := (1.0-yFrac)*interpolatedX0 + yFrac*interpolatedX1
 	return float64(xIdx-1) + xFrac, float64(yIdx-1) + yFrac, interpolatedValue, nil
+}
+
+func Interpolate64(xAxis, yAxis, data []float64, xValue, yValue float64) (float64, float64, float64, error) {
+	if len(xAxis) == 0 || len(yAxis) == 0 || len(data) == 0 {
+		return 0, 0, 0, fmt.Errorf("xAxis, yAxis or data is empty")
+	}
+
+	// Get interpolation points and fractions
+	xIdx, xFrac := findIndexAndFrac64(xAxis, xValue)
+	yIdx, yFrac := findIndexAndFrac64(yAxis, yValue)
+
+	// Calculate indices for the four corners
+	width := len(xAxis)
+	idx00 := (yIdx-1)*width + (xIdx - 1)
+	idx01 := (yIdx-1)*width + xIdx
+	idx10 := yIdx*width + (xIdx - 1)
+	idx11 := yIdx*width + xIdx
+
+	// Ensure indices are within bounds
+	if idx00 < 0 || idx11 >= len(data) {
+		return 0, 0, 0, fmt.Errorf("interpolation points out of bounds")
+	}
+
+	// Get values at the four corners
+	v00 := data[idx00]
+	v01 := data[idx01]
+	v10 := data[idx10]
+	v11 := data[idx11]
+
+	// Perform bilinear interpolation
+	top := (1.0-xFrac)*v00 + xFrac*v01
+	bottom := (1.0-xFrac)*v10 + xFrac*v11
+	value := (1.0-yFrac)*top + yFrac*bottom
+
+	return float64(xIdx-1) + xFrac, float64(yIdx-1) + yFrac, value, nil
+}
+
+// Finds the index and fraction of the nearest value in the given array
+func findIndexAndFrac64(arr []float64, value float64) (int, float64) {
+	idx := len(arr) - 1
+	frac := 0.0
+
+	for i, v := range arr {
+		if v >= value {
+			idx = i
+			break
+		}
+	}
+
+	if idx > 0 {
+		delta := arr[idx] - arr[idx-1]
+		frac = (value - arr[idx-1]) / delta
+	}
+
+	return idx, frac
 }
 
 func SetInterpolated(xAxis, yAxis []int, data []int, xValue, yValue, zValue int) error {

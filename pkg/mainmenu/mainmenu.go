@@ -9,7 +9,7 @@ import (
 
 var T5SymbolsTuningOrder = []string{
 	"Options",
-	// "Injectors",
+	"Injectors",
 	"Fuel",
 	// "Ignition",
 	// "Boost",
