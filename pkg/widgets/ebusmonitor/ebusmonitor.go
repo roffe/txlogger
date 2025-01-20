@@ -44,7 +44,7 @@ func (t *Widget) SetText(value string, data float64) {
 	defer t.mu.Unlock()
 	if _, ok := t.values[value]; !ok {
 
-		t.values[value] = canvas.NewText(fmt.Sprintf("%s: %g", value, data), colors.GetColor(value))
+		t.values[value] = canvas.NewText(fmt.Sprintf("%s: %.3g", value, data), colors.GetColor(value))
 		t.order = append(t.order, value)
 		sort.Strings(t.order)
 

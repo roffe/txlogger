@@ -10,6 +10,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/mainmenu"
@@ -215,7 +216,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 				mw.Error(err)
 				return
 			}
-			mw.Log(fmt.Sprintf("set %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
+			debug.Log(fmt.Sprintf("set $%d %s %s", addr, axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 		}
 	}
 

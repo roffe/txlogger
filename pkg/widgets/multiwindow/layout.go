@@ -12,7 +12,7 @@ func (m *multiWinLayout) Layout(objects []fyne.CanvasObject, _ fyne.Size) {
 }
 
 func (m *multiWinLayout) MinSize(_ []fyne.CanvasObject) fyne.Size {
-	return fyne.Size{}
+	return fyne.Size{Width: 700, Height: 400}
 }
 
 func clamp32(value, min, max float32) float32 {

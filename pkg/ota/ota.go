@@ -19,10 +19,9 @@ const (
 )
 
 type Config struct {
-	Port string
-	//Filename     string
-	Logfunc      func(v ...any)
-	ProgressFunc func(progress float64)
+	Port         string
+	Logfunc      func(...any)
+	ProgressFunc func(float64)
 }
 
 func UpdateOTA(cfg Config) error {
@@ -80,7 +79,7 @@ func UpdateOTA(cfg Config) error {
 		return fmt.Errorf("unexpected response: %X %X", cmd.Command, cmd.Data)
 	}
 
-	cfg.Logfunc("Connected device firmware: ", string(cmd.Data))
+	cfg.Logfunc("Device firmware: ", string(cmd.Data))
 
 	if _, err := sp.Write([]byte{'u'}); err != nil {
 		return err
@@ -182,7 +181,7 @@ func readSerialCommand(port serial.Port, timeout time.Duration) (*gocan.SerialCo
 	readbuf := make([]byte, 16)
 
 	for time.Now().Before(deadline) {
-		port.SetReadTimeout(10 * time.Millisecond)
+		port.SetReadTimeout(20 * time.Millisecond)
 
 		n, err := port.Read(readbuf)
 		if err != nil {
@@ -206,7 +205,7 @@ func readSerialCommand(port serial.Port, timeout time.Duration) (*gocan.SerialCo
 
 			if cmdbuffPtr == commandSize {
 				if commandChecksum != b {
-					log.Printf("dara: %X", cmdbuff[:cmdbuffPtr])
+					log.Printf("data: %X", cmdbuff[:cmdbuffPtr])
 					return nil, fmt.Errorf("checksum error: expected %02X, got %02X", b, commandChecksum)
 				}
 
@@ -226,7 +225,6 @@ func readSerialCommand(port serial.Port, timeout time.Duration) (*gocan.SerialCo
 			}
 		}
 	}
-
 	return nil, fmt.Errorf("timeout after %v", timeout)
 }
 

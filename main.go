@@ -2,18 +2,16 @@ package main
 
 import (
 	_ "embed"
-	"encoding/gob"
-	"errors"
 	"flag"
 	"fmt"
 	"image/color"
-	"io"
 	"log"
-	"net"
 	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -38,23 +36,28 @@ func init() {
 	flag.Parse()
 }
 
-func main() {
+func startpprof() {
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
+}
+
+func signalHandler() {
+	sig := make(chan os.Signal, 2)
+	signal.Notify(sig, syscall.SIGINT)
+	go func() {
+		<-sig
+		//rdebug.PrintStack()
+	}()
+}
+
+func main() {
+	startpprof()
 
 	socketFile := filepath.Join(os.TempDir(), "txlogger.sock")
-	if fileExists(socketFile) {
-		if !ping(socketFile) {
-			log.Println("txlogger is not running, removing stale socket file")
-			if err := os.Remove(socketFile); err != nil {
-				log.Println(err)
-			}
-		} else {
-			log.Println("txlogger is running, sending show request over socket")
-			sendShow(socketFile)
-			return
-		}
+
+	if ipc.IsRunning(socketFile) {
+		return
 	}
 
 	if workDirectory != "" {
@@ -64,26 +67,62 @@ func main() {
 		}
 	}
 
-	s, err := net.Listen("unix", socketFile)
-	if err != nil {
-		log.Printf("%T: %w", err, err)
-	}
-	defer s.Close() // cleanup
+	tx := app.NewWithID("com.roffe.txlogger")
+	tx.Settings().SetTheme(&txTheme{})
 
-	a := app.NewWithID("com.roffe.txlogger")
-	a.Settings().SetTheme(&txTheme{})
-
-	if err := presets.Load(a); err != nil {
+	if err := presets.Load(tx); err != nil {
 		log.Println(err)
 	}
 
-	meta := a.Metadata()
-	debug.Log(fmt.Sprintf("starting txlogger v%s build %d", meta.Version, meta.Build))
-	log.Printf("starting txlogger v%s build %d", meta.Version, meta.Build)
-	log.Printf("tempDir: %s", os.TempDir())
+	meta := tx.Metadata()
+	debug.Log(fmt.Sprintf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir()))
+	log.Printf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir())
 
-	var mw *windows.MainWindow
+	mw := windows.NewMainWindow(tx)
 
+	router := ipc.Router{
+		"ping": func(data string) *ipc.Message {
+			return &ipc.Message{Type: "pong", Data: ""}
+		},
+		"open": func(data string) *ipc.Message {
+			mw.Window.RequestFocus() // show window
+			if strings.HasSuffix(data, ".bin") {
+				mw.LoadSymbolsFromFile(data)
+			}
+			if strings.HasSuffix(data, ".t5l") || strings.HasSuffix(data, ".t7l") || strings.HasSuffix(data, ".t8l") || strings.HasSuffix(data, ".csv") {
+				mw.LoadLogfile(data, fyne.Position{}, true)
+			}
+			return nil
+		},
+	}
+
+	sockServ, err := ipc.NewServer(router, socketFile)
+	if err != nil {
+		debug.Log("error: " + err.Error())
+	}
+	defer sockServ.Close()
+
+	if filename := flag.Arg(0); filename != "" {
+		switch strings.ToLower(path.Ext(filename)) {
+		case ".bin":
+			//mw = windows.NewMainWindow(a, filename)
+			mw.LoadSymbolsFromFile(filename)
+		case ".t5l", ".t7l", ".t8l", ".csv":
+			mw.LoadLogfile(filename, fyne.Position{}, false)
+		}
+	} else {
+		if filename := tx.Preferences().String("lastBinFile"); filename != "" {
+			mw.LoadSymbolsFromFile(filename)
+		}
+	}
+
+	//go updateCheck(a, mw)
+
+	mw.ShowAndRun()
+}
+
+/*
+func socketServer(s net.Listener, mw *windows.MainWindow) {
 	go func() {
 		for {
 			conn, err := s.Accept()
@@ -112,7 +151,7 @@ func main() {
 						log.Println(err)
 					}
 				case "open":
-					mw.RequestFocus() // show window
+					mw.Window.RequestFocus // show window
 					if strings.HasSuffix(msg.Data, ".bin") {
 						mw.LoadSymbolsFromFile(msg.Data)
 					}
@@ -123,101 +162,8 @@ func main() {
 			}()
 		}
 	}()
-
-	if mw == nil {
-		mw = windows.NewMainWindow(a, "")
-	}
-
-	if filename := flag.Arg(0); filename != "" {
-		switch strings.ToLower(path.Ext(filename)) {
-		case ".bin":
-			mw = windows.NewMainWindow(a, filename)
-		case ".t5l", ".t7l", ".t8l", ".csv":
-			mw.LoadLogfile(filename, fyne.Position{}, false)
-		}
-	}
-
-	/*
-		sig := make(chan os.Signal, 2)
-		signal.Notify(sig, syscall.SIGINT)
-		go func() {
-			<-sig
-			rdebug.PrintStack()
-			mw.Close()
-		}()
-	*/
-
-	//go updateCheck(a, mw)
-
-	mw.ShowAndRun()
 }
-
-func sendShow(socketFile string) {
-	c, err := net.Dial("unix", socketFile)
-	if err != nil {
-		var nErr *net.OpError
-		if errors.As(err, &nErr) {
-			if nErr.Op == "dial" {
-				log.Println("txlogger is not running")
-				return
-			}
-		}
-		log.Println(err)
-		return
-	}
-	defer c.Close()
-	gb := gob.NewEncoder(c)
-	if filename := flag.Arg(0); filename != "" {
-		err = gb.Encode(ipc.Message{Type: "open", Data: flag.Arg(0)})
-	} else {
-		err = gb.Encode(ipc.Message{Type: "open", Data: ""})
-	}
-	if err != nil {
-		log.Println(err)
-	}
-}
-
-func ping(socketFile string) bool {
-	c, err := net.Dial("unix", socketFile)
-	if err != nil {
-		var nErr *net.OpError
-		if errors.As(err, &nErr) {
-			if nErr.Op == "dial" {
-				return false
-			}
-		}
-		log.Println(err)
-		return false
-	}
-	defer c.Close()
-
-	gdec := gob.NewDecoder(c)
-	gb := gob.NewEncoder(c)
-
-	err = gb.Encode(ipc.Message{Type: "ping", Data: ""})
-	if err != nil {
-		log.Println(err)
-	}
-
-	var msg ipc.Message
-	err = gdec.Decode(&msg)
-	if err != nil {
-		log.Println(err)
-		return false
-	}
-
-	if msg.Type == "pong" {
-		log.Println("txlogger is running")
-		return true
-	}
-
-	return false
-}
-
-func fileExists(name string) bool {
-	_, err := os.Stat(name)
-	return !os.IsNotExist(err)
-}
+*/
 
 /*
 func updateCheck(a fyne.App, mw fyne.Window) {

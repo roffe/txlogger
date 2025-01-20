@@ -101,7 +101,7 @@ func (sw *SettingsWidget) GetWidebandType() string {
 func (sw *SettingsWidget) GetWidebandSymbolName() string {
 	switch sw.wblSource.Selected {
 	case "ECU":
-		switch sw.cfg.EcuSelect.Selected {
+		switch sw.cfg.GetEcu() {
 		case "T5":
 			return "AD_EGR"
 		case "T7":
@@ -196,7 +196,8 @@ func (sw *SettingsWidget) GetCursorFollowCrosshair() bool {
 }
 
 type Config struct {
-	EcuSelect *widget.Select
+	//EcuSelect *widget.Select
+	GetEcu func() string
 }
 
 func New(cfg *Config) *SettingsWidget {

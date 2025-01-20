@@ -62,19 +62,15 @@ func New(port string) *TxUpdater {
 			if err := ota.UpdateOTA(ota.Config{
 				Port: t.port,
 				Logfunc: func(v ...any) {
-					//fyne.Do(func() {
-					t.outputData.Append(fmt.Sprint(v...))
-					//})
+					fyne.Do(func() {
+						t.outputData.Append(fmt.Sprint(v...))
+					})
 				},
-				ProgressFunc: func(progress float64) {
-					//fyne.Do(func() {
-					t.progressbar.SetValue(progress)
-					//})
-				},
+				ProgressFunc: t.progressbar.SetValue,
 			}); err != nil {
-				//fyne.Do(func() {
-				t.outputData.Append(fmt.Sprint("Error: ", err))
-				//})
+				fyne.Do(func() {
+					t.outputData.Append(fmt.Sprint("Error: ", err))
+				})
 			}
 		}()
 	})

@@ -473,7 +473,7 @@ func (c *T8Client) Start() error {
 
 func (c *T8Client) handleWriteTxbridge(ctx context.Context, cl *gocan.Client, write *WriteRequest) error {
 	toRead := min(write.Length, T8ChunkSize)
-	log.Printf("Writing RAM $%X:%d", write.Address, toRead)
+	// log.Printf("Writing RAM $%X:%d", write.Address, toRead)
 	cmd := gocan.SerialCommand{
 		Command: 'W',
 		Data: []byte{
@@ -513,7 +513,7 @@ func (c *T8Client) handleWriteTxbridge(ctx context.Context, cl *gocan.Client, wr
 
 func (c *T8Client) handleReadTxbridge(ctx context.Context, cl *gocan.Client, read *ReadRequest) error {
 	toRead := min(T8ChunkSize, read.Length)
-	log.Printf("Reading RAM $%X:%d", read.Address, toRead)
+	// log.Printf("Reading RAM $%X:%d", read.Address, toRead)
 	cmd := gocan.SerialCommand{
 		Command: 'R',
 		Data: []byte{

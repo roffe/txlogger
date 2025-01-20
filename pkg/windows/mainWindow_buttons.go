@@ -136,8 +136,8 @@ func (mw *MainWindow) newDebugBtn() *widget.Button {
 				mw.Error(err)
 				return
 			}
-			//fyne.CurrentApp().Clipboard().SetContent(strings.Join(str, "\n"))
-			fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(strings.Join(str, "\n"))
+			fyne.CurrentApp().Clipboard().SetContent(strings.Join(str, "\n"))
+			// fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(strings.Join(str, "\n"))
 			dialog.ShowInformation("Debug log", "Content copied to clipboard", mw)
 		}
 		xy := mw.wm.Size().Subtract(dbl.MinSize().AddWidthHeight(20, 60))
@@ -156,7 +156,6 @@ func (mw *MainWindow) newOpenLogBtn() *widget.Button {
 				fyne.LogError("Error loading log file", err)
 				return
 			}
-
 			mw.LoadLogfileCombined(filename, fyne.Position{})
 		}()
 	})

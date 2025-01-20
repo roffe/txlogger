@@ -65,9 +65,9 @@ func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
 			// log.Println(mw.buttons.openLogBtn.Position(), mw.buttons.openLogBtn.Size())
 			if p.X >= mw.buttons.openLogBtn.Position().X && p.X <= mw.buttons.openLogBtn.Position().X+mw.buttons.openLogBtn.Size().Width &&
 				p.Y >= mw.buttons.openLogBtn.Position().Y+30 && p.Y <= mw.buttons.openLogBtn.Position().Y+30+mw.buttons.openLogBtn.Size().Height {
-				go mw.LoadLogfileCombined(filename, p)
+				mw.LoadLogfileCombined(filename, p)
 			} else {
-				go mw.LoadLogfile(filename, p, true)
+				mw.LoadLogfile(filename, p, true)
 			}
 		}
 	}
@@ -121,7 +121,7 @@ func (mw *MainWindow) openSettings() {
 	mw.wm.Add(inner)
 }
 
-func (mw *MainWindow) loadPrefs(filename string) {
+func (mw *MainWindow) loadPrefs() {
 	if ecu := mw.app.Preferences().StringWithFallback(prefsSelectedECU, "T7"); ecu != "" {
 		mw.selects.ecuSelect.SetSelected(ecu)
 	}
@@ -129,23 +129,24 @@ func (mw *MainWindow) loadPrefs(filename string) {
 	if preset := mw.app.Preferences().String(prefsSelectedPreset); preset != "" {
 		mw.selects.presetSelect.SetSelected(preset)
 	}
-
-	if filename == "" {
-		if filename := mw.app.Preferences().String(prefsLastBinFile); filename != "" {
+	/*
+		if filename == "" {
+			if filename := mw.app.Preferences().String(prefsLastBinFile); filename != "" {
+				if err := mw.LoadSymbolsFromFile(filename); err != nil {
+					mw.Error(err)
+					return
+				}
+				mw.filename = filename
+				return
+			}
+		} else {
 			if err := mw.LoadSymbolsFromFile(filename); err != nil {
 				mw.Error(err)
 				return
 			}
 			mw.filename = filename
-			return
 		}
-	} else {
-		if err := mw.LoadSymbolsFromFile(filename); err != nil {
-			mw.Error(err)
-			return
-		}
-		mw.filename = filename
-	}
+	*/
 
 }
 

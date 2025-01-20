@@ -309,6 +309,7 @@ func (i *innerWindowRenderer) Refresh() {
 
 var _ desktop.Mouseable = (*draggableLabel)(nil)
 var _ fyne.Draggable = (*draggableLabel)(nil)
+var _ fyne.Focusable = (*draggableLabel)(nil)
 
 type draggableLabel struct {
 	widget.Label
@@ -320,6 +321,21 @@ func newDraggableLabel(title string, win *InnerWindow) *draggableLabel {
 	d.ExtendBaseWidget(d)
 	d.Text = title
 	return d
+}
+
+func (d *draggableLabel) FocusGained() {
+}
+
+func (d *draggableLabel) FocusLost() {
+}
+
+func (d *draggableLabel) TypedKey(ev *fyne.KeyEvent) {
+	if obj, ok := d.win.content.Objects[0].(fyne.Focusable); ok {
+		obj.TypedKey(ev)
+	}
+}
+
+func (d *draggableLabel) TypedRune(r rune) {
 }
 
 func (d *draggableLabel) Dragged(ev *fyne.DragEvent) {

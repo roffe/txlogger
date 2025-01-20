@@ -1,6 +1,7 @@
 package logplayer
 
 import (
+	"log"
 	"sync"
 	"time"
 
@@ -58,6 +59,7 @@ type Logplayer struct {
 	OnMouseDown func()
 
 	focused bool
+	closed  bool
 }
 
 type logplayerObjects struct {
@@ -101,6 +103,7 @@ func New(cfg *Config) *Logplayer {
 func (l *Logplayer) Close() {
 	l.closeOnce.Do(func() {
 		close(l.controlChan)
+		l.closed = true
 	})
 }
 
@@ -117,6 +120,9 @@ func (l *Logplayer) Focused() bool {
 }
 
 func (l *Logplayer) TypedKey(ev *fyne.KeyEvent) {
+	if l.closed {
+		return
+	}
 	switch ev.Name {
 	case fyne.KeyF12:
 		c := fyne.CurrentApp().Driver().CanvasForObject(l)
@@ -329,6 +335,7 @@ func (lr *LogplayerRenderer) Objects() []fyne.CanvasObject {
 }
 
 func (lr *LogplayerRenderer) Destroy() {
+	log.Println("LogplayerRenderer.Destroy")
 	lr.l.Close()
 }
 

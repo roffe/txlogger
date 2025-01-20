@@ -26,6 +26,7 @@ Or why not create your own gauges and make it just like you want :)
 - Moved txlogger firmware update shortcut to "File"
 - Added "What's new" to "File" menu to access this document
 - Added support to drag the plotter instead of having to use the slider to seek in the logfile
+- Improved T5 support
 
 
 

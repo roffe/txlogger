@@ -19,35 +19,25 @@ import (
 
 type Widget struct {
 	widget.BaseWidget
-
-	cfg *Config
-
+	cfg        *Config
 	entryMap   map[string]*SymbolWidgetEntry
 	entries    []*SymbolWidgetEntry
 	container  *fyne.Container
 	scroll     *container.Scroll
 	updateBars bool
-	onUpdate   func([]*symbol.Symbol)
-	w          fyne.Window
-
-	subs map[string]func()
-
-	mu sync.Mutex
+	subs       map[string]func()
+	mu         sync.Mutex
 }
 
 type Config struct {
-	EBus       *eventbus.Controller
-	Window     fyne.Window
-	UpdateFunc func([]*symbol.Symbol)
-	Symbols    []*symbol.Symbol
+	EBus    *eventbus.Controller
+	Symbols []*symbol.Symbol
 }
 
 func New(cfg *Config) *Widget {
 	sl := &Widget{
 		cfg:      cfg,
 		entryMap: make(map[string]*SymbolWidgetEntry),
-		onUpdate: cfg.UpdateFunc,
-		w:        cfg.Window,
 		subs:     make(map[string]func()),
 	}
 	sl.ExtendBaseWidget(sl)
@@ -97,6 +87,7 @@ func (s *Widget) SetValue(name string, value float64) {
 			val.valueBar.Resize(fyne.NewSize(factor*100, 26))
 			//})
 		}
+
 		switch val.symbol.Correctionfactor {
 		case 1:
 			//fyne.Do(func() {
@@ -124,6 +115,7 @@ func (s *Widget) SetValue(name string, value float64) {
 			//})
 			return
 		}
+
 	}
 }
 
@@ -168,7 +160,6 @@ func (s *Widget) Add(symbols ...*symbol.Symbol) {
 						delete(s.subs, sw.symbol.Name)
 					}
 					s.container.Remove(sw)
-					s.onUpdate(s.cfg.Symbols)
 					break
 				}
 			}
@@ -179,7 +170,6 @@ func (s *Widget) Add(symbols ...*symbol.Symbol) {
 		s.container.Add(entry)
 		s.entryMap[sym.Name] = entry
 	}
-	s.onUpdate(s.cfg.Symbols)
 }
 
 func (s *Widget) Clear() {
@@ -199,7 +189,6 @@ func (s *Widget) clear() {
 	}
 	clear(s.entryMap)
 	clear(s.subs)
-	s.onUpdate(s.cfg.Symbols)
 }
 
 func (s *Widget) LoadSymbols(symbols ...*symbol.Symbol) {
@@ -304,8 +293,8 @@ func NewSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry
 	}
 	sw.ExtendBaseWidget(sw)
 	sw.copyName = widget.NewButtonWithIcon("", theme.ContentCopyIcon(), func() {
-		//fyne.CurrentApp().Clipboard().SetContent(sym.Name)
-		fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(sym.Name)
+		fyne.CurrentApp().Clipboard().SetContent(sym.Name)
+		//fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(sym.Name)
 	})
 	sw.symbolName = widget.NewLabel(sw.symbol.Name)
 	sw.symbolValue = widget.NewLabel("---")

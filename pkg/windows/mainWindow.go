@@ -44,15 +44,21 @@ const (
 	prefsSelectedPreset = "selectedPreset"
 )
 
-var _ fyne.Tappable = (*secretText)(nil)
+var _ fyne.Tappable = (*SecretText)(nil)
 
-type secretText struct {
+type SecretText struct {
 	*widget.Label
 	tappedTimes int
 	SecretFunc  func()
 }
 
-func (s *secretText) Tapped(*fyne.PointEvent) {
+func NewSecretText(text string) *SecretText {
+	return &SecretText{
+		Label: widget.NewLabel(text),
+	}
+}
+
+func (s *SecretText) Tapped(*fyne.PointEvent) {
 	s.tappedTimes++
 	//	log.Println("tapped", s.tappedTimes)
 	if s.tappedTimes >= 10 {
@@ -87,7 +93,7 @@ type MainWindow struct {
 	dlc             datalogger.IClient
 	buttonsDisabled bool
 	settings        *settings.SettingsWidget
-	statusText      *secretText
+	statusText      *SecretText
 	oCtx            *oto.Context
 	wm              *multiwindow.MultipleWindows
 	content         *fyne.Container
@@ -123,7 +129,7 @@ type mainWindowCounters struct {
 	fpsCounterLabel *widget.Label
 }
 
-func NewMainWindow(app fyne.App, filename string) *MainWindow {
+func NewMainWindow(app fyne.App) *MainWindow {
 	mw := &MainWindow{
 		Window:     app.NewWindow("txlogger"),
 		app:        app,
@@ -134,59 +140,38 @@ func NewMainWindow(app fyne.App, filename string) *MainWindow {
 			//errorCounter:   binding.NewInt(),
 			//fpsCounter:     binding.NewInt(),
 		},
-
 		selects: &mainWindowSelects{},
 		buttons: &mainWindowButtons{},
+		symbolList: symbollist.New(&symbollist.Config{
+			EBus: ebus.CONTROLLER,
+		}),
 
-		statusText: &secretText{Label: widget.NewLabel("Harder, Better, Faster, Stronger")},
-
-		oCtx: newOtoContext(),
+		statusText: NewSecretText("Harder, Better, Faster, Stronger"),
+		oCtx:       newOtoContext(),
 	}
-
-	mw.wm = multiwindow.NewMultipleWindows()
-	mw.wm.LockViewport = true
-
-	mw.wm.OnError = mw.Error
-
-	updateSymbols := func(syms []*symbol.Symbol) {
-		if mw.dlc != nil {
-			if err := mw.dlc.SetSymbols(mw.symbolList.Symbols()); err != nil {
-				if err.Error() == "pending" {
-					return
-				}
-				mw.Error(err)
-			}
-		}
-	}
-
-	mw.symbolList = symbollist.New(&symbollist.Config{
-		EBus:       ebus.CONTROLLER,
-		Window:     mw,
-		UpdateFunc: updateSymbols,
+	mw.settings = settings.New(&settings.Config{
+		GetEcu: func() string {
+			return mw.selects.ecuSelect.Selected
+		},
 	})
 
 	mw.setupMenu()
-
 	mw.createButtons()
 	mw.createSelects()
 	mw.createCounters()
-
 	mw.newSymbolnameTypeahead()
+	mw.setupShortcuts()
 
-	mw.settings = settings.New(&settings.Config{
-		EcuSelect: mw.selects.ecuSelect,
-	})
+	mw.loadPrefs()
 
-	mw.loadPrefs(filename)
-	if mw.fw == nil {
-		mw.SetTitle("No symbols loaded")
-	}
-
-	mw.Window.SetOnDropped(mw.onDropped)
-	mw.SetCloseIntercept(mw.closeIntercept)
+	mw.wm = multiwindow.NewMultipleWindows()
+	mw.wm.LockViewport = true
+	mw.wm.OnError = mw.Error
 
 	mw.render()
 
+	mw.Window.SetOnDropped(mw.onDropped)
+	mw.SetCloseIntercept(mw.closeIntercept)
 	mw.SetPadded(true)
 	mw.SetContent(mw.content)
 	mw.Resize(fyne.NewSize(1000, 700))
@@ -195,6 +180,15 @@ func NewMainWindow(app fyne.App, filename string) *MainWindow {
 
 	mw.whatsNew()
 
+	mw.startup = true
+	mw.buttons.symbolListBtn.OnTapped()
+	mw.buttons.dashboardBtn.OnTapped()
+	mw.startup = false
+
+	return mw
+}
+
+func (mw *MainWindow) setupShortcuts() {
 	ctrlEnter := &desktop.CustomShortcut{KeyName: fyne.KeyReturn, Modifier: fyne.KeyModifierControl}
 	altEnter := &desktop.CustomShortcut{KeyName: fyne.KeyReturn, Modifier: fyne.KeyModifierAlt}
 	ctrl1 := &desktop.CustomShortcut{KeyName: fyne.Key1, Modifier: fyne.KeyModifierControl}
@@ -227,13 +221,6 @@ func NewMainWindow(app fyne.App, filename string) *MainWindow {
 	mw.Window.Canvas().AddShortcut(ctrl4, func(shortcut fyne.Shortcut) {
 		log.Println("ctrl4")
 	})
-
-	mw.startup = true
-	mw.buttons.symbolListBtn.OnTapped()
-	mw.buttons.dashboardBtn.OnTapped()
-	mw.startup = false
-
-	return mw
 }
 
 func (mw *MainWindow) render() {
@@ -410,16 +397,13 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, p fyne.Position) {
 	//	cp.Close()
 	//}
 	w := mw.app.NewWindow(fp)
-
 	w.SetCloseIntercept(func() {
 		cp.Close()
 		w.Close()
 	})
 	w.Canvas().SetOnTypedKey(cp.TypedKey)
-	//fyne.Do(func() {
 	w.SetContent(cp)
 	w.Show()
-	//})
 
 	//w.Show()
 	//mw.wm.Add(iw, p)
@@ -468,17 +452,17 @@ func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position, fromDropped 
 
 func (mw *MainWindow) Log(s string) {
 	debug.Log(s)
-	//go fyne.Do(func() {
-	mw.outputData.Append(s)
-	//})
+	go fyne.Do(func() {
+		mw.outputData.Append(s)
+	})
 }
 
 func (mw *MainWindow) Error(err error) {
 	debug.Log("error:" + err.Error())
-	//go fyne.Do(func() {
-	mw.outputData.Append(err.Error())
-	dialog.ShowError(err, mw.Window)
-	//})
+	go fyne.Do(func() {
+		mw.outputData.Append(err.Error())
+		dialog.ShowError(err, mw.Window)
+	})
 	//log.Printf("error: %s", err)
 }
 

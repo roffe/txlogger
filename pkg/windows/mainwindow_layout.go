@@ -87,7 +87,7 @@ func (mw *MainWindow) jsonLayout() ([]byte, error) {
 	var history []WindowProperties
 	viewportSize := mw.wm.Size()
 
-	for _, w := range mw.wm.Windows {
+	for _, w := range mw.wm.Windows() {
 		if w.IgnoreSave {
 			continue
 		}

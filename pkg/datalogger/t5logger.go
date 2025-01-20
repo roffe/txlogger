@@ -188,7 +188,47 @@ func (c *T5Client) Start() error {
 			case symbols := <-c.symbolChan:
 				_ = symbols
 			case read := <-c.readChan:
-				read.Complete(fmt.Errorf("not implemented"))
+				if txbridge {
+					// log.Println(read.Length)
+					toRead := min(234, read.Length)
+					read.Length -= toRead
+					cmd := gocan.SerialCommand{
+						Command: 'R',
+						Data: []byte{
+							byte(read.Address),
+							byte(read.Address >> 8),
+							byte(read.Address >> 16),
+							byte(read.Address >> 24),
+							byte(toRead),
+						},
+					}
+					read.Address += uint32(toRead)
+					payload, err := cmd.MarshalBinary()
+					if err != nil {
+						c.onError(err)
+						continue
+					}
+					frame := gocan.NewFrame(adapter.SystemMsg, payload, gocan.Outgoing)
+					resp, err := cl.SendAndPoll(ctx, frame, 3000*time.Millisecond, adapter.SystemMsgDataRequest)
+					if err != nil {
+						read.Complete(err)
+						continue
+					}
+					read.Data = append(read.Data, resp.Data()...)
+					if read.Length > 0 {
+						c.readChan <- read
+					} else {
+						read.Complete(nil)
+					}
+					continue
+				}
+				data, err := t5.ReadRam(ctx, read.Address, read.Length)
+				if err != nil {
+					c.onError(err)
+					continue
+				}
+				read.Data = data
+				read.Complete(nil)
 			case upd := <-c.updateChan:
 				upd.Complete(fmt.Errorf("not implemented"))
 			case <-t.C:

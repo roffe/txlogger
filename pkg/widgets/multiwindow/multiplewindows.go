@@ -31,7 +31,7 @@ type MultipleWindows struct {
 
 	LockViewport bool
 
-	Windows []*InnerWindow
+	windows []*InnerWindow
 
 	content      *fyne.Container
 	propertyLock sync.RWMutex
@@ -46,9 +46,7 @@ type MultipleWindows struct {
 // You can add new more windows to this container by calling `Add` or updating the `Windows`
 // field and calling `Refresh`.
 func NewMultipleWindows(wins ...*InnerWindow) *MultipleWindows {
-	m := &MultipleWindows{
-		Windows: wins,
-	}
+	m := &MultipleWindows{}
 	m.ExtendBaseWidget(m)
 	return m
 }
@@ -68,7 +66,7 @@ func (m *MultipleWindows) Add(w *InnerWindow, startPosition ...fyne.Position) bo
 	m.propertyLock.Lock()
 	defer m.propertyLock.Unlock()
 
-	m.Windows = append(m.Windows, w)
+	m.windows = append(m.windows, w)
 	m.setupChild(w)
 	if len(startPosition) == 0 {
 		w.Move(m.openOffset)
@@ -98,10 +96,18 @@ func (m *MultipleWindows) Add(w *InnerWindow, startPosition ...fyne.Position) bo
 	return true
 }
 
+func (m *MultipleWindows) Windows() []*InnerWindow {
+	m.propertyLock.RLock()
+	defer m.propertyLock.RUnlock()
+	out := make([]*InnerWindow, len(m.windows))
+	copy(out, m.windows)
+	return out
+}
+
 func (m *MultipleWindows) HasWindow(title string) *InnerWindow {
 	//m.propertyLock.RLock()
 	//defer m.propertyLock.RUnlock()
-	for _, w := range m.Windows {
+	for _, w := range m.windows {
 		if w.Title() == title {
 			return w
 		}
@@ -110,8 +116,8 @@ func (m *MultipleWindows) HasWindow(title string) *InnerWindow {
 }
 
 func (m *MultipleWindows) CloseAll() {
-	windows := make([]*InnerWindow, len(m.Windows))
-	copy(windows, m.Windows)
+	windows := make([]*InnerWindow, len(m.windows))
+	copy(windows, m.windows)
 	for _, w := range windows {
 		if w.Persist {
 			// log.Println("Persist", w.Title())
@@ -141,9 +147,9 @@ func (m *MultipleWindows) Remove(w *InnerWindow) {
 func (m *MultipleWindows) remove(w *InnerWindow) {
 	m.propertyLock.Lock()
 	defer m.propertyLock.Unlock()
-	for i, ww := range m.Windows {
+	for i, ww := range m.windows {
 		if ww == w {
-			m.Windows = append(m.Windows[:i], m.Windows[i+1:]...)
+			m.windows = append(m.windows[:i], m.windows[i+1:]...)
 			m.content.Remove(w)
 			m.refreshChildren()
 			return
@@ -152,7 +158,7 @@ func (m *MultipleWindows) remove(w *InnerWindow) {
 }
 
 func (m *MultipleWindows) Arrange(arr Arranger) {
-	arr.Layout(m.content.Size(), m.LockViewport, m.Windows)
+	arr.Layout(m.content.Size(), m.LockViewport, m.windows)
 }
 
 func (m *MultipleWindows) Refresh() {
@@ -173,7 +179,7 @@ func (m *MultipleWindows) raise(w *InnerWindow) {
 		return
 	}
 	id := -1
-	for i, ww := range m.Windows {
+	for i, ww := range m.windows {
 		if ww == w {
 			id = i
 			w.bgFillColor = theme.ColorNamePrimary
@@ -186,8 +192,8 @@ func (m *MultipleWindows) raise(w *InnerWindow) {
 	if id == -1 {
 		return
 	}
-	windows := append(m.Windows[:id], m.Windows[id+1:]...)
-	m.Windows = append(windows, w)
+	windows := append(m.windows[:id], m.windows[id+1:]...)
+	m.windows = append(windows, w)
 	m.refreshChildren()
 }
 
@@ -195,8 +201,8 @@ func (m *MultipleWindows) refreshChildren() {
 	if m.content == nil {
 		return
 	}
-	objs := make([]fyne.CanvasObject, len(m.Windows))
-	for i, w := range m.Windows {
+	objs := make([]fyne.CanvasObject, len(m.windows))
+	for i, w := range m.windows {
 		objs[i] = w
 	}
 	m.content.Objects = objs
@@ -205,6 +211,8 @@ func (m *MultipleWindows) refreshChildren() {
 
 func (m *MultipleWindows) setupChild(w *InnerWindow) {
 	w.OnDragged = func(ev *fyne.DragEvent) {
+		//S		log.Println("Dragged", ev.Dragged)
+		// log.Println(m.content.Size())
 		if w.maximized {
 			//mouseRatio := ev.Position.X / w.Size().Width
 			//w.Resize(w.MinSize())
@@ -274,7 +282,7 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 		if f, ok := w.content.Objects[0].(fyne.Focusable); ok {
 			c := fyne.CurrentApp().Driver().CanvasForObject(w)
 			c.Focus(f)
-			c.SetOnTypedKey(f.TypedKey)
+			//c.SetOnTypedKey(f.TypedKey)
 		}
 		m.Raise(w)
 	}
@@ -316,7 +324,7 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 func (m *MultipleWindows) LoadLayout(windows []WindowProperties) error {
 	viewportSize := m.Size()
 	for _, h := range windows {
-		for _, w := range m.Windows {
+		for _, w := range m.windows {
 			if w.Title() == h.Title {
 				// Convert ratios to absolute positions and sizes
 				position := fyne.NewPos(
@@ -350,7 +358,7 @@ func (wm *MultipleWindows) JsonLayout() ([]byte, error) {
 	var history []WindowProperties
 	viewportSize := wm.Size()
 
-	for _, w := range wm.Windows {
+	for _, w := range wm.windows {
 		if w.IgnoreSave {
 			continue
 		}

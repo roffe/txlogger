@@ -125,7 +125,7 @@ func NewWBL(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 						cfg.Log("wbl nil message")
 						return
 					}
-					// log.Printf("plx: %X\n", msg.Data())
+					//log.Printf("plx: %X\n", msg.Data())
 					if err := wblClient.Parse(msg.Data()); err != nil {
 						cfg.Log(err.Error())
 						log.Println(err)

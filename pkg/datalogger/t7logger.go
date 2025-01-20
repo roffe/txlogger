@@ -366,11 +366,6 @@ func (c *T7Client) Start() error {
 				data, err := kwp.ReadMemoryByAddress(ctx, int(read.Address), int(read.Length))
 				if err != nil {
 					read.Complete(err)
-					if txbridge {
-						if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
-							c.onError(err)
-						}
-					}
 					continue
 				}
 				read.Data = data
