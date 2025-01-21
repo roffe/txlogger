@@ -156,7 +156,9 @@ func (mw *MainWindow) newOpenLogBtn() *widget.Button {
 				fyne.LogError("Error loading log file", err)
 				return
 			}
-			mw.LoadLogfileCombined(filename, fyne.Position{})
+
+			mw.LoadLogfileCombined(filename, fyne.Position{}, true)
+
 		}()
 	})
 }

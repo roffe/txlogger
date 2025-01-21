@@ -315,7 +315,7 @@ func (mw *MainWindow) render() {
 		// mw.tabs,
 	)
 }
-func (mw *MainWindow) LoadLogfileCombined(filename string, p fyne.Position) {
+func (mw *MainWindow) LoadLogfileCombined(filename string, p fyne.Position, fromRoutine bool) {
 	// Just filename, used for Window title
 	fp := filepath.Base(filename)
 
@@ -396,14 +396,24 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, p fyne.Position) {
 	//iw.CloseIntercept = func() {
 	//	cp.Close()
 	//}
-	w := mw.app.NewWindow(fp)
-	w.SetCloseIntercept(func() {
-		cp.Close()
-		w.Close()
-	})
-	w.Canvas().SetOnTypedKey(cp.TypedKey)
-	w.SetContent(cp)
-	w.Show()
+
+	do := func() {
+
+		w := mw.app.NewWindow(fp)
+		w.SetCloseIntercept(func() {
+			cp.Close()
+			w.Close()
+		})
+		w.Canvas().SetOnTypedKey(cp.TypedKey)
+		w.SetContent(cp)
+		w.Show()
+	}
+
+	if fromRoutine {
+		fyne.Do(do)
+	} else {
+		do()
+	}
 
 	//w.Show()
 	//mw.wm.Add(iw, p)
