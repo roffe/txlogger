@@ -88,34 +88,11 @@ func (s *Widget) SetValue(name string, value float64) {
 			//})
 		}
 
-		switch val.symbol.Correctionfactor {
-		case 1:
-			//fyne.Do(func() {
-			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 0, 64))
-			//})
-			return
-		case 0.1:
-			//fyne.Do(func() {
-			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 1, 64))
-			//})
-			return
-		case 0.01:
-			//fyne.Do(func() {
-			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 2, 64))
-			//})
-			return
-		case 0.001:
-			//fyne.Do(func() {
-			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 3, 64))
-			//})
-			return
-		default:
-			//fyne.Do(func() {
-			val.symbolValue.SetText(strconv.FormatFloat(value, 'f', 2, 64))
-			//})
-			return
-		}
-
+		prec := symbol.GetPrecision(val.symbol.Correctionfactor)
+		textValue := strconv.FormatFloat(value, 'f', prec, 64)
+		//fyne.Do(func() {
+		val.symbolValue.SetText(textValue)
+		//})
 	}
 }
 

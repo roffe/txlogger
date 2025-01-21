@@ -2,14 +2,13 @@ package mapviewer
 
 import (
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/txlogger/pkg/interpolate"
 )
 
 type MapViewerOption func(*MapViewer) error
 
 type LoadFunc func()
-type SaveFunc func([]int)
-type UpdateFunc func(idx int, value []int)
+type SaveFunc func([]float64)
+type UpdateFunc func(idx int, value []float64)
 
 func WithButtons(buttons bool) MapViewerOption {
 	return func(mv *MapViewer) error {
@@ -32,7 +31,7 @@ func WithYFrom(yFrom string) MapViewerOption {
 	}
 }
 
-func WithXData(xData []int) MapViewerOption {
+func WithXData(xData []float64) MapViewerOption {
 	//	log.Println("WithXData", xData)
 	return func(mv *MapViewer) error {
 		mv.numColumns = len(xData)
@@ -41,7 +40,7 @@ func WithXData(xData []int) MapViewerOption {
 	}
 }
 
-func WithYData(yData []int) MapViewerOption {
+func WithYData(yData []float64) MapViewerOption {
 	//	log.Println("WithYData", yData)
 	return func(mv *MapViewer) error {
 		mv.numRows = len(yData)
@@ -50,7 +49,7 @@ func WithYData(yData []int) MapViewerOption {
 	}
 }
 
-func WithZData(zData []int) MapViewerOption {
+func WithZData(zData []float64) MapViewerOption {
 	//	log.Println("WithZData", zData)
 	return func(mv *MapViewer) error {
 		mv.numData = len(zData)
@@ -68,51 +67,23 @@ func WithAxisLabels(x, y, z string) MapViewerOption {
 	}
 }
 
-func WithXCorrFac(xCorrFac float64) MapViewerOption {
+func WithXPrecision(precision int) MapViewerOption {
 	return func(mv *MapViewer) error {
-		mv.xCorrFac = xCorrFac
+		mv.xPrecision = precision
 		return nil
 	}
 }
 
-func WithYCorrFac(yCorrFac float64) MapViewerOption {
+func WithYPrecision(precision int) MapViewerOption {
 	return func(mv *MapViewer) error {
-		mv.yCorrFac = yCorrFac
+		mv.yPrecision = precision
 		return nil
 	}
 }
 
-func WithZCorrFac(zCorrFac float64) MapViewerOption {
+func WithZPrecision(precision int) MapViewerOption {
 	return func(mv *MapViewer) error {
-		mv.zCorrFac = zCorrFac
-		return nil
-	}
-}
-
-func WithXOffset(xOffset float64) MapViewerOption {
-	return func(mv *MapViewer) error {
-		mv.xCorrOffset = xOffset
-		return nil
-	}
-}
-
-func WithYOffset(yOffset float64) MapViewerOption {
-	return func(mv *MapViewer) error {
-		mv.yCorrOffset = yOffset
-		return nil
-	}
-}
-
-func WithZOffset(zOffset float64) MapViewerOption {
-	return func(mv *MapViewer) error {
-		mv.zCorrOffset = zOffset
-		return nil
-	}
-}
-
-func WithInterPolFunc(ipf interpolate.InterPolFunc) MapViewerOption {
-	return func(mv *MapViewer) error {
-		mv.ipf = ipf
+		mv.zPrecision = precision
 		return nil
 	}
 }

@@ -1,12 +1,13 @@
 package mapviewer
 
 import (
-	"fmt"
+	"log"
+	"math"
 	"strconv"
 	"strings"
 
 	"fyne.io/fyne/v2"
-	"github.com/roffe/txlogger/pkg/debug"
+	"fyne.io/fyne/v2/driver/desktop"
 )
 
 //func (mw *MapViewer) Tapped(_ *fyne.PointEvent) {
@@ -79,31 +80,12 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 					fyne.LogError("Error parsing float", err)
 					return
 				}
-				switch mv.zCorrFac {
-				case 1:
-					mv.zData[cell] = int(num)
-				case 0.1:
-					mv.zData[cell] = int(num * 10)
-				case 0.01:
-					mv.zData[cell] = int(num * 100)
-				case 0.001:
-					mv.zData[cell] = int(num * 1000)
-				case oneHundredTwentyeighth:
-					mv.zData[cell] = int(num * 128)
-				case oneThousandTwentyfourth:
-					mv.zData[cell] = int(num * 1024)
-				case 0.00390625:
-					mv.zData[cell] = int(num * 256)
-				case 0.004:
-					mv.zData[cell] = int(num * 250)
-				default:
-					fyne.LogError("unknown zCorrFac", fmt.Errorf("%f", mv.zCorrFac))
-					debug.Log(fmt.Sprintf("%s unknown zCorrFac: %f", mv.symbol.Name, mv.zCorrFac))
-				}
+				mv.zData[cell] = num
+				log.Println("Set", cell, num)
 			} else {
 				num, err := strconv.Atoi(mv.inputBuffer.String())
 				if err == nil {
-					mv.zData[cell] = num
+					mv.zData[cell] = float64(num)
 				}
 			}
 		}
@@ -112,26 +94,43 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 		mv.restoreValues = false
 		mv.inputBuffer.Reset()
 	case fyne.KeyPageUp, "S":
+		base := 10.0
+		if dr, ok := fyne.CurrentApp().Driver().(desktop.Driver); ok {
+			if dr.CurrentKeyModifiers()&fyne.KeyModifierShift != 0 {
+				base = 100
+			}
+		}
+
+		increment := base * math.Pow(10, -float64(mv.zPrecision))
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] += int((mv.zCorrFac*10)*(1.0/mv.zCorrFac) + mv.zCorrOffset)
+			mv.zData[cell] += increment
 		}
 		mv.updateCells()
 		refresh = true
 	case fyne.KeyPageDown, "X":
+		base := 10.0
+		if dr, ok := fyne.CurrentApp().Driver().(desktop.Driver); ok {
+			if dr.CurrentKeyModifiers()&fyne.KeyModifierShift != 0 {
+				base = 100
+			}
+		}
+		increment := base * math.Pow(10, -float64(mv.zPrecision))
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] -= int((mv.zCorrFac*10)*(1.0/mv.zCorrFac) + mv.zCorrOffset)
+			mv.zData[cell] -= increment
 		}
 		mv.updateCells()
 		refresh = true
 	case "+", "A":
+		increment := math.Pow(10, -float64(mv.zPrecision))
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] += int(mv.zCorrFac*(1.0/mv.zCorrFac) + mv.zCorrOffset)
+			mv.zData[cell] += increment
 		}
 		mv.updateCells()
 		refresh = true
 	case "-", "Z":
+		increment := math.Pow(10, -float64(mv.zPrecision))
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] -= int(mv.zCorrFac*(1.0/mv.zCorrFac) + mv.zCorrOffset)
+			mv.zData[cell] -= increment
 		}
 		mv.updateCells()
 		refresh = true

@@ -175,7 +175,7 @@ func (l *Logplayer) control(op *controlMsg) {
 	select {
 	case l.controlChan <- op:
 	default:
-		fyne.LogError("Logplayer control channel full", nil)
+		//fyne.LogError("Logplayer control channel full", nil)
 	}
 }
 
@@ -389,10 +389,11 @@ func (l *Logplayer) playLog() {
 					for k, v := range rec.Values {
 						l.cfg.EBus.Publish(k, v)
 					}
-					//fyne.Do(func() {
 					l.objs.positionSlider.Value = float64(op.Pos)
+					timeText := rec.Time.Format("15:04:05.00")
+					//fyne.Do(func() {
 					l.objs.positionSlider.Refresh()
-					l.objs.timeLabel.SetText(rec.Time.Format("15:04:05.00"))
+					l.objs.timeLabel.SetText(timeText)
 					//})
 					if f := l.cfg.TimeSetter; f != nil {
 						f(rec.Time)
@@ -417,14 +418,15 @@ func (l *Logplayer) playLog() {
 						l.cfg.EBus.Publish(k, v)
 					}
 					l.objs.positionSlider.Value = float64(pos)
+					timeText := rec.Time.Format("15:04:05.00")
+					//fyne.Do(func() {
 					l.objs.positionSlider.Refresh()
-					l.objs.timeLabel.SetText(rec.Time.Format("15:04:05.00"))
+					l.objs.timeLabel.SetText(timeText)
+					//})
 					if f := l.cfg.TimeSetter; f != nil {
 						f(rec.Time)
 					}
 					l.objs.plotter.Seek(pos + 1)
-					// Seek back one position since we just read the record
-					//l.logFile.Seek(pos)
 				}
 				if l.state == statePlaying {
 					timer.Reset(0)
@@ -436,9 +438,14 @@ func (l *Logplayer) playLog() {
 						for k, v := range rec.Values {
 							l.cfg.EBus.Publish(k, v)
 						}
+
 						l.objs.positionSlider.Value = float64(pos + 1)
+						timeText := rec.Time.Format("15:04:05.00")
+						//fyne.Do(func() {
 						l.objs.positionSlider.Refresh()
-						l.objs.timeLabel.SetText(rec.Time.Format("15:04:05.00"))
+						l.objs.timeLabel.SetText(timeText)
+						//})
+
 						if f := l.cfg.TimeSetter; f != nil {
 							f(rec.Time)
 						}

@@ -50,7 +50,7 @@ type Meshgrid struct {
 // NewMeshgrid creates a new Meshgrid given width, height, depth and spacing.
 func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int) (*Meshgrid, error) {
 	// Check if the provided values slice has the correct number of elements
-	if len(values) != cols*rows {
+	if len(values) != max(1, cols)*max(1, rows) {
 		return nil, fmt.Errorf("the number of Z values does not match the meshgrid dimensions")
 	}
 	// Find min and max Z values for normalization
@@ -76,7 +76,7 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 		zlabel: zlabel,
 	}
 
-	m.createVertices(fyne.Min(float32(m.cols), 1), fyne.Min(float32(m.rows), 1))
+	m.createVertices(fyne.Max(float32(m.cols), 1), fyne.Max(float32(m.rows), 1))
 
 	m.scaleMeshgrid(0.3)
 
@@ -195,17 +195,11 @@ func (m *Meshgrid) SetFloat642(idx int, value float64) {
 	m.refresh()
 }
 
-func (m *Meshgrid) SetMin(min float64) {
+func (m *Meshgrid) LoadFloat64s(min, max float64, floats []float64) {
 	m.zmin = min
-	m.zrange = m.zmax - m.zmin
-}
-
-func (m *Meshgrid) SetMax(max float64) {
 	m.zmax = max
 	m.zrange = m.zmax - m.zmin
-}
 
-func (m *Meshgrid) LoadFloat64s(floats []float64) {
 	m.values = floats
 	if len(floats) == 0 {
 		return

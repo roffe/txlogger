@@ -69,6 +69,11 @@ func NewTappableText(text string, col color.Color, onTapped func(enabled bool), 
 	return tt
 }
 
+func (tt *TappableText) Refresh() {
+	tt.value.Refresh()
+	tt.text.Refresh()
+}
+
 func (tt *TappableText) MouseIn(e *desktop.MouseEvent) {
 	tt.onHover(true)
 }

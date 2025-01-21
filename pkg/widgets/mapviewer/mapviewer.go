@@ -3,6 +3,7 @@ package mapviewer
 import (
 	"fmt"
 	"image/color"
+	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -24,10 +25,8 @@ import (
 )
 
 const (
-	minTextSize             = 11
-	maxTextSize             = 28
-	oneThousandTwentyfourth = 1.0 / 1024
-	oneHundredTwentyeighth  = 1.0 / 128
+	minTextSize = 11
+	maxTextSize = 28
 )
 
 type MapViewerInfo struct {
@@ -54,18 +53,15 @@ type MapViewer struct {
 
 	symbol *symbol.Symbol
 
-	xData, yData, zData []int
+	zMin, zMax                         float64
+	xData, yData, zData                []float64
+	xPrecision, yPrecision, zPrecision int
 
-	xValue, yValue int
-
-	xCorrFac, yCorrFac, zCorrFac          float64
-	xCorrOffset, yCorrOffset, zCorrOffset float64
-	xIndex, yIndex                        float64
+	xValue, yValue float64
+	xIndex, yIndex float64
 
 	xFrom, yFrom                 string
 	numColumns, numRows, numData int
-
-	min, max int
 
 	xAxisLabel, yAxisLabel, zAxisLabel       string
 	xAxisLabelContainer, yAxisLabelContainer *fyne.Container
@@ -82,8 +78,6 @@ type MapViewer struct {
 	crosshair     *canvas.Rectangle
 
 	zDataRects []*canvas.Rectangle
-
-	ipf interpolate.InterPolFunc
 
 	selectedX, SelectedY int
 
@@ -127,10 +121,9 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 			editable: true,
 		},
 		funcs: &funcs{
-
 			loadECUFunc:   func() {},
-			saveECUFunc:   func(data []int) {},
-			updateECUFunc: func(idx int, value []int) {},
+			saveECUFunc:   func(data []float64) {},
+			updateECUFunc: func(idx int, value []float64) {},
 		},
 	}
 	mv.ExtendBaseWidget(mv)
@@ -144,7 +137,7 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 	if len(mv.zData) == 0 {
 		return nil, fmt.Errorf("MapViewer zData is empty")
 	}
-	mv.min, mv.max = findMinMax(mv.zData)
+	mv.zMin, mv.zMax = widgets.FindMinMax(mv.zData)
 
 	if mv.numColumns*mv.numRows != mv.numData && mv.numColumns > 1 && mv.numRows > 1 {
 		return nil, fmt.Errorf("MapViewer columns * rows != datalen")
@@ -152,7 +145,7 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 
 	mv.crosshair = NewCrosshair(color.RGBA{165, 55, 253, 180}, 3)
 	mv.selectionRect = NewRectangle(color.RGBA{0x30, 0x70, 0xFF, 0xFF}, 3)
-	// log.Printf("MapViewer c: %d r: %d dlen: %d x: %s y: %s z: %s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom, mv.symbol.Name)
+	log.Printf("MapViewer c: %d r: %d dlen: %d x: %s y: %s z: %s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom, mv.symbol.Name)
 
 	mv.createYAxis()
 	mv.createXAxis()
@@ -238,7 +231,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 
 	buttons := mv.createButtons()
 
-	if mv.symbol == nil || mv.numColumns == 1 && mv.numRows == 1 {
+	if mv.symbol == nil || (mv.numColumns == 1 || mv.numRows == 1) {
 		return container.NewBorder(
 			nil,
 			buttons,
@@ -268,10 +261,11 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 			mv.xAxisLabel,
 			mv.yAxisLabel,
 			mv.zAxisLabel,
-			mv.symbol.Float64s(),
+			mv.zData,
 			mv.numColumns,
 			mv.numRows,
 		)
+
 		if err == nil {
 			split := container.NewVSplit(
 				mapview,
@@ -285,6 +279,8 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 			)
 			split.Offset = 0.9
 			return split
+		} else {
+			log.Println("MapViewer meshview failed:", err)
 		}
 	}
 	return container.NewBorder(
@@ -309,67 +305,57 @@ func (mv *MapViewer) Info() MapViewerInfo {
 func (mv *MapViewer) SetValue(name string, value float64) {
 	var hit bool
 	if name == mv.xFrom {
-		if name == "IgnProt.fi_Offset" || name == "IgnMastProt.fi_Offset" {
-			mv.xValue = int(value * 10)
-		} else {
-			mv.xValue = int(value)
-		}
+		mv.xValue = value
 		hit = true
 	}
 	if name == mv.yFrom {
-		if name == "ActualIn.p_AirInlet" {
-			mv.yValue = int(value * 1000)
-		} else if name == "Out.X_AccPedal" {
-			mv.yValue = int(value * 10)
-		} else if name == "Rpm" {
-			mv.yValue = int(value * 0.1)
-		} else {
-			mv.yValue = int(value)
-		}
+		mv.yValue = value
 		hit = true
 	}
 	if hit {
-		//fyne.Do(func() {
 		//log.Printf("MapViewer SetValue x(%s): %d y(%s): %d", mv.xFrom, mv.xValue, mv.yFrom, mv.yValue)
+		//fyne.Do(func() {
 		if mv.crosshair.Hidden {
 			mv.crosshair.Resize(fyne.NewSize(mv.widthFactor, mv.heightFactor))
 			mv.crosshair.Show()
 		}
 		mv.setXY(mv.xValue, mv.yValue)
 		//})
+	} else {
+		log.Printf("MapViewer SetValue unknown: %s", name)
 	}
 }
 
-func (mv *MapViewer) SetCellText(idx int, value int) {
-	textValue := strconv.FormatFloat((float64(value)*mv.zCorrFac)+mv.zCorrOffset, 'f', getPrecission(mv.zCorrFac), 64)
+func (mv *MapViewer) setCellText(idx int, value float64) {
+	textValue := strconv.FormatFloat(value, 'f', mv.zPrecision, 64)
 	if mv.textValues[idx].Text != textValue {
 		mv.textValues[idx].Text = textValue
 		mv.textValues[idx].Refresh()
 	}
 }
 
-func (mv *MapViewer) SetZ(zData []int) {
+func (mv *MapViewer) SetZData(zData []float64) error {
+	if len(zData) != mv.numData {
+		return fmt.Errorf("MapViewer SetZ len mismatch %d != %d", len(zData), mv.numData)
+	}
 	mv.zData = zData
 	mv.numData = len(zData)
 	//fyne.Do(func() {
 	mv.Refresh()
 	//})
+	return nil
 }
 
 func (mv *MapViewer) Refresh() {
-	values := make([]float64, len(mv.zData))
-	mv.min, mv.max = findMinMax(mv.zData)
-	min := (float64(mv.min) * mv.zCorrFac) + mv.zCorrOffset
-	max := (float64(mv.max) * mv.zCorrFac) + mv.zCorrOffset
-	for i, v := range mv.zData {
-		mv.SetCellText(i, v)
-		values[i] = (float64(v) * mv.zCorrFac) + mv.zCorrOffset
+	mv.zMin, mv.zMax = widgets.FindMinMax(mv.zData)
+	for idx, value := range mv.zData {
+		mv.setCellText(idx, value)
 		col := widgets.GetColorInterpolation(
-			min,
-			max,
-			values[i],
+			mv.zMin,
+			mv.zMax,
+			value,
 		)
-		r := mv.zDataRects[i]
+		r := mv.zDataRects[idx]
 		if col != r.FillColor {
 			r.StrokeColor = col
 			r.FillColor = col
@@ -377,9 +363,7 @@ func (mv *MapViewer) Refresh() {
 		}
 	}
 	if mv.mesh != nil {
-		mv.mesh.SetMin(min)
-		mv.mesh.SetMax(max)
-		mv.mesh.LoadFloat64s(values)
+		mv.mesh.LoadFloat64s(mv.zMin, mv.zMax, mv.zData)
 	}
 }
 
@@ -389,12 +373,13 @@ func (mv *MapViewer) createYAxis() {
 		for i := mv.numRows - 1; i >= 0; i-- {
 			text := &canvas.Text{
 				Alignment: fyne.TextAlignCenter,
-				Text:      strconv.FormatFloat((float64(mv.yData[i])*mv.yCorrFac)+mv.xCorrOffset, 'f', getPrecission(mv.yCorrFac), 64),
+				Text:      strconv.FormatFloat(mv.yData[i], 'f', mv.yPrecision, 64),
 				TextSize:  minTextSize + 2,
 			}
 			mv.yAxisTexts = append(mv.yAxisTexts, text)
 			mv.yAxisLabelContainer.Add(text)
 		}
+		return
 	}
 }
 
@@ -404,20 +389,21 @@ func (mv *MapViewer) createXAxis() {
 		for i := 0; i < mv.numColumns; i++ {
 			text := &canvas.Text{
 				Alignment: fyne.TextAlignCenter,
-				Text:      strconv.FormatFloat((float64(mv.xData[i])*mv.xCorrFac)+mv.xCorrOffset, 'f', getPrecission(mv.xCorrFac), 64),
+				Text:      strconv.FormatFloat(mv.xData[i], 'f', mv.xPrecision, 64),
 				TextSize:  minTextSize + 2,
 			}
 			mv.xAxisTexts = append(mv.xAxisTexts, text)
 			mv.xAxisLabelContainer.Add(text)
 		}
+		return
 	}
 }
 
 func (mv *MapViewer) createTextValues() {
-	mv.valueTexts = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.4))
+	mv.valueTexts = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.32))
 	for _, v := range mv.zData {
 		text := &canvas.Text{
-			Text:      strconv.FormatFloat((float64(v)*mv.zCorrFac)+mv.zCorrOffset, 'f', getPrecission(mv.zCorrFac), 64),
+			Text:      strconv.FormatFloat(v, 'f', mv.zPrecision, 64),
 			TextSize:  minTextSize,
 			Color:     color.Black,
 			Alignment: fyne.TextAlignCenter,
@@ -428,13 +414,9 @@ func (mv *MapViewer) createTextValues() {
 }
 
 func (mv *MapViewer) createZdata() {
-	mv.valueRects = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.33))
-	minCorrected := (float64(mv.min) * mv.zCorrFac) + mv.zCorrOffset
-	maxCorrected := (float64(mv.max) * mv.zCorrFac) + mv.zCorrOffset
-	// Calculate the colors for each cell based on data
-	for _, v := range mv.zData {
-		value := (float64(v) * mv.zCorrFac) + mv.zCorrOffset
-		color := widgets.GetColorInterpolation(minCorrected, maxCorrected, value)
+	mv.valueRects = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.32))
+	for _, value := range mv.zData {
+		color := widgets.GetColorInterpolation(mv.zMin, mv.zMax, value)
 		rect := &canvas.Rectangle{FillColor: color, StrokeColor: color, StrokeWidth: 0}
 		rect.SetMinSize(fyne.NewSize(34, 14))
 		mv.zDataRects = append(mv.zDataRects, rect)
@@ -442,15 +424,14 @@ func (mv *MapViewer) createZdata() {
 	}
 }
 
-func (mv *MapViewer) setXY(xValue, yValue int) error {
+func (mv *MapViewer) setXY(xValue, yValue float64) error {
 	mv.xValue = xValue
 	mv.yValue = yValue
 
-	xIdx, yIdx, _, err := mv.ipf(mv.xData, mv.yData, mv.zData, xValue, yValue)
+	xIdx, yIdx, _, err := interpolate.Interpolate64(mv.xData, mv.yData, mv.zData, xValue, yValue)
 	if err != nil {
 		return err
 	}
-
 	if yIdx < 0 {
 		yIdx = 0
 	} else if yIdx > float64(mv.numRows-1) {
@@ -483,7 +464,8 @@ func (mv *MapViewer) createButtons() *fyne.Container {
 		return container.NewGridWithColumns(4,
 			widget.NewButtonWithIcon("Load File", theme.DocumentIcon(), func() {
 				if mv.symbol != nil {
-					mv.zData = mv.symbol.Ints()
+					log.Println("symbol loaded")
+					mv.zData = mv.symbol.Float64s()
 					mv.Refresh()
 				}
 			}),
@@ -608,23 +590,6 @@ func (r *mapViewerRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{r.mv.content}
 }
 
-func getPrecission(corrFac float64) int {
-	precission := 0
-	switch corrFac {
-	case 0.1:
-		precission = 1
-	case 0.01, 0.00390625, 0.004:
-		precission = 2
-	case 0.001:
-		precission = 3
-	case oneThousandTwentyfourth:
-		precission = 4
-	case oneHundredTwentyeighth:
-		precission = 3
-	}
-	return precission
-}
-
 func calculateTextSize(widthFactor, heightFactor float32) float32 {
 	cellSize := fyne.Min(widthFactor, heightFactor)
 
@@ -639,19 +604,6 @@ func calculateTextSize(widthFactor, heightFactor float32) float32 {
 		return maxTextSize
 	}
 	return float32(math.Ceil(baseTextSize))
-}
-
-func findMinMax(data []int) (int, int) {
-	var min, max int = data[0], data[0]
-	for _, v := range data {
-		if v < min {
-			min = v
-		}
-		if v > max {
-			max = v
-		}
-	}
-	return min, max
 }
 
 func NewCrosshair(strokeColor color.RGBA, strokeWidth float32) *canvas.Rectangle {

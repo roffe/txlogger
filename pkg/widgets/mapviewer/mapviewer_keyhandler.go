@@ -14,7 +14,7 @@ func (mv *MapViewer) restoreSelectedValues() {
 	if mv.restoreValues {
 		mv.inputBuffer.Reset()
 		for _, cell := range mv.selectedCells {
-			mv.SetCellText(cell, mv.zData[cell])
+			mv.setCellText(cell, mv.zData[cell])
 		}
 		mv.restoreValues = false
 	}
@@ -48,7 +48,7 @@ func (mv *MapViewer) copy() {
 				x += 200
 			}
 		}
-		copyString.WriteString(fmt.Sprintf("%d:%d:%d:"+copyPasteSeparator, x, y, mv.zData[cell]))
+		copyString.WriteString(fmt.Sprintf("%d:%d:%g:"+copyPasteSeparator, x, y, mv.zData[cell]))
 	}
 	fyne.CurrentApp().Clipboard().SetContent(copyString.String())
 	//fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(copyString.String())
@@ -100,9 +100,9 @@ func (mv *MapViewer) paste() {
 			log.Printf("Index out of range: %d", index)
 			continue
 		}
-		mv.zData[index] = value
+		mv.zData[index] = float64(value)
 		if len(split) < 30 {
-			mv.funcs.updateECUFunc(index, []int{mv.zData[index]})
+			mv.funcs.updateECUFunc(index, []float64{mv.zData[index]})
 		}
 	}
 	if len(split) >= 30 {
@@ -117,7 +117,7 @@ func (mv *MapViewer) smooth() {
 		return
 	}
 
-	values := make([]int, len(mv.selectedCells))
+	values := make([]float64, len(mv.selectedCells))
 
 	for i, idx := range mv.selectedCells {
 		values[i] = mv.zData[idx]
@@ -131,7 +131,7 @@ func (mv *MapViewer) smooth() {
 
 	// Interpolate internal values
 	for i := 1; i < len(values)-1; i++ {
-		values[i] = start + int(float64(i)*step+0.5) // Adding 0.5 for rounding to nearest integer
+		values[i] = start + float64(i)*step
 	}
 	for i, idx := range mv.selectedCells {
 		mv.zData[idx] = values[i]
@@ -153,7 +153,7 @@ func (mv *MapViewer) updateCursor() {
 type updateBlock struct {
 	idx  int
 	end  int
-	data []int
+	data []float64
 }
 
 func (mv *MapViewer) updateCells() {
@@ -163,7 +163,7 @@ func (mv *MapViewer) updateCells() {
 
 	slices.Sort(mv.selectedCells)
 	updates := []*updateBlock{
-		{mv.selectedCells[0], mv.selectedCells[0], []int{mv.zData[mv.selectedCells[0]]}},
+		{mv.selectedCells[0], mv.selectedCells[0], []float64{mv.zData[mv.selectedCells[0]]}},
 	}
 	for _, cell := range mv.selectedCells[1:] {
 		data := mv.zData[cell]
@@ -172,7 +172,7 @@ func (mv *MapViewer) updateCells() {
 			last.end = cell
 			last.data = append(last.data, data)
 		} else {
-			updates = append(updates, &updateBlock{cell, cell, []int{data}})
+			updates = append(updates, &updateBlock{cell, cell, []float64{data}})
 		}
 	}
 

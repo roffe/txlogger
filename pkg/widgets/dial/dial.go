@@ -135,13 +135,13 @@ func (c *Dial) SetValue(value float64) {
 		return
 	}
 	c.value = value
-	//fyne.Do(func() {
+
 	c.rotateNeedle(c.needle, value, c.needleOffset, c.needleLength)
 	c.buf.Reset()
 	fmt.Fprintf(&c.buf, c.displayString, value)
 	c.displayText.Text = c.buf.String()
 	c.displayText.Refresh()
-	//})
+
 	/*
 		if value > c.highestObserved || time.Since(c.lastHighestObserved) > 10*time.Second {
 			c.highestObserved = value

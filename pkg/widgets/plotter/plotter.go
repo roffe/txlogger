@@ -236,8 +236,8 @@ func (p *Plotter) Seek(pos int) {
 	for i, v := range p.valueOrder {
 		valueIndex := min(p.dataLength, p.cursorPos)
 		obj := p.legendTexts[i]
-		//fyne.Do(func() {
 		obj.value.Text = fmt.Sprintf("%g", p.values[v][valueIndex])
+		//fyne.Do(func() {
 		obj.Refresh()
 		//})
 	}

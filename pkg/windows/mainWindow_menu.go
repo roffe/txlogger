@@ -10,9 +10,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ebus"
-	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/mainmenu"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
@@ -147,13 +145,34 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		return
 	}
 
-	xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := mw.fw.GetXYZ(axis.X, axis.Y, axis.Z)
-	if err != nil {
-		mw.Error(err)
+	symX := mw.fw.GetByName(axis.X)
+	symY := mw.fw.GetByName(axis.Y)
+	symZ := mw.fw.GetByName(axis.Z)
+
+	var xData, yData, zData []float64
+	if symX != nil {
+		xData = symX.Float64s()
+	} else {
+		xData = []float64{0}
+	}
+
+	if symY != nil {
+		yData = symY.Float64s()
+	} else {
+		yData = []float64{0}
+		if symZ.Name == "Batt_korr_tab!" {
+			yData = []float64{15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5}
+		} else {
+			yData = []float64{0}
+		}
+	}
+
+	if symZ == nil {
+		mw.Error(fmt.Errorf("failed to find symbol %s", axis.Z))
 		return
 	}
 
-	symZ := mw.fw.GetByName(axis.Z)
+	zData = symZ.Float64s()
 
 	if axis.X == "Pwm_ind_trot!" {
 		xData = xData[:8]
@@ -190,12 +209,12 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 	var mv *mapviewer.MapViewer
 
-	updateFunc := func(idx int, value []int) {
+	updateFunc := func(idx int, value []float64) {
 		if mw.dlc != nil && mw.settings.GetAutoSave() {
 			buff := bytes.NewBuffer([]byte{})
 			var dataLen int
 			for i, val := range value {
-				buff.Write(symZ.EncodeInt(val))
+				buff.Write(symZ.EncodeFloat64(val))
 				if i == 0 {
 					dataLen = buff.Len()
 				}
@@ -216,7 +235,8 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 				mw.Error(err)
 				return
 			}
-			debug.Log(fmt.Sprintf("set $%d %s %s", addr, axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
+			//mw.Log(fmt.Sprintf("set $%d %s %s", addr, axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
+			mw.Log(fmt.Sprintf("set %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 		}
 	}
 
@@ -239,18 +259,21 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 				mw.Error(err)
 				return
 			}
-			ints := symZ.BytesToInts(data)
-			mv.SetZ(ints)
+
+			if err := mv.SetZData(symZ.BytesToFloat64s(data)); err != nil {
+				mw.Error(err)
+				return
+			}
 			mw.Log(fmt.Sprintf("load %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 		}
 	}
 
-	saveFunc := func(data []int) {
+	saveFunc := func(data []float64) {
 		if mw.dlc == nil {
 			return
 		}
 		start := time.Now()
-		buff := bytes.NewBuffer(symZ.EncodeInts(data))
+		buff := bytes.NewBuffer(symZ.EncodeFloat64s(data))
 		var startPos uint32
 		switch mw.selects.ecuSelect.Selected {
 		case "T7":
@@ -265,16 +288,17 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		}
 		buff.Reset()
 
+		//mw.Log(fmt.Sprintf("save %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 		mw.Log(fmt.Sprintf("save %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 	}
 
-	saveFileFunc := func(data []int) {
+	saveFileFunc := func(data []float64) {
 		ss := mw.fw.GetByName(axis.Z)
 		if ss == nil {
 			mw.Log(fmt.Sprintf("failed to find symbol %s", axis.Z))
 			return
 		}
-		if err := ss.SetData(ss.EncodeInts(data)); err != nil {
+		if err := ss.SetData(ss.EncodeFloat64s(data)); err != nil {
 			mw.Error(err)
 			return
 		}
@@ -285,20 +309,27 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		mw.Log(fmt.Sprintf("Saved %s", axis.Z))
 	}
 
-	mv, err = mapviewer.New(
+	var xPrecision, yPrecision, zPrecision int
+	if symX != nil {
+		xPrecision = symbol.GetPrecision(symX.Correctionfactor)
+	}
+
+	if symY != nil {
+		yPrecision = symbol.GetPrecision(symY.Correctionfactor)
+	}
+
+	zPrecision = symbol.GetPrecision(symZ.Correctionfactor)
+
+	mv, err := mapviewer.New(
 		mapviewer.WithSymbol(symZ),
 		mapviewer.WithXData(xData),
 		mapviewer.WithYData(yData),
 		mapviewer.WithZData(zData),
-		mapviewer.WithXCorrFac(xCorrFac),
-		mapviewer.WithYCorrFac(yCorrFac),
-		mapviewer.WithZCorrFac(zCorrFac),
-		mapviewer.WithXOffset(symbol.T5Offsets[axis.X]),
-		mapviewer.WithYOffset(symbol.T5Offsets[axis.Y]),
-		mapviewer.WithZOffset(symbol.T5Offsets[axis.Z]),
+		mapviewer.WithXPrecision(xPrecision),
+		mapviewer.WithYPrecision(yPrecision),
+		mapviewer.WithZPrecision(zPrecision),
 		mapviewer.WithXFrom(axis.XFrom),
 		mapviewer.WithYFrom(axis.YFrom),
-		mapviewer.WithInterPolFunc(interpolate.Interpolate),
 		mapviewer.WithUpdateECUFunc(updateFunc),
 		mapviewer.WithLoadECUFunc(loadFunc),
 		mapviewer.WithSaveECUFunc(saveFunc),

@@ -50,8 +50,8 @@ func (g *Grid) MinSize(objects []fyne.CanvasObject) fyne.Size {
 // NewGrid creates a new Grid layout with the specified number of columns and rows
 func NewGrid(cols, rows int, padding float32) *Grid {
 	return &Grid{
-		Cols:    cols,
-		Rows:    rows,
+		Cols:    max(cols, 1),
+		Rows:    max(rows, 1),
 		Padding: padding,
 	}
 }

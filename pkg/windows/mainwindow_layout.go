@@ -147,17 +147,14 @@ func (mw *MainWindow) LoadLayout(name string) error {
 		return fmt.Errorf("LoadLayout failed to decode window layout: %w", err)
 	}
 
-	debug.Log("Close all windows")
 	mw.wm.CloseAll()
 
-	debug.Log("Set ECU and Preset")
 	if mw.dlc == nil {
 		mw.selects.ecuSelect.SetSelected(layout.ECU)
 		mw.selects.presetSelect.SetSelected(layout.Preset)
 	}
 
 	for _, h := range layout.Windows {
-		debug.Log("Create window: " + h.Title)
 		var openMap bool
 		switch h.Title {
 		case "Settings":
