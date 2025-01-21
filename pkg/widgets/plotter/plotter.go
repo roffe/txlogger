@@ -237,7 +237,7 @@ func (p *Plotter) Seek(pos int) {
 		valueIndex := min(p.dataLength, p.cursorPos)
 		obj := p.legendTexts[i]
 		obj.value.Text = fmt.Sprintf("%g", p.values[v][valueIndex])
-		//fyne.Do(func() {
+		//fyne.DoAsync(func() {
 		obj.Refresh()
 		//})
 	}
@@ -263,8 +263,10 @@ func (p *Plotter) refreshImage() {
 		// write the text of the current value in the top left corner of the image
 	}
 
+	//fyne.DoAsync(func() {
 	p.canvasImage.Image = img
 	p.canvasImage.Refresh()
+	//})
 
 }
 

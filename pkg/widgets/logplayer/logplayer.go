@@ -391,7 +391,7 @@ func (l *Logplayer) playLog() {
 					}
 					l.objs.positionSlider.Value = float64(op.Pos)
 					timeText := rec.Time.Format("15:04:05.00")
-					//fyne.Do(func() {
+					//fyne.DoAsync(func() {
 					l.objs.positionSlider.Refresh()
 					l.objs.timeLabel.SetText(timeText)
 					//})
@@ -419,7 +419,7 @@ func (l *Logplayer) playLog() {
 					}
 					l.objs.positionSlider.Value = float64(pos)
 					timeText := rec.Time.Format("15:04:05.00")
-					//fyne.Do(func() {
+					//fyne.DoAsync(func() {
 					l.objs.positionSlider.Refresh()
 					l.objs.timeLabel.SetText(timeText)
 					//})
@@ -441,7 +441,7 @@ func (l *Logplayer) playLog() {
 
 						l.objs.positionSlider.Value = float64(pos + 1)
 						timeText := rec.Time.Format("15:04:05.00")
-						//fyne.Do(func() {
+						//fyne.DoAsync(func() {
 						l.objs.positionSlider.Refresh()
 						l.objs.timeLabel.SetText(timeText)
 						//})
@@ -482,10 +482,11 @@ func (l *Logplayer) playLog() {
 				}
 
 				l.objs.positionSlider.Value = float64(currentPos)
+				timeText := rec.Time.Format("15:04:05.00")
 
-				//fyne.Do(func() {
+				//fyne.DoAsync(func() {
 				l.objs.positionSlider.Refresh()
-				l.objs.timeLabel.SetText(rec.Time.Format("15:04:05.00"))
+				l.objs.timeLabel.SetText(timeText)
 				//})
 
 				if f := l.cfg.TimeSetter; f != nil {

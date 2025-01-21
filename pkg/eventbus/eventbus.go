@@ -234,7 +234,9 @@ func (e *Controller) SubscribeFunc(topic string, fn func(float64)) (cancel func(
 	respChan := e.Subscribe(topic)
 	go func() {
 		for v := range respChan {
+			//fyne.DoAsync(func() {
 			fn(v)
+			//})
 		}
 	}()
 	cancel = func() {

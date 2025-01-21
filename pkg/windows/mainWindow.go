@@ -398,7 +398,6 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, p fyne.Position, from
 	//}
 
 	do := func() {
-
 		w := mw.app.NewWindow(fp)
 		w.SetCloseIntercept(func() {
 			cp.Close()

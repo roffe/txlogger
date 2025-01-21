@@ -141,14 +141,6 @@ func (c *Dial) SetValue(value float64) {
 	fmt.Fprintf(&c.buf, c.displayString, value)
 	c.displayText.Text = c.buf.String()
 	c.displayText.Refresh()
-
-	/*
-		if value > c.highestObserved || time.Since(c.lastHighestObserved) > 10*time.Second {
-			c.highestObserved = value
-			c.rotateNeedle(c.highestObservedMarker, c.highestObserved, c.radius, c.eightRadius*0.5)
-			c.lastHighestObserved = time.Now()
-		}
-	*/
 }
 
 func (c *Dial) SetValue2(value float64) {
