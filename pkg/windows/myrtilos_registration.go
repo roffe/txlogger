@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
+	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
@@ -26,6 +27,8 @@ type MyrtilosRegistration struct {
 	btn        *widget.Button
 	output     *widget.List
 	outputData binding.StringList
+
+	l binding.DataListener
 
 	widget.BaseWidget
 }
@@ -69,12 +72,6 @@ func NewMyrtilosRegistration(mw *MainWindow) fyne.Widget {
 		return nil
 	}
 	mr.btn = widget.NewButtonWithIcon("Register", theme.InfoIcon(), func() {
-		go func() {
-			time.Sleep(100 * time.Millisecond)
-			//fyne.Do(func() {
-			mr.output.ScrollToBottom()
-			//})
-		}()
 		key, err := hex.DecodeString(mr.input.Text)
 		if err != nil {
 			mr.text.SetText(err.Error())
@@ -90,6 +87,10 @@ func NewMyrtilosRegistration(mw *MainWindow) fyne.Widget {
 }
 
 func (mr *MyrtilosRegistration) CreateRenderer() fyne.WidgetRenderer {
+	mr.l = binding.NewDataListener(func() {
+		mr.output.ScrollToBottom()
+	})
+	mr.outputData.AddListener(mr.l)
 	return &myrtilosRegistrationRenderer{MyrtilosRegistration: mr}
 }
 
@@ -101,18 +102,13 @@ func (mr *MyrtilosRegistration) register(key []byte) error {
 		return errors.New("stop logging before registering")
 	}
 
-	l := func(s string) {
-		go func() {
-			time.Sleep(100 * time.Millisecond)
-			//fyne.Do(func() {
-			mr.output.ScrollToBottom()
-			//})
-		}()
-		mr.outputData.Append(s)
-		mr.output.ScrollToBottom()
+	logFn := func(s string) {
+		debug.Do(func() {
+			mr.outputData.Append(s)
+		})
 	}
 
-	adapter, err := mr.mw.settings.CanSettings.GetAdapter("T7", l)
+	adapter, err := mr.mw.settings.CanSettings.GetAdapter("T7", logFn)
 	if err != nil {
 		return err
 	}
@@ -181,6 +177,7 @@ func (mr *myrtilosRegistrationRenderer) Refresh() {
 }
 
 func (mr *myrtilosRegistrationRenderer) Destroy() {
+	mr.outputData.RemoveListener(mr.l)
 }
 
 func (mr *MyrtilosRegistration) Objects() []fyne.CanvasObject {

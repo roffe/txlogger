@@ -337,7 +337,7 @@ func (mw *MainWindow) startLogging() {
 		}
 		mw.loggingRunning = false
 		mw.dlc = nil
-		//fyne.Do(func() {
+		//debug.Do(func() {
 		mw.Enable()
 		mw.buttons.logBtn.Icon = theme.MediaPlayIcon()
 		mw.buttons.logBtn.SetText("Start")
@@ -354,17 +354,17 @@ func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, er
 		Rate:           mw.settings.GetFreq(),
 		OnMessage:      mw.Log,
 		CaptureCounter: func(i int) {
-			//fyne.Do(func() {
+			//debug.Do(func() {
 			mw.counters.capturedCounterLabel.SetText("Cap: " + strconv.Itoa(i))
 			//})
 		},
 		ErrorCounter: func(i int) {
-			//fyne.Do(func() {
+			//debug.Do(func() {
 			mw.counters.errorCounterLabel.SetText("Err: " + strconv.Itoa(i))
 			//})
 		},
 		FpsCounter: func(i int) {
-			//fyne.Do(func() {
+			//debug.Do(func() {
 			mw.counters.fpsCounterLabel.SetText("Fps: " + strconv.Itoa(i))
 			//})
 		},

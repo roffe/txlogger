@@ -83,16 +83,12 @@ func (s *Widget) SetValue(name string, value float64) {
 			col := widgets.GetColorInterpolation(val.min, val.max, value)
 			col.A = 30
 			val.valueBar.FillColor = col
-			//fyne.Do(func() {
 			val.valueBar.Resize(fyne.NewSize(factor*100, 26))
-			//})
 		}
 
 		prec := symbol.GetPrecision(val.symbol.Correctionfactor)
 		textValue := strconv.FormatFloat(value, 'f', prec, 64)
-		//fyne.Do(func() {
 		val.symbolValue.SetText(textValue)
-		//})
 	}
 }
 

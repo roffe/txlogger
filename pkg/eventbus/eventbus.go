@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jellydator/ttlcache/v3"
+	"github.com/roffe/txlogger/pkg/debug"
 )
 
 type Config struct {
@@ -90,6 +91,8 @@ func (e *Controller) run() {
 	//}
 
 	//outer:
+
+	//t := time.NewTicker(5 * time.Second)
 	for {
 		select {
 		case <-e.quit:
@@ -105,6 +108,15 @@ func (e *Controller) run() {
 			e.handleSubscription(sub)
 		case unsub := <-e.unsub:
 			e.handleUnsubscription(unsub)
+			/*
+				case <-t.C:
+					e.subs.Range(func(key, value interface{}) bool {
+						topic := key.(string)
+						subs := value.([]chan float64)
+						log.Printf("Topic %s has %d subscribers", topic, len(subs))
+						return true
+					})
+			*/
 		}
 	}
 	//log.Println("Waiting for goroutines to finish")
@@ -234,9 +246,9 @@ func (e *Controller) SubscribeFunc(topic string, fn func(float64)) (cancel func(
 	respChan := e.Subscribe(topic)
 	go func() {
 		for v := range respChan {
-			//fyne.DoAsync(func() {
-			fn(v)
-			//})
+			debug.Do(func() {
+				fn(v)
+			})
 		}
 	}()
 	cancel = func() {

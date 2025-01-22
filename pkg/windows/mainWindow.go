@@ -448,7 +448,7 @@ func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position, fromDropped 
 		lp.Close()
 	}
 	if fromDropped {
-		//fyne.Do(func() {
+		//debug.Do(func() {
 		mw.wm.Add(iw, p)
 		//})
 	} else {

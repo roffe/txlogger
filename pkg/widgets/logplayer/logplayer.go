@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/capture"
+	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/eventbus"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
@@ -391,10 +392,10 @@ func (l *Logplayer) playLog() {
 					}
 					l.objs.positionSlider.Value = float64(op.Pos)
 					timeText := rec.Time.Format("15:04:05.00")
-					//fyne.DoAsync(func() {
-					l.objs.positionSlider.Refresh()
-					l.objs.timeLabel.SetText(timeText)
-					//})
+					debug.Do(func() {
+						l.objs.positionSlider.Refresh()
+						l.objs.timeLabel.SetText(timeText)
+					})
 					if f := l.cfg.TimeSetter; f != nil {
 						f(rec.Time)
 					}
@@ -419,10 +420,10 @@ func (l *Logplayer) playLog() {
 					}
 					l.objs.positionSlider.Value = float64(pos)
 					timeText := rec.Time.Format("15:04:05.00")
-					//fyne.DoAsync(func() {
-					l.objs.positionSlider.Refresh()
-					l.objs.timeLabel.SetText(timeText)
-					//})
+					debug.Do(func() {
+						l.objs.positionSlider.Refresh()
+						l.objs.timeLabel.SetText(timeText)
+					})
 					if f := l.cfg.TimeSetter; f != nil {
 						f(rec.Time)
 					}
@@ -441,10 +442,10 @@ func (l *Logplayer) playLog() {
 
 						l.objs.positionSlider.Value = float64(pos + 1)
 						timeText := rec.Time.Format("15:04:05.00")
-						//fyne.DoAsync(func() {
-						l.objs.positionSlider.Refresh()
-						l.objs.timeLabel.SetText(timeText)
-						//})
+						debug.Do(func() {
+							l.objs.positionSlider.Refresh()
+							l.objs.timeLabel.SetText(timeText)
+						})
 
 						if f := l.cfg.TimeSetter; f != nil {
 							f(rec.Time)
@@ -471,7 +472,9 @@ func (l *Logplayer) playLog() {
 			currentPos := l.logFile.Pos()
 			if currentPos >= logLen {
 				l.state = stateStopped
-				l.objs.playbackToggleBtn.SetIcon(theme.MediaPlayIcon())
+				debug.Do(func() {
+					l.objs.playbackToggleBtn.SetIcon(theme.MediaPlayIcon())
+				})
 				continue
 			}
 
@@ -484,10 +487,10 @@ func (l *Logplayer) playLog() {
 				l.objs.positionSlider.Value = float64(currentPos)
 				timeText := rec.Time.Format("15:04:05.00")
 
-				//fyne.DoAsync(func() {
-				l.objs.positionSlider.Refresh()
-				l.objs.timeLabel.SetText(timeText)
-				//})
+				debug.Do(func() {
+					l.objs.positionSlider.Refresh()
+					l.objs.timeLabel.SetText(timeText)
+				})
 
 				if f := l.cfg.TimeSetter; f != nil {
 					f(rec.Time)

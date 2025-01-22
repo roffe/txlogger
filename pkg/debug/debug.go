@@ -8,7 +8,13 @@ import (
 	"runtime"
 	"sync"
 	"time"
+
+	"fyne.io/fyne/v2"
 )
+
+func Do(f func()) {
+	fyne.DoAsync(f)
+}
 
 var initOnce sync.Once
 var fh *os.File

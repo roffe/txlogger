@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/colors"
+	"github.com/roffe/txlogger/pkg/debug"
 )
 
 // var _ fyne.Focusable = (*Plotter)(nil)
@@ -237,9 +238,9 @@ func (p *Plotter) Seek(pos int) {
 		valueIndex := min(p.dataLength, p.cursorPos)
 		obj := p.legendTexts[i]
 		obj.value.Text = fmt.Sprintf("%g", p.values[v][valueIndex])
-		//fyne.DoAsync(func() {
-		obj.Refresh()
-		//})
+		debug.Do(func() {
+			obj.Refresh()
+		})
 	}
 	p.updateCursor()
 	p.refreshImage()
@@ -263,10 +264,8 @@ func (p *Plotter) refreshImage() {
 		// write the text of the current value in the top left corner of the image
 	}
 
-	//fyne.DoAsync(func() {
 	p.canvasImage.Image = img
 	p.canvasImage.Refresh()
-	//})
 
 }
 
@@ -390,10 +389,7 @@ func (p *Plotter) updateCursor() {
 	p.cursor.Position1 = fyne.NewPos(xOffset, 0)
 	p.cursor.Position2 = fyne.NewPos(xOffset+1, plotSize.Height)
 
-	//fyne.Do(func() {
 	p.cursor.Refresh()
-	//})
-
 }
 
 // Helper functions

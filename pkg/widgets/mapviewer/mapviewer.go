@@ -314,16 +314,29 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 	}
 	if hit {
 		//log.Printf("MapViewer SetValue x(%s): %d y(%s): %d", mv.xFrom, mv.xValue, mv.yFrom, mv.yValue)
-		//fyne.Do(func() {
+		//debug.Do(func() {
 		if mv.crosshair.Hidden {
-			mv.crosshair.Resize(fyne.NewSize(mv.widthFactor, mv.heightFactor))
 			mv.crosshair.Show()
+			mv.crosshair.Resize(fyne.Size{Width: mv.widthFactor, Height: mv.heightFactor})
 		}
-		mv.setXY(mv.xValue, mv.yValue)
+		mv.setXY()
 		//})
 	} else {
 		log.Printf("MapViewer SetValue unknown: %s", name)
 	}
+}
+
+func (mv *MapViewer) SetX(xValue float64) {
+	mv.xValue = xValue
+}
+
+func (mv *MapViewer) SetY(yValue float64) {
+	mv.yValue = yValue
+	if mv.crosshair.Hidden {
+		mv.crosshair.Show()
+		mv.crosshair.Resize(fyne.Size{Width: mv.widthFactor, Height: mv.heightFactor})
+	}
+	mv.setXY()
 }
 
 func (mv *MapViewer) setCellText(idx int, value float64) {
@@ -340,7 +353,7 @@ func (mv *MapViewer) SetZData(zData []float64) error {
 	}
 	mv.zData = zData
 	mv.numData = len(zData)
-	//fyne.Do(func() {
+	//debug.Do(func() {
 	mv.Refresh()
 	//})
 	return nil
@@ -424,11 +437,8 @@ func (mv *MapViewer) createZdata() {
 	}
 }
 
-func (mv *MapViewer) setXY(xValue, yValue float64) error {
-	mv.xValue = xValue
-	mv.yValue = yValue
-
-	xIdx, yIdx, _, err := interpolate.Interpolate64(mv.xData, mv.yData, mv.zData, xValue, yValue)
+func (mv *MapViewer) setXY() error {
+	xIdx, yIdx, err := interpolate.Interpolate64S(mv.xData, mv.yData, mv.zData, mv.xValue, mv.yValue)
 	if err != nil {
 		return err
 	}
@@ -446,10 +456,10 @@ func (mv *MapViewer) setXY(xValue, yValue float64) error {
 	mv.yIndex = yIdx
 
 	mv.crosshair.Move(
-		fyne.NewPos(
-			float32(xIdx)*mv.widthFactor,
-			float32(float64(mv.numRows-1)-yIdx)*mv.heightFactor,
-		),
+		fyne.Position{
+			X: float32(xIdx) * mv.widthFactor,
+			Y: float32(float64(mv.numRows-1)-yIdx) * mv.heightFactor,
+		},
 	)
 	if mv.opts.cursorFollowCrosshair {
 		mv.selectedX = int(math.Round(xIdx))
@@ -477,7 +487,7 @@ func (mv *MapViewer) createButtons() *fyne.Container {
 				p.Show()
 				go func() {
 					mv.funcs.loadECUFunc()
-					//fyne.Do(func() {
+					//debug.Do(func() {
 					p.Hide()
 					//})
 				}()
@@ -487,7 +497,7 @@ func (mv *MapViewer) createButtons() *fyne.Container {
 				p.Show()
 				go func() {
 					mv.funcs.saveECUFunc(mv.zData)
-					//fyne.Do(func() {
+					//debug.Do(func() {
 					p.Hide()
 					//})
 

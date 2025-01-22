@@ -350,13 +350,9 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			openMapLock.Lock()
 			defer openMapLock.Unlock()
 			p := progressmodal.New(mw.Window.Canvas(), "Loading "+axis.Z)
-			//fyne.Do(func() {
 			p.Show()
-			//})
 			loadFunc()
-			//fyne.Do(func() {
 			p.Hide()
-			//})
 		}()
 	}
 
@@ -370,12 +366,12 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	var cancelFuncs []func()
 	if axis.XFrom != "" {
 		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.XFrom, func(value float64) {
-			mv.SetValue(axis.XFrom, value)
+			mv.SetX(value)
 		}))
 	}
 	if axis.YFrom != "" {
 		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.YFrom, func(value float64) {
-			mv.SetValue(axis.YFrom, value)
+			mv.SetY(value)
 		}))
 	}
 	mapWindow.OnClose = func() {

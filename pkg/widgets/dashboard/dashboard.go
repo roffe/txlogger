@@ -447,32 +447,6 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 	return router
 }
 
-func (db *Dashboard) Sweep() {
-	db.image.checkEngine.Hide()
-	an := fyne.NewAnimation(900*time.Millisecond, func(p float32) {
-		pa := float64(p)
-		db.gauges.speed.SetValue(300 * pa)
-		db.gauges.rpm.SetValue(8000 * pa)
-		db.gauges.iat.SetValue(80 * pa)
-		db.gauges.airmass.SetValue(2100 * pa)
-		db.gauges.airmass.SetValue2(2200 * pa)
-		db.gauges.engineTemp.SetValue(160 * pa)
-		db.gauges.pressure.SetValue(3 * pa)
-		db.gauges.throttle.SetValue(100 * pa)
-		db.gauges.pwm.SetValue(100 * pa)
-		db.gauges.nblambda.SetValue(25 * pa)
-		db.gauges.wblambda.SetValue(1.52 * pa)
-		//db.metricsChan <- &model.DashboardMetric{Name: "Out.fi_Ignition", Value: 30.0 * pa}
-		//db.metricsChan <- &model.DashboardMetric{Name: "IgnProt.fi_Offset", Value: 15.0 * pa}
-
-	})
-	an.AutoReverse = true
-	an.Curve = fyne.AnimationEaseInOut
-	an.Start()
-	time.Sleep(1800 * time.Millisecond)
-	db.image.checkEngine.Show()
-}
-
 /*
 	func lambdaToString(v float64) string {
 		switch v {

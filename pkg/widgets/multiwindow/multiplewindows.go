@@ -218,14 +218,10 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 			//w.Resize(w.MinSize())
 			//w.Move(fyne.NewPos(ev.AbsolutePosition.X-mouseRatio*w.MinSize().Width, w.Position().Y))
 			w.maximized = false
-			ms := canvas.NewPositionAnimation(w.Position(), ev.Position.SubtractXY(w.preMaximizedSize.Width*0.5, 5), 10*time.Millisecond, func(pos fyne.Position) {
-				w.Move(pos)
-			})
-			ms.Start()
-			rs := canvas.NewSizeAnimation(w.Size(), w.MinSize(), 8*time.Millisecond, func(sz fyne.Size) {
-				w.Resize(sz)
-			})
-			rs.Start()
+
+			w.Move(ev.Position.SubtractXY(w.preMaximizedSize.Width*0.5, 5))
+			w.Resize(w.MinSize())
+
 			return
 		}
 
