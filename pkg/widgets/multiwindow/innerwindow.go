@@ -393,6 +393,7 @@ func (c *draggableCorner) CreateRenderer() fyne.WidgetRenderer {
 	} else {
 		prop = canvas.NewImageFromResource(th.Icon(theme.IconNameDragCornerIndicator))
 	}
+	prop.ScaleMode = canvas.ImageScaleFastest
 	prop.SetMinSize(fyne.NewSquareSize(16))
 	return widget.NewSimpleRenderer(prop)
 }

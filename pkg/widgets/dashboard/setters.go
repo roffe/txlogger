@@ -3,6 +3,7 @@ package dashboard
 import (
 	"fmt"
 	"image/color"
+	"log"
 	"strconv"
 	"time"
 
@@ -12,22 +13,18 @@ import (
 )
 
 func knkDetSetter(icon *icon.Icon) func(float64) {
-	var showTime time.Time
 	knkStr2 := make([]byte, 4)
 	var oldValue float64
+	var showTime time.Time
 	return func(value float64) {
-		if value <= 0 && time.Since(showTime) > 5*time.Second {
-			icon.Hide()
-			return
-		}
-		if value <= 0 {
-			return
-		}
 		if value == oldValue {
 			return
 		}
-
 		knockValue := uint32(value)
+		if knockValue <= 0 {
+			return
+		}
+
 		// log.Printf("knkDetSetter: %08X\n", knockValue)
 
 		knkCyl1 := uint8(knockValue & 0xFF000000 >> 24)
@@ -57,8 +54,17 @@ func knkDetSetter(icon *icon.Icon) func(float64) {
 			knkStr2[3] = '-'
 		}
 		icon.SetText(string(knkStr2))
-		icon.Show()
+
 		showTime = time.Now()
+		go func() {
+			log.Println("knkDetSetter: sleeping")
+			time.Sleep(5 * time.Second)
+			if time.Since(showTime) < 5*time.Second {
+				fyne.Do(icon.Hide)
+			}
+		}()
+
+		icon.Show()
 	}
 }
 
@@ -84,6 +90,7 @@ func ioffSetter(obj *canvas.Text, icon *canvas.Image) func(float64) {
 		if value == lastVal {
 			return
 		}
+		lastVal = value
 		buf = buf[:0] // clear buffer
 		buf = append(buf, "Ioff: "...)
 		buf = strconv.AppendFloat(buf, value, 'f', 1, 64)
@@ -100,7 +107,6 @@ func ioffSetter(obj *canvas.Text, icon *canvas.Image) func(float64) {
 			icon.Show()
 		}
 		obj.Refresh()
-		lastVal = value
 	}
 }
 
@@ -142,8 +148,12 @@ func textSetter(obj *canvas.Text, text, unit string, precision int) func(float64
 }
 
 func idcSetter(obj *canvas.Text, text string) func(float64) {
+	oldValue := -1.0
 	return func(value float64) {
-		//		log.Println(value)
+		if value == oldValue {
+			return
+		}
+		oldValue = value
 		obj.Text = fmt.Sprintf(text+": %02.0f%%", value)
 		switch {
 		case value > 60 && value < 85:

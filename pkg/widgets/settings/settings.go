@@ -484,7 +484,7 @@ func newImageFromResource(name string) *canvas.Image {
 		img.SetMinSize(fyne.NewSize(470, 224))
 	}
 	img.FillMode = canvas.ImageFillContain
-	img.ScaleMode = canvas.ImageScalePixels
+	img.ScaleMode = canvas.ImageScaleFastest
 	return img
 }
 

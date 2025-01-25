@@ -65,6 +65,7 @@ func (s *SecretText) Tapped(*fyne.PointEvent) {
 	if s.tappedTimes >= 10 {
 		t := fyne.NewStaticResource("taz.png", assets.Taz)
 		cv := canvas.NewImageFromResource(t)
+		cv.ScaleMode = canvas.ImageScaleFastest
 		cv.SetMinSize(fyne.NewSize(0, 0))
 		cont := container.NewStack(cv)
 		s.tappedTimes = 0

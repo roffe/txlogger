@@ -190,9 +190,9 @@ func (mv *MapViewer) Dragged(ev *fyne.DragEvent) {
 func (mv *MapViewer) DragEnd() {}
 
 func (mv *MapViewer) CreateRenderer() fyne.WidgetRenderer {
-	//return widget.NewSimpleRenderer(mv.content)
 	mv.content = mv.render()
-	return &mapViewerRenderer{mv: mv}
+	return widget.NewSimpleRenderer(mv.content)
+	//return &mapViewerRenderer{mv: mv}
 }
 
 type movingRectsLayout struct {

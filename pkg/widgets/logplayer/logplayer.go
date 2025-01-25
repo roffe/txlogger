@@ -244,26 +244,21 @@ func (l *Logplayer) render() {
 	}
 	l.logFile.Seek(-1)
 
-	plotterOpts := []plotter.PlotterOpt{
-		plotter.WithPlotResolutionFactor(1),
-		//plotter.WithOrder(order),
-	}
-
 	l.objs.plotter = plotter.NewPlotter(
 		values,
-		plotterOpts...,
+		plotter.WithPlotResolutionFactor(1),
+		plotter.WithOnDragged(func(event *fyne.DragEvent) {
+			pos := l.objs.positionSlider.Value - float64(event.Dragged.DX)
+			if pos < 0 {
+				pos = 0
+			} else if pos > l.objs.positionSlider.Max {
+				pos = l.objs.positionSlider.Max
+			}
+			l.objs.positionSlider.Value = pos
+			l.objs.positionSlider.Refresh()
+			l.control(&controlMsg{Op: OpSeek, Pos: int(pos)})
+		}),
 	)
-
-	l.objs.plotter.OnDragged = func(event *fyne.DragEvent) {
-		pos := float64(int(l.objs.positionSlider.Value) - int(event.Dragged.DX))
-		if pos < 0 {
-			pos = 0
-		}
-		if pos > l.objs.positionSlider.Max {
-			pos = l.objs.positionSlider.Max
-		}
-		l.control(&controlMsg{Op: OpSeek, Pos: int(pos)})
-	}
 }
 
 func (l *Logplayer) CreateRenderer() fyne.WidgetRenderer {

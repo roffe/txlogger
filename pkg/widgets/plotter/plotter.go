@@ -67,6 +67,12 @@ func WithPlotResolutionFactor(factor float32) PlotterOpt {
 	}
 }
 
+func WithOnDragged(f func(event *fyne.DragEvent)) PlotterOpt {
+	return func(p *Plotter) {
+		p.OnDragged = f
+	}
+}
+
 func WithOrder(order []string) PlotterOpt {
 	return func(p *Plotter) {
 		p.valueOrder = order
@@ -87,10 +93,7 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 	}
 	p.ExtendBaseWidget(p)
 
-	l := widget.NewLabel("Cursor")
-	l.Truncation = fyne.TextTruncateOff
-
-	p.canvasImage.FillMode = canvas.ImageFillStretch
+	p.canvasImage.FillMode = canvas.ImageFillContain
 	p.canvasImage.ScaleMode = canvas.ImageScaleFastest
 
 	p.zoom.Orientation = widget.Vertical
@@ -223,12 +226,12 @@ func (p *Plotter) CreateRenderer() fyne.WidgetRenderer {
 
 func (p *Plotter) Seek(pos int) {
 	halfDataPointsToShow := int(float64(p.dataPointsToShow) * .5)
-	offsetPosition := float64(pos - halfDataPointsToShow)
+	offsetPosition := pos - halfDataPointsToShow
 	if pos <= p.dataLength-halfDataPointsToShow {
 		if offsetPosition < 0 {
 			offsetPosition = 0
 		}
-		p.plotStartPos = min(int(offsetPosition), p.dataLength)
+		p.plotStartPos = min(offsetPosition, p.dataLength)
 	}
 	p.cursorPos = pos
 	for i, v := range p.valueOrder {

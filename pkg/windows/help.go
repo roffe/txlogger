@@ -19,19 +19,19 @@ func Help() *container.AppTabs {
 	kvaserLogo := canvas.NewImageFromResource(fyne.NewStaticResource("kvaser_logo.png", assets.KvaserLogoBytes))
 	kvaserLogo.SetMinSize(fyne.NewSize(190, 117))
 	kvaserLogo.FillMode = canvas.ImageFillContain
-	kvaserLogo.ScaleMode = canvas.ImageScaleSmooth
+	kvaserLogo.ScaleMode = canvas.ImageScaleFastest
 
 	mackanizedLogo := canvas.NewImageFromResource(fyne.NewStaticResource("mackanized.png", assets.MackanizedBytes))
 	mackanizedLogo.SetMinSize(fyne.NewSize(302, 80))
 	mackanizedLogo.FillMode = canvas.ImageFillContain
-	mackanizedLogo.ScaleMode = canvas.ImageScaleSmooth
+	mackanizedLogo.ScaleMode = canvas.ImageScaleFastest
 
 	tx, _ := url.Parse("https://txlogger.com")
 	tt, _ := url.Parse("https://www.trionictuning.com")
 	kv, _ := url.Parse("https://www.kvaser.com")
 	mk, _ := url.Parse("https://www.mackanized.eu/")
 	txlogo := canvas.NewImageFromResource(fyne.CurrentApp().Metadata().Icon)
-	txlogo.ScaleMode = canvas.ImageScaleSmooth
+	txlogo.ScaleMode = canvas.ImageScaleFastest
 	txlogo.FillMode = canvas.ImageFillContain
 	txlogo.SetMinSize(fyne.NewSquareSize(90))
 
@@ -121,19 +121,19 @@ func About() *fyne.Container {
 	kvaserLogo := canvas.NewImageFromResource(fyne.NewStaticResource("kvaser_logo.png", assets.KvaserLogoBytes))
 	kvaserLogo.SetMinSize(fyne.NewSize(190, 117))
 	kvaserLogo.FillMode = canvas.ImageFillContain
-	kvaserLogo.ScaleMode = canvas.ImageScaleSmooth
+	kvaserLogo.ScaleMode = canvas.ImageScaleFastest
 
 	mackanizedLogo := canvas.NewImageFromResource(fyne.NewStaticResource("mackanized.png", assets.MackanizedBytes))
 	mackanizedLogo.SetMinSize(fyne.NewSize(302, 80))
 	mackanizedLogo.FillMode = canvas.ImageFillContain
-	mackanizedLogo.ScaleMode = canvas.ImageScaleSmooth
+	mackanizedLogo.ScaleMode = canvas.ImageScaleFastest
 
 	tx, _ := url.Parse("https://txlogger.com")
 	tt, _ := url.Parse("https://www.trionictuning.com")
 	kv, _ := url.Parse("https://www.kvaser.com")
 	mk, _ := url.Parse("https://www.mackanized.eu/")
 	txlogo := canvas.NewImageFromResource(fyne.CurrentApp().Metadata().Icon)
-	txlogo.ScaleMode = canvas.ImageScaleSmooth
+	txlogo.ScaleMode = canvas.ImageScaleFastest
 	txlogo.FillMode = canvas.ImageFillContain
 	txlogo.SetMinSize(fyne.NewSquareSize(90))
 

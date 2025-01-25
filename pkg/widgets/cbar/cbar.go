@@ -118,7 +118,6 @@ func (s *CBar) SetValue(value float64) {
 		return
 	}
 	s.value = value
-	// Clamp value between min and max
 	if s.value > s.cfg.Max {
 		s.value = s.cfg.Max
 	} else if value < s.cfg.Min {
