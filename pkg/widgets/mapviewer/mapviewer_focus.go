@@ -165,7 +165,7 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 	}
 
 	if updateCursor {
-		mv.updateCursor()
+		mv.updateCursor(false)
 	}
 
 	if refresh {

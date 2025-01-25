@@ -140,14 +140,21 @@ func (mv *MapViewer) smooth() {
 	mv.Refresh()
 }
 
-func (mv *MapViewer) updateCursor() {
+func (mv *MapViewer) updateCursor(goroutine bool) {
 	mv.selectedCells = []int{mv.SelectedY*mv.numColumns + mv.selectedX}
 	xPosFactor := float32(mv.selectedX)
 	yPosFactor := float32(float64(mv.numRows-1) - float64(mv.SelectedY))
 	xPos := xPosFactor * mv.widthFactor
 	yPos := yPosFactor * mv.heightFactor
-	mv.selectionRect.Resize(fyne.NewSize(mv.widthFactor+1, mv.heightFactor+1))
-	mv.selectionRect.Move(fyne.NewPos(xPos-1, yPos-1))
+	if goroutine {
+		fyne.Do(func() {
+			mv.selectionRect.Resize(fyne.Size{Width: mv.widthFactor + 1, Height: mv.heightFactor + 1})
+			mv.selectionRect.Move(fyne.Position{X: xPos - 1, Y: yPos - 1})
+		})
+	} else {
+		mv.selectionRect.Resize(fyne.Size{Width: mv.widthFactor + 1, Height: mv.heightFactor + 1})
+		mv.selectionRect.Move(fyne.Position{X: xPos - 1, Y: yPos - 1})
+	}
 }
 
 type updateBlock struct {
