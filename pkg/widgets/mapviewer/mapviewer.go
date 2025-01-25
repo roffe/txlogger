@@ -152,6 +152,27 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 	mv.createZdata()
 	mv.createTextValues()
 
+	/*
+		fmt.Println()
+		fmt.Print("[]float64{")
+		for _, num := range mv.xData {
+			fmt.Print(num, ",")
+		}
+		fmt.Println("}")
+
+		fmt.Print("[]float64{")
+		for _, num := range mv.yData {
+			fmt.Print(num, ",")
+		}
+		fmt.Println("}")
+
+		fmt.Print("[]float64{")
+		for _, num := range mv.zData {
+			fmt.Print(num, ",")
+		}
+		fmt.Println("}")
+	*/
+
 	return mv, nil
 }
 
@@ -179,7 +200,7 @@ type movingRectsLayout struct {
 }
 
 func (mr *movingRectsLayout) MinSize(_ []fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(0, 0)
+	return fyne.Size{Width: 0, Height: 0}
 }
 
 func (mr *movingRectsLayout) Layout(_ []fyne.CanvasObject, size fyne.Size) {
@@ -306,7 +327,7 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 	var hit bool
 	if name == mv.xFrom {
 		mv.xValue = value
-		hit = true
+		//hit = true
 	}
 	if name == mv.yFrom {
 		mv.yValue = value
@@ -314,13 +335,11 @@ func (mv *MapViewer) SetValue(name string, value float64) {
 	}
 	if hit {
 		//log.Printf("MapViewer SetValue x(%s): %d y(%s): %d", mv.xFrom, mv.xValue, mv.yFrom, mv.yValue)
-		//debug.Do(func() {
 		if mv.crosshair.Hidden {
 			mv.crosshair.Show()
 			mv.crosshair.Resize(fyne.Size{Width: mv.widthFactor, Height: mv.heightFactor})
 		}
 		mv.setXY()
-		//})
 	} else {
 		log.Printf("MapViewer SetValue unknown: %s", name)
 	}
@@ -353,7 +372,7 @@ func (mv *MapViewer) SetZData(zData []float64) error {
 	}
 	mv.zData = zData
 	mv.numData = len(zData)
-	//debug.Do(func() {
+	//fyne.Do(func() {
 	mv.Refresh()
 	//})
 	return nil
@@ -487,9 +506,9 @@ func (mv *MapViewer) createButtons() *fyne.Container {
 				p.Show()
 				go func() {
 					mv.funcs.loadECUFunc()
-					//debug.Do(func() {
-					p.Hide()
-					//})
+					fyne.Do(func() {
+						p.Hide()
+					})
 				}()
 			}),
 			widget.NewButtonWithIcon("Save ECU", theme.UploadIcon(), func() {
@@ -497,9 +516,9 @@ func (mv *MapViewer) createButtons() *fyne.Container {
 				p.Show()
 				go func() {
 					mv.funcs.saveECUFunc(mv.zData)
-					//debug.Do(func() {
-					p.Hide()
-					//})
+					fyne.Do(func() {
+						p.Hide()
+					})
 
 				}()
 			}),

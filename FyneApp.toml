@@ -5,7 +5,7 @@ Website = "https://roffe.nu/"
   Name = "txlogger"
   ID = "com.roffe.txlogger"
   Version = "2.0.0"
-  Build = 469
+  Build = 476
 
-[Migrations]
-  fyneDo = true
+# [Migrations]
+#   fyneDo = true

@@ -124,9 +124,8 @@ func (c *Dial) rotate(hand *canvas.Line, rotation float64, offset, length float3
 	offY := -offset * cosRotation
 	midxOffX := c.middle.X + offX
 	midY := c.middle.Y + offY
-
-	hand.Position1 = fyne.NewPos(midxOffX, midY)
-	hand.Position2 = fyne.NewPos(midxOffX+x2, midY+y2)
+	hand.Position1 = fyne.Position{X: midxOffX, Y: midY}
+	hand.Position2 = fyne.Position{X: midxOffX + x2, Y: midY + y2}
 	hand.Refresh()
 }
 
@@ -174,7 +173,7 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 	midStroke := c.diameter * common.OneEighthieth
 	smallStroke := c.diameter * common.OneTwohundredth
 
-	size := fyne.NewSize(c.diameter, c.diameter)
+	size := fyne.Size{Width: c.diameter, Height: c.diameter}
 
 	topleft := fyne.NewPos(c.middle.X-c.radius, c.middle.Y-c.radius)
 
@@ -186,11 +185,11 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 	center := c.radius * common.OneFourth
 
 	c.center.Move(c.middle.SubtractXY(center*common.OneHalf, center*common.OneHalf))
-	c.center.Resize(fyne.NewSize(center, center))
+	c.center.Resize(fyne.Size{Width: center, Height: center})
 
 	coverY := c.middle.Y + c.radius*common.OneSeventh*5
-	c.cover.Move(fyne.NewPos(0, coverY))
-	c.cover.Resize(fyne.NewSize(space.Width, (space.Height-coverY)+1))
+	c.cover.Move(fyne.Position{X: 0, Y: coverY})
+	c.cover.Resize(fyne.Size{Width: space.Width, Height: (space.Height - coverY) + 1})
 
 	c.displayText.TextSize = c.radius * common.OneHalf
 	c.displayText.Text = fmt.Sprintf(c.displayString, c.value)

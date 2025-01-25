@@ -8,7 +8,6 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ota"
 )
 
@@ -59,17 +58,17 @@ func New(port string) *TxUpdater {
 		t.updateBtn.Disable()
 		go func() {
 			//defer t.updateBtn.Enable()
-			defer debug.Do(t.updateBtn.Enable)
+			defer fyne.Do(t.updateBtn.Enable)
 			if err := ota.UpdateOTA(ota.Config{
 				Port: t.port,
 				Logfunc: func(v ...any) {
-					debug.Do(func() {
+					fyne.Do(func() {
 						t.outputData.Append(fmt.Sprint(v...))
 					})
 				},
 				ProgressFunc: t.progressbar.SetValue,
 			}); err != nil {
-				debug.Do(func() {
+				fyne.Do(func() {
 					t.outputData.Append(fmt.Sprint("Error: ", err))
 				})
 			}

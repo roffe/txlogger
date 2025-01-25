@@ -42,7 +42,7 @@ func startpprof() {
 	}()
 }
 
-func signalHandler() {
+func signalHandler(tx fyne.App) {
 	sig := make(chan os.Signal, 2)
 	signal.Notify(sig, syscall.SIGINT)
 	go func() {
@@ -52,6 +52,7 @@ func signalHandler() {
 }
 
 func main() {
+
 	startpprof()
 
 	socketFile := filepath.Join(os.TempDir(), "txlogger.sock")
@@ -68,6 +69,8 @@ func main() {
 	}
 
 	tx := app.NewWithID("com.roffe.txlogger")
+	//signalHandler(tx)
+
 	tx.Settings().SetTheme(&txTheme{})
 
 	if err := presets.Load(tx); err != nil {
@@ -85,12 +88,12 @@ func main() {
 			return &ipc.Message{Type: "pong", Data: ""}
 		},
 		"open": func(data string) *ipc.Message {
-			mw.Window.RequestFocus() // show window
+			fyne.Do(mw.Window.RequestFocus) // show window
 			if strings.HasSuffix(data, ".bin") {
 				mw.LoadSymbolsFromFile(data)
 			}
 			if strings.HasSuffix(data, ".t5l") || strings.HasSuffix(data, ".t7l") || strings.HasSuffix(data, ".t8l") || strings.HasSuffix(data, ".csv") {
-				mw.LoadLogfile(data, fyne.Position{}, true)
+				mw.LoadLogfile(data, fyne.Position{})
 			}
 			return nil
 		},
@@ -102,18 +105,25 @@ func main() {
 	}
 	defer sockServ.Close()
 
+	var loadedSymbols bool
+
 	if filename := flag.Arg(0); filename != "" {
 		switch strings.ToLower(path.Ext(filename)) {
 		case ".bin":
 			//mw = windows.NewMainWindow(a, filename)
-			mw.LoadSymbolsFromFile(filename)
+			if err := mw.LoadSymbolsFromFile(filename); err != nil {
+				mw.Error(err)
+			} else {
+				loadedSymbols = true
+			}
+
 		case ".t5l", ".t7l", ".t8l", ".csv":
-			mw.LoadLogfile(filename, fyne.Position{}, false)
+			mw.LoadLogfile(filename, fyne.Position{})
 		}
-	} else {
-		if filename := tx.Preferences().String("lastBinFile"); filename != "" {
-			mw.LoadSymbolsFromFile(filename)
-		}
+	}
+
+	if filename := tx.Preferences().String("lastBinFile"); filename != "" && !loadedSymbols {
+		mw.LoadSymbolsFromFile(filename)
 	}
 
 	//go updateCheck(a, mw)

@@ -28,6 +28,7 @@ import (
 	"github.com/roffe/txlogger/pkg/mainmenu"
 	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
+	"github.com/roffe/txlogger/pkg/widgets/ledicon"
 	"github.com/roffe/txlogger/pkg/widgets/logplayer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
@@ -98,6 +99,8 @@ type MainWindow struct {
 	wm              *multiwindow.MultipleWindows
 	content         *fyne.Container
 	startup         bool
+
+	canLED *ledicon.Widget
 }
 
 type mainWindowSelects struct {
@@ -146,6 +149,7 @@ func NewMainWindow(app fyne.App) *MainWindow {
 			EBus: ebus.CONTROLLER,
 		}),
 
+		canLED:     ledicon.New("CAN"),
 		statusText: NewSecretText("Harder, Better, Faster, Stronger"),
 		oCtx:       newOtoContext(),
 	}
@@ -299,7 +303,8 @@ func (mw *MainWindow) render() {
 				mw.selects.layoutSelect,
 			),
 			container.NewHBox(
-				container.NewGridWithColumns(4,
+				container.NewGridWithColumns(5,
+					mw.canLED,
 					mw.counters.capturedCounterLabel,
 					mw.counters.errorCounterLabel,
 					mw.counters.fpsCounterLabel,
@@ -307,6 +312,7 @@ func (mw *MainWindow) render() {
 				),
 				widget.NewButtonWithIcon("", theme.ComputerIcon(), mw.openEBUSMonitor),
 			),
+
 			mw.statusText,
 		),
 		nil,
@@ -419,7 +425,7 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, p fyne.Position, from
 	mw.Log("loaded log file " + filename + " in combined logplayer")
 }
 
-func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position, fromDropped bool) {
+func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position) {
 	// Just filename, used for Window title
 	fp := filepath.Base(filename)
 
@@ -447,29 +453,20 @@ func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position, fromDropped 
 	iw.OnClose = func() {
 		lp.Close()
 	}
-	if fromDropped {
-		//debug.Do(func() {
-		mw.wm.Add(iw, p)
-		//})
-	} else {
-		mw.wm.Add(iw, p)
 
-	}
-
+	mw.wm.Add(iw, p)
 	mw.Log("loaded log file " + filename)
 }
 
 func (mw *MainWindow) Log(s string) {
 	debug.Log(s)
-	go fyne.Do(func() {
-		mw.outputData.Append(s)
-	})
+	mw.outputData.Append(s)
 }
 
 func (mw *MainWindow) Error(err error) {
 	debug.Log("error:" + err.Error())
+	mw.outputData.Append(err.Error())
 	go fyne.Do(func() {
-		mw.outputData.Append(err.Error())
 		dialog.ShowError(err, mw.Window)
 	})
 	//log.Printf("error: %s", err)

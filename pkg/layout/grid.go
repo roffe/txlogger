@@ -33,7 +33,7 @@ func (g *Grid) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 			float32(col)*(cellWidth+padding2)+g.Padding,
 			baseY-float32(row)*(cellHeight+padding2),
 		))
-		obj.Resize(fyne.NewSize(cellWidth, cellHeight))
+		obj.Resize(fyne.Size{Width: cellWidth, Height: cellHeight})
 	}
 }
 
@@ -42,7 +42,7 @@ func (g *Grid) MinSize(objects []fyne.CanvasObject) fyne.Size {
 	w := objects[0].MinSize().Width + (2 * g.Padding)
 	h := objects[0].MinSize().Height + (2 * g.Padding)
 
-	return fyne.NewSize(w*float32(g.Cols), h*float32(g.Rows))
+	return fyne.Size{Width: w * float32(g.Cols), Height: h * float32(g.Rows)}
 
 	//return fyne.NewSize(float32(g.Cols)*g.Padding+totalPaddingWidth, float32(g.Rows)*g.Padding+totalPaddingHeight)
 }

@@ -103,8 +103,8 @@ func (s *VBar) SetValue(value float64) {
 
 	valueHeightFactor := float32(value) * s.layoutValues.heightFactor
 
-	s.bar.Resize(fyne.NewSize(s.size.Width-s.layoutValues.twoEight, valueHeightFactor))
-	s.bar.Move(fyne.NewPos(s.layoutValues.diameterEight, s.size.Height-valueHeightFactor))
+	s.bar.Resize(fyne.Size{Width: s.size.Width - s.layoutValues.twoEight, Height: valueHeightFactor})
+	s.bar.Move(fyne.Position{X: s.layoutValues.diameterEight, Y: s.size.Height - valueHeightFactor})
 	// Format number directly without conversion
 	s.displayText.Text = strconv.FormatFloat(value, 'f', 0, 64)
 	s.displayText.Refresh()
@@ -125,7 +125,6 @@ func (s *VBar) CreateRenderer() fyne.WidgetRenderer {
 
 func (s *VBar) getColorForValue(value float64) (fillColor, strokeColor color.RGBA) {
 	ratio := value / s.cfg.Max
-
 	if s.cfg.ColorScale == widgets.BlueYellowScale {
 		if ratio < 0.5 {
 			blueRatio := 1 - (ratio * 2)
@@ -141,7 +140,6 @@ func (s *VBar) getColorForValue(value float64) (fillColor, strokeColor color.RGB
 		return color.RGBA{R: r, G: g, B: 0x33, A: 0x80},
 			color.RGBA{R: r, G: g, B: 0x33, A: 0xFF}
 	}
-
 	// Traditional scale
 	r := uint8(0xA5 * ratio)
 	g := uint8(0xA5 * (1 - ratio))
@@ -178,18 +176,16 @@ func (r *VBarRenderer) Layout(space fyne.Size) {
 	stepFactor := float32(space.Height) / float32(r.cfg.Steps)
 
 	// Face layout
-	r.face.Move(fyne.NewPos(0, -2))
+	r.face.Move(fyne.Position{X: 0, Y: -2})
 	r.face.Resize(space.AddWidthHeight(0, 3))
 
 	// Text layout
-	r.titleText.Move(fyne.NewPos(
-		r.layoutValues.middle+r.layoutValues.titleX,
-		space.Height+2,
-	))
-	r.displayText.Move(fyne.NewPos(
-		r.layoutValues.middle+r.layoutValues.displayTextX,
-		space.Height-r.displayText.MinSize().Height,
-	))
+	r.titleText.Move(fyne.Position{X: r.layoutValues.middle + r.layoutValues.titleX,
+		Y: space.Height + 2,
+	})
+	r.displayText.Move(fyne.Position{X: r.layoutValues.middle + r.layoutValues.displayTextX,
+		Y: space.Height - r.displayText.MinSize().Height,
+	})
 
 	// Bar lines layout
 	oneThird := space.Width * common.OneThird
@@ -199,18 +195,18 @@ func (r *VBarRenderer) Layout(space fyne.Size) {
 	for i, line := range r.bars {
 		y := float32(i) * stepFactor
 		if i%2 == 0 {
-			line.Position1 = fyne.NewPos(middle-oneThird, y)
-			line.Position2 = fyne.NewPos(middle+oneThird, y)
+			line.Position1 = fyne.Position{X: middle - oneThird, Y: y}
+			line.Position2 = fyne.Position{X: middle + oneThird, Y: y}
 		} else {
-			line.Position1 = fyne.NewPos(middle-oneSeventh, y)
-			line.Position2 = fyne.NewPos(middle+oneSeventh, y)
+			line.Position1 = fyne.Position{X: middle - oneSeventh, Y: y}
+			line.Position2 = fyne.Position{X: middle + oneSeventh, Y: y}
 		}
 	}
 
 	// Update bar position
 	valueHeightFactor := float32(r.value) * r.layoutValues.heightFactor
-	r.bar.Resize(fyne.NewSize(r.size.Width-r.layoutValues.twoEight, valueHeightFactor))
-	r.bar.Move(fyne.NewPos(r.layoutValues.diameterEight, r.size.Height-valueHeightFactor))
+	r.bar.Resize(fyne.Size{Width: r.size.Width - r.layoutValues.twoEight, Height: valueHeightFactor})
+	r.bar.Move(fyne.Position{X: r.layoutValues.diameterEight, Y: r.size.Height - valueHeightFactor})
 
 }
 

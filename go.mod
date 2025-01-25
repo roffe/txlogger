@@ -66,8 +66,11 @@ require fyne.io/x/fyne v0.0.0-20240803204126-8b5b5bfe65ef
 require (
 	github.com/ebitengine/oto/v3 v3.3.1
 	github.com/hajimehoshi/go-mp3 v0.3.4
-	github.com/jellydator/ttlcache/v3 v3.3.0
+	google.golang.org/grpc v1.69.4
+	google.golang.org/protobuf v1.36.3
 )
+
+require google.golang.org/genproto/googleapis/rpc v0.0.0-20250122153221-138b5a5a4fd4 // indirect
 
 require (
 	github.com/BurntSushi/toml v1.4.0 // indirect

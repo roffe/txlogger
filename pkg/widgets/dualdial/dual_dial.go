@@ -133,8 +133,8 @@ func (c *DualDial) rotate(hand *canvas.Line, rotation float64, offset, length fl
 	offY := -offset * cosRotation
 	midOffX := c.middle.X + offX
 	midY := c.middle.Y + offY
-	hand.Position1 = fyne.NewPos(midOffX, midY)
-	hand.Position2 = fyne.NewPos(midOffX+x2, midY+y2)
+	hand.Position1 = fyne.Position{X: midOffX, Y: midY}
+	hand.Position2 = fyne.Position{X: midOffX + x2, Y: midY + y2}
 	hand.Refresh()
 }
 
@@ -211,7 +211,7 @@ func (c *DualDialRenderer) Layout(space fyne.Size) {
 
 	coverY := c.middle.Y + c.radius*common.OneSeventh*5
 	c.cover.Move(fyne.NewPos(0, coverY))
-	c.cover.Resize(fyne.NewSize(space.Width, (space.Height-coverY)+1))
+	c.cover.Resize(fyne.Size{Width: space.Width, Height: (space.Height - coverY) + 1})
 
 	sixthDiameter := c.diameter * common.OneSixth
 

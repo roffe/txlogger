@@ -127,7 +127,7 @@ func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client)
 func (c *T7Client) onError(err error) {
 	c.errCount++
 	c.errPerSecond++
-	c.ErrorCounter(0)
+	c.ErrorCounter(c.errCount)
 	c.OnMessage(err.Error())
 }
 
@@ -146,7 +146,7 @@ func (c *T7Client) Start() error {
 		c.Device,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create t7 client: %w", err)
 	}
 	defer cl.Close()
 
@@ -180,7 +180,7 @@ func (c *T7Client) Start() error {
 
 	c.lamb, err = NewWBL(ctx, cl, cfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create wideband lambda: %w", err)
 	}
 
 	if c.lamb != nil {
@@ -484,9 +484,9 @@ func (c *T7Client) Start() error {
 				if count%15 == 0 {
 					c.CaptureCounter(count)
 				}
-			case msg := <-tx.C():
-				if msg == nil {
-					return retry.Unrecoverable(errors.New("nil message received"))
+			case msg, ok := <-tx.C():
+				if !ok {
+					return retry.Unrecoverable(errors.New("txbridge recv channel closed"))
 				}
 				if msg.Identifier() == adapter.SystemMsgError {
 					data := msg.Data()

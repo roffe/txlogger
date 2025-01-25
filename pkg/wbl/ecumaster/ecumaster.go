@@ -53,8 +53,9 @@ func (l *LambdaToCAN) Start(ctx context.Context) error {
 		defer sub.Close()
 		for l.running {
 			select {
-			case msg := <-sub.C():
-				if msg == nil {
+			case msg, ok := <-sub.C():
+				if !ok {
+					log.Println("channel closed")
 					return //channel closed
 				}
 				if err := l.decodeCAN(msg.Identifier(), msg.Data()); err != nil {

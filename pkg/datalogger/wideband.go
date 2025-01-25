@@ -52,10 +52,17 @@ func NewWBL(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 		wblClient.Start(ctx)
 		if cfg.Txbridge {
 			wblSub := cl.Subscribe(ctx, adapter.SystemMsgWBLReading)
-			//defer wblSub.Close()
 			go func() {
-				for msg := range wblSub.C() {
-					wblClient.SetData(msg.Data())
+				ch := wblSub.C()
+				for {
+					select {
+					case msg, ok := <-ch:
+						if !ok {
+							cfg.Log("wbl channel closed")
+							return
+						}
+						wblClient.SetData(msg.Data())
+					}
 				}
 			}()
 		}
@@ -73,22 +80,24 @@ func NewWBL(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 				return nil, err
 			}
 			wblSub := cl.Subscribe(ctx, adapter.SystemMsgWBLReading)
-			// defer wblSub.Close()
 			go func() {
-				for msg := range wblSub.C() {
-					if msg == nil {
-						cfg.Log("wbl nil message")
-						return
+				ch := wblSub.C()
+				for {
+					select {
+					case msg, ok := <-ch:
+						if !ok {
+							cfg.Log("wbl reading channel closed")
+							return
+						}
+						// create a float from the message
+						f, err := strconv.ParseFloat(string(msg.Data()), 64)
+						if err != nil {
+							cfg.Log("could not decode WBL value")
+							continue
+						}
+						//lambda := float64(binary.BigEndian.Uint16(msg.Data()[0:2])) / 100
+						wblClient.SetLambda(f / 10)
 					}
-					// create a float from the message
-					f, err := strconv.ParseFloat(string(msg.Data()), 64)
-					if err != nil {
-						cfg.Log("could not decode WBL value")
-						continue
-					}
-
-					//lambda := float64(binary.BigEndian.Uint16(msg.Data()[0:2])) / 100
-					wblClient.SetLambda(f / 10)
 				}
 			}()
 		} else if cfg.Port == "CAN" {
@@ -96,8 +105,16 @@ func NewWBL(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 			wblSub := cl.Subscribe(ctx, 0x180)
 			go func() {
 				// defer wblSub.Close()
-				for msg := range wblSub.C() {
-					wblClient.SetData(msg.Data())
+				ch := wblSub.C()
+				for {
+					select {
+					case msg, ok := <-ch:
+						if !ok {
+							cfg.Log("wbl channel closed")
+							return
+						}
+						wblClient.SetData(msg.Data())
+					}
 				}
 			}()
 		} else {
@@ -113,22 +130,25 @@ func NewWBL(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 		if err != nil {
 			return nil, err
 		}
-		if cfg.Txbridge {
+		if cfg.Txbridge || cfg.Port == "txbridge" {
 			if err := cl.SendFrame(adapter.SystemMsg, []byte{'w', 1, 'p', 'p'}, gocan.Outgoing); err != nil {
 				return nil, err
 			}
 			wblSub := cl.Subscribe(ctx, adapter.SystemMsgWBLReading)
 
 			go func() {
-				for msg := range wblSub.C() {
-					if msg == nil {
-						cfg.Log("wbl nil message")
-						return
-					}
-					//log.Printf("plx: %X\n", msg.Data())
-					if err := wblClient.Parse(msg.Data()); err != nil {
-						cfg.Log(err.Error())
-						log.Println(err)
+				ch := wblSub.C()
+				for {
+					select {
+					case msg, ok := <-ch:
+						if !ok {
+							cfg.Log("wbl channel closed")
+							return
+						}
+						if err := wblClient.Parse(msg.Data()); err != nil {
+							cfg.Log(err.Error())
+							log.Println(err)
+						}
 					}
 				}
 			}()

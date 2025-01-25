@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/adapter"
+	"github.com/roffe/gocan/client"
 	"github.com/roffe/txlogger/pkg/layout"
 	"go.bug.st/serial/enumerator"
 )
@@ -180,8 +181,7 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 	if cs.adapterSelector.Selected == "txbridge" {
 		minimumVersion = minimumtxbridgeVersion
 	}
-
-	return adapter.New(
+	return client.New(
 		cs.adapterSelector.Selected,
 		&gocan.AdapterConfig{
 			Port:         cs.portSelector.Selected,

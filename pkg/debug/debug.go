@@ -8,13 +8,7 @@ import (
 	"runtime"
 	"sync"
 	"time"
-
-	"fyne.io/fyne/v2"
 )
-
-func Do(f func()) {
-	fyne.DoAsync(f)
-}
 
 var initOnce sync.Once
 var fh *os.File
@@ -32,7 +26,6 @@ func start() {
 
 func Log(msg string) {
 	initOnce.Do(start)
-
 	timeStr := time.Now().Format("2006-01-02 15:04:05.000")
 	_, fullPath, line, ok := runtime.Caller(2)
 	filename := filepath.Base(fullPath)

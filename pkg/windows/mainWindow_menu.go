@@ -57,7 +57,7 @@ func (mw *MainWindow) setupMenu() {
 					mw.Error(err)
 					return
 				}
-				mw.LoadLogfile(filename, fyne.NewPos(10, 10), false)
+				mw.LoadLogfile(filename, fyne.NewPos(10, 10))
 			}),
 			fyne.NewMenuItem("Open log folder", func() {
 				if err := open.Run(mw.settings.GetLogPath()); err != nil {
@@ -149,7 +149,14 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	symY := mw.fw.GetByName(axis.Y)
 	symZ := mw.fw.GetByName(axis.Z)
 
+	if symZ == nil {
+		mw.Error(fmt.Errorf("failed to find symbol %s", axis.Z))
+		return
+	}
+
 	var xData, yData, zData []float64
+	zData = symZ.Float64s()
+
 	if symX != nil {
 		xData = symX.Float64s()
 	} else {
@@ -162,17 +169,15 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		yData = []float64{0}
 		if symZ.Name == "Batt_korr_tab!" {
 			yData = []float64{15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5}
+		} else if len(xData) <= 1 && len(yData) <= 1 && len(zData) > 1 {
+			yData = make([]float64, len(zData))
+			for i := range yData {
+				yData[i] = float64(i)
+			}
 		} else {
 			yData = []float64{0}
 		}
 	}
-
-	if symZ == nil {
-		mw.Error(fmt.Errorf("failed to find symbol %s", axis.Z))
-		return
-	}
-
-	zData = symZ.Float64s()
 
 	if axis.X == "Pwm_ind_trot!" {
 		xData = xData[:8]

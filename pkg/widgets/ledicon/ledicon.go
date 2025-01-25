@@ -5,65 +5,53 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 )
 
 type Widget struct {
 	widget.BaseWidget
-
-	Text string
-
-	ledicon *canvas.Circle
-	label   *widget.Label
-
-	content *fyne.Container
-
-	state bool
+	ColorOn  color.RGBA
+	ColorOff color.RGBA
+	Text     string
+	ledicon  *canvas.Circle
+	label    *widget.Label
+	state    bool
 }
 
-func New(label string) *Widget {
+func New(text string) *Widget {
 	w := &Widget{
-		Text: label,
+		Text:     text,
+		ColorOn:  color.RGBA{0x00, 0xFF, 0x00, 0xFF},
+		ColorOff: color.RGBA{0x80, 0x80, 0x80, 0xFF},
 	}
 	w.ExtendBaseWidget(w)
-
 	w.ledicon = &canvas.Circle{FillColor: color.RGBA{0x80, 0x80, 0x80, 0xFF}}
-	w.label = widget.NewLabel(label)
-
+	w.label = widget.NewLabel(text)
 	return w
 }
 
 func (w *Widget) On() {
-	w.setState(true)
+	w.SetState(true)
 }
 
 func (w *Widget) Off() {
-	w.setState(false)
+	w.SetState(false)
 }
 
-func (w *Widget) setState(state bool) {
+func (w *Widget) SetState(state bool) {
 	if state == w.state {
 		return
 	}
 	if state {
-		w.ledicon.FillColor = color.RGBA{0x00, 0xFF, 0x00, 0xFF}
+		w.ledicon.FillColor = w.ColorOn
 	} else {
-		w.ledicon.FillColor = color.RGBA{0x80, 0x80, 0x80, 0xFF}
+		w.ledicon.FillColor = w.ColorOff
 	}
 	w.state = state
 	w.ledicon.Refresh()
 }
 
 func (w *Widget) CreateRenderer() fyne.WidgetRenderer {
-	w.content = container.NewBorder(
-		nil,
-		nil,
-		w.ledicon,
-		nil,
-		w.label,
-	)
-	//return widget.NewSimpleRenderer(w.content)
 	return &iconRenderer{w: w}
 
 }

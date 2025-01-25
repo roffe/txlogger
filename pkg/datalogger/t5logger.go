@@ -265,9 +265,9 @@ func (c *T5Client) Start() error {
 				if count%15 == 0 {
 					c.CaptureCounter(count)
 				}
-			case msg := <-tx.C():
-				if msg == nil {
-					return retry.Unrecoverable(errors.New("nil message received"))
+			case msg, ok := <-tx.C():
+				if !ok {
+					return retry.Unrecoverable(errors.New("txbridge recv channel closed"))
 				}
 				if msg.Identifier() == adapter.SystemMsgError {
 					data := msg.Data()

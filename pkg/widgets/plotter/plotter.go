@@ -6,7 +6,6 @@ import (
 	"image/color"
 	"log"
 	"sort"
-	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -15,7 +14,6 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/colors"
-	"github.com/roffe/txlogger/pkg/debug"
 )
 
 // var _ fyne.Focusable = (*Plotter)(nil)
@@ -57,7 +55,6 @@ type Plotter struct {
 
 	hilightLine int
 
-	mu        sync.Mutex
 	OnDragged func(event *fyne.DragEvent)
 	OnTapped  func(event *fyne.PointEvent)
 }
@@ -125,14 +122,14 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 
 		onTapped := func(enabled bool) {
 			p.ts[n].Enabled = enabled
-			p.refreshImage()
+			p.refreshImage(false)
 		}
 
 		onColorUpdate := func(col color.Color) {
 			r, g, b, a := col.RGBA()
 			p.ts[n].Color = color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)}
 			// log.Printf("\"%s\": {%d, %d, %d, %d},", k, uint8(r), uint8(g), uint8(b), uint8(a))
-			p.refreshImage()
+			p.refreshImage(false)
 		}
 		//var oldColor color.RGBA
 		onHover := func(hover bool) {
@@ -144,14 +141,14 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 				p.hilightLine = n
 				p.legendTexts[n].text.TextStyle.Bold = true
 				p.legendTexts[n].value.TextStyle.Bold = true
-				p.refreshImage()
+				p.refreshImage(false)
 			} else {
 				//p.ts[n].Color = oldColor
 				p.legendTexts[n].text.TextStyle.Bold = false
 				p.legendTexts[n].value.TextStyle.Bold = false
 				p.overlayText.Text = ""
 				p.hilightLine = -1
-				p.refreshImage()
+				p.refreshImage(false)
 			}
 		}
 
@@ -238,17 +235,15 @@ func (p *Plotter) Seek(pos int) {
 		valueIndex := min(p.dataLength, p.cursorPos)
 		obj := p.legendTexts[i]
 		obj.value.Text = fmt.Sprintf("%g", p.values[v][valueIndex])
-		debug.Do(func() {
+		fyne.Do(func() {
 			obj.Refresh()
 		})
 	}
 	p.updateCursor()
-	p.refreshImage()
+	p.refreshImage(true)
 }
 
-func (p *Plotter) refreshImage() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+func (p *Plotter) refreshImage(goroutine bool) {
 	img := image.NewRGBA(image.Rect(0, 0, int(p.plotResolution.Width), int(p.plotResolution.Height)))
 	for n := range len(p.ts) {
 		if !p.ts[n].Enabled {

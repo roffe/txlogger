@@ -9,74 +9,21 @@ import (
 	"github.com/roffe/txlogger/pkg/datalogger"
 )
 
+var _ Logfile = (*CSVLogfile)(nil)
+
 type CSVLogfile struct {
-	records []Record
-	length  int
-	pos     int
+	BaseLogfile
 }
 
 func NewFromCSVLogfile(filename string) (Logfile, error) {
-	c := &CSVLogfile{
-		pos: -1,
-	}
-
+	c := &CSVLogfile{}
+	c.pos = -1
+	// start := time.Now()
 	if err := c.parseCSVLogfile(filename); err != nil {
 		return nil, err
 	}
-
+	// log.Printf("Parsed %d records in %s", len(rec), time.Since(start))
 	return c, nil
-}
-
-func (l *CSVLogfile) Next() Record {
-	if l.pos+1 > l.length-1 || l.pos+1 < 0 {
-		return Record{
-			EOF: true,
-		}
-	}
-	l.pos++
-	return l.records[l.pos]
-}
-
-func (l *CSVLogfile) Prev() Record {
-	if l.pos-1 < 0 {
-		return Record{
-			EOF: true,
-		}
-	}
-	l.pos--
-	return l.records[l.pos]
-}
-
-func (l *CSVLogfile) Seek(pos int) Record {
-	if pos < 0 || pos >= l.length {
-		return Record{
-			EOF: true,
-		}
-	}
-	l.pos = pos
-	return l.records[pos]
-}
-
-func (l *CSVLogfile) Pos() int {
-	return l.pos
-}
-
-func (l *CSVLogfile) Len() int {
-	return l.length
-}
-
-func (l *CSVLogfile) Start() time.Time {
-	if l.length > 0 {
-		return l.records[0].Time
-	}
-	return time.Time{}
-}
-
-func (l *CSVLogfile) End() time.Time {
-	if l.length > 0 {
-		return l.records[l.length-1].Time
-	}
-	return time.Time{}
 }
 
 func (l *CSVLogfile) parseCSVLogfile(filename string) error {
@@ -128,6 +75,7 @@ func (l *CSVLogfile) parseCSVLogfile(filename string) error {
 	}
 
 	l.length = len(l.records)
+	l.end = l.length - 1
 
 	return nil
 }

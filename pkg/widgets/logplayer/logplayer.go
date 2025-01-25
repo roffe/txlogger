@@ -11,7 +11,6 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/capture"
-	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/eventbus"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
@@ -69,7 +68,7 @@ type logplayerObjects struct {
 	rewindBtn         *widget.Button
 	playbackToggleBtn *widget.Button
 	forwardBtn        *widget.Button
-	positionSlider    *widget.Slider
+	positionSlider    *slider
 	timeLabel         *widget.Label
 	speedSelect       *widget.Select
 }
@@ -84,17 +83,19 @@ func New(cfg *Config) *Logplayer {
 	lp := &Logplayer{
 		cfg:         cfg,
 		container:   container.NewWithoutLayout(),
-		minsize:     fyne.NewSize(150, 50),
+		minsize:     fyne.Size{Width: 150, Height: 50},
 		controlChan: make(chan *controlMsg, 10),
 		playChan:    make(chan struct{}, 2),
 		pauseChan:   make(chan struct{}, 2),
 		state:       stateStopped,
 		objs: &logplayerObjects{
-			positionSlider: widget.NewSlider(0, 100),
+			positionSlider: NewSlider(),
 		},
 		logFile: cfg.Logfile,
 	}
 	lp.ExtendBaseWidget(lp)
+
+	lp.objs.positionSlider.typedKey = lp.TypedKey
 
 	lp.render()
 
@@ -105,6 +106,7 @@ func (l *Logplayer) Close() {
 	l.closeOnce.Do(func() {
 		close(l.controlChan)
 		l.closed = true
+		l.logFile.Close()
 	})
 }
 
@@ -135,35 +137,35 @@ func (l *Logplayer) TypedKey(ev *fyne.KeyEvent) {
 	case fyne.KeyEnter:
 		l.objs.speedSelect.SetSelected("1x")
 	case fyne.KeyReturn, fyne.KeyHome:
-		l.controlChan <- &controlMsg{Op: OpSeek, Pos: 0}
+		l.control(&controlMsg{Op: OpSeek, Pos: 0})
 	case fyne.KeyPageUp:
 		pos := int(l.objs.positionSlider.Value) + 100
 		if pos < 0 {
 			pos = 0
 		}
-		l.controlChan <- &controlMsg{Op: OpSeek, Pos: pos}
+		l.control(&controlMsg{Op: OpSeek, Pos: pos})
 	case fyne.KeyUp:
 		pos := int(l.objs.positionSlider.Value) + 12
 		if pos < 0 {
 			pos = 0
 		}
-		l.controlChan <- &controlMsg{Op: OpSeek, Pos: pos}
+		l.control(&controlMsg{Op: OpSeek, Pos: pos})
 	case fyne.KeyDown:
 		pos := int(l.objs.positionSlider.Value) - 12
 		if pos < 0 {
 			pos = 0
 		}
-		l.controlChan <- &controlMsg{Op: OpSeek, Pos: pos}
+		l.control(&controlMsg{Op: OpSeek, Pos: pos})
 	case fyne.KeyPageDown:
 		pos := int(l.objs.positionSlider.Value) - 100
 		if pos < 0 {
 			pos = 0
 		}
-		l.controlChan <- &controlMsg{Op: OpSeek, Pos: pos}
+		l.control(&controlMsg{Op: OpSeek, Pos: pos})
 	case fyne.KeyLeft:
-		l.controlChan <- &controlMsg{Op: OpPrev}
+		l.control(&controlMsg{Op: OpPrev})
 	case fyne.KeyRight:
-		l.controlChan <- &controlMsg{Op: OpNext}
+		l.control(&controlMsg{Op: OpNext})
 	case fyne.KeySpace:
 		l.objs.playbackToggleBtn.OnTapped()
 	}
@@ -175,8 +177,9 @@ func (l *Logplayer) TypedRune(_ rune) {
 func (l *Logplayer) control(op *controlMsg) {
 	select {
 	case l.controlChan <- op:
+		//		log.Println("control", op.Op, op.Pos)
 	default:
-		//fyne.LogError("Logplayer control channel full", nil)
+		fyne.LogError("Logplayer control channel full", nil)
 	}
 }
 
@@ -185,7 +188,8 @@ func (l *Logplayer) render() {
 		l.control(&controlMsg{Op: OpSeek, Pos: int(pos)})
 	}
 	l.objs.positionSlider.Step = 1
-	l.objs.positionSlider.Max = float64(l.logFile.Len())
+	l.objs.positionSlider.Min = 0
+	l.objs.positionSlider.Max = float64(l.logFile.Len() - 1)
 	l.objs.positionSlider.Value = 0
 
 	l.objs.speedSelect = widget.NewSelect([]string{"0.1x", "0.2x", "0.5x", "1x", "2x", "4x", "8x", "16x"}, func(s string) {
@@ -210,7 +214,7 @@ func (l *Logplayer) render() {
 	})
 	l.objs.speedSelect.Selected = "1x"
 
-	l.objs.timeLabel = widget.NewLabel("")
+	l.objs.timeLabel = widget.NewLabel(l.logFile.Start().Format("15:04:05.00"))
 
 	l.objs.restartBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
 		l.control(&controlMsg{Op: OpSeek, Pos: 0})
@@ -220,15 +224,7 @@ func (l *Logplayer) render() {
 		l.control(&controlMsg{Op: OpPrev})
 	})
 
-	playing := false
-
 	l.objs.playbackToggleBtn = widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() {
-		if playing {
-			l.objs.playbackToggleBtn.SetIcon(theme.MediaPlayIcon())
-		} else {
-			l.objs.playbackToggleBtn.SetIcon(theme.MediaPauseIcon())
-		}
-		playing = !playing
 		l.togglePlayback()
 	})
 
@@ -237,24 +233,16 @@ func (l *Logplayer) render() {
 	})
 
 	values := make(map[string][]float64)
-	//order := make([]string, 0)
-	// first := true
 	for {
 		if rec := l.logFile.Next(); !rec.EOF {
 			for k, v := range rec.Values {
 				values[k] = append(values[k], v)
-				//if first {
-				//	order = append(order, k)
-				//}
 			}
-			//first = false
 		} else {
 			break
 		}
 	}
-	l.logFile.Seek(0)
-
-	//sort.Strings(order)
+	l.logFile.Seek(-1)
 
 	plotterOpts := []plotter.PlotterOpt{
 		plotter.WithPlotResolutionFactor(1),
@@ -342,6 +330,22 @@ func (lr *LogplayerRenderer) Destroy() {
 
 type Op int
 
+func (o Op) String() string {
+	switch o {
+	case OpTogglePlayback:
+		return "TogglePlayback"
+	case OpSeek:
+		return "Seek"
+	case OpPrev:
+		return "Prev"
+	case OpNext:
+		return "Next"
+	case OpPlaybackSpeed:
+		return "PlaybackSpeed"
+	}
+	return "Unknown"
+}
+
 const (
 	OpTogglePlayback Op = iota
 	OpSeek
@@ -354,14 +358,12 @@ func (l *Logplayer) togglePlayback() {
 	switch l.state {
 	case stateStopped, statePaused:
 		l.objs.playbackToggleBtn.SetIcon(theme.MediaPauseIcon())
-		l.state = statePlaying
 		select {
 		case l.playChan <- struct{}{}: // Signal to start/resume playback
 		default:
 		}
 	case statePlaying:
 		l.objs.playbackToggleBtn.SetIcon(theme.MediaPlayIcon())
-		l.state = statePaused
 		select {
 		case l.pauseChan <- struct{}{}: // Signal to pause playback
 		default:
@@ -371,137 +373,137 @@ func (l *Logplayer) togglePlayback() {
 
 func (l *Logplayer) playLog() {
 	speedMultiplier := 1.0
-	logLen := l.logFile.Len() - 1
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 
+	var nextDelay time.Duration
+
+	timeSetter := func(t time.Time) {
+		timeText := t.Format("15:04:05.00")
+		fyne.Do(func() {
+			l.objs.timeLabel.SetText(timeText)
+		})
+	}
+
 	for {
 		select {
-		case op := <-l.controlChan:
-			if op == nil {
+		case op, ok := <-l.controlChan:
+			if !ok {
 				return
 			}
 			switch op.Op {
 			case OpPlaybackSpeed:
 				speedMultiplier = op.Rate
 			case OpSeek:
+				// log.Println("Seeking to", op.Pos)
 				l.logFile.Seek(op.Pos)
-				if rec := l.logFile.Next(); !rec.EOF {
-					for k, v := range rec.Values {
-						l.cfg.EBus.Publish(k, v)
-					}
-					l.objs.positionSlider.Value = float64(op.Pos)
-					timeText := rec.Time.Format("15:04:05.00")
-					debug.Do(func() {
-						l.objs.positionSlider.Refresh()
-						l.objs.timeLabel.SetText(timeText)
-					})
+				if rec := l.logFile.Get(); !rec.EOF {
 					if f := l.cfg.TimeSetter; f != nil {
 						f(rec.Time)
+					}
+					if l.state == statePlaying {
+						timer.Reset(10 * time.Millisecond)
+					} else {
+						for k, v := range rec.Values {
+							if err := l.cfg.EBus.Publish(k, v); err != nil {
+								log.Println("Error publishing to eventbus:", err)
+							}
+						}
+						timeSetter(rec.Time)
+						timer.Stop()
 					}
 					l.objs.plotter.Seek(op.Pos)
-
-					// Seek back one position since we just read the record
-					l.logFile.Seek(op.Pos)
-				}
-				if l.state == statePlaying {
-					timer.Reset(0) // Trigger immediate playback
 				}
 			case OpPrev:
-				pos := l.logFile.Pos() - 2
-				if pos < 0 {
-					pos = 0
-				}
-				l.logFile.Seek(pos)
-				// Update plotter and UI immediately regardless of playback state
-				if rec := l.logFile.Next(); !rec.EOF {
-					for k, v := range rec.Values {
-						l.cfg.EBus.Publish(k, v)
-					}
+				if rec := l.logFile.Prev(); !rec.EOF {
+					pos := l.logFile.Pos()
 					l.objs.positionSlider.Value = float64(pos)
-					timeText := rec.Time.Format("15:04:05.00")
-					debug.Do(func() {
+					timeSetter(rec.Time)
+					fyne.Do(func() {
 						l.objs.positionSlider.Refresh()
-						l.objs.timeLabel.SetText(timeText)
 					})
+
+					if l.state == statePlaying {
+						timer.Reset(0)
+					} else {
+						for k, v := range rec.Values {
+							if err := l.cfg.EBus.Publish(k, v); err != nil {
+								log.Println("Error publishing to eventbus:", err)
+							}
+						}
+					}
+
+					l.objs.plotter.Seek(pos)
 					if f := l.cfg.TimeSetter; f != nil {
 						f(rec.Time)
 					}
-					l.objs.plotter.Seek(pos + 1)
 				}
-				if l.state == statePlaying {
-					timer.Reset(0)
-				}
+
 			case OpNext:
-				pos := l.logFile.Pos()
-				if pos < logLen {
-					if rec := l.logFile.Next(); !rec.EOF {
+				if rec := l.logFile.Next(); !rec.EOF {
+					pos := l.logFile.Pos()
+					l.objs.positionSlider.Value = float64(pos)
+					timeSetter(rec.Time)
+					fyne.Do(func() {
+
+					})
+					if l.state == statePlaying {
+						timer.Reset(0)
+					} else {
 						for k, v := range rec.Values {
-							l.cfg.EBus.Publish(k, v)
+							if err := l.cfg.EBus.Publish(k, v); err != nil {
+								log.Println("Error publishing to eventbus:", err)
+							}
 						}
-
-						l.objs.positionSlider.Value = float64(pos + 1)
-						timeText := rec.Time.Format("15:04:05.00")
-						debug.Do(func() {
-							l.objs.positionSlider.Refresh()
-							l.objs.timeLabel.SetText(timeText)
-						})
-
-						if f := l.cfg.TimeSetter; f != nil {
-							f(rec.Time)
-						}
-						l.objs.plotter.Seek(pos + 1)
 					}
+					if f := l.cfg.TimeSetter; f != nil {
+						f(rec.Time)
+					}
+					l.objs.plotter.Seek(pos)
 				}
-				if l.state == statePlaying {
-					timer.Reset(0)
-				}
+
 			}
 
 		case <-l.playChan:
+			l.state = statePlaying
 			timer.Reset(0) // Start playback immediately
 
 		case <-l.pauseChan:
-			continue // Wait for next control message
+			l.state = statePaused
+			timer.Stop()
+			continue
 
 		case <-timer.C:
 			if l.state != statePlaying {
+				timer.Stop()
 				continue
 			}
-
-			currentPos := l.logFile.Pos()
-			if currentPos >= logLen {
-				l.state = stateStopped
-				debug.Do(func() {
-					l.objs.playbackToggleBtn.SetIcon(theme.MediaPlayIcon())
-				})
-				continue
-			}
-
 			if rec := l.logFile.Next(); !rec.EOF {
-				// Update all values atomically
-				for k, v := range rec.Values {
-					l.cfg.EBus.Publish(k, v)
-				}
+				currentPos := l.logFile.Pos()
+				nextDelay = time.Duration(float64(rec.DelayTillNext)*speedMultiplier) * time.Millisecond
+				timer.Reset(nextDelay)
 
 				l.objs.positionSlider.Value = float64(currentPos)
 				timeText := rec.Time.Format("15:04:05.00")
-
-				debug.Do(func() {
+				fyne.Do(func() {
 					l.objs.positionSlider.Refresh()
 					l.objs.timeLabel.SetText(timeText)
 				})
-
+				for k, v := range rec.Values {
+					if err := l.cfg.EBus.Publish(k, v); err != nil {
+						log.Println("Error publishing to eventbus:", err)
+					}
+				}
 				if f := l.cfg.TimeSetter; f != nil {
 					f(rec.Time)
 				}
 				l.objs.plotter.Seek(currentPos)
-				// Schedule next frame
-				nextDelay := time.Duration(float64(rec.DelayTillNext)*speedMultiplier) * time.Millisecond
-				timer.Reset(nextDelay)
 			} else {
 				l.state = stateStopped
-				l.objs.playbackToggleBtn.SetIcon(theme.MediaPlayIcon())
+				fyne.Do(func() {
+					l.objs.playbackToggleBtn.SetIcon(theme.MediaPlayIcon())
+				})
+				timer.Reset(100 * time.Millisecond)
 			}
 		}
 	}

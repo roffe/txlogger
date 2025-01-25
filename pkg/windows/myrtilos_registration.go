@@ -13,7 +13,6 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
-	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
@@ -103,9 +102,7 @@ func (mr *MyrtilosRegistration) register(key []byte) error {
 	}
 
 	logFn := func(s string) {
-		debug.Do(func() {
-			mr.outputData.Append(s)
-		})
+		mr.outputData.Append(s)
 	}
 
 	adapter, err := mr.mw.settings.CanSettings.GetAdapter("T7", logFn)

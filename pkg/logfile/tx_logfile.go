@@ -10,77 +10,21 @@ import (
 	"time"
 )
 
+var _ Logfile = (*TxLogfile)(nil)
+
 type TxLogfile struct {
-	records []Record
-	length  int
-	pos     int
+	BaseLogfile
 }
 
 func NewFromTxLogfile(filename string) (Logfile, error) {
-	//	start := time.Now()
-
-	//	log.Printf("Parsed %d records in %s", len(rec), time.Since(start))
-	txlog := &TxLogfile{
-		pos: -1,
-	}
-
+	txlog := &TxLogfile{}
+	txlog.pos = -1
+	// start := time.Now()
 	if err := txlog.parseTxLogfile(filename); err != nil {
 		return nil, err
 	}
-
+	// log.Printf("Parsed %d records in %s", len(rec), time.Since(start))
 	return txlog, nil
-}
-
-func (l *TxLogfile) Next() Record {
-	if l.pos+1 > l.length-1 || l.pos+1 < 0 {
-		return Record{
-			EOF: true,
-		}
-	}
-	l.pos++
-	return l.records[l.pos]
-}
-
-func (l *TxLogfile) Prev() Record {
-	if l.pos-1 < 0 {
-		return Record{
-			EOF: true,
-		}
-	}
-	l.pos--
-	return l.records[l.pos]
-}
-
-func (l *TxLogfile) Seek(pos int) Record {
-	if pos < 0 || pos >= l.length {
-		return Record{
-			EOF: true,
-		}
-	}
-	l.pos = pos
-	return l.records[pos]
-}
-
-func (l *TxLogfile) Pos() int {
-	return l.pos
-}
-
-func (l *TxLogfile) Len() int {
-	return l.length
-}
-
-func (l *TxLogfile) Start() time.Time {
-	if l.length > 0 {
-		return l.records[0].Time
-	}
-	return time.Time{}
-}
-
-func (l *TxLogfile) End() time.Time {
-	if l.length > 0 {
-		return l.records[l.length-1].Time
-	}
-	return time.Time{}
 }
 
 var timeFormats = []string{
@@ -141,7 +85,7 @@ func (l *TxLogfile) parseTxLogfile(filename string) error {
 	}
 
 	l.length = len(l.records)
-
+	l.end = l.length - 1
 	return nil
 }
 

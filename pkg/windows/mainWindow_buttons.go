@@ -331,17 +331,20 @@ func (mw *MainWindow) startLogging() {
 	mw.buttons.logBtn.SetText("Stop")
 	mw.Disable()
 
+	mw.canLED.On()
 	go func() {
 		if err := mw.dlc.Start(); err != nil {
 			mw.Error(err)
 		}
 		mw.loggingRunning = false
 		mw.dlc = nil
-		//debug.Do(func() {
-		mw.Enable()
-		mw.buttons.logBtn.Icon = theme.MediaPlayIcon()
-		mw.buttons.logBtn.SetText("Start")
-		//})
+		fyne.Do(func() {
+			mw.Enable()
+			mw.buttons.logBtn.Icon = theme.MediaPlayIcon()
+			mw.buttons.logBtn.SetText("Start")
+			mw.canLED.Off()
+			mw.counters.fpsCounterLabel.SetText("Fps: 0")
+		})
 	}()
 }
 
@@ -354,19 +357,19 @@ func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, er
 		Rate:           mw.settings.GetFreq(),
 		OnMessage:      mw.Log,
 		CaptureCounter: func(i int) {
-			//debug.Do(func() {
-			mw.counters.capturedCounterLabel.SetText("Cap: " + strconv.Itoa(i))
-			//})
+			fyne.Do(func() {
+				mw.counters.capturedCounterLabel.SetText("Cap: " + strconv.Itoa(i))
+			})
 		},
 		ErrorCounter: func(i int) {
-			//debug.Do(func() {
-			mw.counters.errorCounterLabel.SetText("Err: " + strconv.Itoa(i))
-			//})
+			fyne.Do(func() {
+				mw.counters.errorCounterLabel.SetText("Err: " + strconv.Itoa(i))
+			})
 		},
 		FpsCounter: func(i int) {
-			//debug.Do(func() {
-			mw.counters.fpsCounterLabel.SetText("Fps: " + strconv.Itoa(i))
-			//})
+			fyne.Do(func() {
+				mw.counters.fpsCounterLabel.SetText("Fps: " + strconv.Itoa(i))
+			})
 		},
 		LogFormat: mw.settings.GetLogFormat(),
 		LogPath:   mw.settings.GetLogPath(),

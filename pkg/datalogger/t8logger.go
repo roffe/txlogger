@@ -401,9 +401,9 @@ func (c *T8Client) Start() error {
 						c.CaptureCounter(count)
 					}
 					testerPresent()
-				case msg := <-tx.C():
-					if msg == nil {
-						return retry.Unrecoverable(errors.New("nil message received"))
+				case msg, ok := <-tx.C():
+					if !ok {
+						return retry.Unrecoverable(errors.New("txbridge recv channel closed"))
 					}
 
 					if msg.Identifier() == adapter.SystemMsgError {

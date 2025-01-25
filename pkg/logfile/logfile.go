@@ -7,6 +7,7 @@ import (
 )
 
 type Logfile interface {
+	Get() Record
 	Next() Record
 	Prev() Record
 	Seek(int) Record
@@ -14,6 +15,7 @@ type Logfile interface {
 	Len() int
 	Start() time.Time
 	End() time.Time
+	Close()
 }
 
 func NewRecord(time time.Time) Record {
