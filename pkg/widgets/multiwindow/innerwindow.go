@@ -1,6 +1,7 @@
 package multiwindow
 
 import (
+	"image/color"
 	"runtime"
 
 	"fyne.io/fyne/v2"
@@ -18,6 +19,15 @@ var (
 	_ desktop.Mouseable  = (*InnerWindow)(nil)
 	_ desktop.Hoverable  = (*InnerWindow)(nil)
 	_ desktop.Cursorable = (*InnerWindow)(nil)
+)
+
+type titleBarButtonMode int
+
+const (
+	modeClose titleBarButtonMode = iota
+	modeMinimize
+	modeMaximize
+	modeIcon
 )
 
 // InnerWindow defines a container that wraps content in a window border - that can then be placed inside
@@ -40,7 +50,7 @@ type InnerWindow struct {
 	IgnoreSave bool // Ignore saving to layout
 
 	icon                     fyne.CanvasObject
-	minBtn, maxBtn, closeBtn *widget.Button
+	minBtn, maxBtn, closeBtn *borderButton
 
 	title       string
 	bg          *canvas.Rectangle
@@ -153,26 +163,28 @@ func (w *InnerWindow) Close() {
 }
 
 func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
-	w.minBtn = &widget.Button{Icon: theme.WindowMinimizeIcon(), Importance: widget.LowImportance, OnTapped: w.OnMinimized}
+	th := w.Theme()
+	w.minBtn = newBorderButton(theme.WindowMinimizeIcon(), modeMinimize, th, w.OnMinimized)
 	if w.OnMinimized == nil {
 		w.minBtn.Disable()
 	}
-	w.maxBtn = &widget.Button{Icon: theme.WindowMaximizeIcon(), Importance: widget.LowImportance, OnTapped: w.OnMaximized}
+	w.maxBtn = newBorderButton(theme.WindowMaximizeIcon(), modeMaximize, th, w.OnMaximized)
 	if w.OnMaximized == nil {
 		w.maxBtn.Disable()
 	}
-	w.closeBtn = &widget.Button{Icon: theme.WindowCloseIcon(), Importance: widget.LowImportance, OnTapped: func() {
+
+	w.closeBtn = newBorderButton(theme.WindowCloseIcon(), modeClose, th, func() {
 		w.Close()
-	}}
+	})
 
 	if w.Icon != nil {
-		w.icon = &widget.Button{Icon: w.Icon, Importance: widget.LowImportance, OnTapped: func() {
+		w.icon = newBorderButton(w.Icon, modeIcon, th, func() {
 			if f := w.OnTappedIcon; f != nil {
 				f()
 			}
-		}}
+		})
 		if w.OnTappedIcon == nil {
-			w.icon.(*widget.Button).Disable()
+			w.icon.(*borderButton).Disable()
 		}
 	}
 
@@ -183,17 +195,20 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 
 	var buttons *fyne.Container
 	var bar *fyne.Container
+	height := w.Theme().Size(theme.SizeNameWindowTitleBarHeight)
+	off := (height - title.labelMinSize().Height) / 2
 	if isLeading {
 		// Left side (darwin default or explicit left alignment)
 		buttons = container.NewHBox(w.closeBtn, w.minBtn, w.maxBtn)
-		bar = container.NewBorder(nil, nil, buttons, w.icon, title)
+		//bar = container.NewBorder(nil, nil, buttons, w.icon, title)
+		bar = container.NewBorder(nil, nil, buttons, w.icon, container.New(layout.NewCustomPaddedLayout(off, 0, 0, 0), title))
 	} else {
 		// Right side (Windows/Linux default and explicit right alignment)
 		buttons = container.NewHBox(w.minBtn, w.maxBtn, w.closeBtn)
-		bar = container.NewBorder(nil, nil, w.icon, buttons, title)
+		//bar = container.NewBorder(nil, nil, w.icon, buttons, title)
+		bar = container.NewBorder(nil, nil, w.icon, buttons, container.New(layout.NewCustomPaddedLayout(off, 0, 0, 0), title))
 	}
 
-	th := w.Theme()
 	v := fyne.CurrentApp().Settings().ThemeVariant()
 	w.bg = canvas.NewRectangle(th.Color(theme.ColorNameOverlayBackground, v))
 	contentBG := canvas.NewRectangle(th.Color(theme.ColorNameBackground, v))
@@ -203,7 +218,7 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 
 	objects := []fyne.CanvasObject{w.bg, contentBG, bar, w.content, leftCorner, rightCorner}
 	return &innerWindowRenderer{ShadowingRenderer: NewShadowingRenderer(objects, DialogLevel),
-		win: w, bar: bar, bg: w.bg, leftCorner: leftCorner, rightCorner: rightCorner, contentBG: contentBG}
+		win: w, bar: bar, buttons: []*borderButton{w.minBtn, w.maxBtn, w.closeBtn}, bg: w.bg, leftCorner: leftCorner, rightCorner: rightCorner, contentBG: contentBG}
 }
 
 func (w *InnerWindow) SetContent(obj fyne.CanvasObject) {
@@ -236,6 +251,7 @@ type innerWindowRenderer struct {
 	*ShadowingRenderer
 	win           *InnerWindow
 	bar           *fyne.Container
+	buttons       []*borderButton
 	bg, contentBG *canvas.Rectangle
 	leftCorner    fyne.CanvasObject
 	rightCorner   fyne.CanvasObject
@@ -243,25 +259,24 @@ type innerWindowRenderer struct {
 
 func (i *innerWindowRenderer) Layout(size fyne.Size) {
 	// Calculate padding and base size
-	padding := float32(2.0) //i.win.Theme().Size(theme.SizeNamePadding)
-	basePos := fyne.NewSquareOffsetPos(padding / 2)
+	padding := i.win.Theme().Size(theme.SizeNamePadding)
+
 	contentSize := size.Subtract(fyne.NewSquareSize(padding))
 
 	// Pre-calculate commonly used dimensions
 	adjustedWidth := contentSize.Width - padding*2
 
 	// Layout shadow and background
-	i.LayoutShadow(contentSize, basePos)
-	i.bg.Move(basePos)
+	i.LayoutShadow(size, fyne.Position{})
 	i.bg.Resize(contentSize)
 
 	// Layout title bar
-	barHeight := i.bar.MinSize().Height
-	i.bar.Resize(fyne.NewSize(adjustedWidth, barHeight))
-	i.bar.Move(basePos.AddXY(padding, 0))
+	barHeight := i.win.Theme().Size(theme.SizeNameWindowTitleBarHeight)
+	i.bar.Move(fyne.NewPos(padding, 0))
+	i.bar.Resize(fyne.NewSize(size.Width-(padding*2), barHeight))
 
 	// Layout main content area
-	contentPos := basePos.AddXY(padding, barHeight)
+	contentPos := fyne.NewPos(padding, barHeight)
 	contentDimensions := fyne.NewSize(adjustedWidth, contentSize.Height-padding-barHeight)
 
 	i.contentBG.Move(contentPos)
@@ -270,27 +285,31 @@ func (i *innerWindowRenderer) Layout(size fyne.Size) {
 	i.win.content.Resize(contentDimensions)
 
 	// Layout corners
-	i.layoutCorners(basePos, contentSize)
+	i.layoutCorners(size, padding/2)
 }
 
 // Helper method to handle corner layout
-func (i *innerWindowRenderer) layoutCorners(basePos fyne.Position, size fyne.Size) {
+func (i *innerWindowRenderer) layoutCorners(size fyne.Size, pad float32) {
 	rightSize := i.rightCorner.MinSize()
-	i.rightCorner.Move(basePos.Add(size).Subtract(rightSize).AddXY(1, 1))
+	rightPos := fyne.Position{X: size.Width - rightSize.Width + pad, Y: size.Height - rightSize.Height}
+	i.rightCorner.Move(rightPos)
 	i.rightCorner.Resize(rightSize)
 
 	leftSize := i.leftCorner.MinSize()
-	leftPos := basePos.AddXY(0, size.Height-leftSize.Height).AddXY(-1, 1)
+	leftPos := fyne.Position{X: -(pad + 1), Y: size.Height - leftSize.Height}
 	i.leftCorner.Move(leftPos)
 	i.leftCorner.Resize(leftSize)
 }
 
 func (i *innerWindowRenderer) MinSize() fyne.Size {
-	pad := i.win.Theme().Size(theme.SizeNamePadding)
+	th := i.win.Theme()
+	pad := th.Size(theme.SizeNamePadding)
 	contentMin := i.win.content.MinSize()
-	barMin := i.bar.MinSize()
-	innerWidth := fyne.Max(barMin.Width, contentMin.Width)
-	return fyne.NewSize(innerWidth+pad*2, contentMin.Height+pad+barMin.Height).Add(fyne.NewSquareSize(pad))
+	barHeight := th.Size(theme.SizeNameWindowTitleBarHeight)
+
+	innerWidth := fyne.Max(i.bar.MinSize().Width, contentMin.Width)
+
+	return fyne.NewSize(innerWidth+pad*2, contentMin.Height+pad+barHeight)
 }
 
 func (i *innerWindowRenderer) Refresh() {
@@ -301,8 +320,11 @@ func (i *innerWindowRenderer) Refresh() {
 	i.contentBG.FillColor = th.Color(theme.ColorNameBackground, v)
 	i.contentBG.Refresh()
 
+	for _, b := range i.buttons {
+		b.setTheme(th, i.win.active)
+	}
 	i.bar.Refresh()
-	title := i.bar.Objects[0].(*draggableLabel)
+	title := i.bar.Objects[0].(*fyne.Container).Objects[0].(*draggableLabel)
 	title.SetText(i.win.title)
 	i.ShadowingRenderer.RefreshShadow()
 }
@@ -321,6 +343,12 @@ func newDraggableLabel(title string, win *InnerWindow) *draggableLabel {
 	d.ExtendBaseWidget(d)
 	d.Text = title
 	return d
+}
+
+func (d *draggableLabel) MinSize() fyne.Size {
+	width := d.Label.MinSize().Width
+	height := d.Label.Theme().Size(theme.SizeNameWindowButtonHeight)
+	return fyne.NewSize(width, height)
 }
 
 func (d *draggableLabel) FocusGained() {
@@ -369,6 +397,10 @@ func (d *draggableLabel) MouseDown(*desktop.MouseEvent) {
 
 // MouseUp is called when the user releases the mouse button on the label.
 func (d *draggableLabel) MouseUp(*desktop.MouseEvent) {
+}
+
+func (d *draggableLabel) labelMinSize() fyne.Size {
+	return d.Label.MinSize()
 }
 
 var _ desktop.Cursorable = (*draggableCorner)(nil)
@@ -421,4 +453,84 @@ func (c *draggableCorner) MouseUp(*desktop.MouseEvent) {
 }
 
 func (c *draggableCorner) DragEnd() {
+}
+
+type borderButton struct {
+	widget.BaseWidget
+
+	b    *widget.Button
+	c    *container.ThemeOverride
+	mode titleBarButtonMode
+}
+
+func newBorderButton(icon fyne.Resource, mode titleBarButtonMode, th fyne.Theme, fn func()) *borderButton {
+	buttonImportance := widget.MediumImportance
+	if mode == modeIcon {
+		buttonImportance = widget.LowImportance
+	}
+	b := &widget.Button{Icon: icon, Importance: buttonImportance, OnTapped: fn}
+	c := container.NewThemeOverride(b, &buttonTheme{Theme: th, mode: mode})
+
+	ret := &borderButton{b: b, c: c, mode: mode}
+	ret.ExtendBaseWidget(ret)
+	return ret
+}
+
+func (b *borderButton) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(b.c)
+}
+
+func (b *borderButton) Disable() {
+	b.b.Disable()
+}
+
+func (b *borderButton) MinSize() fyne.Size {
+	height := b.Theme().Size(theme.SizeNameWindowButtonHeight)
+	return fyne.NewSquareSize(height)
+}
+
+func (b *borderButton) setTheme(th fyne.Theme, active bool) {
+	b.c.Theme = &buttonTheme{Theme: th, mode: b.mode, active: active}
+}
+
+type buttonTheme struct {
+	fyne.Theme
+	mode   titleBarButtonMode
+	active bool
+}
+
+func (b *buttonTheme) Color(n fyne.ThemeColorName, v fyne.ThemeVariant) color.Color {
+	switch n {
+	case theme.ColorNameButton, theme.ColorNameDisabledButton:
+		if b.active {
+			n = theme.ColorNamePrimary
+		} else {
+			n = theme.ColorNameOverlayBackground
+		}
+	case theme.ColorNameHover:
+		if b.mode == modeClose {
+			n = theme.ColorNameError
+		} else {
+			if b.active {
+				n = fyne.ThemeColorName("primary-hover")
+			} else {
+				n = theme.ColorNameHover
+			}
+		}
+	}
+	return b.Theme.Color(n, v)
+}
+
+func (b *buttonTheme) Size(n fyne.ThemeSizeName) float32 {
+	switch n {
+	case theme.SizeNameInputRadius:
+		if b.mode == modeIcon {
+			return 0
+		}
+		n = theme.SizeNameWindowButtonRadius
+	case theme.SizeNameInlineIcon:
+		n = theme.SizeNameWindowButtonIcon
+	}
+
+	return b.Theme.Size(n)
 }

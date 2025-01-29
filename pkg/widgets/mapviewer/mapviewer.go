@@ -206,7 +206,8 @@ func (mv *MapViewer) CreateRenderer() fyne.WidgetRenderer {
 }
 
 type movingRectsLayout struct {
-	mv *MapViewer
+	mv      *MapViewer
+	oldSize fyne.Size
 }
 
 func (mr *movingRectsLayout) MinSize(_ []fyne.CanvasObject) fyne.Size {
@@ -214,9 +215,15 @@ func (mr *movingRectsLayout) MinSize(_ []fyne.CanvasObject) fyne.Size {
 }
 
 func (mr *movingRectsLayout) Layout(_ []fyne.CanvasObject, size fyne.Size) {
+	if size == mr.oldSize {
+		return
+	}
+	mr.oldSize = size
 	// Calculate shared factors
 	mr.mv.widthFactor = mr.mv.innerView.Size().Width / float32(mr.mv.numColumns)
 	mr.mv.heightFactor = mr.mv.innerView.Size().Height / float32(mr.mv.numRows)
+
+	mr.mv.crosshair.Resize(fyne.Size{Width: mr.mv.widthFactor, Height: mr.mv.heightFactor})
 
 	// Calculate and update text sizes
 	newTextSize := calculateTextSize(mr.mv.widthFactor, mr.mv.heightFactor)
@@ -228,14 +235,13 @@ func (mr *movingRectsLayout) Layout(_ []fyne.CanvasObject, size fyne.Size) {
 	}
 
 	// Position and resize crosshair
-	mr.mv.crosshair.Resize(fyne.NewSize(mr.mv.widthFactor, mr.mv.heightFactor))
 	mr.mv.crosshair.Move(
 		fyne.NewPos(
 			float32(mr.mv.xIndex)*mr.mv.widthFactor,
 			float32(float64(mr.mv.numRows)-1-mr.mv.yIndex)*mr.mv.heightFactor,
 		),
 	)
-	mr.mv.resizeCursor()
+	mr.mv.resizeSelectionRect()
 	mr.mv.updateCursor(false)
 }
 
@@ -243,11 +249,11 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 
 	// y must be created before x as it's width is used to calculate x's offset
 
-	mv.crosshair.CornerRadius = 4
+	//mv.crosshair.CornerRadius = 4
 	mv.crosshair.Resize(fyne.NewSize(34, 14))
 	mv.crosshair.Hide()
 
-	mv.selectionRect.CornerRadius = 4
+	//mv.selectionRect.CornerRadius = 4
 	mv.selectionRect.Resize(fyne.NewSize(34, 14))
 	//mv.selectionRect.Hide()
 
@@ -372,9 +378,12 @@ func (mv *MapViewer) SetY(yValue float64) {
 func (mv *MapViewer) setY(yValue float64) {
 	mv.yValue = yValue
 	if mv.crosshair.Hidden {
+		size := fyne.Size{Width: mv.widthFactor, Height: mv.heightFactor}
 		fyne.Do(func() {
 			mv.crosshair.Show()
-			mv.crosshair.Resize(fyne.Size{Width: mv.widthFactor, Height: mv.heightFactor})
+			if mv.crosshair.Size() != size {
+				mv.crosshair.Resize(size)
+			}
 		})
 	}
 	mv.setXY()
@@ -550,7 +559,7 @@ func (mv *MapViewer) createButtons() *fyne.Container {
 	}
 }
 
-func (mv *MapViewer) resizeCursor() {
+func (mv *MapViewer) resizeSelectionRect() {
 	// Early return if no selection
 	if mv.selectedX < 0 {
 		return
@@ -608,8 +617,9 @@ func (mv *MapViewer) resizeCursor() {
 	}
 
 	// Batch UI updates
-	mv.selectionRect.Resize(size)
 	mv.selectionRect.Move(pos)
+	mv.selectionRect.Resize(size)
+	//mv.selectionRect.MoveAndResize(pos, size)
 }
 
 var _ fyne.WidgetRenderer = (*mapViewerRenderer)(nil)
@@ -659,16 +669,18 @@ func calculateTextSize(widthFactor, heightFactor float32) float32 {
 
 func NewCrosshair(strokeColor color.RGBA, strokeWidth float32) *canvas.Rectangle {
 	return &canvas.Rectangle{
-		FillColor:   strokeColor,
-		StrokeColor: strokeColor,
-		StrokeWidth: strokeWidth,
+		FillColor:    strokeColor,
+		StrokeColor:  strokeColor,
+		StrokeWidth:  strokeWidth,
+		CornerRadius: 4,
 	}
 }
 
 func NewRectangle(strokeColor color.RGBA, strokeWidth float32) *canvas.Rectangle {
 	return &canvas.Rectangle{
-		FillColor:   color.RGBA{0, 0, 0, 0},
-		StrokeColor: strokeColor,
-		StrokeWidth: strokeWidth,
+		FillColor:    color.RGBA{0, 0, 0, 0},
+		StrokeColor:  strokeColor,
+		StrokeWidth:  strokeWidth,
+		CornerRadius: 4,
 	}
 }

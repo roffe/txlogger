@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -36,16 +37,21 @@ type Widget struct {
 	portSelector    *widget.Select
 	speedSelector   *widget.Select
 	refreshBtn      *widget.Button
+	adapters        map[string]*adapter.AdapterInfo
+
+	mu sync.Mutex
 }
 
-func NewCanSettingsWidget(app fyne.App) *Widget {
+func NewCanSettingsWidget() *Widget {
 	csw := &Widget{
-		app: app,
+		app:      fyne.CurrentApp(),
+		adapters: make(map[string]*adapter.AdapterInfo),
 	}
 	csw.ExtendBaseWidget(csw)
-	csw.adapterSelector = widget.NewSelect(adapter.List(), func(s string) {
-		if info, found := adapter.GetAdapterMap()[s]; found {
-			app.Preferences().SetString(prefsAdapter, s)
+
+	csw.adapterSelector = widget.NewSelect([]string{}, func(s string) {
+		if info, found := csw.adapters[s]; found {
+			csw.app.Preferences().SetString(prefsAdapter, s)
 			if info.RequiresSerialPort {
 				csw.portSelector.Enable()
 				csw.speedSelector.Enable()
@@ -57,14 +63,14 @@ func NewCanSettingsWidget(app fyne.App) *Widget {
 	})
 
 	csw.portSelector = widget.NewSelect(csw.ListPorts(), func(s string) {
-		app.Preferences().SetString(prefsPort, s)
+		csw.app.Preferences().SetString(prefsPort, s)
 	})
 	csw.speedSelector = widget.NewSelect(portSpeeds, func(s string) {
-		app.Preferences().SetString(prefsSpeed, s)
+		csw.app.Preferences().SetString(prefsSpeed, s)
 	})
 
 	csw.debugCheckbox = widget.NewCheck("Debug", func(b bool) {
-		app.Preferences().SetBool(prefsDebug, b)
+		csw.app.Preferences().SetBool(prefsDebug, b)
 	})
 
 	csw.refreshBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
@@ -74,6 +80,25 @@ func NewCanSettingsWidget(app fyne.App) *Widget {
 
 	csw.loadPrefs()
 	return csw
+}
+
+func (c *Widget) AddAdapter(adapter *adapter.AdapterInfo) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, found := c.adapters[adapter.Name]; found {
+		return
+	}
+	c.adapters[adapter.Name] = adapter
+	names := make([]string, 0, len(c.adapters))
+	for name := range c.adapters {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	c.adapterSelector.Options = names
+	c.adapterSelector.Refresh()
+	if ad := c.app.Preferences().String(prefsAdapter); ad != "" {
+		c.adapterSelector.SetSelected(ad)
+	}
 }
 
 func (c *Widget) Disable() {
@@ -91,7 +116,7 @@ func (c *Widget) Enable() {
 	c.debugCheckbox.Enable()
 	c.refreshBtn.Enable()
 
-	if info, found := adapter.GetAdapterMap()[c.adapterSelector.Selected]; found {
+	if info, found := c.adapters[c.adapterSelector.Selected]; found {
 		if info.RequiresSerialPort {
 			c.portSelector.Enable()
 			c.speedSelector.Enable()

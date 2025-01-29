@@ -225,7 +225,7 @@ func (e *Controller) SubscribeFunc(topic string, fn func(float64)) (cancel func(
 		}
 	}()
 	cancel = func() {
-		//log.Println("UnsubscribeFunc", topic
+		// log.Println("UnsubscribeFunc", topic)
 		e.Unsubscribe(respChan)
 	}
 	return

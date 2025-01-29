@@ -22,8 +22,8 @@ type TappableText struct {
 	onColorUpdate func(col color.Color)
 	onHover       func(bool)
 	color         color.Color
-
-	oldSize fyne.Size
+	oldSize       fyne.Size
+	precission    int
 }
 
 func NewTappableText(text string, col color.Color, onTapped func(enabled bool), onColorUpdate func(col color.Color), onHover func(bool)) *TappableText {

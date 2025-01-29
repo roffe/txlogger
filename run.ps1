@@ -1,3 +1,4 @@
+.\buildcangw.ps1
 $env:GOARCH = "amd64"
 $env:CGO_ENABLED = "1" 
 $env:GOGC = "100"
@@ -7,4 +8,3 @@ Invoke-Expression "copy $Env:USERPROFILE\Documents\PlatformIO\Projects\txbridge\
 Invoke-Expression "go generate ./..."
 # Invoke-Expression "go run -tags combi . $args"
 Invoke-Expression "go run . $args"
-#Invoke-Expression "go run . $args"

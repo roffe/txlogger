@@ -343,63 +343,71 @@ func sumFloat32(a []float32) float32 {
 }
 
 type symbolWidgetEntryRenderer struct {
-	*SymbolWidgetEntry
+	e *SymbolWidgetEntry
 }
 
 func (s *symbolWidgetEntryRenderer) Destroy() {
 }
 
 func (s *symbolWidgetEntryRenderer) Layout(size fyne.Size) {
-	if s.oldSize == size {
+	if s.e.oldSize == size {
 		return
 	}
-	s.oldSize = size
+	s.e.oldSize = size
 	padd := size.Width * ((1.0 - sumFloat32(sz)) / float32(len(sz)))
-	s.copyName.Resize(fyne.NewSize(size.Width*sz[0], size.Height))
-	s.symbolName.Resize(fyne.NewSize(size.Width*sz[1], size.Height))
-	s.symbolValue.Resize(fyne.NewSize(size.Width*sz[2], size.Height))
-	s.symbolNumber.Resize(fyne.NewSize(size.Width*sz[3], size.Height))
+	s.e.copyName.Resize(fyne.NewSize(size.Width*sz[0], size.Height))
+	s.e.symbolName.Resize(fyne.NewSize(size.Width*sz[1], size.Height))
+	s.e.symbolValue.Resize(fyne.NewSize(size.Width*sz[2], size.Height))
+	s.e.symbolNumber.Resize(fyne.NewSize(size.Width*sz[3], size.Height))
 	//s.symbolType.Resize(fyne.NewSize(size.Width*sz[4], size.Height))
-	s.symbolCorrectionfactor.Resize(fyne.NewSize(size.Width*sz[4], size.Height))
-	s.deleteBTN.Resize(fyne.NewSize(size.Width*sz[5], size.Height))
+	s.e.symbolCorrectionfactor.Resize(fyne.NewSize(size.Width*sz[4], size.Height))
+	s.e.deleteBTN.Resize(fyne.NewSize(size.Width*sz[5], size.Height))
 
 	var x float32
 
-	s.copyName.Move(fyne.NewPos(x, 0))
-	x += s.copyName.Size().Width + padd
+	s.e.copyName.Move(fyne.NewPos(x, 0))
+	x += s.e.copyName.Size().Width + padd
 
-	s.symbolName.Move(fyne.NewPos(x, 0))
-	x += s.symbolName.Size().Width + padd
+	s.e.symbolName.Move(fyne.NewPos(x, 0))
+	x += s.e.symbolName.Size().Width + padd
 
-	s.symbolValue.Move(fyne.NewPos(x, 0))
-	s.valueBar.Move(fyne.NewPos(x, 6))
-	x += s.symbolValue.Size().Width + padd
+	s.e.symbolValue.Move(fyne.NewPos(x, 0))
+	s.e.valueBar.Move(fyne.NewPos(x, 6))
+	x += s.e.symbolValue.Size().Width + padd
 
-	s.symbolNumber.Move(fyne.NewPos(x, 0))
-	x += s.symbolNumber.Size().Width + padd
+	s.e.symbolNumber.Move(fyne.NewPos(x, 0))
+	x += s.e.symbolNumber.Size().Width + padd
 
 	// s.symbolType.Move(fyne.NewPos(x, 0))
 	// x += s.symbolType.Size().Width + padd
 
-	s.symbolCorrectionfactor.Move(fyne.NewPos(x, 0))
-	x += s.symbolCorrectionfactor.Size().Width + padd
+	s.e.symbolCorrectionfactor.Move(fyne.NewPos(x, 0))
+	x += s.e.symbolCorrectionfactor.Size().Width + padd
 
-	s.deleteBTN.Move(fyne.NewPos(x, 0))
+	s.e.deleteBTN.Move(fyne.NewPos(x, 0))
 }
 
 func (s *symbolWidgetEntryRenderer) MinSize() fyne.Size {
 	return fyne.NewSize(400, 36)
 }
 
+func (s *symbolWidgetEntryRenderer) Refresh() {
+	s.e.copyName.Refresh()
+	s.e.symbolName.Refresh()
+	s.e.symbolValue.Refresh()
+	s.e.symbolNumber.Refresh()
+	s.e.symbolCorrectionfactor.Refresh()
+}
+
 func (s *symbolWidgetEntryRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{
-		s.copyName,
-		s.valueBar,
-		s.symbolName,
-		s.symbolValue,
-		s.symbolNumber,
+		s.e.copyName,
+		s.e.valueBar,
+		s.e.symbolName,
+		s.e.symbolValue,
+		s.e.symbolNumber,
 		//s.symbolType,
-		s.symbolCorrectionfactor,
-		s.deleteBTN,
+		s.e.symbolCorrectionfactor,
+		s.e.deleteBTN,
 	}
 }

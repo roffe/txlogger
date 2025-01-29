@@ -1,17 +1,21 @@
 package main
 
 import (
+	"bufio"
 	_ "embed"
+	"errors"
 	"flag"
 	"fmt"
 	"image/color"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path"
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -52,8 +56,56 @@ func signalHandler(tx fyne.App) {
 }
 
 func main() {
-
 	startpprof()
+
+	readyChan := make(chan bool)
+
+	if wd, err := os.Getwd(); err == nil {
+		command := filepath.Join(wd, "cangw.exe")
+		cmd := exec.Command(command)
+		//cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+		rc, err := cmd.StderrPipe()
+		if err != nil {
+			log.Fatal(err)
+		}
+		r := bufio.NewReader(rc)
+		go func() {
+			start := true
+			for {
+				str, err := r.ReadString('\n')
+				if err != nil {
+					log.Fatal(err)
+				}
+				fmt.Print(str)
+				if start {
+					if strings.Contains(str, "server listening") {
+						readyChan <- true
+					} else {
+						readyChan <- false
+					}
+					start = false
+				}
+			}
+		}()
+		if err := cmd.Start(); err != nil {
+			log.Fatal("Failed to start GoCAN Gateway")
+		} else {
+			defer cmd.Process.Kill()
+			log.Printf("Starting GoCAN Gateway pid: %d", cmd.Process.Pid)
+		}
+
+	}
+
+	select {
+	case ready := <-readyChan:
+		if ready {
+			log.Println("GoCAN Gateway is ready")
+		} else {
+			log.Fatal("GoCAN Gateway did not start")
+		}
+	case <-time.After(5 * time.Second):
+		fyne.LogError("GoCAN Gateway did not start", errors.New("timeout"))
+	}
 
 	socketFile := filepath.Join(os.TempDir(), "txlogger.sock")
 
@@ -224,10 +276,12 @@ func updateCheck(a fyne.App, mw fyne.Window) {
 type txTheme struct{}
 
 func (m txTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
-	if name == theme.ColorNameBackground {
+	switch name {
+	case theme.ColorNameBackground:
 		return color.RGBA{R: 23, G: 23, B: 24, A: 255}
+	case fyne.ThemeColorName("primary-hover"):
+		return color.RGBA{R: 0x21, G: 0x99, B: 0xF3, A: 255}
 	}
-
 	return theme.DefaultTheme().Color(name, theme.VariantDark)
 }
 
@@ -279,6 +333,14 @@ func (m txTheme) Size(name fyne.ThemeSizeName) float32 {
 		return 5
 	case theme.SizeNameSelectionRadius:
 		return 3
+	case theme.SizeNameWindowTitleBarHeight:
+		return 26
+	case theme.SizeNameWindowButtonHeight:
+		return 20
+	case theme.SizeNameWindowButtonIcon:
+		return 20
+	case theme.SizeNameWindowButtonRadius:
+		return 0
 	default:
 		return 0
 	}

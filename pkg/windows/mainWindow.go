@@ -19,6 +19,8 @@ import (
 	xwidget "fyne.io/x/fyne/widget"
 	"github.com/ebitengine/oto/v3"
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/gocan/adapter"
+	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
@@ -35,6 +37,10 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -101,7 +107,8 @@ type MainWindow struct {
 	content         *fyne.Container
 	startup         bool
 
-	canLED *ledicon.Widget
+	gocanGatewayLED *ledicon.Widget
+	canLED          *ledicon.Widget
 }
 
 type mainWindowSelects struct {
@@ -150,9 +157,10 @@ func NewMainWindow(app fyne.App) *MainWindow {
 			EBus: ebus.CONTROLLER,
 		}),
 
-		canLED:     ledicon.New("CAN"),
-		statusText: NewSecretText("Harder, Better, Faster, Stronger"),
-		oCtx:       newOtoContext(),
+		gocanGatewayLED: ledicon.New("Gateway"),
+		canLED:          ledicon.New("CAN"),
+		statusText:      NewSecretText("Harder, Better, Faster, Stronger"),
+		oCtx:            newOtoContext(),
 	}
 	mw.settings = settings.New(&settings.Config{
 		GetEcu: func() string {
@@ -190,7 +198,63 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	mw.buttons.dashboardBtn.OnTapped()
 	mw.startup = false
 
+	mw.gocanGWClient()
+
 	return mw
+}
+
+func (mw *MainWindow) gocanGWClient() {
+	var socketFile string
+	if cacheDir, err := os.UserCacheDir(); err == nil {
+		socketFile = filepath.Join(cacheDir, "gocan.sock")
+	} else {
+		mw.Error(fmt.Errorf("failed to get user cache dir: %w", err))
+		mw.gocanGatewayLED.Off()
+		return
+	}
+
+	kacp := keepalive.ClientParameters{
+		Time:                10 * time.Second, // send pings every 10 seconds if there is no activity
+		Timeout:             time.Second,      // wait 1 second for ping ack before considering the connection dead
+		PermitWithoutStream: true,             // send pings even without active streams
+	}
+
+	conn, err := grpc.NewClient(
+		"unix:"+socketFile,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithKeepaliveParams(kacp),
+	)
+	if err != nil {
+		mw.Error(fmt.Errorf("failed to connect to gocan gateway: %w", err))
+		mw.gocanGatewayLED.Off()
+		return
+	}
+	defer conn.Close()
+
+	client := proto.NewGocanClient(conn)
+	mw.gocanGatewayLED.On()
+	res, err := client.GetAdapters(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		mw.Error(fmt.Errorf("failed to get adapters from gocan gateway: %w", err))
+		return
+	}
+	addAdapters(res.Adapters, mw.settings.CanSettings.AddAdapter)
+}
+
+func addAdapters(adapters []*proto.AdapterInfo, add func(adapter *adapter.AdapterInfo)) {
+	for _, a := range adapters {
+		adapter := &adapter.AdapterInfo{
+			Name:        a.GetName(),
+			Description: a.GetDescription(),
+			Capabilities: adapter.AdapterCapabilities{
+				HSCAN: a.GetCapabilities().GetHSCAN(),
+				SWCAN: a.GetCapabilities().GetSWCAN(),
+				KLine: a.GetCapabilities().GetKLine(),
+			},
+			RequiresSerialPort: a.GetRequireSerialPort(),
+		}
+		add(adapter)
+	}
 }
 
 func (mw *MainWindow) setupShortcuts() {
@@ -304,7 +368,8 @@ func (mw *MainWindow) render() {
 				mw.selects.layoutSelect,
 			),
 			container.NewHBox(
-				container.NewGridWithColumns(5,
+				container.NewHBox(
+					mw.gocanGatewayLED,
 					mw.canLED,
 					mw.counters.capturedCounterLabel,
 					mw.counters.errorCounterLabel,

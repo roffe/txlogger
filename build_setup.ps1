@@ -1,5 +1,7 @@
 $ifpPath = (Get-Location).Path + "\installer.nsi"
+
 Start-Process -FilePath "C:\Program Files (x86)\NSIS\makensis.exe" -ArgumentList $ifpPath -WorkingDirectory (Get-Location).Path -Wait
+
 if (-not (Test-Path "install.exe")) {
     Write-Host "install.exe not found. Exiting."
     exit

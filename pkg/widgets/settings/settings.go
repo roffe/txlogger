@@ -226,9 +226,9 @@ func New(cfg *Config) *SettingsWidget {
 
 	sw.plotResolution = sw.newPlotResolution()
 
-	app := fyne.CurrentApp()
+	sw.CanSettings = cansettings.NewCanSettingsWidget()
 
-	sw.CanSettings = cansettings.NewCanSettingsWidget(app)
+	app := fyne.CurrentApp()
 
 	sw.wblPortLabel = widget.NewLabel("WBL Port")
 	sw.wblPortSelect = widget.NewSelect(append([]string{"txbridge", "CAN"}, sw.CanSettings.ListPorts()...), func(s string) {
@@ -249,7 +249,7 @@ func New(cfg *Config) *SettingsWidget {
 		if err != nil {
 			return err
 		}
-		fyne.CurrentApp().Preferences().SetString(prefsminimumVoltageWideband, s)
+		app.Preferences().SetString(prefsminimumVoltageWideband, s)
 		sw.minimumVoltageWideband = val
 		return nil
 	}
@@ -273,7 +273,7 @@ func New(cfg *Config) *SettingsWidget {
 		if err != nil {
 			return err
 		}
-		fyne.CurrentApp().Preferences().SetString(prefslowAFR, s)
+		app.Preferences().SetString(prefslowAFR, s)
 		sw.lowAFR = val
 		return nil
 	}
@@ -315,7 +315,7 @@ func New(cfg *Config) *SettingsWidget {
 			container.NewGridWithColumns(2,
 				widget.NewButtonWithIcon("Reset", theme.ContentClearIcon(), func() {
 					sw.logPath.SetText(datalogger.LOGPATH)
-					fyne.CurrentApp().Preferences().SetString(prefsLogPath, datalogger.LOGPATH)
+					app.Preferences().SetString(prefsLogPath, datalogger.LOGPATH)
 				}),
 				widget.NewButtonWithIcon("Browse", theme.FileIcon(), func() {
 					dir, err := sdialog.Directory().Title("Select log folder").Browse()
@@ -327,7 +327,7 @@ func New(cfg *Config) *SettingsWidget {
 						return
 					}
 					sw.logPath.SetText(dir)
-					fyne.CurrentApp().Preferences().SetString(prefsLogPath, dir)
+					app.Preferences().SetString(prefsLogPath, dir)
 				}),
 			),
 			widget.NewLabel("Log folder"),
@@ -485,6 +485,7 @@ func newImageFromResource(name string) *canvas.Image {
 	}
 	img.FillMode = canvas.ImageFillContain
 	img.ScaleMode = canvas.ImageScaleFastest
+
 	return img
 }
 

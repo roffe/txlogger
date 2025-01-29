@@ -3,19 +3,8 @@ Remove-Item "install.exe" -ErrorAction SilentlyContinue
 Remove-Item "txlogger.zip" -ErrorAction SilentlyContinue
 Remove-Item "setup.zip" -ErrorAction SilentlyContinue
 
-# Set the environment variables
-$env:PKG_CONFIG_PATH = "C:\vcpkg\packages\libusb_x86-windows\lib\pkgconfig"
-$env:CGO_CFLAGS = "-IC:\vcpkg\packages\libusb_x86-windows\include\libusb-1.0"
-$env:GOARCH = "386"
-$env:CGO_ENABLED = "1"
-$env:CC = "C:\\mingw32\\bin\i686-w64-mingw32-gcc.exe"
-$env:CXX = "C:\\mingw32\\bin\i686-w64-mingw32-g++.exe"
-
-Write-Host "Building txlogger.exe"
-# Invoke-Expression "rsrc -arch 386 -manifest manifest.xml"
-Invoke-Expression "copy $Env:USERPROFILE\Documents\PlatformIO\Projects\txbridge\.pio\build\esp32dev\firmware.bin .\pkg\ota\"
-Invoke-Expression "fyne package -tags combi --release"
-# Remove-Item "rsrc_windows_386.syso" -ErrorAction SilentlyContinue
+.\buildcangw.ps1
+.\build.ps1
 
 
 Write-Host "Building install.exe"

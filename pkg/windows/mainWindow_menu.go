@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -123,10 +124,12 @@ func (mw *MainWindow) loadBinary() {
 			mw.Error(err)
 			return
 		}
-		if err := mw.LoadSymbolsFromFile(filename); err != nil {
-			mw.Error(err)
-			return
-		}
+		fyne.Do(func() {
+			if err := mw.LoadSymbolsFromFile(filename); err != nil {
+				mw.Error(err)
+				return
+			}
+		})
 	}()
 }
 
@@ -145,7 +148,13 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		return
 	}
 
+	log.Println(axis)
+
 	symX := mw.fw.GetByName(axis.X)
+	if symX == nil && axis.X == "BstKnkCal.fi_offsetXSP" {
+		symX = mw.fw.GetByName("BstKnkCal.OffsetXSP")
+	}
+
 	symY := mw.fw.GetByName(axis.Y)
 	symZ := mw.fw.GetByName(axis.Z)
 
@@ -355,9 +364,9 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			openMapLock.Lock()
 			defer openMapLock.Unlock()
 			p := progressmodal.New(mw.Window.Canvas(), "Loading "+axis.Z)
-			p.Show()
+			fyne.DoAndWait(p.Show)
 			loadFunc()
-			p.Hide()
+			fyne.Do(p.Hide)
 		}()
 	}
 

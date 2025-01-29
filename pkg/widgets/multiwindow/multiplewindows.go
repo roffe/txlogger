@@ -188,6 +188,7 @@ func (m *MultipleWindows) raise(w *InnerWindow) {
 		}
 		ww.active = false
 		ww.bgFillColor = theme.ColorNameOverlayBackground
+
 	}
 	if id == -1 {
 		return
