@@ -32,7 +32,11 @@ import (
 
 var (
 	workDirectory string
+	ma            = &mainApp{}
 )
+
+type mainApp struct {
+}
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
@@ -55,11 +59,7 @@ func signalHandler(tx fyne.App) {
 	}()
 }
 
-func main() {
-	startpprof()
-
-	readyChan := make(chan bool)
-
+func startCanGW(errFunc func(error), readyChan chan<- bool) *os.Process {
 	if wd, err := os.Getwd(); err == nil {
 		command := filepath.Join(wd, "cangw.exe")
 		cmd := exec.Command(command)
@@ -74,7 +74,12 @@ func main() {
 			for {
 				str, err := r.ReadString('\n')
 				if err != nil {
-					log.Fatal(err)
+					if err.Error() == "EOF" {
+						errFunc(errors.New("GoCAN Gateway exited"))
+						return
+					}
+					errFunc(fmt.Errorf("GoCAN Gateway error: %s", err))
+					return
 				}
 				fmt.Print(str)
 				if start {
@@ -90,23 +95,16 @@ func main() {
 		if err := cmd.Start(); err != nil {
 			log.Fatal("Failed to start GoCAN Gateway")
 		} else {
-			defer cmd.Process.Kill()
+			// defer cmd.Process.Kill()
 			log.Printf("Starting GoCAN Gateway pid: %d", cmd.Process.Pid)
 		}
-
+		return cmd.Process
 	}
+	return nil
+}
 
-	select {
-	case ready := <-readyChan:
-		if ready {
-			log.Println("GoCAN Gateway is ready")
-		} else {
-			log.Fatal("GoCAN Gateway did not start")
-		}
-	case <-time.After(5 * time.Second):
-		fyne.LogError("GoCAN Gateway did not start", errors.New("timeout"))
-	}
-
+func main() {
+	startpprof()
 	socketFile := filepath.Join(os.TempDir(), "txlogger.sock")
 
 	if ipc.IsRunning(socketFile) {
@@ -120,7 +118,29 @@ func main() {
 		}
 	}
 
+	readyChan := make(chan bool)
+
+	var errFunc = func(err error) {
+		log.Print(err.Error())
+	}
+
+	if p := startCanGW(errFunc, readyChan); p != nil {
+		defer p.Kill()
+	}
+
+	select {
+	case ready := <-readyChan:
+		if ready {
+			log.Println("GoCAN Gateway is ready")
+		} else {
+			log.Fatal("GoCAN Gateway did not start")
+		}
+	case <-time.After(5 * time.Second):
+		fyne.LogError("GoCAN Gateway did not start", errors.New("timeout"))
+	}
+
 	tx := app.NewWithID("com.roffe.txlogger")
+
 	//signalHandler(tx)
 
 	tx.Settings().SetTheme(&txTheme{})
@@ -134,6 +154,8 @@ func main() {
 	log.Printf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir())
 
 	mw := windows.NewMainWindow(tx)
+
+	errFunc = mw.Error
 
 	router := ipc.Router{
 		"ping": func(data string) *ipc.Message {
