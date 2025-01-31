@@ -251,7 +251,7 @@ func (p *Plotter) Seek(pos int) {
 			obj.Refresh()
 		})
 	}
-	p.updateCursor()
+	p.updateCursor(true)
 	p.refreshImage(true)
 }
 
@@ -272,7 +272,11 @@ func (p *Plotter) refreshImage(goroutine bool) {
 	}
 
 	p.canvasImage.Image = img
-	p.canvasImage.Refresh()
+	if goroutine {
+		fyne.Do(p.canvasImage.Refresh)
+	} else {
+		p.canvasImage.Refresh()
+	}
 
 }
 
@@ -374,7 +378,7 @@ func findMinMaxFloat64(data []float64) (float64, float64) {
 }
 
 // Updated cursor positioning method
-func (p *Plotter) updateCursor() {
+func (p *Plotter) updateCursor(goroutine bool) {
 	var x float32
 	halfDataPointsToShow := int(float64(p.dataPointsToShow) * .5)
 	plotSize := p.canvasImage.Size()
@@ -396,7 +400,11 @@ func (p *Plotter) updateCursor() {
 	p.cursor.Position1 = fyne.NewPos(xOffset, 0)
 	p.cursor.Position2 = fyne.NewPos(xOffset+1, plotSize.Height)
 
-	p.cursor.Refresh()
+	if goroutine {
+		fyne.Do(p.cursor.Refresh)
+	} else {
+		p.cursor.Refresh()
+	}
 }
 
 // Helper functions

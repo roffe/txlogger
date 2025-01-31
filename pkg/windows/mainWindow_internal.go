@@ -1,6 +1,7 @@
 package windows
 
 import (
+	"context"
 	"errors"
 	"log"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	xwidget "fyne.io/x/fyne/widget"
 	"github.com/ebitengine/oto/v3"
+	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/widgets/ebusmonitor"
@@ -46,6 +48,8 @@ func newOtoContext() *oto.Context {
 }
 
 func (mw *MainWindow) closeIntercept() {
+	mw.gclient.SendCommand(context.Background(), &proto.Command{Data: []byte("quit")})
+
 	if mw.dlc != nil {
 		mw.dlc.Close()
 	}

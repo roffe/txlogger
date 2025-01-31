@@ -207,10 +207,8 @@ func (c *T7Client) Start() error {
 	kwp := kwp2000.New(cl)
 	err = retry.Do(func() error {
 		if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
-			if retries == 0 {
-				return retry.Unrecoverable(err)
-			}
-			return err
+
+			return retry.Unrecoverable(errors.New("failed to start session"))
 		}
 		defer func() {
 			kwp.StopSession(ctx)
@@ -221,7 +219,7 @@ func (c *T7Client) Start() error {
 
 		granted, err := kwp.RequestSecurityAccess(ctx, false)
 		if err != nil {
-			return err
+			return errors.New("failed to request security access")
 		}
 
 		if !granted {
@@ -231,7 +229,7 @@ func (c *T7Client) Start() error {
 		}
 
 		if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
-			return err
+			return errors.New("failed to clear dynamic register")
 		}
 		c.OnMessage("Cleared dynamic register")
 
@@ -242,7 +240,7 @@ func (c *T7Client) Start() error {
 			}
 			//			log.Println("Defining", sym.Name, dpos)
 			if err := kwp.DynamicallyDefineLocalIdRequest(ctx, dpos, sym); err != nil {
-				return err
+				return errors.New("failed to define dynamic register")
 			}
 			dpos++
 			time.Sleep(12 * time.Millisecond)

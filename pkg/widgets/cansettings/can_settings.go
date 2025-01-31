@@ -14,6 +14,7 @@ import (
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/adapter"
 	"github.com/roffe/gocan/client"
+	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/layout"
 	"go.bug.st/serial/enumerator"
 )
@@ -82,13 +83,26 @@ func NewCanSettingsWidget() *Widget {
 	return csw
 }
 
-func (c *Widget) AddAdapter(adapter *adapter.AdapterInfo) {
+func (c *Widget) AddAdapters(adapters []*proto.AdapterInfo) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if _, found := c.adapters[adapter.Name]; found {
-		return
+	for _, a := range adapters {
+		adapter := &adapter.AdapterInfo{
+			Name:        a.GetName(),
+			Description: a.GetDescription(),
+			Capabilities: adapter.AdapterCapabilities{
+				HSCAN: a.GetCapabilities().GetHSCAN(),
+				SWCAN: a.GetCapabilities().GetSWCAN(),
+				KLine: a.GetCapabilities().GetKLine(),
+			},
+			RequiresSerialPort: a.GetRequireSerialPort(),
+		}
+
+		if _, found := c.adapters[adapter.Name]; found {
+			continue
+		}
+		c.adapters[adapter.Name] = adapter
 	}
-	c.adapters[adapter.Name] = adapter
 	names := make([]string, 0, len(c.adapters))
 	for name := range c.adapters {
 		names = append(names, name)
@@ -99,6 +113,10 @@ func (c *Widget) AddAdapter(adapter *adapter.AdapterInfo) {
 	if ad := c.app.Preferences().String(prefsAdapter); ad != "" {
 		c.adapterSelector.SetSelected(ad)
 	}
+}
+
+func (c *Widget) AddAdapter(adapter *adapter.AdapterInfo) {
+
 }
 
 func (c *Widget) Disable() {

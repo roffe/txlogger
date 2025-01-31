@@ -19,7 +19,6 @@ import (
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
 	"github.com/roffe/txlogger/pkg/wbl/plx"
 	"github.com/roffe/txlogger/pkg/widgets/cansettings"
-	sdialog "github.com/sqweek/dialog"
 )
 
 const (
@@ -90,6 +89,8 @@ type SettingsWidget struct {
 	lambdatocan *canvas.Image
 	t7          *canvas.Image
 	plx         *canvas.Image
+
+	OpenFileDialogueFunc func() (string, error)
 
 	widget.BaseWidget
 }
@@ -318,9 +319,9 @@ func New(cfg *Config) *SettingsWidget {
 					app.Preferences().SetString(prefsLogPath, datalogger.LOGPATH)
 				}),
 				widget.NewButtonWithIcon("Browse", theme.FileIcon(), func() {
-					dir, err := sdialog.Directory().Title("Select log folder").Browse()
+					dir, err := selectFolder()
 					if err != nil {
-						if errors.Is(err, sdialog.ErrCancelled) {
+						if err.Error() == "Cancelled" {
 							return
 						}
 						log.Println(err)

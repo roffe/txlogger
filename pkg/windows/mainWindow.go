@@ -19,7 +19,6 @@ import (
 	xwidget "fyne.io/x/fyne/widget"
 	"github.com/ebitengine/oto/v3"
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan/adapter"
 	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/datalogger"
@@ -99,6 +98,7 @@ type MainWindow struct {
 	symbolList      *symbollist.Widget
 	fw              symbol.SymbolCollection
 	dlc             datalogger.IClient
+	gclient         proto.GocanClient
 	buttonsDisabled bool
 	settings        *settings.SettingsWidget
 	statusText      *SecretText
@@ -229,7 +229,7 @@ func (mw *MainWindow) gocanGWClient() {
 		mw.gocanGatewayLED.Off()
 		return
 	}
-	defer conn.Close()
+	//defer conn.Close()
 
 	client := proto.NewGocanClient(conn)
 	mw.gocanGatewayLED.On()
@@ -238,23 +238,9 @@ func (mw *MainWindow) gocanGWClient() {
 		mw.Error(fmt.Errorf("failed to get adapters from gocan gateway: %w", err))
 		return
 	}
-	addAdapters(res.Adapters, mw.settings.CanSettings.AddAdapter)
-}
+	mw.settings.CanSettings.AddAdapters(res.Adapters)
 
-func addAdapters(adapters []*proto.AdapterInfo, add func(adapter *adapter.AdapterInfo)) {
-	for _, a := range adapters {
-		adapter := &adapter.AdapterInfo{
-			Name:        a.GetName(),
-			Description: a.GetDescription(),
-			Capabilities: adapter.AdapterCapabilities{
-				HSCAN: a.GetCapabilities().GetHSCAN(),
-				SWCAN: a.GetCapabilities().GetSWCAN(),
-				KLine: a.GetCapabilities().GetKLine(),
-			},
-			RequiresSerialPort: a.GetRequireSerialPort(),
-		}
-		add(adapter)
-	}
+	mw.gclient = client
 }
 
 func (mw *MainWindow) setupShortcuts() {
@@ -354,6 +340,15 @@ func (mw *MainWindow) render() {
 			mw.buttons.addGaugeBtn,
 			widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
 				mw.wm.CloseAll()
+			}),
+			widget.NewButtonWithIcon("x", theme.SettingsIcon(), func() {
+				ctx := context.Background()
+				resp, err := mw.gclient.SendCommand(ctx, &proto.Command{Data: []byte("ping")})
+				if err != nil {
+					mw.Error(fmt.Errorf("failed to send command: %w", err))
+					return
+				}
+				log.Println("response:", string(resp.Data))
 			}),
 		),
 

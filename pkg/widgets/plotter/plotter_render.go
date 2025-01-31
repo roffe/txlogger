@@ -53,7 +53,7 @@ func (t *plotLayout) Layout(_ []fyne.CanvasObject, plotSize fyne.Size) {
 	t.p.widthFactor = plotSize.Width / float32(t.p.dataPointsToShow)
 	// Refresh the image and cursor
 	t.p.refreshImage(false)
-	t.p.updateCursor()
+	t.p.updateCursor(false)
 }
 
 func (t *plotLayout) MinSize([]fyne.CanvasObject) fyne.Size {

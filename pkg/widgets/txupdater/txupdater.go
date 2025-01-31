@@ -59,19 +59,25 @@ func New(port string) *TxUpdater {
 		go func() {
 			//defer t.updateBtn.Enable()
 			defer fyne.Do(t.updateBtn.Enable)
-			if err := ota.UpdateOTA(ota.Config{
+			err := ota.UpdateOTA(ota.Config{
 				Port: t.port,
 				Logfunc: func(v ...any) {
+					t.outputData.Append(fmt.Sprint(v...))
+				},
+				ProgressFunc: func(f float64) {
 					fyne.Do(func() {
-						t.outputData.Append(fmt.Sprint(v...))
+						t.progressbar.SetValue(f)
 					})
 				},
-				ProgressFunc: t.progressbar.SetValue,
-			}); err != nil {
-				fyne.Do(func() {
-					t.outputData.Append(fmt.Sprint("Error: ", err))
-				})
+			})
+			if err != nil {
+				t.outputData.Append(fmt.Sprint("Error: ", err))
+				return
 			}
+			n := fyne.NewNotification("txlogger", "txbrige firmware updated")
+			fyne.Do(func() {
+				fyne.CurrentApp().SendNotification(n)
+			})
 		}()
 	})
 

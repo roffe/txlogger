@@ -296,7 +296,7 @@ func (i *innerWindowRenderer) layoutCorners(size fyne.Size, pad float32) {
 	i.rightCorner.Resize(rightSize)
 
 	leftSize := i.leftCorner.MinSize()
-	leftPos := fyne.Position{X: -(pad + 1), Y: size.Height - leftSize.Height}
+	leftPos := fyne.Position{X: -(pad + 2), Y: size.Height - leftSize.Height}
 	i.leftCorner.Move(leftPos)
 	i.leftCorner.Resize(leftSize)
 }

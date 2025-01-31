@@ -68,7 +68,7 @@ func Help() *container.AppTabs {
 					widget.NewLabel("SAAB for making the cars we ❤️❤️❤️"),
 					widget.NewLabel("MattiasC, Dilemma, J.K Nilsson, Manick"),
 					widget.NewLabel("Artursson, Schottis, Chriva, Myrtilos"),
-					widget.NewLabel("Mackan, Kalej, Bojer, Saab74"),
+					widget.NewLabel("Mackan, Kalej, Bojer, Saab74, JB9"),
 					widget.NewLabel("catavares, Richardc9052, rk3"),
 					widget.NewHyperlink("TrionicTuning", tt),
 					widget.NewLabel("o2o Crew"),
