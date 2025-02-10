@@ -1,6 +1,7 @@
 package logfile
 
 import (
+	"io"
 	"path"
 	"strings"
 	"time"
@@ -36,13 +37,13 @@ func (r Record) SetValue(key string, value float64) {
 	r.Values[key] = value
 }
 
-func Open(filename string) (Logfile, error) {
+func Open(filename string, reader io.ReadCloser) (Logfile, error) {
 	switch strings.ToLower(path.Ext(filename)) {
 	case ".csv":
-		return NewFromCSVLogfile(filename)
+		return NewFromCSVLogfile(reader)
 	case ".t5l", ".t7l", ".t8l":
 		fallthrough
 	default:
-		return NewFromTxLogfile(filename)
+		return NewFromTxLogfile(reader)
 	}
 }

@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"strings"
 
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/presets"
-	sdialog "github.com/sqweek/dialog"
+	"github.com/roffe/txlogger/pkg/widgets"
 )
 
 func (mw *MainWindow) reloadPresets() {
@@ -60,37 +61,28 @@ func (mw *MainWindow) newPreset() {
 }
 
 func (mw *MainWindow) importPreset() {
-	filename, err := sdialog.File().Filter("Preset file", "txp").Load()
-	if err != nil {
-		if err.Error() == "Cancelled" {
+	cb := func(r fyne.URIReadCloser) {
+		defer r.Close()
+		if err := mw.LoadPreset(r); err != nil {
+			mw.Error(err)
 			return
 		}
-		mw.Error(err)
-		return
+		mw.SyncSymbols()
 	}
-	if err := mw.LoadPreset(filename); err != nil {
-		mw.Error(err)
-		return
-	}
-	mw.SyncSymbols()
+	widgets.SelectFile(cb, "Preset file", "txp")
 }
 
 func (mw *MainWindow) exportPreset() {
-	filename, err := sdialog.File().Filter("Preset file", "txp").Save()
-	if err != nil {
-		if err.Error() == "Cancelled" {
+	cb := func(filename string) {
+		if !strings.HasSuffix(filename, ".txp") {
+			filename += ".txp"
+		}
+		if err := mw.SavePreset(filename); err != nil {
+			mw.Error(err)
 			return
 		}
-		mw.Error(err)
-		return
 	}
-	if !strings.HasSuffix(filename, ".txp") {
-		filename += ".txp"
-	}
-	if err := mw.SavePreset(filename); err != nil {
-		mw.Error(err)
-		return
-	}
+	widgets.SaveFile(cb, "Preset file", "txp")
 }
 
 func (mw *MainWindow) deletePreset() {

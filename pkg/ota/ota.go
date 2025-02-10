@@ -3,12 +3,19 @@ package ota
 import (
 	"bytes"
 	_ "embed"
+	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"time"
 
-	"github.com/roffe/gocan"
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/dialog"
+	"github.com/roffe/gocan/pkg/serialcommand"
+	"github.com/roffe/txlogger/pkg/widgets/cansettings"
 	"go.bug.st/serial"
+	"golang.org/x/mod/semver"
 )
 
 //go:embed firmware.bin
@@ -40,7 +47,15 @@ func UpdateOTA(cfg Config) error {
 	start := time.Now()
 	cfg.Logfunc("Opening port ", cfg.Port)
 
-	sp, err := openPort(cfg.Port)
+	var err error
+	var sp io.ReadWriteCloser
+
+	if cfg.Port == "tcp" {
+		sp, err = openTcpPort()
+	} else {
+		sp, err = openSerialPort(cfg.Port)
+	}
+
 	if err != nil {
 		if sp != nil {
 			sp.Close()
@@ -56,7 +71,7 @@ func UpdateOTA(cfg Config) error {
 
 	//cfg.Logfunc("Firmware size: ", len(firmware))
 
-	cmd := gocan.NewSerialCommand('v', []byte{0x10})
+	cmd := serialcommand.NewSerialCommand('v', []byte{0x10})
 	buf, err := cmd.MarshalBinary()
 	if err != nil {
 		return err
@@ -80,6 +95,23 @@ func UpdateOTA(cfg Config) error {
 	}
 
 	cfg.Logfunc("Device firmware: ", string(cmd.Data))
+
+	ver := semver.Compare("v"+string(cmd.Data), "v"+cansettings.MinimumtxbridgeVersion)
+	if ver == 0 {
+		cc := make(chan bool)
+		fyne.Do(func() {
+			dialog.ShowConfirm("Firmware up to date", "Firmware is already up to date, install anyway?", func(b bool) {
+				cc <- b
+			}, fyne.CurrentApp().Driver().AllWindows()[0])
+		})
+		select {
+		case t := <-cc:
+			if !t {
+				return errors.New("Update aborted")
+			}
+		}
+
+	}
 
 	if _, err := sp.Write([]byte{'u'}); err != nil {
 		return err
@@ -151,23 +183,40 @@ func UpdateOTA(cfg Config) error {
 	return fmt.Errorf("unexpected response end OTA: %X %X", cmd.Command, cmd.Data)
 }
 
-func checkErr(cmd *gocan.SerialCommand) error {
+func checkErr(cmd *serialcommand.SerialCommand) error {
 	if cmd.Command == 'e' {
 		return fmt.Errorf("error: %X %X", cmd.Command, cmd.Data)
 	}
 	return nil
 }
 
-func openPort(port string) (serial.Port, error) {
+func openSerialPort(port string) (io.ReadWriteCloser, error) {
 	mode := &serial.Mode{
 		BaudRate: COM_SPEED, // 2Mbit
 	}
-	return serial.Open(port, mode)
+	p, err := serial.Open(port, mode)
+	if err != nil {
+		return nil, err
+	}
+	p.SetReadTimeout(20 * time.Millisecond)
+	return p, nil
+}
+
+func openTcpPort() (io.ReadWriteCloser, error) {
+	d := net.Dialer{Timeout: 2 * time.Second}
+	p, err := d.Dial("tcp", "192.168.4.1:1337")
+	if err != nil {
+		return nil, err
+	}
+	if t, ok := p.(*net.TCPConn); ok {
+		t.SetNoDelay(true)
+	}
+
+	return p, nil
 }
 
 // readSerialCommand reads a single command from the serial port with timeout
-func readSerialCommand(port serial.Port, timeout time.Duration) (*gocan.SerialCommand, error) {
-	deadline := time.Now().Add(timeout)
+func readSerialCommand(port io.ReadWriteCloser, timeout time.Duration) (*serialcommand.SerialCommand, error) {
 
 	var (
 		parsingCommand  bool
@@ -180,9 +229,8 @@ func readSerialCommand(port serial.Port, timeout time.Duration) (*gocan.SerialCo
 
 	readbuf := make([]byte, 16)
 
+	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		port.SetReadTimeout(20 * time.Millisecond)
-
 		n, err := port.Read(readbuf)
 		if err != nil {
 			return nil, fmt.Errorf("read error: %w", err)
@@ -212,7 +260,7 @@ func readSerialCommand(port serial.Port, timeout time.Duration) (*gocan.SerialCo
 				data := make([]byte, cmdbuffPtr)
 				copy(data, cmdbuff[:cmdbuffPtr])
 
-				return &gocan.SerialCommand{
+				return &serialcommand.SerialCommand{
 					Command: command,
 					Data:    data,
 				}, nil
@@ -229,8 +277,8 @@ func readSerialCommand(port serial.Port, timeout time.Duration) (*gocan.SerialCo
 }
 
 // writeSerialCommand writes a single command to the serial port
-func writeSerialCommand(port serial.Port, command byte, data []byte) error {
-	cmd := &gocan.SerialCommand{
+func writeSerialCommand(port io.ReadWriteCloser, command byte, data []byte) error {
+	cmd := &serialcommand.SerialCommand{
 		Command: command,
 		Data:    data,
 	}

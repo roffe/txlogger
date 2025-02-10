@@ -3,6 +3,7 @@ package windows
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,7 +18,6 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	xwidget "fyne.io/x/fyne/widget"
-	"github.com/ebitengine/oto/v3"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/assets"
@@ -51,6 +51,7 @@ const (
 )
 
 var _ fyne.Tappable = (*SecretText)(nil)
+var _ desktop.Mouseable = (*SecretText)(nil)
 
 type SecretText struct {
 	*widget.Label
@@ -85,6 +86,14 @@ func (s *SecretText) Tapped(*fyne.PointEvent) {
 	}
 }
 
+func (s *SecretText) MouseDown(e *desktop.MouseEvent) {
+	log.Println("MouseDown", e)
+}
+
+func (s *SecretText) MouseUp(e *desktop.MouseEvent) {
+	log.Println("MouseUp", e)
+}
+
 type MainWindow struct {
 	fyne.Window
 	app             fyne.App
@@ -102,7 +111,6 @@ type MainWindow struct {
 	buttonsDisabled bool
 	settings        *settings.SettingsWidget
 	statusText      *SecretText
-	oCtx            *oto.Context
 	wm              *multiwindow.MultipleWindows
 	content         *fyne.Container
 	startup         bool
@@ -160,13 +168,7 @@ func NewMainWindow(app fyne.App) *MainWindow {
 		gocanGatewayLED: ledicon.New("Gateway"),
 		canLED:          ledicon.New("CAN"),
 		statusText:      NewSecretText("Harder, Better, Faster, Stronger"),
-		oCtx:            newOtoContext(),
 	}
-	mw.settings = settings.New(&settings.Config{
-		GetEcu: func() string {
-			return mw.selects.ecuSelect.Selected
-		},
-	})
 
 	mw.setupMenu()
 	mw.createButtons()
@@ -174,6 +176,12 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	mw.createCounters()
 	mw.newSymbolnameTypeahead()
 	mw.setupShortcuts()
+
+	mw.settings = settings.New(&settings.Config{
+		GetEcu: func() string {
+			return mw.selects.ecuSelect.Selected
+		},
+	})
 
 	mw.loadPrefs()
 
@@ -198,7 +206,9 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	mw.buttons.dashboardBtn.OnTapped()
 	mw.startup = false
 
-	mw.gocanGWClient()
+	if !fyne.CurrentApp().Driver().Device().IsMobile() {
+		mw.gocanGWClient()
+	}
 
 	return mw
 }
@@ -341,15 +351,17 @@ func (mw *MainWindow) render() {
 			widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
 				mw.wm.CloseAll()
 			}),
-			widget.NewButtonWithIcon("x", theme.SettingsIcon(), func() {
-				ctx := context.Background()
-				resp, err := mw.gclient.SendCommand(ctx, &proto.Command{Data: []byte("ping")})
-				if err != nil {
-					mw.Error(fmt.Errorf("failed to send command: %w", err))
-					return
-				}
-				log.Println("response:", string(resp.Data))
-			}),
+			/*
+				widget.NewButtonWithIcon("x", theme.SettingsIcon(), func() {
+					ctx := context.Background()
+					resp, err := mw.gclient.SendCommand(ctx, &proto.Command{Data: []byte("ping")})
+					if err != nil {
+						mw.Error(fmt.Errorf("failed to send command: %w", err))
+						return
+					}
+					log.Println("response:", string(resp.Data))
+				}),
+			*/
 		),
 
 		container.NewBorder(
@@ -382,7 +394,7 @@ func (mw *MainWindow) render() {
 		// mw.tabs,
 	)
 }
-func (mw *MainWindow) LoadLogfileCombined(filename string, p fyne.Position, fromRoutine bool) {
+func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser, p fyne.Position, fromRoutine bool) {
 	// Just filename, used for Window title
 	fp := filepath.Base(filename)
 
@@ -391,7 +403,7 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, p fyne.Position, from
 	// 	return
 	// }
 
-	logz, err := logfile.Open(filename)
+	logz, err := logfile.Open(filename, reader)
 	if err != nil {
 		mw.Error(fmt.Errorf("failed to open log file: %w", err))
 		return
@@ -486,7 +498,7 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, p fyne.Position, from
 	mw.Log("loaded log file " + filename + " in combined logplayer")
 }
 
-func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position) {
+func (mw *MainWindow) LoadLogfile(filename string, r io.ReadCloser, p fyne.Position) {
 	// Just filename, used for Window title
 	fp := filepath.Base(filename)
 
@@ -495,11 +507,13 @@ func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position) {
 		return
 	}
 
-	logz, err := logfile.Open(filename)
+	logz, err := logfile.Open(filename, r)
 	if err != nil {
 		mw.Error(fmt.Errorf("failed to open log file: %w", err))
 		return
 	}
+
+	mw.Log("loaded log file " + filename)
 
 	lp := logplayer.New(&logplayer.Config{
 		EBus:    ebus.CONTROLLER,
@@ -514,13 +528,12 @@ func (mw *MainWindow) LoadLogfile(filename string, p fyne.Position) {
 	iw.OnClose = func() {
 		lp.Close()
 	}
-
 	mw.wm.Add(iw, p)
-	mw.Log("loaded log file " + filename)
+
 }
 
 func (mw *MainWindow) Log(s string) {
-	debug.Log(s)
+	debug.LogDepth(2, s)
 	mw.outputData.Append(s)
 }
 
@@ -621,7 +634,7 @@ func (mw *MainWindow) LoadSymbolsFromECU() error {
 	return nil
 }
 
-func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
+func (mw *MainWindow) LoadSymbolsFromFile(filename string, r io.Reader) error {
 	ecuType, symbols, err := symbol.Load(filename, mw.Log)
 	if err != nil {
 		return fmt.Errorf("error loading symbols: %w", err)
@@ -635,8 +648,8 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	return nil
 }
 
-func (mw *MainWindow) LoadPreset(filename string) error {
-	b, err := os.ReadFile(filename)
+func (mw *MainWindow) LoadPreset(r io.Reader) error {
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return fmt.Errorf("failed to read config file: %w", err)
 	}

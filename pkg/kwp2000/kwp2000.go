@@ -49,7 +49,7 @@ func New(c *gocan.Client /*canID uint32, recvID ...uint32*/) *Client {
 func (t *Client) StartSession(ctx context.Context, id, responseID uint32) error {
 	payload := []byte{0x3F, START_COMMUNICATION, 0x00, 0x11, byte(REQ_MSG_ID >> 8), byte(REQ_MSG_ID), 0x00, 0x00}
 	frame := gocan.NewFrame(id, payload, gocan.ResponseRequired)
-	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, responseID)
+	resp, err := t.c.SendAndWait(ctx, frame, 3*time.Second, responseID)
 	if err != nil {
 		return fmt.Errorf("StartSession: %w", err)
 	}
@@ -75,7 +75,7 @@ func (t *Client) StopSession(ctx context.Context) error {
 func (t *Client) TesterPresent(ctx context.Context) error {
 	payload := []byte{0x40, 0xA1, 0x01, TESTER_PRESENT}
 	frame := gocan.NewFrame(REQ_MSG_ID, payload, gocan.ResponseRequired)
-	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+	resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.responseID)
 	if err != nil {
 		return fmt.Errorf("TesterPresent: %w", err)
 	}
@@ -88,7 +88,7 @@ func (t *Client) StartRoutineByIdentifier(ctx context.Context, id byte, extra ..
 	payload = append(payload, extra...)
 	payload[2] = byte(len(payload) - 3)
 	frame := gocan.NewFrame(REQ_MSG_ID, payload, gocan.ResponseRequired)
-	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout*2, t.responseID)
+	resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout*2, t.responseID)
 	if err != nil {
 		return fmt.Errorf("StartRoutineByIdentifier: %w", err)
 	}
@@ -98,7 +98,7 @@ func (t *Client) StartRoutineByIdentifier(ctx context.Context, id byte, extra ..
 func (t *Client) StopRoutineByIdentifier(ctx context.Context, id byte) ([]byte, error) {
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, STOP_ROUTINE_BY_IDENTIFIER, id}, gocan.ResponseRequired)
 	log.Println(frame.String())
-	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+	resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.responseID)
 	if err != nil {
 		return nil, fmt.Errorf("StopRoutineByIdentifier: %w", err)
 	}
@@ -109,7 +109,7 @@ func (t *Client) StopRoutineByIdentifier(ctx context.Context, id byte) ([]byte, 
 func (t *Client) RequestRoutineResultsByLocalIdentifier(ctx context.Context, id byte) ([]byte, error) {
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, REQUEST_ROUTINE_RESULTS_BY_LOCAL_IDENTIFIER, id}, gocan.ResponseRequired)
 	log.Println(frame.String())
-	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+	resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.responseID)
 	if err != nil {
 		return nil, fmt.Errorf("RequestRoutineResultsByLocalIdentifier: %w", err)
 	}
@@ -121,7 +121,7 @@ func (t *Client) RequestRoutineResultsByLocalIdentifier(ctx context.Context, id 
 func (t *Client) ReadDataByLocalIdentifierMode(ctx context.Context, id, mode byte) ([]byte, error) {
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x03, READ_DATA_BY_IDENTIFIER, id, mode}, gocan.ResponseRequired)
 	log.Println(frame.String())
-	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+	resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.responseID)
 	if err != nil {
 		return nil, fmt.Errorf("ReadDataByLocalIdentifier2: %w", err)
 	}
@@ -158,7 +158,7 @@ func (t *Client) ReadDataByLocalIdentifierMode(ctx context.Context, id, mode byt
 		//log.Printf("current chunk %02X", currentChunkNumber)
 		frame := gocan.NewFrame(RESP_CHUNK_CONF_ID, []byte{0x40, 0xA1, 0x3F, d[0] &^ 0x40, 0x00, 0x00, 0x00, 0x00}, gocan.ResponseRequired)
 		//log.Println(frame.String())
-		resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+		resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.responseID)
 		if err != nil {
 			return nil, err
 		}
@@ -178,7 +178,7 @@ func (t *Client) ReadDataByLocalIdentifierMode(ctx context.Context, id, mode byt
 
 func (client *Client) ReadDataByIdentifier(ctx context.Context, identifier byte) ([]byte, error) {
 	initialFrame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, READ_DATA_BY_IDENTIFIER, identifier}, gocan.ResponseRequired)
-	response, err := client.c.SendAndPoll(ctx, initialFrame, client.defaultTimeout, client.responseID)
+	response, err := client.c.SendAndWait(ctx, initialFrame, client.defaultTimeout, client.responseID)
 	if err != nil {
 		return nil, err // Directly return the error without additional wrapping
 	}
@@ -198,7 +198,7 @@ func (client *Client) ReadDataByIdentifier(ctx context.Context, identifier byte)
 
 	for currentChunkNumber != 0 {
 		nextFrame := gocan.NewFrame(RESP_CHUNK_CONF_ID, []byte{0x40, 0xA1, 0x3F, dataBuffer[0] &^ 0x40}, gocan.ResponseRequired)
-		response, err := client.c.SendAndPoll(ctx, nextFrame, client.defaultTimeout, client.responseID)
+		response, err := client.c.SendAndWait(ctx, nextFrame, client.defaultTimeout, client.responseID)
 		if err != nil {
 			return nil, err
 		}
@@ -215,7 +215,7 @@ func (client *Client) ReadDataByIdentifier(ctx context.Context, identifier byte)
 /*
 	func (t *Client) ReadDataByIdentifier3(ctx context.Context, id byte) ([]byte, error) {
 		frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, READ_DATA_BY_IDENTIFIER, id}, gocan.ResponseRequired)
-		resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+		resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.responseID)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", getFunctionName(), err)
 		}
@@ -248,7 +248,7 @@ func (client *Client) ReadDataByIdentifier(ctx context.Context, identifier byte)
 			//log.Printf("current chunk %02X", currentChunkNumber)
 			frame := gocan.NewFrame(RESP_CHUNK_CONF_ID, []byte{0x40, 0xA1, 0x3F, databuff[0] &^ 0x40}, gocan.ResponseRequired)
 			//log.Println(frame.String())
-			resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+			resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.responseID)
 			if err != nil {
 				return nil, err
 			}
@@ -300,7 +300,7 @@ outer:
 		}
 		for toRead > 0 {
 			select {
-			case f := <-sub.C():
+			case f := <-sub.Chan():
 				d := f.Data()
 				// log.Printf("toRead %d, %X", toRead, d)
 				readThis := int(min(6, toRead))
@@ -325,7 +325,7 @@ outer:
 func (t *Client) transferData(ctx context.Context) ([]byte, error) {
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x01, TRANSFER_DATA}, gocan.ResponseRequired)
 	//	log.Println(frame.String())
-	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+	resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.responseID)
 	if err != nil {
 		return nil, fmt.Errorf("transferData: %w", err)
 	}
@@ -335,7 +335,7 @@ func (t *Client) transferData(ctx context.Context) ([]byte, error) {
 func (t *Client) RequestTransferExit(ctx context.Context) error {
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x01, REQUEST_TRANSFER_EXIT}, gocan.ResponseRequired)
 	//	log.Println(frame.String())
-	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+	resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.responseID)
 	if err != nil {
 		return fmt.Errorf("RequestTransferExit: %w", err)
 	}
@@ -356,7 +356,7 @@ func (t *Client) RequestTransferExit(ctx context.Context) error {
 func (t *Client) ClearDynamicallyDefineLocalId(ctx context.Context) error {
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER, DM_CDDLI}, gocan.ResponseRequired)
 	//	log.Println(frame.String())
-	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout*2, t.responseID)
+	resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout*2, t.responseID)
 	if err != nil {
 		return fmt.Errorf("DynamicallyClearDefineLocalId: %w", err)
 	}
@@ -385,7 +385,7 @@ func (t *Client) DynamicallyDefineLocalIdRequest(ctx context.Context, index int,
 				return fmt.Errorf("DynamicallyDefineLocalIdRequest1: %w", err)
 			}
 		} else {
-			resp, err := t.c.SendAndPoll(ctx, msg, t.defaultTimeout, REQ_CHUNK_CONF_ID)
+			resp, err := t.c.SendAndWait(ctx, msg, t.defaultTimeout, REQ_CHUNK_CONF_ID)
 			if err != nil {
 				return fmt.Errorf("DynamicallyDefineLocalIdRequest2: %w", err)
 			}
@@ -419,7 +419,7 @@ func (t *Client) RequestSecurityAccess(ctx context.Context, force bool) (bool, e
 
 func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 	msg := []byte{0x40, 0xA1, 0x02, SECURITY_ACCESS, DEVELOPMENT_PRIORITY}
-	ff, err := t.c.SendAndPoll(ctx, gocan.NewFrame(REQ_MSG_ID, msg, gocan.ResponseRequired), t.defaultTimeout, t.responseID)
+	ff, err := t.c.SendAndWait(ctx, gocan.NewFrame(REQ_MSG_ID, msg, gocan.ResponseRequired), t.defaultTimeout, t.responseID)
 	if err != nil {
 		return false, fmt.Errorf("request seed: %v", err)
 	}
@@ -434,7 +434,7 @@ func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 	key := CalcKey(seed, method)
 
 	msgReply := []byte{0x40, 0xA1, 0x04, SECURITY_ACCESS, DEVELOPMENT_PRIORITY + 1, byte(int(key) >> 8), byte(key)}
-	f2, err := t.c.SendAndPoll(ctx, gocan.NewFrame(REQ_MSG_ID, msgReply, gocan.ResponseRequired), t.defaultTimeout*2, t.responseID)
+	f2, err := t.c.SendAndWait(ctx, gocan.NewFrame(REQ_MSG_ID, msgReply, gocan.ResponseRequired), t.defaultTimeout*2, t.responseID)
 	if err != nil {
 		return false, fmt.Errorf("send seed: %v", err)
 
@@ -591,7 +591,7 @@ outer:
 			return nil, ctx.Err()
 		case <-time.After(t.defaultTimeout):
 			return nil, fmt.Errorf("timeout")
-		case f := <-sub.C():
+		case f := <-sub.Chan():
 			d := f.Data()
 			if d[0]&0x40 == 0x40 {
 				payloadLeft = int(d[2]) - 2 // subtract two non-payload bytes
@@ -677,7 +677,7 @@ func (t *Client) ReadMemoryByAddressF0(ctx context.Context, address, length int)
 	// Jump to read adress
 	t.c.SendFrame(REQ_MSG_ID, []byte{0x41, 0xA1, 0x08, DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER, 0xF0, 0x03, 0x00, byte(length)}, gocan.Outgoing)
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x00, 0xA1, byte((address >> 16) & 0xFF), byte((address >> 8) & 0xFF), byte(address & 0xFF), 0x00, 0x00, 0x00}, gocan.ResponseRequired)
-	f, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout*2, t.responseID)
+	f, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout*2, t.responseID)
 	if err != nil {
 		return nil, err
 	}
@@ -717,7 +717,7 @@ func (t *Client) recvData(ctx context.Context, length int) ([]byte, error) {
 			return nil, ctx.Err()
 		case <-time.After(t.defaultTimeout):
 			return nil, fmt.Errorf("timeout")
-		case frame := <-sub.C():
+		case frame := <-sub.Chan():
 			data := frame.Data()
 
 			// Handle frame based on control byte
@@ -754,7 +754,7 @@ func (t *Client) recvData(ctx context.Context, length int) ([]byte, error) {
 // Reset ECU
 func (t *Client) ResetECU(ctx context.Context) error {
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, ECU_RESET, 0x01}, gocan.ResponseRequired)
-	f, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+	f, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.responseID)
 	if err != nil {
 		return err
 	}
@@ -772,7 +772,7 @@ func (t *Client) ResetECU(ctx context.Context) error {
 /*
 func (t *Client) ReadDataByAddress(ctx context.Context, address int, length byte) ([]byte, error) {
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x05, READ_MEMORY_BY_ADDRESS, byte(address >> 16), byte(address >> 8), byte(address), length}, gocan.ResponseRequired)
-	f, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout*3, t.responseID)
+	f, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout*3, t.responseID)
 	if err != nil {
 		return nil, err
 	}
@@ -843,7 +843,7 @@ outer:
 
 func (t *Client) ReadDataBySymbol2(ctx context.Context, symbolNo int) ([]byte, error) {
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x04, READ_MEMORY_BY_ADDRESS, SYMBOL_IDENTIFICATION, byte(symbolNo >> 8), byte(symbolNo), 0x00}, gocan.ResponseRequired)
-	f, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout*3, t.responseID)
+	f, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout*3, t.responseID)
 	if err != nil {
 		return nil, err
 	}
@@ -877,7 +877,7 @@ func (t *Client) ReadMemoryByAddress(ctx context.Context, address, length int) (
 
 func (t *Client) readMemoryByAddress(ctx context.Context, address int, length byte) ([]byte, error) {
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x05, READ_MEMORY_BY_ADDRESS, byte(address >> 16), byte(address >> 8), byte(address), length}, gocan.ResponseRequired)
-	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+	resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.responseID)
 	if err != nil {
 		return nil, fmt.Errorf("ReadDataByAddress: %w", err)
 	}
@@ -902,7 +902,7 @@ func (t *Client) readMemoryByAddress(ctx context.Context, address int, length by
 	currentChunkNumber := d[0] & 0x3F
 	for currentChunkNumber != 0 {
 		frame := gocan.NewFrame(RESP_CHUNK_CONF_ID, []byte{0x40, 0xA1, 0x3F, d[0] &^ 0x40}, gocan.ResponseRequired)
-		resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+		resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.responseID)
 		if err != nil {
 			return nil, err
 		}
@@ -930,7 +930,7 @@ func (t *Client) RequestUpload(ctx context.Context, address, length uint32) erro
 	for _, msg := range t.splitRequest(message, false) {
 		//		log.Println(msg.String())
 		if msg.Type().Type == 1 {
-			resp, err := t.c.SendAndPoll(ctx, msg, t.defaultTimeout, t.responseID)
+			resp, err := t.c.SendAndWait(ctx, msg, t.defaultTimeout, t.responseID)
 			if err != nil {
 				return err
 			}
@@ -940,7 +940,7 @@ func (t *Client) RequestUpload(ctx context.Context, address, length uint32) erro
 			}
 
 		} else {
-			resp, err := t.c.SendAndPoll(ctx, msg, t.defaultTimeout, REQ_CHUNK_CONF_ID)
+			resp, err := t.c.SendAndWait(ctx, msg, t.defaultTimeout, REQ_CHUNK_CONF_ID)
 			if err != nil {
 				return fmt.Errorf("RequestUpload: %w", err)
 			}
@@ -963,7 +963,7 @@ func (t *Client) sendLong(ctx context.Context, data []byte) error {
 			//	return err
 			//}
 
-			resp, err := t.c.SendAndPoll(ctx, msg, t.defaultTimeout, t.responseID)
+			resp, err := t.c.SendAndWait(ctx, msg, t.defaultTimeout, t.responseID)
 			if err != nil {
 				return err
 			}
@@ -972,7 +972,7 @@ func (t *Client) sendLong(ctx context.Context, data []byte) error {
 				return err
 			}
 		} else {
-			resp, err := t.c.SendAndPoll(ctx, msg, t.defaultTimeout, REQ_CHUNK_CONF_ID)
+			resp, err := t.c.SendAndWait(ctx, msg, t.defaultTimeout, REQ_CHUNK_CONF_ID)
 			if err != nil {
 				return fmt.Errorf("%s2: %w", getFunctionName(), err)
 			}
@@ -1034,7 +1034,7 @@ func (t *Client) SaveROM(ctx context.Context, address uint32, data []byte) error
 				return fmt.Errorf("%s1: %w", getFunctionName(), err)
 			}
 		} else {
-			resp, err := t.c.SendAndPoll(ctx, msg, t.defaultTimeout, REQ_CHUNK_CONF_ID)
+			resp, err := t.c.SendAndWait(ctx, msg, t.defaultTimeout, REQ_CHUNK_CONF_ID)
 			if err != nil {
 				return fmt.Errorf("%s2: %w", getFunctionName(), err)
 			}
@@ -1113,7 +1113,7 @@ func (t *Client) RequestDownload(ctx context.Context, address uint32, length uin
 				return fmt.Errorf("%s1: %w", getFunctionName(), err)
 			}
 		} else {
-			resp, err := t.c.SendAndPoll(ctx, msg, t.defaultTimeout, t.responseID)
+			resp, err := t.c.SendAndWait(ctx, msg, t.defaultTimeout, t.responseID)
 			if err != nil {
 				return fmt.Errorf("%s2: %w", getFunctionName(), err)
 			}

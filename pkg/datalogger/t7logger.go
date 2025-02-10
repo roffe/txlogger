@@ -8,13 +8,14 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/adapter"
+	"github.com/roffe/gocan/pkg/serialcommand"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
@@ -89,7 +90,7 @@ func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client)
 		<-c.quitChan
 		sub.Close()
 	}()
-	for msg := range sub.C() {
+	for msg := range sub.Chan() {
 		switch msg.Identifier() {
 		case 0x1A0:
 			rpm = binary.BigEndian.Uint16(msg.Data()[1:3])
@@ -135,7 +136,7 @@ func (c *T7Client) Start() error {
 	defer c.lw.Close()
 
 	var txbridge bool
-	if c.Config.Device.Name() == "txbridge" {
+	if strings.HasPrefix(c.Config.Device.Name(), "txbridge") {
 		txbridge = true
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -199,7 +200,7 @@ func (c *T7Client) Start() error {
 	retries := 0
 
 	if txbridge {
-		if err := cl.SendFrame(adapter.SystemMsg, []byte("7"), gocan.Outgoing); err != nil {
+		if err := cl.SendFrame(gocan.SystemMsg, []byte("7"), gocan.Outgoing); err != nil {
 			return err
 		}
 	}
@@ -207,7 +208,6 @@ func (c *T7Client) Start() error {
 	kwp := kwp2000.New(cl)
 	err = retry.Do(func() error {
 		if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
-
 			return retry.Unrecoverable(errors.New("failed to start session"))
 		}
 		defer func() {
@@ -273,13 +273,13 @@ func (c *T7Client) Start() error {
 			}
 		}
 
-		tx := cl.Subscribe(ctx, adapter.SystemMsgDataResponse, adapter.SystemMsgError)
+		tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse, gocan.SystemMsgError)
 		defer tx.Close()
 
 		if txbridge {
 			//			log.Println("stopped timer, using txbridge")
 			t.Stop()
-			if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
+			if err := cl.SendFrame(gocan.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
 				return err
 			}
 		}
@@ -291,6 +291,8 @@ func (c *T7Client) Start() error {
 		var currtimestamp uint32
 		for {
 			select {
+			case err := <-cl.Err():
+				return retry.Unrecoverable(err)
 			case <-c.quitChan:
 				c.OnMessage("Stopped logging..")
 				return nil
@@ -330,7 +332,7 @@ func (c *T7Client) Start() error {
 				if txbridge {
 					toRead := min(235, read.Length)
 					read.Length -= toRead
-					cmd := gocan.SerialCommand{
+					cmd := serialcommand.SerialCommand{
 						Command: 'R',
 						Data: []byte{
 							byte(read.Address),
@@ -346,8 +348,8 @@ func (c *T7Client) Start() error {
 						c.onError(err)
 						continue
 					}
-					frame := gocan.NewFrame(adapter.SystemMsg, payload, gocan.Outgoing)
-					resp, err := cl.SendAndPoll(ctx, frame, 3*time.Second, adapter.SystemMsgDataRequest)
+					frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
+					resp, err := cl.SendAndWait(ctx, frame, 3*time.Second, gocan.SystemMsgDataRequest)
 					if err != nil {
 						read.Complete(err)
 						continue
@@ -371,7 +373,7 @@ func (c *T7Client) Start() error {
 			case write := <-c.updateChan:
 				if txbridge {
 					toRead := min(235, write.Length)
-					cmd := gocan.SerialCommand{
+					cmd := serialcommand.SerialCommand{
 						Command: 'W',
 						Data: []byte{
 							byte(write.Address),
@@ -393,15 +395,15 @@ func (c *T7Client) Start() error {
 						continue
 					}
 
-					frame := gocan.NewFrame(adapter.SystemMsg, payload, gocan.Outgoing)
+					frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
 
-					resp, err := cl.SendAndPoll(ctx, frame, 1*time.Second, adapter.SystemMsgWriteResponse, adapter.SystemMsgError)
+					resp, err := cl.SendAndWait(ctx, frame, 1*time.Second, gocan.SystemMsgWriteResponse, gocan.SystemMsgError)
 					if err != nil {
 						write.Complete(err)
 						continue
 					}
 
-					if resp.Identifier() == adapter.SystemMsgError {
+					if resp.Identifier() == gocan.SystemMsgError {
 						write.Complete(fmt.Errorf("error response"))
 						continue
 					}
@@ -482,11 +484,11 @@ func (c *T7Client) Start() error {
 				if count%15 == 0 {
 					c.CaptureCounter(count)
 				}
-			case msg, ok := <-tx.C():
+			case msg, ok := <-tx.Chan():
 				if !ok {
 					return retry.Unrecoverable(errors.New("txbridge recv channel closed"))
 				}
-				if msg.Identifier() == adapter.SystemMsgError {
+				if msg.Identifier() == gocan.SystemMsgError {
 					data := msg.Data()
 					switch data[0] {
 					case 0x31:

@@ -2,7 +2,7 @@ package logfile
 
 import (
 	"encoding/csv"
-	"os"
+	"io"
 	"strconv"
 	"time"
 
@@ -15,26 +15,20 @@ type CSVLogfile struct {
 	BaseLogfile
 }
 
-func NewFromCSVLogfile(filename string) (Logfile, error) {
+func NewFromCSVLogfile(reader io.ReadCloser) (Logfile, error) {
 	c := &CSVLogfile{}
 	c.pos = -1
 	// start := time.Now()
-	if err := c.parseCSVLogfile(filename); err != nil {
+	if err := c.parseCSVLogfile(reader); err != nil {
 		return nil, err
 	}
 	// log.Printf("Parsed %d records in %s", len(rec), time.Since(start))
 	return c, nil
 }
 
-func (l *CSVLogfile) parseCSVLogfile(filename string) error {
-	f, err := os.Open(filename)
-	if f != nil {
-		defer f.Close()
-	}
-	if err != nil {
-		return err
-	}
-	r := csv.NewReader(f)
+func (l *CSVLogfile) parseCSVLogfile(reader io.ReadCloser) error {
+	r := csv.NewReader(reader)
+
 	records, err := r.ReadAll()
 	if err != nil {
 		return err

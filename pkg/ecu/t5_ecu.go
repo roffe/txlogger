@@ -14,7 +14,7 @@ import (
 )
 
 func GetSymbolsT5(ctx context.Context, dev gocan.Adapter, cb func(string)) (symbol.SymbolCollection, error) {
-	cl, err := gocan.New(context.TODO(), dev)
+	cl, err := gocan.NewClient(context.TODO(), dev)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func GetSymbolsT5(ctx context.Context, dev gocan.Adapter, cb func(string)) (symb
 func sendCommand(ctx context.Context, c *gocan.Client, cmd []byte) error {
 	for _, b := range cmd {
 		frame := gocan.NewFrame(0x05, []byte{0xC4, b}, gocan.ResponseRequired)
-		resp, err := c.SendAndPoll(ctx, frame, 100*time.Millisecond, 0xC)
+		resp, err := c.SendAndWait(ctx, frame, 100*time.Millisecond, 0xC)
 		if err != nil {
 			return err
 		}
@@ -97,7 +97,7 @@ func recvDataEND(ctx context.Context, c *gocan.Client) ([]byte, error) {
 			dd = 0
 		}
 		ack(c)
-		resp, err := c.Poll(ctx, 40*time.Millisecond, 0xC)
+		resp, err := c.Wait(ctx, 40*time.Millisecond, 0xC)
 		if err != nil {
 			os.WriteFile("dump", buff.Bytes(), 0644)
 			return nil, err

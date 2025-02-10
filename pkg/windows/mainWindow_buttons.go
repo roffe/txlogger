@@ -14,10 +14,10 @@ import (
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
+	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/msglist"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
-	sdialog "github.com/sqweek/dialog"
 )
 
 func (mw *MainWindow) createButtons() {
@@ -147,19 +147,12 @@ func (mw *MainWindow) newDebugBtn() *widget.Button {
 
 func (mw *MainWindow) newOpenLogBtn() *widget.Button {
 	return widget.NewButtonWithIcon("Open log in new Window", theme.MediaFastForwardIcon(), func() {
-		go func() {
-			filename, err := sdialog.File().Filter("logfile", "t5l", "t7l", "t8l", "csv").Load()
-			if err != nil {
-				if err.Error() == "Cancelled" {
-					return
-				}
-				fyne.LogError("Error loading log file", err)
-				return
-			}
-
-			mw.LoadLogfileCombined(filename, fyne.Position{}, true)
-
-		}()
+		cb := func(r fyne.URIReadCloser) {
+			defer r.Close()
+			filename := r.URI().Path()
+			mw.LoadLogfileCombined(filename, r, fyne.Position{}, true)
+		}
+		widgets.SelectFile(cb, "logfile", "t5l", "t7l", "t8l", "csv")
 	})
 }
 

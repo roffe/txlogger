@@ -13,14 +13,14 @@ import (
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/mainmenu"
+	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmmod"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmstatus"
 	"github.com/roffe/txlogger/pkg/widgets/txupdater"
-	"github.com/skratchdot/open-golang/open"
-	sdialog "github.com/sqweek/dialog"
+	// "github.com/skratchdot/open-golang/open"
 )
 
 func (mw *MainWindow) setupMenu() {
@@ -50,28 +50,28 @@ func (mw *MainWindow) setupMenu() {
 			}),
 			fyne.NewMenuItem("Open binary", mw.loadBinary),
 			fyne.NewMenuItem("Open log", func() {
-				filename, err := sdialog.File().Filter("Log file", "csv", "t5l", "t7l", "t8l").Load()
-				if err != nil {
-					if err.Error() == "Cancelled" {
-						return
-					}
-					mw.Error(err)
-					return
+				cb := func(r fyne.URIReadCloser) {
+					defer r.Close()
+					filename := r.URI().Path()
+					log.Println("open log", filename)
+					mw.LoadLogfile(filename, r, fyne.NewPos(10, 10))
 				}
-				mw.LoadLogfile(filename, fyne.NewPos(10, 10))
+				widgets.SelectFile(cb, "Log file", "csv", "t5l", "t7l", "t8l")
 			}),
-			fyne.NewMenuItem("Open log folder", func() {
-				if err := open.Run(mw.settings.GetLogPath()); err != nil {
-					mw.Error(fmt.Errorf("failed to open logs folder: %w", err))
-				}
-			}),
+			//fyne.NewMenuItem("Open log folder", func() {
+			//	if err := open.Run(mw.settings.GetLogPath()); err != nil {
+			//		mw.Error(fmt.Errorf("failed to open logs folder: %w", err))
+			//	}
+			//}),
 			fyne.NewMenuItem("Settings", func() {
 				mw.openSettings()
 			}),
 			fyne.NewMenuItem("Update txbridge", func() {
-				updater := multiwindow.NewInnerWindow("txbridge firmware updater", txupdater.New(
-					mw.settings.CanSettings.GetSerialPort(),
-				))
+				port := mw.settings.CanSettings.GetSerialPort()
+				if mw.settings.CanSettings.GetAdapterName() == "txbridge wifi" {
+					port = "tcp"
+				}
+				updater := multiwindow.NewInnerWindow("txbridge firmware updater", txupdater.New(port))
 				updater.Icon = theme.DownloadIcon()
 				updater.Resize(fyne.NewSize(400, 300))
 				mw.wm.Add(updater)
@@ -115,22 +115,15 @@ func (mw *MainWindow) loadBinary() {
 		mw.Error(errors.New("stop logging before loading a new binary"))
 		return
 	}
-	go func() {
-		filename, err := sdialog.File().Filter("Binary file", "bin").Load()
-		if err != nil {
-			if err.Error() == "Cancelled" {
-				return
-			}
+	cb := func(r fyne.URIReadCloser) {
+		defer r.Close()
+		filename := r.URI().Path()
+		if err := mw.LoadSymbolsFromFile(filename, r); err != nil {
 			mw.Error(err)
 			return
 		}
-		fyne.Do(func() {
-			if err := mw.LoadSymbolsFromFile(filename); err != nil {
-				mw.Error(err)
-				return
-			}
-		})
-	}()
+	}
+	widgets.SelectFile(cb, "Binary file", "bin")
 }
 
 var openMapLock sync.Mutex

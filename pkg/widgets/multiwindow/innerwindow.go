@@ -39,7 +39,7 @@ type InnerWindow struct {
 	// The default is widget.ButtonAlignCenter which will auto select based on the OS.
 	//	- On Darwin this will be `widget.ButtonAlignLeading`
 	//	- On all other OS this will be `widget.ButtonAlignTrailing`
-	ButtonAlignment                                     widget.ButtonAlign
+	Alignment                                           widget.ButtonAlign
 	OnClose                                             func()                `json:"-"`
 	OnDragged, OnResized                                func(*fyne.DragEvent) `json:"-"`
 	OnMinimized, OnMaximized, OnTappedBar, OnTappedIcon func()                `json:"-"`
@@ -49,8 +49,7 @@ type InnerWindow struct {
 	Persist    bool // Persist through layout changes
 	IgnoreSave bool // Ignore saving to layout
 
-	icon                     fyne.CanvasObject
-	minBtn, maxBtn, closeBtn *borderButton
+	//minBtn, maxBtn, closeBtn *borderButton
 
 	title       string
 	bg          *canvas.Rectangle
@@ -61,7 +60,8 @@ type InnerWindow struct {
 	active           bool
 	leftDrag         bool
 	preMaximizedSize fyne.Size
-	preMaximizedPos  fyne.Position
+
+	preMaximizedPos fyne.Position
 
 	onClose func() `json:"-"`
 }
@@ -164,49 +164,53 @@ func (w *InnerWindow) Close() {
 
 func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 	th := w.Theme()
-	w.minBtn = newBorderButton(theme.WindowMinimizeIcon(), modeMinimize, th, w.OnMinimized)
+
+	min := newBorderButton(theme.WindowMinimizeIcon(), modeMinimize, th, w.OnMinimized)
 	if w.OnMinimized == nil {
-		w.minBtn.Disable()
+		min.Disable()
 	}
-	w.maxBtn = newBorderButton(theme.WindowMaximizeIcon(), modeMaximize, th, w.OnMaximized)
+	max := newBorderButton(theme.WindowMaximizeIcon(), modeMaximize, th, w.OnMaximized)
 	if w.OnMaximized == nil {
-		w.maxBtn.Disable()
+		max.Disable()
 	}
 
-	w.closeBtn = newBorderButton(theme.WindowCloseIcon(), modeClose, th, func() {
+	close := newBorderButton(theme.WindowCloseIcon(), modeClose, th, func() {
 		w.Close()
 	})
 
-	if w.Icon != nil {
-		w.icon = newBorderButton(w.Icon, modeIcon, th, func() {
-			if f := w.OnTappedIcon; f != nil {
-				f()
-			}
-		})
-		if w.OnTappedIcon == nil {
-			w.icon.(*borderButton).Disable()
+	borderIcon := newBorderButton(w.Icon, modeIcon, th, func() {
+		if f := w.OnTappedIcon; f != nil {
+			f()
 		}
+	})
+	if w.OnTappedIcon == nil {
+		borderIcon.Disable()
+	}
+
+	if w.Icon == nil {
+		borderIcon.Hide()
 	}
 
 	title := newDraggableLabel(w.title, w)
 	title.Truncation = fyne.TextTruncateEllipsis
 
-	isLeading := w.ButtonAlignment == widget.ButtonAlignLeading || (w.ButtonAlignment == widget.ButtonAlignCenter && runtime.GOOS == "darwin")
+	isLeading := w.Alignment == widget.ButtonAlignLeading || (w.Alignment == widget.ButtonAlignCenter && runtime.GOOS == "darwin")
 
 	var buttons *fyne.Container
 	var bar *fyne.Container
 	height := w.Theme().Size(theme.SizeNameWindowTitleBarHeight)
-	off := (height - title.labelMinSize().Height) / 2
+	topPad := (height - title.labelMinSize().Height) / 2
+
 	if isLeading {
 		// Left side (darwin default or explicit left alignment)
-		buttons = container.NewHBox(w.closeBtn, w.minBtn, w.maxBtn)
-		//bar = container.NewBorder(nil, nil, buttons, w.icon, title)
-		bar = container.NewBorder(nil, nil, buttons, w.icon, container.New(layout.NewCustomPaddedLayout(off, 0, 0, 0), title))
+		buttons = container.NewHBox(close, min, max)
+		//bar = container.NewBorder(nil, nil, buttons, borderIcon, title)
+		bar = container.NewBorder(nil, nil, buttons, borderIcon, container.New(layout.NewCustomPaddedLayout(topPad, 0, 0, 0), title))
 	} else {
 		// Right side (Windows/Linux default and explicit right alignment)
-		buttons = container.NewHBox(w.minBtn, w.maxBtn, w.closeBtn)
-		//bar = container.NewBorder(nil, nil, w.icon, buttons, title)
-		bar = container.NewBorder(nil, nil, w.icon, buttons, container.New(layout.NewCustomPaddedLayout(off, 0, 0, 0), title))
+		buttons = container.NewHBox(min, max, close)
+		//bar = container.NewBorder(nil, nil, borderIcon, buttons, title)
+		bar = container.NewBorder(nil, nil, borderIcon, buttons, container.New(layout.NewCustomPaddedLayout(topPad, 0, 0, 0), title))
 	}
 
 	v := fyne.CurrentApp().Settings().ThemeVariant()
@@ -218,7 +222,7 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 
 	objects := []fyne.CanvasObject{w.bg, contentBG, bar, w.content, leftCorner, rightCorner}
 	return &innerWindowRenderer{ShadowingRenderer: NewShadowingRenderer(objects, DialogLevel),
-		win: w, bar: bar, buttons: []*borderButton{w.minBtn, w.maxBtn, w.closeBtn}, bg: w.bg, leftCorner: leftCorner, rightCorner: rightCorner, contentBG: contentBG}
+		win: w, bar: bar, buttons: []*borderButton{min, max, close}, bg: w.bg, leftCorner: leftCorner, rightCorner: rightCorner, contentBG: contentBG}
 }
 
 func (w *InnerWindow) SetContent(obj fyne.CanvasObject) {

@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -60,6 +61,7 @@ func signalHandler(tx fyne.App) {
 }
 
 func startCanGW(errFunc func(error), readyChan chan<- bool) *os.Process {
+
 	if wd, err := os.Getwd(); err == nil {
 		command := filepath.Join(wd, "cangw.exe")
 		cmd := exec.Command(command)
@@ -70,7 +72,6 @@ func startCanGW(errFunc func(error), readyChan chan<- bool) *os.Process {
 		}
 		r := bufio.NewReader(rc)
 		go func() {
-			start := true
 			for {
 				str, err := r.ReadString('\n')
 				if err != nil {
@@ -82,13 +83,8 @@ func startCanGW(errFunc func(error), readyChan chan<- bool) *os.Process {
 					return
 				}
 				fmt.Print(str)
-				if start {
-					if strings.Contains(str, "server listening") {
-						readyChan <- true
-					} else {
-						readyChan <- false
-					}
-					start = false
+				if strings.Contains(str, "server listening") {
+					readyChan <- true
 				}
 			}
 		}()
@@ -104,7 +100,29 @@ func startCanGW(errFunc func(error), readyChan chan<- bool) *os.Process {
 }
 
 func main() {
-	startpprof()
+	isAndroid := runtime.GOOS == "android"
+	if isAndroid {
+		mainAndroid()
+	} else {
+		mainDesktop()
+	}
+}
+
+func mainAndroid() {
+	tx := app.NewWithID("com.roffe.txlogger")
+	tx.Settings().SetTheme(&txTheme{})
+	if err := presets.Load(tx); err != nil {
+		log.Println(err)
+	}
+	meta := tx.Metadata()
+	debug.Log(fmt.Sprintf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir()))
+	log.Printf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir())
+	mw := windows.NewMainWindow(tx)
+	mw.ShowAndRun()
+}
+
+func mainDesktop() {
+	//startpprof()
 	socketFile := filepath.Join(os.TempDir(), "txlogger.sock")
 
 	if ipc.IsRunning(socketFile) {
@@ -151,7 +169,7 @@ func main() {
 
 	meta := tx.Metadata()
 	debug.Log(fmt.Sprintf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir()))
-	log.Printf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir())
+	//log.Printf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir())
 
 	mw := windows.NewMainWindow(tx)
 
@@ -161,13 +179,24 @@ func main() {
 		"ping": func(data string) *ipc.Message {
 			return &ipc.Message{Type: "pong", Data: ""}
 		},
-		"open": func(data string) *ipc.Message {
+		"open": func(filename string) *ipc.Message {
 			fyne.Do(mw.Window.RequestFocus) // show window
-			if strings.HasSuffix(data, ".bin") {
-				mw.LoadSymbolsFromFile(data)
+			if strings.HasSuffix(filename, ".bin") {
+				f, err := os.Open(filename)
+				if err != nil {
+					mw.Error(err)
+				}
+				defer f.Close()
+				mw.LoadSymbolsFromFile(filename, f)
 			}
-			if strings.HasSuffix(data, ".t5l") || strings.HasSuffix(data, ".t7l") || strings.HasSuffix(data, ".t8l") || strings.HasSuffix(data, ".csv") {
-				mw.LoadLogfile(data, fyne.Position{})
+			if strings.HasSuffix(filename, ".t5l") || strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") || strings.HasSuffix(filename, ".csv") {
+				f, err := os.Open(filename)
+				if err != nil {
+					mw.Error(err)
+				}
+				defer f.Close()
+
+				mw.LoadLogfile(filename, f, fyne.Position{})
 			}
 			return nil
 		},
@@ -185,24 +214,48 @@ func main() {
 		switch strings.ToLower(path.Ext(filename)) {
 		case ".bin":
 			//mw = windows.NewMainWindow(a, filename)
-			if err := mw.LoadSymbolsFromFile(filename); err != nil {
+			f, err := os.Open(filename)
+			if err != nil {
+				mw.Error(err)
+			}
+			defer f.Close()
+			if err := mw.LoadSymbolsFromFile(filename, f); err != nil {
 				mw.Error(err)
 			} else {
 				loadedSymbols = true
 			}
 
 		case ".t5l", ".t7l", ".t8l", ".csv":
-			mw.LoadLogfile(filename, fyne.Position{})
+			f, err := os.Open(filename)
+			if err != nil {
+				mw.Error(err)
+			}
+			defer f.Close()
+
+			mw.LoadLogfile(filename, f, fyne.Position{})
 		}
 	}
 
 	if filename := tx.Preferences().String("lastBinFile"); filename != "" && !loadedSymbols {
-		mw.LoadSymbolsFromFile(filename)
+		if fileExists(filename) {
+			f, err := os.Open(filename)
+			if err != nil {
+				mw.Error(err)
+			} else {
+				defer f.Close()
+				mw.LoadSymbolsFromFile(filename, f)
+			}
+		}
 	}
 
 	//go updateCheck(a, mw)
 
 	mw.ShowAndRun()
+}
+
+func fileExists(name string) bool {
+	_, err := os.Stat(name)
+	return !os.IsNotExist(err)
 }
 
 /*

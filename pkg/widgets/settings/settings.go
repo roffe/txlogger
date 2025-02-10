@@ -2,7 +2,6 @@ package settings
 
 import (
 	"errors"
-	"log"
 	"strconv"
 	"strings"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
 	"github.com/roffe/txlogger/pkg/wbl/plx"
+	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/cansettings"
 )
 
@@ -89,8 +89,6 @@ type SettingsWidget struct {
 	lambdatocan *canvas.Image
 	t7          *canvas.Image
 	plx         *canvas.Image
-
-	OpenFileDialogueFunc func() (string, error)
 
 	widget.BaseWidget
 }
@@ -319,16 +317,11 @@ func New(cfg *Config) *SettingsWidget {
 					app.Preferences().SetString(prefsLogPath, datalogger.LOGPATH)
 				}),
 				widget.NewButtonWithIcon("Browse", theme.FileIcon(), func() {
-					dir, err := selectFolder()
-					if err != nil {
-						if err.Error() == "Cancelled" {
-							return
-						}
-						log.Println(err)
-						return
+					cb := func(dir string) {
+						sw.logPath.SetText(dir)
+						app.Preferences().SetString(prefsLogPath, dir)
 					}
-					sw.logPath.SetText(dir)
-					app.Preferences().SetString(prefsLogPath, dir)
+					widgets.SelectFolder(cb)
 				}),
 			),
 			widget.NewLabel("Log folder"),
@@ -605,7 +598,7 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 }
 
 func (sw *SettingsWidget) newFreqSlider() *widget.Slider {
-	slider := widget.NewSlider(5, 100)
+	slider := widget.NewSlider(5, 300)
 	slider.OnChanged = func(f float64) {
 		sw.freqValue.SetText(strconv.FormatFloat(f, 'f', 0, 64))
 	}

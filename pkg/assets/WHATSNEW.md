@@ -27,6 +27,9 @@ Or why not create your own gauges and make it just like you want :)
 - Added "What's new" to "File" menu to access this document
 - Added support to drag the plotter instead of having to use the slider to seek in the logfile
 - Improved T5 support
+- goCAN now supports Kvaser Canlib for all Kvaser products
+- The CANbus communication has been broken out to a separate binary that is compiled as 32-bit due to the requirements for j2534 dll's.
+
 
 
 

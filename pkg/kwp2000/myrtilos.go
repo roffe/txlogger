@@ -3,7 +3,6 @@ package kwp2000
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/roffe/gocan"
 )
@@ -11,12 +10,12 @@ import (
 func (t *Client) SendEU0DRegistrationKey(ctx context.Context, key []byte) error {
 	payload := append([]byte{0x40, 0xA1, 0x05, EU0D_SET_REGISTRATION_KEY}, key...)
 	frame := gocan.NewFrame(REQ_MSG_ID, payload, gocan.ResponseRequired)
-	log.Println("Send>", frame.String())
-	resp, err := t.c.SendAndPoll(ctx, frame, t.defaultTimeout, t.responseID)
+	//	log.Println("Send>", frame.String())
+	resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.responseID)
 	if err != nil {
 		return fmt.Errorf("SetEU0DRegistrationKey: %w", err)
 	}
-	log.Println("Recv>", resp.String())
+	//	log.Println("Recv>", resp.String())
 	return checkErr(resp)
 }
 

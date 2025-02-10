@@ -110,7 +110,7 @@ func (mr *MyrtilosRegistration) register(key []byte) error {
 		return err
 	}
 	ctx := context.Background()
-	c, err := gocan.New(ctx, adapter)
+	c, err := gocan.NewClient(ctx, adapter)
 	if err != nil {
 		return err
 	}

@@ -27,7 +27,19 @@ func start() {
 func Log(msg string) {
 	initOnce.Do(start)
 	timeStr := time.Now().Format("2006-01-02 15:04:05.000")
-	_, fullPath, line, ok := runtime.Caller(2)
+	_, fullPath, line, ok := runtime.Caller(1)
+	filename := filepath.Base(fullPath)
+	if ok {
+		LogRaw(fmt.Sprintf("%s %s:%d %s", timeStr, filename, line, msg))
+	} else {
+		LogRaw(timeStr + " " + msg)
+	}
+}
+
+func LogDepth(depth int, msg string) {
+	initOnce.Do(start)
+	timeStr := time.Now().Format("2006-01-02 15:04:05.000")
+	_, fullPath, line, ok := runtime.Caller(depth)
 	filename := filepath.Base(fullPath)
 	if ok {
 		LogRaw(fmt.Sprintf("%s %s:%d %s", timeStr, filename, line, msg))

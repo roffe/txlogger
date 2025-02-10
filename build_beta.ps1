@@ -35,4 +35,4 @@ else {
     Write-Error "WinRAR is not installed or not found in expected locations"
 }
 
-Invoke-Expression "scp txlogger_beta.zip roffe@roffe.nu:/webroot/roffe/public_html/txlogger"
+scp txlogger_beta.zip roffe@roffe.nu:/webroot/roffe/public_html/txlogger

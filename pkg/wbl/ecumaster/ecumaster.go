@@ -53,7 +53,7 @@ func (l *LambdaToCAN) Start(ctx context.Context) error {
 		defer sub.Close()
 		for l.running {
 			select {
-			case msg, ok := <-sub.C():
+			case msg, ok := <-sub.Chan():
 				if !ok {
 					log.Println("channel closed")
 					return //channel closed

@@ -7,13 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/adapter"
+	"github.com/roffe/gocan/pkg/serialcommand"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/t5can"
 )
@@ -79,7 +80,7 @@ func (c *T5Client) Start() error {
 	defer c.lw.Close()
 
 	var txbridge bool
-	if c.Config.Device.Name() == "txbridge" {
+	if strings.HasPrefix(c.Config.Device.Name(), "txbridge") {
 		txbridge = true
 	}
 
@@ -130,7 +131,7 @@ func (c *T5Client) Start() error {
 
 	var expectedPayloadSize uint16
 	if txbridge {
-		if err := cl.SendFrame(adapter.SystemMsg, []byte("5"), gocan.Outgoing); err != nil {
+		if err := cl.SendFrame(gocan.SystemMsg, []byte("5"), gocan.Outgoing); err != nil {
 			return err
 		}
 
@@ -142,7 +143,7 @@ func (c *T5Client) Start() error {
 
 			// deletelog.Printf("Symbol: %s, offset: %X, length: %d\n", sym.Name, sym.SramOffset, sym.Length)
 		}
-		cmd := &gocan.SerialCommand{
+		cmd := &serialcommand.SerialCommand{
 			Command: 'd',
 			Data:    symbollist,
 		}
@@ -150,19 +151,19 @@ func (c *T5Client) Start() error {
 		if err != nil {
 			return err
 		}
-		if err := cl.SendFrame(adapter.SystemMsg, payload, gocan.Outgoing); err != nil {
+		if err := cl.SendFrame(gocan.SystemMsg, payload, gocan.Outgoing); err != nil {
 			return err
 		}
 		c.OnMessage("Symbol list configured")
 	}
 
 	err = retry.Do(func() error {
-		tx := cl.Subscribe(ctx, adapter.SystemMsgDataResponse, adapter.SystemMsgError)
+		tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse, gocan.SystemMsgError)
 		defer tx.Close()
 
 		if txbridge {
 			t.Stop()
-			if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
+			if err := cl.SendFrame(gocan.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
 				return err
 			}
 		}
@@ -192,7 +193,7 @@ func (c *T5Client) Start() error {
 					// log.Println(read.Length)
 					toRead := min(234, read.Length)
 					read.Length -= toRead
-					cmd := gocan.SerialCommand{
+					cmd := serialcommand.SerialCommand{
 						Command: 'R',
 						Data: []byte{
 							byte(read.Address),
@@ -208,8 +209,8 @@ func (c *T5Client) Start() error {
 						c.onError(err)
 						continue
 					}
-					frame := gocan.NewFrame(adapter.SystemMsg, payload, gocan.Outgoing)
-					resp, err := cl.SendAndPoll(ctx, frame, 3000*time.Millisecond, adapter.SystemMsgDataRequest)
+					frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
+					resp, err := cl.SendAndWait(ctx, frame, 3000*time.Millisecond, gocan.SystemMsgDataRequest)
 					if err != nil {
 						read.Complete(err)
 						continue
@@ -265,11 +266,11 @@ func (c *T5Client) Start() error {
 				if count%15 == 0 {
 					c.CaptureCounter(count)
 				}
-			case msg, ok := <-tx.C():
+			case msg, ok := <-tx.Chan():
 				if !ok {
 					return retry.Unrecoverable(errors.New("txbridge recv channel closed"))
 				}
-				if msg.Identifier() == adapter.SystemMsgError {
+				if msg.Identifier() == gocan.SystemMsgError {
 					data := msg.Data()
 					switch data[0] {
 					case 0x31:

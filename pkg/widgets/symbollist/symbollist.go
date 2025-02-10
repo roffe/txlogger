@@ -114,10 +114,12 @@ func (s *Widget) Add(symbols ...*symbol.Symbol) {
 			continue
 		}
 
-		cancel := s.cfg.EBus.SubscribeFunc(sym.Name, func(value float64) {
-			s.SetValue(sym.Name, value)
-		})
-		s.subs[sym.Name] = cancel
+		if s.cfg.EBus != nil {
+			cancel := s.cfg.EBus.SubscribeFunc(sym.Name, func(value float64) {
+				s.SetValue(sym.Name, value)
+			})
+			s.subs[sym.Name] = cancel
+		}
 
 		deleteFunc := func(sw *SymbolWidgetEntry) {
 			s.mu.Lock()

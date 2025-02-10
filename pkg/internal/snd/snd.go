@@ -1,19 +1,13 @@
 package snd
 
 import (
-	"bytes"
 	_ "embed"
-	"fmt"
-	"log"
-	"time"
-
-	"github.com/ebitengine/oto/v3"
-	"github.com/hajimehoshi/go-mp3"
 )
 
 //go:embed pedro.mp3
 var pedroMp3 []byte
 
+/*
 func Pedro(otoCtx *oto.Context) error {
 	fileBytesReader := bytes.NewReader(pedroMp3)
 	decodedMp3, err := mp3.NewDecoder(fileBytesReader)
@@ -47,3 +41,4 @@ func Pedro(otoCtx *oto.Context) error {
 	}()
 	return nil
 }
+*/

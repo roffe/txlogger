@@ -2,19 +2,16 @@ package windows
 
 import (
 	"context"
-	"errors"
 	"log"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
 	xwidget "fyne.io/x/fyne/widget"
-	"github.com/ebitengine/oto/v3"
 	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ebus"
@@ -22,6 +19,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
 
+/*
 // Remember that you should **not** create more than one context
 func newOtoContext() *oto.Context {
 	opts := &oto.NewContextOptions{
@@ -46,9 +44,12 @@ func newOtoContext() *oto.Context {
 		return nil
 	}
 }
+*/
 
 func (mw *MainWindow) closeIntercept() {
-	mw.gclient.SendCommand(context.Background(), &proto.Command{Data: []byte("quit")})
+	if mw.gclient != nil {
+		mw.gclient.SendCommand(context.Background(), &proto.Command{Data: []byte("quit")})
+	}
 
 	if mw.dlc != nil {
 		mw.dlc.Close()
@@ -63,15 +64,34 @@ func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
 		filename := u.Path()
 		switch strings.ToLower(path.Ext(filename)) {
 		case ".bin":
-			mw.LoadSymbolsFromFile(filename)
+			f, err := os.Open(filename)
+			if err != nil {
+				mw.Error(err)
+				return
+			}
+			defer f.Close()
+			mw.LoadSymbolsFromFile(filename, f)
 		case ".t5l", ".t7l", ".t8l", ".csv":
 			// Check if we dropped it on the open log button
 			// log.Println(mw.buttons.openLogBtn.Position(), mw.buttons.openLogBtn.Size())
 			if p.X >= mw.buttons.openLogBtn.Position().X && p.X <= mw.buttons.openLogBtn.Position().X+mw.buttons.openLogBtn.Size().Width &&
 				p.Y >= mw.buttons.openLogBtn.Position().Y+30 && p.Y <= mw.buttons.openLogBtn.Position().Y+30+mw.buttons.openLogBtn.Size().Height {
-				mw.LoadLogfileCombined(filename, p, false)
+
+				f, err := os.Open(filename)
+				if err != nil {
+					mw.Error(err)
+					return
+				}
+				defer f.Close()
+				mw.LoadLogfileCombined(filename, f, p, false)
 			} else {
-				mw.LoadLogfile(filename, p)
+				f, err := os.Open(filename)
+				if err != nil {
+					mw.Error(err)
+					return
+				}
+				defer f.Close()
+				mw.LoadLogfile(filename, f, p)
 			}
 		}
 	}

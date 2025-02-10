@@ -3,8 +3,11 @@ package widgets
 import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 )
+
+var _ desktop.Mouseable = (*TestWidget)(nil)
 
 type TestWidget struct {
 	widget.BaseWidget
@@ -36,11 +39,13 @@ func (t *TestWidget) CreateRenderer() fyne.WidgetRenderer {
 	}
 }
 
-func (t *TestWidget) SetValue(value float64) {
-	t.value = value
+func (t *TestWidget) MouseDown(e *desktop.MouseEvent) {
 }
 
-func (t *TestWidget) SetValue2(value float64) {
+func (t *TestWidget) MouseUp(e *desktop.MouseEvent) {
+}
+
+func (t *TestWidget) SetValue(value float64) {
 	t.value = value
 }
 

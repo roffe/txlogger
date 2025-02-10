@@ -2,7 +2,10 @@ package cansettings
 
 import (
 	"errors"
-	"sort"
+	"fmt"
+	"log"
+	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,10 +16,8 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/adapter"
-	"github.com/roffe/gocan/client"
 	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/layout"
-	"go.bug.st/serial/enumerator"
 )
 
 const (
@@ -25,7 +26,7 @@ const (
 	prefsSpeed   = "speed"
 	prefsDebug   = "debug"
 
-	minimumtxbridgeVersion = "1.0.6"
+	MinimumtxbridgeVersion = "1.0.6"
 )
 
 var portSpeeds = []string{"9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600", "1mbit", "2mbit", "3mbit"}
@@ -107,7 +108,9 @@ func (c *Widget) AddAdapters(adapters []*proto.AdapterInfo) {
 	for name := range c.adapters {
 		names = append(names, name)
 	}
-	sort.Strings(names)
+	slices.SortFunc(names, func(i, j string) int {
+		return strings.Compare(strings.ToLower(i), strings.ToLower(j))
+	})
 	c.adapterSelector.Options = names
 	c.adapterSelector.Refresh()
 	if ad := c.app.Preferences().String(prefsAdapter); ad != "" {
@@ -143,6 +146,10 @@ func (c *Widget) Enable() {
 			c.speedSelector.Disable()
 		}
 	}
+}
+
+func (cs *Widget) GetAdapterName() string {
+	return cs.adapterSelector.Selected
 }
 
 func (cs *Widget) GetSerialPort() string {
@@ -181,7 +188,7 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 		return nil, errors.New("Select CANbus adapter in settings") //lint:ignore ST1005 This is ok
 	}
 
-	if adapter.GetAdapterMap()[cs.adapterSelector.Selected].RequiresSerialPort {
+	if cs.adapters[cs.adapterSelector.Selected].RequiresSerialPort {
 		if cs.portSelector.Selected == "" {
 			return nil, errors.New("Select port in setings") //lint:ignore ST1005 This is ok
 
@@ -221,10 +228,10 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 		canRate = 500
 	}
 	var minimumVersion string
-	if cs.adapterSelector.Selected == "txbridge" {
-		minimumVersion = minimumtxbridgeVersion
+	if strings.HasPrefix(cs.adapterSelector.Selected, "txbridge") {
+		minimumVersion = MinimumtxbridgeVersion
 	}
-	return client.New(
+	return adapter.NewClient(
 		cs.adapterSelector.Selected,
 		&gocan.AdapterConfig{
 			Port:         cs.portSelector.Selected,
@@ -234,37 +241,18 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 			OnMessage:    logger,
 			Debug:        cs.debugCheckbox.Checked,
 			OnError: func(err error) {
+				_, file, no, ok := runtime.Caller(1)
+				if ok {
+					fmt.Printf("%s#%d %v\n", file, no, err)
+				} else {
+					log.Println(err)
+				}
 				logger(err.Error())
 			},
 			MinimumFirmwareVersion: minimumVersion,
+			PrintVersion:           true,
 		},
 	)
-}
-
-func (cs *Widget) ListPorts() []string {
-	var portsList []string
-	ports, err := enumerator.GetDetailedPortsList()
-	if err != nil {
-		//m.output(err.Error())
-		return []string{}
-	}
-	if len(ports) == 0 {
-		//m.output("No serial ports found!")
-		return []string{}
-	}
-
-	for _, port := range ports {
-		//m.output(fmt.Sprintf("Found port: %s", port.Name))
-		//if port.IsUSB {
-		//m.output(fmt.Sprintf("  USB ID     %s:%s", port.VID, port.PID))
-		//m.output(fmt.Sprintf("  USB serial %s", port.SerialNumber))
-		portsList = append(portsList, port.Name)
-		//}
-	}
-
-	sort.Strings(portsList)
-
-	return portsList
 }
 
 func (cs *Widget) CreateRenderer() fyne.WidgetRenderer {

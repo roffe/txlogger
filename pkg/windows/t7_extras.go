@@ -69,7 +69,7 @@ func (t *T7Extras) resetECU() error {
 		return err
 	}
 	ctx := context.Background()
-	c, err := gocan.New(ctx, adapter)
+	c, err := gocan.NewClient(ctx, adapter)
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (t *T7Extras) resetECU() error {
 	   	time.Sleep(100 * time.Millisecond) */
 
 	frame := gocan.NewFrame(0x240, []byte{0x40, 0xA1, 0x02, 0x11, 0x01}, gocan.ResponseRequired)
-	f, err := c.SendAndPoll(ctx, frame, 400*time.Millisecond, 0x258)
+	f, err := c.SendAndWait(ctx, frame, 400*time.Millisecond, 0x258)
 	if err != nil {
 		return err
 	}

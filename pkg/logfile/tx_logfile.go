@@ -3,8 +3,8 @@ package logfile
 import (
 	"bufio"
 	"errors"
+	"io"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -16,11 +16,11 @@ type TxLogfile struct {
 	BaseLogfile
 }
 
-func NewFromTxLogfile(filename string) (Logfile, error) {
+func NewFromTxLogfile(reader io.ReadCloser) (Logfile, error) {
 	txlog := &TxLogfile{}
 	txlog.pos = -1
 	// start := time.Now()
-	if err := txlog.parseTxLogfile(filename); err != nil {
+	if err := txlog.parseTxLogfile(reader); err != nil {
 		return nil, err
 	}
 	// log.Printf("Parsed %d records in %s", len(rec), time.Since(start))
@@ -45,17 +45,10 @@ func detectTimeFormat(text string) (string, error) {
 	return "", errors.New("could not detect time format")
 }
 
-func (l *TxLogfile) parseTxLogfile(filename string) error {
+func (l *TxLogfile) parseTxLogfile(reader io.ReadCloser) error {
 	lines := make([]string, 0)
-	readFile, err := os.Open(filename)
-	if readFile != nil {
-		defer readFile.Close()
-	}
-	if err != nil {
-		return err
-	}
 	buffer := make([]byte, 4*1024)
-	fileScanner := bufio.NewScanner(readFile)
+	fileScanner := bufio.NewScanner(reader)
 	fileScanner.Buffer(buffer, bufio.MaxScanTokenSize)
 	for fileScanner.Scan() {
 		lines = append(lines, string(fileScanner.Bytes()))
