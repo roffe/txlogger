@@ -13,7 +13,7 @@ require (
 	fyne.io/x/fyne v0.0.0-20250106132206-3228f6c50107
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/lusingander/colorpicker v0.7.4
-	github.com/roffe/ecusymbol v0.0.0-00010101000000-000000000000
+	github.com/roffe/ecusymbol v0.0.0-20250202020823-4b5104c7ac0a
 	github.com/roffe/gocan v0.0.0-20250210201942-7f0e51b4924d
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.2
