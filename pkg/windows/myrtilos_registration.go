@@ -9,31 +9,56 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
+var _ fyne.Widget = (*MyrtilosRegistration)(nil)
+
 type MyrtilosRegistration struct {
-	fyne.Window
-	app   fyne.App
-	mw    *MainWindow
-	input *widget.Entry
-	text  *widget.Label
+	mw *MainWindow
+
+	input      *widget.Entry
+	text       *widget.Label
+	btn        *widget.Button
+	output     *widget.List
+	outputData binding.StringList
+
+	l binding.DataListener
+
+	widget.BaseWidget
 }
 
-func NewMyrtilosRegistration(app fyne.App, mw *MainWindow) *MyrtilosRegistration {
+func NewMyrtilosRegistration(mw *MainWindow) fyne.Widget {
 	mr := &MyrtilosRegistration{
-		Window: app.NewWindow("EU0D registration"),
-		app:    app,
-		mw:     mw,
-		input:  widget.NewEntry(),
-		text:   widget.NewLabel("Enter security key"),
+		mw:         mw,
+		input:      widget.NewEntry(),
+		text:       widget.NewLabel("Enter security key"),
+		outputData: binding.NewStringList(),
 	}
+	mr.ExtendBaseWidget(mr)
+	mr.output = widget.NewListWithData(
+		mr.outputData,
+		func() fyne.CanvasObject {
+			return &widget.Label{
+				Alignment:  fyne.TextAlignLeading,
+				Truncation: fyne.TextTruncateEllipsis,
+			}
 
-	mr.input.MultiLine = false
+		},
+		func(item binding.DataItem, obj fyne.CanvasObject) {
+			i := item.(binding.String)
+			txt, err := i.Get()
+			if err != nil {
+				log.Println()
+				return
+			}
+			obj.(*widget.Label).SetText(txt)
+		},
+	)
 	mr.input.Validator = func(s string) error {
 		s = strings.ReplaceAll(s, " ", "")
 		if len(s) != 8 {
@@ -45,31 +70,27 @@ func NewMyrtilosRegistration(app fyne.App, mw *MainWindow) *MyrtilosRegistration
 		}
 		return nil
 	}
-
-	mr.Resize(fyne.NewSize(500, 30))
-	mr.SetContent(mr.render())
+	mr.btn = widget.NewButtonWithIcon("Register", theme.InfoIcon(), func() {
+		key, err := hex.DecodeString(mr.input.Text)
+		if err != nil {
+			mr.text.SetText(err.Error())
+			return
+		}
+		if err := mr.register(key); err != nil {
+			mr.outputData.Append(err.Error())
+		} else {
+			mr.outputData.Append("key saved in ecu")
+		}
+	})
 	return mr
 }
 
-func (mr *MyrtilosRegistration) render() *fyne.Container {
-	return container.NewBorder(
-		mr.text,
-		widget.NewButtonWithIcon("Register", theme.InfoIcon(), func() {
-			key, err := hex.DecodeString(mr.input.Text)
-			if err != nil {
-				mr.text.SetText(err.Error())
-				return
-			}
-			if err := mr.register(key); err != nil {
-				mr.text.SetText(err.Error())
-			} else {
-				mr.text.SetText("key saved in ecu")
-			}
-		}),
-		nil,
-		nil,
-		mr.input,
-	)
+func (mr *MyrtilosRegistration) CreateRenderer() fyne.WidgetRenderer {
+	mr.l = binding.NewDataListener(func() {
+		mr.output.ScrollToBottom()
+	})
+	mr.outputData.AddListener(mr.l)
+	return &myrtilosRegistrationRenderer{MyrtilosRegistration: mr}
 }
 
 func (mr *MyrtilosRegistration) register(key []byte) error {
@@ -79,12 +100,17 @@ func (mr *MyrtilosRegistration) register(key []byte) error {
 	if mr.mw.dlc != nil {
 		return errors.New("stop logging before registering")
 	}
-	adapter, err := mr.mw.settings.CanSettings.GetAdapter("T7", mr.mw.Log)
+
+	logFn := func(s string) {
+		mr.outputData.Append(s)
+	}
+
+	adapter, err := mr.mw.settings.CanSettings.GetAdapter("T7", logFn)
 	if err != nil {
 		return err
 	}
 	ctx := context.Background()
-	c, err := gocan.New(ctx, adapter)
+	c, err := gocan.NewClient(ctx, adapter)
 	if err != nil {
 		return err
 	}
@@ -116,4 +142,41 @@ func (mr *MyrtilosRegistration) register(key []byte) error {
 		return err
 	}
 	return nil
+}
+
+var _ fyne.WidgetRenderer = (*myrtilosRegistrationRenderer)(nil)
+
+type myrtilosRegistrationRenderer struct {
+	*MyrtilosRegistration
+	oldSize fyne.Size
+}
+
+func (mr *myrtilosRegistrationRenderer) MinSize() fyne.Size {
+	return fyne.NewSize(400, 200)
+}
+
+func (mr *myrtilosRegistrationRenderer) Layout(size fyne.Size) {
+	if size == mr.oldSize {
+		return
+	}
+	mr.oldSize = size
+	mr.text.Resize(fyne.NewSize(size.Width, 30))
+	mr.input.Resize(fyne.NewSize(size.Width, 38))
+	mr.output.Move(fyne.NewPos(0, 68))
+	mr.btn.Resize(fyne.NewSize(size.Width, 30))
+	mr.text.Move(fyne.NewPos(0, 0))
+	mr.input.Move(fyne.NewPos(0, 30))
+	mr.output.Resize(fyne.NewSize(size.Width, size.Height-mr.btn.Size().Height-66))
+	mr.btn.Move(fyne.NewPos(0, size.Height-mr.btn.Size().Height))
+}
+
+func (mr *myrtilosRegistrationRenderer) Refresh() {
+}
+
+func (mr *myrtilosRegistrationRenderer) Destroy() {
+	mr.outputData.RemoveListener(mr.l)
+}
+
+func (mr *MyrtilosRegistration) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{mr.text, mr.input, mr.output, mr.btn}
 }

@@ -1,17 +1,22 @@
 //go:build windows
-// +build windows
 
 package datalogger
 
 import (
-	"fmt"
-	"strings"
+	"log"
+	"os"
+	"path/filepath"
 )
 
-const (
-	LOGPATH = "logs\\"
-)
+var LOGPATH = "logs\\"
 
-func fullPath(path, filename string) string {
-	return fmt.Sprintf("%s\\%s", strings.TrimSuffix(path, "\\"), filename)
+func init() {
+
+	if dir, err := os.UserHomeDir(); err == nil {
+		LOGPATH = filepath.Join(dir, "txlogger", "logs")
+		log.Println("LOGPATH: ", LOGPATH)
+	}
+	if err := os.MkdirAll(LOGPATH, os.ModePerm); err != nil {
+		log.Println("Error creating log directory: ", err)
+	}
 }

@@ -8,13 +8,14 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/adapter"
+	"github.com/roffe/gocan/pkg/serialcommand"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
@@ -43,8 +44,8 @@ func NewT7(cfg Config, lw LogWriter) (IClient, error) {
 	return &T7Client{
 		Config:     cfg,
 		symbolChan: make(chan []*symbol.Symbol, 1),
-		updateChan: make(chan *WriteRequest, 1),
-		readChan:   make(chan *ReadRequest, 1),
+		updateChan: make(chan *WriteRequest, 10),
+		readChan:   make(chan *ReadRequest, 10),
 		quitChan:   make(chan struct{}),
 		sysvars:    NewThreadSafeMap(),
 		lw:         lw,
@@ -54,7 +55,7 @@ func NewT7(cfg Config, lw LogWriter) (IClient, error) {
 func (c *T7Client) Close() {
 	c.closeOnce.Do(func() {
 		close(c.quitChan)
-		//time.Sleep(200 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 	})
 }
 
@@ -89,7 +90,7 @@ func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client)
 		<-c.quitChan
 		sub.Close()
 	}()
-	for msg := range sub.C() {
+	for msg := range sub.Chan() {
 		switch msg.Identifier() {
 		case 0x1A0:
 			rpm = binary.BigEndian.Uint16(msg.Data()[1:3])
@@ -127,7 +128,7 @@ func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client)
 func (c *T7Client) onError(err error) {
 	c.errCount++
 	c.errPerSecond++
-	c.ErrorCounter.Set(c.errCount)
+	c.ErrorCounter(c.errCount)
 	c.OnMessage(err.Error())
 }
 
@@ -135,7 +136,7 @@ func (c *T7Client) Start() error {
 	defer c.lw.Close()
 
 	var txbridge bool
-	if c.Config.Device.Name() == "txbridge" {
+	if strings.HasPrefix(c.Config.Device.Name(), "txbridge") {
 		txbridge = true
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -146,7 +147,7 @@ func (c *T7Client) Start() error {
 		c.Device,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create t7 client: %w", err)
 	}
 	defer cl.Close()
 
@@ -180,7 +181,7 @@ func (c *T7Client) Start() error {
 
 	c.lamb, err = NewWBL(ctx, cl, cfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create wideband lambda: %w", err)
 	}
 
 	if c.lamb != nil {
@@ -199,7 +200,7 @@ func (c *T7Client) Start() error {
 	retries := 0
 
 	if txbridge {
-		if err := cl.SendFrame(adapter.SystemMsg, []byte("7"), gocan.Outgoing); err != nil {
+		if err := cl.SendFrame(gocan.SystemMsg, []byte("7"), gocan.Outgoing); err != nil {
 			return err
 		}
 	}
@@ -207,10 +208,7 @@ func (c *T7Client) Start() error {
 	kwp := kwp2000.New(cl)
 	err = retry.Do(func() error {
 		if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
-			if retries == 0 {
-				return retry.Unrecoverable(err)
-			}
-			return err
+			return retry.Unrecoverable(errors.New("failed to start session"))
 		}
 		defer func() {
 			kwp.StopSession(ctx)
@@ -221,7 +219,7 @@ func (c *T7Client) Start() error {
 
 		granted, err := kwp.RequestSecurityAccess(ctx, false)
 		if err != nil {
-			return err
+			return errors.New("failed to request security access")
 		}
 
 		if !granted {
@@ -231,7 +229,7 @@ func (c *T7Client) Start() error {
 		}
 
 		if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
-			return err
+			return errors.New("failed to clear dynamic register")
 		}
 		c.OnMessage("Cleared dynamic register")
 
@@ -242,7 +240,7 @@ func (c *T7Client) Start() error {
 			}
 			//			log.Println("Defining", sym.Name, dpos)
 			if err := kwp.DynamicallyDefineLocalIdRequest(ctx, dpos, sym); err != nil {
-				return err
+				return errors.New("failed to define dynamic register")
 			}
 			dpos++
 			time.Sleep(12 * time.Millisecond)
@@ -275,13 +273,13 @@ func (c *T7Client) Start() error {
 			}
 		}
 
-		tx := cl.Subscribe(ctx, adapter.SystemMsgDataResponse, adapter.SystemMsgError)
+		tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse, gocan.SystemMsgError)
 		defer tx.Close()
 
 		if txbridge {
 			//			log.Println("stopped timer, using txbridge")
 			t.Stop()
-			if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
+			if err := cl.SendFrame(gocan.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
 				return err
 			}
 		}
@@ -293,11 +291,13 @@ func (c *T7Client) Start() error {
 		var currtimestamp uint32
 		for {
 			select {
+			case err := <-cl.Err():
+				return retry.Unrecoverable(err)
 			case <-c.quitChan:
 				c.OnMessage("Stopped logging..")
 				return nil
 			case <-secondTicker.C:
-				c.FpsCounter.Set(cps)
+				c.FpsCounter(cps)
 				if c.errPerSecond > 5 {
 					c.errPerSecond = 0
 					return fmt.Errorf("too many errors per second")
@@ -332,7 +332,7 @@ func (c *T7Client) Start() error {
 				if txbridge {
 					toRead := min(235, read.Length)
 					read.Length -= toRead
-					cmd := gocan.SerialCommand{
+					cmd := serialcommand.SerialCommand{
 						Command: 'R',
 						Data: []byte{
 							byte(read.Address),
@@ -348,8 +348,8 @@ func (c *T7Client) Start() error {
 						c.onError(err)
 						continue
 					}
-					frame := gocan.NewFrame(adapter.SystemMsg, payload, gocan.Outgoing)
-					resp, err := cl.SendAndPoll(ctx, frame, 3*time.Second, adapter.SystemMsgDataRequest)
+					frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
+					resp, err := cl.SendAndWait(ctx, frame, 3*time.Second, gocan.SystemMsgDataRequest)
 					if err != nil {
 						read.Complete(err)
 						continue
@@ -366,11 +366,6 @@ func (c *T7Client) Start() error {
 				data, err := kwp.ReadMemoryByAddress(ctx, int(read.Address), int(read.Length))
 				if err != nil {
 					read.Complete(err)
-					if txbridge {
-						if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
-							c.onError(err)
-						}
-					}
 					continue
 				}
 				read.Data = data
@@ -378,7 +373,7 @@ func (c *T7Client) Start() error {
 			case write := <-c.updateChan:
 				if txbridge {
 					toRead := min(235, write.Length)
-					cmd := gocan.SerialCommand{
+					cmd := serialcommand.SerialCommand{
 						Command: 'W',
 						Data: []byte{
 							byte(write.Address),
@@ -400,24 +395,27 @@ func (c *T7Client) Start() error {
 						continue
 					}
 
-					frame := gocan.NewFrame(adapter.SystemMsg, payload, gocan.Outgoing)
+					frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
 
-					resp, err := cl.SendAndPoll(ctx, frame, 1*time.Second, adapter.SystemMsgWriteResponse, adapter.SystemMsgError)
+					resp, err := cl.SendAndWait(ctx, frame, 1*time.Second, gocan.SystemMsgWriteResponse, gocan.SystemMsgError)
 					if err != nil {
 						write.Complete(err)
 						continue
 					}
 
-					if resp.Identifier() == adapter.SystemMsgError {
+					if resp.Identifier() == gocan.SystemMsgError {
 						write.Complete(fmt.Errorf("error response"))
 						continue
 					}
 
 					if write.Length > 0 {
-						c.updateChan <- write
+						select {
+						case c.updateChan <- write:
+						default:
+							log.Println("kisskorv updateChan full")
+						}
 						continue
 					}
-
 					write.Complete(nil)
 					continue
 				}
@@ -484,13 +482,13 @@ func (c *T7Client) Start() error {
 				count++
 				cps++
 				if count%15 == 0 {
-					c.CaptureCounter.Set(count)
+					c.CaptureCounter(count)
 				}
-			case msg := <-tx.C():
-				if msg == nil {
-					return retry.Unrecoverable(errors.New("nil message received"))
+			case msg, ok := <-tx.Chan():
+				if !ok {
+					return retry.Unrecoverable(errors.New("txbridge recv channel closed"))
 				}
-				if msg.Identifier() == adapter.SystemMsgError {
+				if msg.Identifier() == gocan.SystemMsgError {
 					data := msg.Data()
 					switch data[0] {
 					case 0x31:
@@ -562,7 +560,7 @@ func (c *T7Client) Start() error {
 				count++
 				cps++
 				if count%15 == 0 {
-					c.CaptureCounter.Set(count)
+					c.CaptureCounter(count)
 				}
 			}
 		}

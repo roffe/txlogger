@@ -1,98 +1,306 @@
 package main
 
 import (
+	"bufio"
+	_ "embed"
+	"errors"
+	"flag"
 	"fmt"
 	"image/color"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
 
-	_ "embed"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
-	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/debug"
+	"github.com/roffe/txlogger/pkg/ipc"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/windows"
+
+	"net/http"
+	_ "net/http/pprof"
 )
 
-//go:embed WHATSNEW.md
-var whatsNew string
+var (
+	workDirectory string
+	ma            = &mainApp{}
+)
+
+type mainApp struct {
+}
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
+	flag.StringVar(&workDirectory, "d", "", "working directory")
+	flag.Parse()
+}
+
+func startpprof() {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+}
+
+func signalHandler(tx fyne.App) {
+	sig := make(chan os.Signal, 2)
+	signal.Notify(sig, syscall.SIGINT)
+	go func() {
+		<-sig
+		//rdebug.PrintStack()
+	}()
+}
+
+func startCanGW(errFunc func(error), readyChan chan<- bool) *os.Process {
+
+	if wd, err := os.Getwd(); err == nil {
+		command := filepath.Join(wd, "cangw.exe")
+		cmd := exec.Command(command)
+		//cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+		rc, err := cmd.StderrPipe()
+		if err != nil {
+			log.Fatal(err)
+		}
+		r := bufio.NewReader(rc)
+		go func() {
+			for {
+				str, err := r.ReadString('\n')
+				if err != nil {
+					if err.Error() == "EOF" {
+						errFunc(errors.New("GoCAN Gateway exited"))
+						return
+					}
+					errFunc(fmt.Errorf("GoCAN Gateway error: %s", err))
+					return
+				}
+				fmt.Print(str)
+				if strings.Contains(str, "server listening") {
+					readyChan <- true
+				}
+			}
+		}()
+		if err := cmd.Start(); err != nil {
+			log.Fatal("Failed to start GoCAN Gateway")
+		} else {
+			// defer cmd.Process.Kill()
+			log.Printf("Starting GoCAN Gateway pid: %d", cmd.Process.Pid)
+		}
+		return cmd.Process
+	}
+	return nil
 }
 
 func main() {
-	//if err := wn.TimeBeginPeriod(1); err != nil {
-	//	log.Println(err)
-	//}
-	//defer func() {
-	//	if err := wn.TimeEndPeriod(1); err != nil {
-	//		log.Println(err)
-	//	}
-	//}()
-	a := app.NewWithID("com.roffe.txlogger")
-	a.Settings().SetTheme(&txTheme{})
+	isAndroid := runtime.GOOS == "android"
+	if isAndroid {
+		mainAndroid()
+	} else {
+		mainDesktop()
+	}
+}
 
-	if err := presets.Load(a); err != nil {
+func mainAndroid() {
+	tx := app.NewWithID("com.roffe.txlogger")
+	tx.Settings().SetTheme(&txTheme{})
+	if err := presets.Load(tx); err != nil {
 		log.Println(err)
 	}
+	meta := tx.Metadata()
+	debug.Log(fmt.Sprintf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir()))
+	log.Printf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir())
+	mw := windows.NewMainWindow(tx)
+	mw.ShowAndRun()
+}
 
-	meta := a.Metadata()
-	debug.Log(fmt.Sprintf("starting txlogger v%s build %d", meta.Version, meta.Build))
-	log.Printf("starting txlogger v%s build %d", meta.Version, meta.Build)
+func mainDesktop() {
+	//startpprof()
+	socketFile := filepath.Join(os.TempDir(), "txlogger.sock")
 
-	var mw *windows.MainWindow
-	if len(os.Args) == 2 {
-		filename := os.Args[1]
-		switch strings.ToLower(path.Ext(filename)) {
-		case ".bin":
-			mw = windows.NewMainWindow(a, filename)
-		case ".t5l", ".t7l", ".t8l", ".csv":
-			windows.NewLogPlayer(a, filename, nil).ShowAndRun()
-			return
+	if ipc.IsRunning(socketFile) {
+		return
+	}
+
+	if workDirectory != "" {
+		log.Println("changing working directory to", workDirectory)
+		if err := os.Chdir(workDirectory); err != nil {
+			log.Println(err)
 		}
 	}
 
-	if mw == nil {
-		mw = windows.NewMainWindow(a, "")
+	readyChan := make(chan bool)
+
+	var errFunc = func(err error) {
+		log.Print(err.Error())
 	}
 
-	quitChan := make(chan os.Signal, 1)
-	signal.Notify(quitChan, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-quitChan
-		mw.CloseIntercept()
-		a.Quit()
-	}()
-
-	lastVersion := a.Preferences().String("lastVersion")
-	if lastVersion != a.Metadata().Version {
-		go func() {
-			time.Sleep(1000 * time.Millisecond)
-			ww := a.NewWindow("What's new")
-			md := widget.NewRichTextFromMarkdown(whatsNew)
-			md.Wrapping = fyne.TextWrapWord
-			ww.SetContent(container.NewVScroll(md))
-			ww.Resize(fyne.NewSize(700, 400))
-			ww.Show()
-			time.Sleep(100 * time.Millisecond)
-			ww.RequestFocus()
-		}()
+	if p := startCanGW(errFunc, readyChan); p != nil {
+		defer p.Kill()
 	}
-	a.Preferences().SetString("lastVersion", a.Metadata().Version)
+
+	select {
+	case ready := <-readyChan:
+		if ready {
+			log.Println("GoCAN Gateway is ready")
+		} else {
+			log.Fatal("GoCAN Gateway did not start")
+		}
+	case <-time.After(5 * time.Second):
+		fyne.LogError("GoCAN Gateway did not start", errors.New("timeout"))
+	}
+
+	tx := app.NewWithID("com.roffe.txlogger")
+
+	//signalHandler(tx)
+
+	tx.Settings().SetTheme(&txTheme{})
+
+	if err := presets.Load(tx); err != nil {
+		log.Println(err)
+	}
+
+	meta := tx.Metadata()
+	debug.Log(fmt.Sprintf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir()))
+	//log.Printf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir())
+
+	mw := windows.NewMainWindow(tx)
+
+	errFunc = mw.Error
+
+	router := ipc.Router{
+		"ping": func(data string) *ipc.Message {
+			return &ipc.Message{Type: "pong", Data: ""}
+		},
+		"open": func(filename string) *ipc.Message {
+			fyne.Do(mw.Window.RequestFocus) // show window
+			if strings.HasSuffix(filename, ".bin") {
+				f, err := os.Open(filename)
+				if err != nil {
+					mw.Error(err)
+				}
+				defer f.Close()
+				mw.LoadSymbolsFromFile(filename, f)
+			}
+			if strings.HasSuffix(filename, ".t5l") || strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") || strings.HasSuffix(filename, ".csv") {
+				f, err := os.Open(filename)
+				if err != nil {
+					mw.Error(err)
+				}
+				defer f.Close()
+
+				mw.LoadLogfile(filename, f, fyne.Position{})
+			}
+			return nil
+		},
+	}
+
+	sockServ, err := ipc.NewServer(router, socketFile)
+	if err != nil {
+		debug.Log("error: " + err.Error())
+	}
+	defer sockServ.Close()
+
+	var loadedSymbols bool
+
+	if filename := flag.Arg(0); filename != "" {
+		switch strings.ToLower(path.Ext(filename)) {
+		case ".bin":
+			//mw = windows.NewMainWindow(a, filename)
+			f, err := os.Open(filename)
+			if err != nil {
+				mw.Error(err)
+			}
+			defer f.Close()
+			if err := mw.LoadSymbolsFromFile(filename, f); err != nil {
+				mw.Error(err)
+			} else {
+				loadedSymbols = true
+			}
+
+		case ".t5l", ".t7l", ".t8l", ".csv":
+			f, err := os.Open(filename)
+			if err != nil {
+				mw.Error(err)
+			}
+			defer f.Close()
+
+			mw.LoadLogfile(filename, f, fyne.Position{})
+		}
+	}
+
+	if filename := tx.Preferences().String("lastBinFile"); filename != "" && !loadedSymbols {
+		if fileExists(filename) {
+			f, err := os.Open(filename)
+			if err != nil {
+				mw.Error(err)
+			} else {
+				defer f.Close()
+				mw.LoadSymbolsFromFile(filename, f)
+			}
+		}
+	}
+
 	//go updateCheck(a, mw)
 
 	mw.ShowAndRun()
 }
+
+func fileExists(name string) bool {
+	_, err := os.Stat(name)
+	return !os.IsNotExist(err)
+}
+
+/*
+func socketServer(s net.Listener, mw *windows.MainWindow) {
+	go func() {
+		for {
+			conn, err := s.Accept()
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			go func() {
+				defer conn.Close()
+				gb := gob.NewDecoder(conn)
+				ge := gob.NewEncoder(conn)
+				var msg ipc.Message
+				err := gb.Decode(&msg)
+				if err != nil {
+					if err == io.EOF {
+						return
+					}
+					log.Println(err)
+					return
+				}
+				log.Println(msg)
+				switch msg.Type {
+				case "ping":
+					err = ge.Encode(ipc.Message{Type: "pong", Data: ""})
+					if err != nil {
+						log.Println(err)
+					}
+				case "open":
+					mw.Window.RequestFocus // show window
+					if strings.HasSuffix(msg.Data, ".bin") {
+						mw.LoadSymbolsFromFile(msg.Data)
+					}
+					if strings.HasSuffix(msg.Data, ".t5l") || strings.HasSuffix(msg.Data, ".t7l") || strings.HasSuffix(msg.Data, ".t8l") || strings.HasSuffix(msg.Data, ".csv") {
+						mw.LoadLogfile(msg.Data, fyne.Position{}, true)
+					}
+				}
+			}()
+		}
+	}()
+}
+*/
 
 /*
 func updateCheck(a fyne.App, mw fyne.Window) {
@@ -143,15 +351,27 @@ func updateCheck(a fyne.App, mw fyne.Window) {
 type txTheme struct{}
 
 func (m txTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
-	if name == theme.ColorNameBackground {
+	switch name {
+	case theme.ColorNameBackground:
 		return color.RGBA{R: 23, G: 23, B: 24, A: 255}
+	case fyne.ThemeColorName("primary-hover"):
+		return color.RGBA{R: 0x21, G: 0x99, B: 0xF3, A: 255}
 	}
-
 	return theme.DefaultTheme().Color(name, theme.VariantDark)
 }
 
+var dragcornerindicatorleftIconRes = &fyne.StaticResource{
+	StaticName:    "drag-corner-indicator-left.svg",
+	StaticContent: assets.LeftCornerBytes,
+}
+
 func (m txTheme) Icon(name fyne.ThemeIconName) fyne.Resource {
-	return theme.DefaultTheme().Icon(name)
+	switch name {
+	case fyne.ThemeIconName("drag-corner-indicator-left"):
+		return theme.NewThemedResource(dragcornerindicatorleftIconRes)
+	default:
+		return theme.DefaultTheme().Icon(name)
+	}
 }
 
 func (m txTheme) Font(style fyne.TextStyle) fyne.Resource {
@@ -169,7 +389,7 @@ func (m txTheme) Size(name fyne.ThemeSizeName) float32 {
 	case theme.SizeNameLineSpacing:
 		return 4
 	case theme.SizeNamePadding: // 2
-		return 4
+		return 2
 	case theme.SizeNameScrollBar: // 8
 		return 16
 	case theme.SizeNameScrollBarSmall:
@@ -188,8 +408,15 @@ func (m txTheme) Size(name fyne.ThemeSizeName) float32 {
 		return 5
 	case theme.SizeNameSelectionRadius:
 		return 3
+	case theme.SizeNameWindowTitleBarHeight:
+		return 26
+	case theme.SizeNameWindowButtonHeight:
+		return 20
+	case theme.SizeNameWindowButtonIcon:
+		return 20
+	case theme.SizeNameWindowButtonRadius:
+		return 0
 	default:
 		return 0
 	}
-
 }

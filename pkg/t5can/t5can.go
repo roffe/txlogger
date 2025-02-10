@@ -48,7 +48,7 @@ func (c *Client) ReadRam(ctx context.Context, address, length uint32) ([]byte, e
 
 func (c *Client) sendReadCommand(ctx context.Context, address uint32) ([]byte, error) {
 	frame := gocan.NewFrame(0x05, []byte{0xC7, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address)}, gocan.ResponseRequired)
-	resp, err := c.c.SendAndPoll(ctx, frame, 200*time.Millisecond, 0xC)
+	resp, err := c.c.SendAndWait(ctx, frame, 200*time.Millisecond, 0xC)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func sendCommand(ctx context.Context, c *gocan.Client, cmd []byte) error {
 	for _, b := range cmd {
 		frame := gocan.NewFrame(0x05, []byte{0xC4, b}, gocan.ResponseRequired)
 		log.Println(frame.String())
-		resp, err := c.SendAndPoll(ctx, frame, 1*time.Second, 0xC)
+		resp, err := c.SendAndWait(ctx, frame, 1*time.Second, 0xC)
 		if err != nil {
 			return err
 		}
@@ -93,7 +93,7 @@ func recvDataEND(ctx context.Context, c *gocan.Client) ([]byte, error) {
 			dd = 0
 		}
 		ack(c)
-		resp, err := c.Poll(ctx, 40*time.Millisecond, 0xC)
+		resp, err := c.Wait(ctx, 40*time.Millisecond, 0xC)
 		if err != nil {
 			os.WriteFile("dump", buff.Bytes(), 0644)
 			return nil, err
@@ -115,7 +115,7 @@ func recvData(ctx context.Context, c *gocan.Client) ([]byte, error) {
 	buff := bytes.NewBuffer(nil)
 	for {
 		ack(c)
-		resp, err := c.Poll(ctx, 100*time.Millisecond, 0xC)
+		resp, err := c.Wait(ctx, 75*time.Millisecond, 0xC)
 		if err != nil {
 			log.Printf("%s", buff.Bytes())
 			return nil, err

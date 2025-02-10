@@ -1,4 +1,4 @@
-tmp
+.tmp
 tmp2
 .vscode
 *.afr
@@ -16,3 +16,4 @@ symbols.txt
 lzhuf/lzhuf.dll
 libusb-1.0.dll
 logs
+layouts/*

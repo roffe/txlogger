@@ -1,8 +1,9 @@
 package capture
 
 import (
+	"bytes"
 	"fmt"
-	"image/jpeg"
+	"image/png"
 	"log"
 	"os"
 	"time"
@@ -19,9 +20,13 @@ func Screenshot(c fyne.Canvas) {
 		return
 	}
 	defer f.Close()
-	if err := jpeg.Encode(f, cap, &jpeg.Options{Quality: 95}); err != nil {
+	buff := bytes.NewBuffer(nil)
+	if err := png.Encode(buff, cap); err != nil {
 		log.Println(err)
 		return
 	}
-	log.Println("Screenshot saved to", filename)
+	if _, err := f.Write(buff.Bytes()); err != nil {
+		log.Println(err)
+		return
+	}
 }

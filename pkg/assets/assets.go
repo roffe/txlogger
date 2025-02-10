@@ -21,3 +21,33 @@ var KvaserLogoBytes []byte
 
 //go:embed maptun_logo.png
 var MaptunLogoBytes []byte
+
+//go:embed mackanized.png
+var MackanizedBytes []byte
+
+//go:embed left_corner.svg
+var LeftCornerBytes []byte
+
+//go:embed WHATSNEW.md
+var WhatsNew string
+
+//go:embed mtx-l.jpg
+var MtxL []byte
+
+//go:embed lc-2.jpg
+var Lc2 []byte
+
+//go:embed uego.jpg
+var Uego []byte
+
+//go:embed lambdatocan.jpg
+var LambdaToCan []byte
+
+//go:embed plx.jpg
+var PLXSMAFR []byte
+
+//go:embed t7.jpg
+var T7 []byte
+
+//go:embed taz.png
+var Taz []byte

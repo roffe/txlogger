@@ -8,12 +8,19 @@ import (
 )
 
 var T5SymbolsTuningOrder = []string{
-	// "Injectors",
-	// "Fuel",
+	"Options",
+	"Injectors",
+	"Fuel",
+	// "Ignition",
 	// "Boost",
+	// "Idle",
+	"Diagnostics",
 }
 
 var T5SymbolsTuning = map[string][]string{
+	"Options": {
+		"Pgm_mod!",
+	},
 	"Injectors": {
 		"Inj_konst!",
 		"Batt_korr_tab!",
@@ -21,8 +28,25 @@ var T5SymbolsTuning = map[string][]string{
 	"Fuel": {
 		"Insp_mat!",
 	},
+	"Ignition": {
+		"Ign_map_0!",
+	},
 	"Boost": {
 		"Tryck_mat!",
+		"Reg_kon_mat!",
+		"P_fors!",
+		"I_fors!",
+		"D_fors!",
+		"Regl_tryck_fgm!",
+		"Regl_tryck_sgm!",
+	},
+	"Idle": {
+		"Idle_rpm_tab!",
+		"Ign_idle_angle!",
+		"Idle_fuel_korr!",
+	},
+	"Diagnostics": {
+		"Pgm_status",
 	},
 }
 
@@ -152,6 +176,7 @@ var T8SymbolsTuning = map[string][]string{
 		"IgnAbsCal.ST_EnableOctanMaps",
 	},
 	"Torque": {
+		"TrqMastCal.X_AccPedalMAP",
 		"TrqLimCal.Trq_ManGear",
 		"TrqLimCal.Trq_MaxEngineTab1",
 		"TrqLimCal.Trq_MaxEngineTab2",
@@ -161,19 +186,19 @@ var T8SymbolsTuning = map[string][]string{
 }
 
 type MainMenu struct {
-	w         fyne.Window
-	menus     []*fyne.Menu
-	oneFunc   func(symbol.ECUType, string)
-	multiFunc func(symbol.ECUType, ...string)
-	otherFunc func(string)
+	w                 fyne.Window
+	leading, trailing []*fyne.Menu
+	oneFunc           func(symbol.ECUType, string)
+	multiFunc         func(symbol.ECUType, ...string)
+	otherFunc         func(string)
 }
 
-func New(w fyne.Window, menus []*fyne.Menu, oneFunc func(symbol.ECUType, string), multiFunc func(symbol.ECUType, ...string), otherFunc func(string)) *MainMenu {
+func New(w fyne.Window, leading, trailing []*fyne.Menu, oneFunc func(symbol.ECUType, string), otherFunc func(string)) *MainMenu {
 	return &MainMenu{
 		w:         w,
 		oneFunc:   oneFunc,
-		multiFunc: multiFunc,
-		menus:     menus,
+		leading:   leading,
+		trailing:  trailing,
 		otherFunc: otherFunc,
 	}
 }
@@ -198,7 +223,7 @@ func (mw *MainMenu) GetMenu(name string) *fyne.MainMenu {
 		typ = symbol.ECU_T8
 	}
 
-	menus := append([]*fyne.Menu{}, mw.menus...)
+	menus := append([]*fyne.Menu{}, mw.leading...)
 
 	for _, category := range order {
 		var items []*fyne.MenuItem
@@ -235,5 +260,8 @@ func (mw *MainMenu) GetMenu(name string) *fyne.MainMenu {
 		}
 		menus = append(menus, fyne.NewMenu(category, items...))
 	}
+
+	menus = append(menus, mw.trailing...)
+
 	return fyne.NewMainMenu(menus...)
 }

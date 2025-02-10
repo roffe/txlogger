@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -200,7 +201,14 @@ func (c *ISP2Client) processBytes(data []byte) {
 			}
 
 			c.wordLength = c.syncBuffer[0]&0x01<<7 | c.syncBuffer[1]&0x7F
-			totalLength := 2 * (int(c.wordLength) + 1) // +1 for the header word
+			if c.wordLength > 10 {
+				log.Println("Invalid word length:", c.wordLength)
+				// Invalid word length, remove the first byte and continue searching
+				c.syncBuffer = c.syncBuffer[1:]
+				continue
+			}
+			// log.Println("Word length:", c.wordLength)
+			totalLength := int(c.wordLength*2) + 2 // +2 for the header word
 
 			if len(c.syncBuffer) < totalLength {
 				// Not enough data for the complete message, wait for more

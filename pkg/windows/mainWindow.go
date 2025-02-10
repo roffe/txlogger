@@ -3,32 +3,43 @@ package windows
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
-	"path"
-	"strings"
+	"path/filepath"
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	xwidget "fyne.io/x/fyne/widget"
-	"github.com/ebitengine/oto/v3"
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/txlogger/pkg/capture"
-	"github.com/roffe/txlogger/pkg/dashboard"
+	"github.com/roffe/gocan/proto"
+	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
+	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu"
-	"github.com/roffe/txlogger/pkg/layout"
+	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/mainmenu"
-	"github.com/roffe/txlogger/pkg/plotter"
-	"github.com/roffe/txlogger/pkg/presets"
-	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
+	"github.com/roffe/txlogger/pkg/widgets/dashboard"
+	"github.com/roffe/txlogger/pkg/widgets/ledicon"
+	"github.com/roffe/txlogger/pkg/widgets/logplayer"
+	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
+	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
+	"github.com/roffe/txlogger/pkg/widgets/settings"
+	"github.com/roffe/txlogger/pkg/widgets/symbollist"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -39,318 +50,528 @@ const (
 	prefsSelectedPreset = "selectedPreset"
 )
 
-type MainWindow struct {
-	fyne.Window
-	app fyne.App
+var _ fyne.Tappable = (*SecretText)(nil)
+var _ desktop.Mouseable = (*SecretText)(nil)
 
-	menu *mainmenu.MainMenu
-
-	symbolLookup *xwidget.CompletionEntry
-
-	output     *widget.List
-	outputData binding.StringList
-
-	ecuSelect *widget.Select
-
-	addSymbolBtn *widget.Button
-	logBtn       *widget.Button
-
-	loadSymbolsEcuBtn  *widget.Button
-	loadSymbolsFileBtn *widget.Button
-	syncSymbolsBtn     *widget.Button
-
-	dashboardBtn *widget.Button
-	plotterBtn   *widget.Button
-	logplayerBtn *widget.Button
-	helpBtn      *widget.Button
-	settingsBtn  *widget.Button
-
-	//loadConfigBtn *widget.Button
-	//saveConfigBtn *widget.Button
-	presetSelect *widget.Select
-
-	captureCounter binding.Int
-	errorCounter   binding.Int
-	fpsCounter     binding.Int
-
-	capturedCounterLabel *widget.Label
-	errorCounterLabel    *widget.Label
-	fpsLabel             *widget.Label
-
-	loggingRunning bool
-
-	filename   string
-	symbolList *widgets.SymbolListWidget
-	fw         symbol.SymbolCollection
-
-	dlc       datalogger.IClient
-	dashboard *dashboard.Dashboard
-	plotter   *plotter.Plotter
-
-	buttonsDisabled bool
-
-	leading *fyne.Container
-
-	settings *widgets.SettingsWidget
-
-	openMaps map[string]fyne.Window
-
-	tab *container.AppTabs
-	//doctab *container.DocTabs
-	statusText *widget.Label
-
-	otoCtx *oto.Context
+type SecretText struct {
+	*widget.Label
+	tappedTimes int
+	SecretFunc  func()
 }
 
-func NewMainWindow(a fyne.App, filename string) *MainWindow {
-
-	op := &oto.NewContextOptions{}
-
-	// Usually 44100 or 48000. Other values might cause distortions in Oto
-	op.SampleRate = 44100
-
-	// Number of channels (aka locations) to play sounds from. Either 1 or 2.
-	// 1 is mono sound, and 2 is stereo (most speakers are stereo).
-	op.ChannelCount = 2
-
-	// Format of the source. go-mp3's format is signed 16bit integers.
-	op.Format = oto.FormatSignedInt16LE
-
-	// Remember that you should **not** create more than one context
-	otoCtx, readyChan, err := oto.NewContext(op)
-	if err != nil {
-		panic("oto.NewContext failed: " + err.Error())
+func NewSecretText(text string) *SecretText {
+	return &SecretText{
+		Label: widget.NewLabel(text),
 	}
-	// It might take a bit for the hardware audio devices to be ready, so we wait on the channel.
-	<-readyChan
+}
 
-	mw := &MainWindow{
-		Window:         a.NewWindow("txlogger"),
-		app:            a,
-		outputData:     binding.NewStringList(),
-		captureCounter: binding.NewInt(),
-		errorCounter:   binding.NewInt(),
-		fpsCounter:     binding.NewInt(),
-
-		openMaps: make(map[string]fyne.Window),
-
-		statusText: widget.NewLabel("Harder, Better, Faster, Stronger"),
-
-		otoCtx: otoCtx,
-	}
-
-	mw.Resize(fyne.NewSize(1024, 768))
-
-	updateSymbols := func(syms []*symbol.Symbol) {
-		if mw.dlc != nil {
-			if err := mw.dlc.SetSymbols(mw.symbolList.Symbols()); err != nil {
-				if err.Error() == "pending" {
-					return
-				}
-				mw.Log(err.Error())
-			}
+func (s *SecretText) Tapped(*fyne.PointEvent) {
+	s.tappedTimes++
+	//	log.Println("tapped", s.tappedTimes)
+	if s.tappedTimes >= 10 {
+		t := fyne.NewStaticResource("taz.png", assets.Taz)
+		cv := canvas.NewImageFromResource(t)
+		cv.ScaleMode = canvas.ImageScaleFastest
+		cv.SetMinSize(fyne.NewSize(0, 0))
+		cont := container.NewStack(cv)
+		s.tappedTimes = 0
+		if f := s.SecretFunc; f != nil {
+			f()
 		}
+		dialog.ShowCustom("You found the secret", "Leif", cont, fyne.CurrentApp().Driver().AllWindows()[0])
+		an := canvas.NewSizeAnimation(fyne.NewSize(0, 0), fyne.NewSize(370, 386), time.Second, func(size fyne.Size) {
+			cv.Resize(size)
+		})
+		an.Start()
 	}
+}
 
-	mw.symbolList = widgets.NewSymbolListWidget(mw, updateSymbols)
+func (s *SecretText) MouseDown(e *desktop.MouseEvent) {
+	log.Println("MouseDown", e)
+}
+
+func (s *SecretText) MouseUp(e *desktop.MouseEvent) {
+	log.Println("MouseUp", e)
+}
+
+type MainWindow struct {
+	fyne.Window
+	app             fyne.App
+	menu            *mainmenu.MainMenu
+	outputData      binding.StringList
+	selects         *mainWindowSelects
+	buttons         *mainWindowButtons
+	counters        *mainWindowCounters
+	loggingRunning  bool
+	filename        string
+	symbolList      *symbollist.Widget
+	fw              symbol.SymbolCollection
+	dlc             datalogger.IClient
+	gclient         proto.GocanClient
+	buttonsDisabled bool
+	settings        *settings.SettingsWidget
+	statusText      *SecretText
+	wm              *multiwindow.MultipleWindows
+	content         *fyne.Container
+	startup         bool
+
+	gocanGatewayLED *ledicon.Widget
+	canLED          *ledicon.Widget
+}
+
+type mainWindowSelects struct {
+	symbolLookup *xwidget.CompletionEntry
+	ecuSelect    *widget.Select
+	presetSelect *widget.Select
+	layoutSelect *widget.Select
+}
+
+type mainWindowButtons struct {
+	debugBtn     *widget.Button
+	addSymbolBtn *widget.Button
+	logBtn       *widget.Button
+	// loadSymbolsEcuBtn *widget.Button
+	syncSymbolsBtn   *widget.Button
+	dashboardBtn     *widget.Button
+	openLogBtn       *widget.Button
+	layoutRefreshBtn *widget.Button
+	symbolListBtn    *widget.Button
+	addGaugeBtn      *widget.Button
+}
+
+type mainWindowCounters struct {
+	//captureCounter       binding.Int
+	capturedCounterLabel *widget.Label
+	//errorCounter         binding.Int
+	errorCounterLabel *widget.Label
+	//fpsCounter           binding.Int
+	fpsCounterLabel *widget.Label
+}
+
+func NewMainWindow(app fyne.App) *MainWindow {
+	mw := &MainWindow{
+		Window:     app.NewWindow("txlogger"),
+		app:        app,
+		outputData: binding.NewStringList(),
+
+		counters: &mainWindowCounters{
+			//captureCounter: binding.NewInt(),
+			//errorCounter:   binding.NewInt(),
+			//fpsCounter:     binding.NewInt(),
+		},
+		selects: &mainWindowSelects{},
+		buttons: &mainWindowButtons{},
+		symbolList: symbollist.New(&symbollist.Config{
+			EBus: ebus.CONTROLLER,
+		}),
+
+		gocanGatewayLED: ledicon.New("Gateway"),
+		canLED:          ledicon.New("CAN"),
+		statusText:      NewSecretText("Harder, Better, Faster, Stronger"),
+	}
 
 	mw.setupMenu()
-
-	mw.Window.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
-		switch ev.Name {
-		case fyne.KeyF12:
-			capture.Screenshot(mw.Canvas())
-		}
-	})
-
-	mw.Window.SetCloseIntercept(mw.CloseIntercept)
-
 	mw.createButtons()
-
-	mw.presetSelect = widget.NewSelect(append([]string{"Select preset"}, presets.Names()...), func(s string) {
-		if s == "Select preset" {
-			return
-		}
-		preset, err := presets.Get(s)
-		if err != nil {
-			dialog.ShowError(err, mw)
-			return
-		}
-		mw.symbolList.LoadSymbols(preset...)
-		mw.SyncSymbols()
-		mw.app.Preferences().SetString(prefsSelectedPreset, s)
-	})
-	mw.presetSelect.Alignment = fyne.TextAlignLeading
-	mw.presetSelect.PlaceHolder = "Select preset"
-
-	mw.newOutputList()
+	mw.createSelects()
+	mw.createCounters()
 	mw.newSymbolnameTypeahead()
+	mw.setupShortcuts()
 
-	mw.capturedCounterLabel = &widget.Label{
-		Alignment: fyne.TextAlignLeading,
-	}
-	mw.captureCounter.AddListener(binding.NewDataListener(func() {
-		if val, err := mw.captureCounter.Get(); err == nil {
-			mw.capturedCounterLabel.SetText(fmt.Sprintf("Cap: %d", val))
-		}
-	}))
-
-	mw.errorCounterLabel = &widget.Label{
-		Alignment: fyne.TextAlignLeading,
-	}
-	mw.errorCounter.AddListener(binding.NewDataListener(func() {
-		if val, err := mw.errorCounter.Get(); err == nil {
-			mw.errorCounterLabel.SetText(fmt.Sprintf("Err: %d", val))
-		}
-	}))
-
-	mw.fpsLabel = &widget.Label{
-		Alignment: fyne.TextAlignLeading,
-	}
-	mw.fpsCounter.AddListener(binding.NewDataListener(func() {
-		if val, err := mw.fpsCounter.Get(); err == nil {
-			mw.fpsLabel.SetText(fmt.Sprintf("Fps: %d", val))
-		}
-	}))
-
-	mw.ecuSelect = widget.NewSelect([]string{"T5", "T7", "T8"}, func(s string) {
-		mw.app.Preferences().SetString(prefsSelectedECU, s)
-		mw.SetMainMenu(mw.menu.GetMenu(s))
+	mw.settings = settings.New(&settings.Config{
+		GetEcu: func() string {
+			return mw.selects.ecuSelect.Selected
+		},
 	})
 
-	mw.settings = widgets.NewSettingsWidget(widgets.CanSettingsWidgetConfig{
-		EcuSelect: mw.ecuSelect,
-	})
+	mw.loadPrefs()
 
-	mw.setupTabs()
+	mw.wm = multiwindow.NewMultipleWindows()
+	mw.wm.LockViewport = true
+	mw.wm.OnError = mw.Error
 
-	mw.loadPrefs(filename)
-	if mw.fw == nil {
-		mw.setTitle("No symbols loaded")
-	}
+	mw.render()
 
+	mw.Window.SetOnDropped(mw.onDropped)
+	mw.SetCloseIntercept(mw.closeIntercept)
+	mw.SetPadded(true)
+	mw.SetContent(mw.content)
+	mw.Resize(fyne.NewSize(1000, 700))
+	mw.CenterOnScreen()
 	mw.SetMaster()
-	mw.SetContent(mw.tab)
 
-	mw.SetOnDropped(func(p fyne.Position, uris []fyne.URI) {
-		log.Println("Dropped", uris)
-		for _, u := range uris {
-			filename := u.Path()
-			switch strings.ToLower(path.Ext(filename)) {
-			case ".bin":
-				mw.LoadSymbolsFromFile(filename)
-			case ".t5l", ".t7l", ".t8l", ".csv":
-				NewLogPlayer(a, filename, mw.fw).Show()
-			}
-		}
-	})
+	mw.whatsNew()
 
-	mw.app.Driver().SetDisableScreenBlanking(true)
+	mw.startup = true
+	mw.buttons.symbolListBtn.OnTapped()
+	mw.buttons.dashboardBtn.OnTapped()
+	mw.startup = false
+
+	if !fyne.CurrentApp().Driver().Device().IsMobile() {
+		mw.gocanGWClient()
+	}
 
 	return mw
 }
-func (mw *MainWindow) CloseIntercept() {
-	if mw.dlc != nil {
-		mw.dlc.Close()
-		time.Sleep(500 * time.Millisecond)
+
+func (mw *MainWindow) gocanGWClient() {
+	var socketFile string
+	if cacheDir, err := os.UserCacheDir(); err == nil {
+		socketFile = filepath.Join(cacheDir, "gocan.sock")
+	} else {
+		mw.Error(fmt.Errorf("failed to get user cache dir: %w", err))
+		mw.gocanGatewayLED.Off()
+		return
 	}
-	//mw.SaveSymbolList()
-	debug.Close()
-	mw.Close()
+
+	kacp := keepalive.ClientParameters{
+		Time:                10 * time.Second, // send pings every 10 seconds if there is no activity
+		Timeout:             time.Second,      // wait 1 second for ping ack before considering the connection dead
+		PermitWithoutStream: true,             // send pings even without active streams
+	}
+
+	conn, err := grpc.NewClient(
+		"unix:"+socketFile,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithKeepaliveParams(kacp),
+	)
+	if err != nil {
+		mw.Error(fmt.Errorf("failed to connect to gocan gateway: %w", err))
+		mw.gocanGatewayLED.Off()
+		return
+	}
+	//defer conn.Close()
+
+	client := proto.NewGocanClient(conn)
+	mw.gocanGatewayLED.On()
+	res, err := client.GetAdapters(context.Background(), &emptypb.Empty{})
+	if err != nil {
+		mw.Error(fmt.Errorf("failed to get adapters from gocan gateway: %w", err))
+		return
+	}
+	mw.settings.CanSettings.AddAdapters(res.Adapters)
+
+	mw.gclient = client
 }
 
-func (mw *MainWindow) createLeading() *fyne.Container {
-	return container.NewBorder(
-		container.NewVBox(
+func (mw *MainWindow) setupShortcuts() {
+	ctrlEnter := &desktop.CustomShortcut{KeyName: fyne.KeyReturn, Modifier: fyne.KeyModifierControl}
+	altEnter := &desktop.CustomShortcut{KeyName: fyne.KeyReturn, Modifier: fyne.KeyModifierAlt}
+	ctrl1 := &desktop.CustomShortcut{KeyName: fyne.Key1, Modifier: fyne.KeyModifierControl}
+	ctrl2 := &desktop.CustomShortcut{KeyName: fyne.Key2, Modifier: fyne.KeyModifierControl}
+	ctrl3 := &desktop.CustomShortcut{KeyName: fyne.Key3, Modifier: fyne.KeyModifierControl}
+	ctrl4 := &desktop.CustomShortcut{KeyName: fyne.Key4, Modifier: fyne.KeyModifierControl}
+
+	mw.Window.Canvas().AddShortcut(ctrlEnter, func(shortcut fyne.Shortcut) {
+		mw.wm.Arrange(&multiwindow.GridArranger{})
+	})
+
+	mw.Window.Canvas().AddShortcut(altEnter, func(shortcut fyne.Shortcut) {
+		mw.Window.SetFullScreen(!mw.Window.FullScreen())
+	})
+
+	mw.Window.Canvas().AddShortcut(ctrl1, func(shortcut fyne.Shortcut) {
+		log.Println("ctrl1")
+		mw.openSettings()
+	})
+
+	mw.Window.Canvas().AddShortcut(ctrl2, func(shortcut fyne.Shortcut) {
+		log.Println("ctrl2")
+		mw.buttons.symbolListBtn.OnTapped()
+	})
+
+	mw.Window.Canvas().AddShortcut(ctrl3, func(shortcut fyne.Shortcut) {
+		log.Println("ctrl3")
+	})
+
+	mw.Window.Canvas().AddShortcut(ctrl4, func(shortcut fyne.Shortcut) {
+		log.Println("ctrl4")
+	})
+}
+
+func (mw *MainWindow) render() {
+	/*
+		mw.tabs = container.NewAppTabs(
+			container.NewTabItem("Symbols", container.NewBorder(
+				container.NewGridWithRows(2,
+					container.NewHBox(
+						container.NewBorder(
+							nil,
+							nil,
+							widget.NewLabel("Preset"),
+							nil,
+							mw.selects.presetSelect,
+						),
+						widget.NewButtonWithIcon("", theme.DocumentSaveIcon(), mw.savePreset),
+						widget.NewButtonWithIcon("", theme.DocumentCreateIcon(), mw.newPreset),
+						widget.NewButtonWithIcon("", theme.UploadIcon(), mw.exportPreset),
+						widget.NewButtonWithIcon("", theme.DownloadIcon(), mw.importPreset),
+						widget.NewButtonWithIcon("", theme.DeleteIcon(), mw.deletePreset),
+					),
+					container.NewBorder(
+						nil,
+						nil,
+						widget.NewIcon(theme.SearchIcon()),
+						container.NewHBox(
+							mw.buttons.addSymbolBtn,
+							mw.buttons.syncSymbolsBtn,
+						),
+						mw.selects.symbolLookup,
+					),
+				),
+				nil,
+				nil,
+				nil,
+				mw.symbolList,
+			)),
+			container.NewTabItem("Settings", mw.settings),
+			container.NewTabItem("Open Windows", mw.wm),
+		)
+	*/
+
+	mw.content = container.NewBorder(
+		container.NewHBox(
 			container.NewBorder(
 				nil,
 				nil,
-				widget.NewIcon(theme.SearchIcon()),
-				container.NewHBox(
-					mw.addSymbolBtn,
-					mw.loadSymbolsFileBtn,
-					mw.loadSymbolsEcuBtn,
-					mw.syncSymbolsBtn,
-				),
-				mw.symbolLookup,
+				widget.NewLabel("ECU"),
+				nil,
+				mw.selects.ecuSelect,
 			),
+			widget.NewSeparator(),
+			mw.buttons.symbolListBtn,
+			mw.buttons.logBtn,
+
+			//mw.buttons.logplayerBtn,
+			mw.buttons.openLogBtn,
+			mw.buttons.dashboardBtn,
+			widget.NewButtonWithIcon("", theme.GridIcon(), func() {
+				mw.wm.Arrange(&multiwindow.GridArranger{})
+			}),
+			mw.buttons.addGaugeBtn,
+			widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
+				mw.wm.CloseAll()
+			}),
+			/*
+				widget.NewButtonWithIcon("x", theme.SettingsIcon(), func() {
+					ctx := context.Background()
+					resp, err := mw.gclient.SendCommand(ctx, &proto.Command{Data: []byte("ping")})
+					if err != nil {
+						mw.Error(fmt.Errorf("failed to send command: %w", err))
+						return
+					}
+					log.Println("response:", string(resp.Data))
+				}),
+			*/
 		),
-		container.NewGridWithColumns(1,
+
+		container.NewBorder(
+			nil,
+			nil,
+			container.NewBorder(
+				nil,
+				nil,
+				nil,
+				mw.buttons.layoutRefreshBtn,
+				mw.selects.layoutSelect,
+			),
+			container.NewHBox(
+				container.NewHBox(
+					mw.gocanGatewayLED,
+					mw.canLED,
+					mw.counters.capturedCounterLabel,
+					mw.counters.errorCounterLabel,
+					mw.counters.fpsCounterLabel,
+					mw.buttons.debugBtn,
+				),
+				widget.NewButtonWithIcon("", theme.ComputerIcon(), mw.openEBUSMonitor),
+			),
+
 			mw.statusText,
 		),
 		nil,
 		nil,
-		mw.symbolList,
+		mw.wm,
+		// mw.tabs,
 	)
 }
+func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser, p fyne.Position, fromRoutine bool) {
+	// Just filename, used for Window title
+	fp := filepath.Base(filename)
 
-func (mw *MainWindow) setupTabs() {
+	// if w := mw.wm.HasWindow(fp); w != nil {
+	// 	mw.wm.Raise(w)
+	// 	return
+	// }
 
-	mw.leading = mw.createLeading()
-	mw.tab = container.NewAppTabs()
+	logz, err := logfile.Open(filename, reader)
+	if err != nil {
+		mw.Error(fmt.Errorf("failed to open log file: %w", err))
+		return
+	}
 
-	bottomSplit := container.NewVSplit(
-		mw.output,
-		container.NewVBox(
-			mw.dashboardBtn,
-			//mw.plotterBtn,
-			mw.logplayerBtn,
-			mw.helpBtn,
-			//mw.settingsBtn,
-			container.NewGridWithColumns(3,
-				mw.capturedCounterLabel,
-				mw.errorCounterLabel,
-				mw.fpsLabel,
-			),
-		),
-	)
-	bottomSplit.SetOffset(0.9)
+	dbcfg := &dashboard.Config{
+		Logplayer:       true,
+		UseMPH:          mw.settings.GetUseMPH(),
+		SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
+		HighAFR:         mw.settings.GetHighAFR(),
+		LowAFR:          mw.settings.GetLowAFR(),
+		WidebandSymbol:  mw.settings.GetWidebandSymbolName(),
+	}
 
-	trailing := container.NewVSplit(
-		container.NewVBox(
-			container.NewBorder(
-				nil,
-				nil,
-				layout.NewFixedWidth(75, widget.NewLabel("ECU")),
-				nil,
-				mw.ecuSelect,
-			),
-			container.NewBorder(
-				nil,
-				nil,
-				layout.NewFixedWidth(75, widget.NewLabel("Preset")),
-				nil,
-				mw.presetSelect,
-			),
-			mw.logBtn,
-		),
-		bottomSplit,
-	)
-	trailing.SetOffset(0.1)
+	rec := logz.Next()
+	if !rec.EOF {
+		for k := range rec.Values {
+			if k == "AirMassMast.m_Request" {
+				dbcfg.AirDemToString = datalogger.AirDemToStringT8
+				break
+			} else if k == "Lufttemp" {
+				//T5
+				break
+			} else {
+				dbcfg.AirDemToString = datalogger.AirDemToStringT7
+				break
+			}
+		}
+	}
+	logz.Seek(0)
 
-	hsplit := container.NewHSplit(
-		mw.leading,
-		trailing,
-	)
-	hsplit.SetOffset(0.8)
+	switch mw.selects.ecuSelect.Selected {
+	case "T7":
+		dbcfg.AirDemToString = datalogger.AirDemToStringT7
+	case "T8":
+		dbcfg.AirDemToString = datalogger.AirDemToStringT8
+	}
 
-	// E85.X_EthAct_Tech2
-	//
+	cpCfg := &combinedlogplayer.CombinedLogplayerConfig{
+		Logfile: logz,
+		DBcfg:   dbcfg,
+	}
 
-	mw.tab.Append(container.NewTabItemWithIcon("Logging", theme.ListIcon(), hsplit))
-	//mw.tab.Append(container.NewTabItemWithIcon("T7", theme.ComputerIcon(), NewT7Extras(mw, fyne.NewSize(200, 100))))
-	mw.tab.Append(container.NewTabItemWithIcon("Settings", theme.SettingsIcon(), mw.settings))
+	cp := combinedlogplayer.New(cpCfg)
+	//iw := multiwindow.NewSystemWindow(fp, cp)
+	//iw.Icon = theme.MediaPlayIcon()
+
+	/*
+		dbcfg.FullscreenFunc = func(b bool) {
+			if b {
+				mw.SetMainMenu(nil)
+				mw.Window.SetContent(cp)
+				mw.SetFullScreen(true)
+			} else {
+				mw.SetMainMenu(mw.menu.GetMenu(mw.selects.ecuSelect.Selected))
+				mw.Window.SetContent(mw.content)
+				cp.Close()
+				//mw.buttons.dashboardBtn.OnTapped()
+				mw.SetFullScreen(false)
+				iw.SetContent(cp)
+			}
+		}
+	*/
+
+	//cp.OnMouseDown = func() {
+	//	mw.wm.Raise(iw)
+	//}
+
+	//iw.CloseIntercept = func() {
+	//	cp.Close()
+	//}
+
+	do := func() {
+		w := mw.app.NewWindow(fp)
+		w.SetCloseIntercept(func() {
+			cp.Close()
+			w.Close()
+		})
+		w.Canvas().SetOnTypedKey(cp.TypedKey)
+		w.SetContent(cp)
+		w.Show()
+	}
+
+	if fromRoutine {
+		fyne.Do(do)
+	} else {
+		do()
+	}
+
+	//w.Show()
+	//mw.wm.Add(iw, p)
+	mw.Log("loaded log file " + filename + " in combined logplayer")
+}
+
+func (mw *MainWindow) LoadLogfile(filename string, r io.ReadCloser, p fyne.Position) {
+	// Just filename, used for Window title
+	fp := filepath.Base(filename)
+
+	if w := mw.wm.HasWindow(fp); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+
+	logz, err := logfile.Open(filename, r)
+	if err != nil {
+		mw.Error(fmt.Errorf("failed to open log file: %w", err))
+		return
+	}
+
+	mw.Log("loaded log file " + filename)
+
+	lp := logplayer.New(&logplayer.Config{
+		EBus:    ebus.CONTROLLER,
+		Logfile: logz,
+	})
+	iw := multiwindow.NewSystemWindow(fp, lp)
+	iw.Icon = theme.MediaPlayIcon()
+
+	lp.OnMouseDown = func() {
+		mw.wm.Raise(iw)
+	}
+	iw.OnClose = func() {
+		lp.Close()
+	}
+	mw.wm.Add(iw, p)
+
 }
 
 func (mw *MainWindow) Log(s string) {
-	debug.Log(s)
+	debug.LogDepth(2, s)
 	mw.outputData.Append(s)
-	mw.output.ScrollToBottom()
+}
+
+func (mw *MainWindow) Error(err error) {
+	debug.Log("error:" + err.Error())
+	mw.outputData.Append(err.Error())
+	go fyne.Do(func() {
+		dialog.ShowError(err, mw.Window)
+	})
+	//log.Printf("error: %s", err)
+}
+
+func (mw *MainWindow) Disable() {
+	mw.buttonsDisabled = true
+	mw.buttons.addSymbolBtn.Disable()
+	//mw.buttons.loadSymbolsEcuBtn.Disable()
+	mw.buttons.syncSymbolsBtn.Disable()
+	if !mw.loggingRunning {
+		mw.buttons.logBtn.Disable()
+	}
+	mw.selects.ecuSelect.Disable()
+	mw.selects.presetSelect.Disable()
+	mw.symbolList.Disable()
+}
+
+func (mw *MainWindow) Enable() {
+	mw.buttonsDisabled = false
+	mw.buttons.addSymbolBtn.Enable()
+	//mw.buttons.loadSymbolsEcuBtn.Enable()
+	mw.buttons.syncSymbolsBtn.Enable()
+	mw.buttons.logBtn.Enable()
+	mw.selects.ecuSelect.Enable()
+	mw.selects.presetSelect.Enable()
+	mw.symbolList.Enable()
 }
 
 func (mw *MainWindow) SyncSymbols() {
 	if mw.fw == nil {
-		//mw.Log("Load bin to sync symbols")
 		return
 	}
 	cnt := 0
@@ -373,45 +594,19 @@ func (mw *MainWindow) SyncSymbols() {
 	mw.Log(fmt.Sprintf("Synced %d / %d symbols", cnt, mw.symbolList.Count()))
 }
 
-func (mw *MainWindow) Disable() {
-	mw.buttonsDisabled = true
-	mw.addSymbolBtn.Disable()
-	mw.loadSymbolsFileBtn.Disable()
-	mw.loadSymbolsEcuBtn.Disable()
-	mw.syncSymbolsBtn.Disable()
-	if !mw.loggingRunning {
-		mw.logBtn.Disable()
-	}
-	mw.ecuSelect.Disable()
-	mw.presetSelect.Disable()
-	mw.symbolList.Disable()
-}
-
-func (mw *MainWindow) Enable() {
-	mw.buttonsDisabled = false
-	mw.addSymbolBtn.Enable()
-	mw.loadSymbolsFileBtn.Enable()
-	mw.loadSymbolsEcuBtn.Enable()
-	mw.syncSymbolsBtn.Enable()
-	mw.logBtn.Enable()
-	mw.ecuSelect.Enable()
-	mw.presetSelect.Enable()
-	mw.symbolList.Enable()
-}
-
 func (mw *MainWindow) LoadSymbolsFromECU() error {
-	device, err := mw.settings.CanSettings.GetAdapter(mw.ecuSelect.Selected, mw.Log)
+	device, err := mw.settings.CanSettings.GetAdapter(mw.selects.ecuSelect.Selected, mw.Log)
 	if err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	p := widgets.NewProgressModal(mw.Window.Content(), "Loading symbols from ECU")
+	p := progressmodal.New(mw.Window.Canvas(), "Loading symbols from ECU")
 	p.Show()
 	defer p.Hide()
 
-	switch mw.ecuSelect.Selected {
+	switch mw.selects.ecuSelect.Selected {
 	case "T5":
 		symbols, err := ecu.GetSymbolsT5(ctx, device, mw.Log)
 		if err != nil {
@@ -435,29 +630,26 @@ func (mw *MainWindow) LoadSymbolsFromECU() error {
 		mw.SyncSymbols()
 	}
 
-	mw.setTitle("Symbols loaded from ECU " + time.Now().Format("2006-01-02 15:04:05.000"))
+	mw.Log("Symbols loaded from ECU " + time.Now().Format("2006-01-02 15:04:05.000"))
 	return nil
 }
 
-func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
+func (mw *MainWindow) LoadSymbolsFromFile(filename string, r io.Reader) error {
 	ecuType, symbols, err := symbol.Load(filename, mw.Log)
 	if err != nil {
 		return fmt.Errorf("error loading symbols: %w", err)
 	}
-	mw.setTitle(filename)
+	mw.SetTitle(filepath.Base(filename))
 	mw.app.Preferences().SetString(prefsLastBinFile, filename)
-
-	mw.ecuSelect.SetSelected(ecuType.String())
-
+	mw.selects.ecuSelect.SetSelected(ecuType.String())
 	mw.fw = symbols
+	mw.filename = filename
 	mw.SyncSymbols()
-
-	//os.WriteFile("symbols.txt", []byte(symbols.Dump()), 0644)
 	return nil
 }
 
-func (mw *MainWindow) LoadPreset(filename string) error {
-	b, err := os.ReadFile(filename)
+func (mw *MainWindow) LoadPreset(r io.Reader) error {
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return fmt.Errorf("failed to read config file: %w", err)
 	}
@@ -480,3 +672,59 @@ func (mw *MainWindow) SavePreset(filename string) error {
 	}
 	return nil
 }
+
+// -----
+
+/*
+var (
+	u32             = syscall.NewLazyDLL("user32.dll")
+	procPostMessage = u32.NewProc("PostMessageW")
+)
+
+const (
+	WM_SYSCOMMAND = 274
+	SC_RESTORE    = 0xF120
+	SC_MINIMIZE   = 0xF020
+	SC_MAXIMIZE   = 0xF030
+)
+
+func PostMessage(hwnd uintptr, msg uint32, wParam, lParam uintptr) bool {
+	ret, _, _ := procPostMessage.Call(hwnd, uintptr(msg), wParam, lParam)
+	return ret != 0
+}
+func (mw *MainWindow) Maximize() {
+	ctx, ok := mw.Window.(driver.NativeWindow)
+	if ok {
+		ctx.RunNative(func(c any) {
+			switch t := c.(type) {
+			case driver.WindowsWindowContext:
+				PostMessage(t.HWND, WM_SYSCOMMAND, SC_MAXIMIZE, 0)
+			}
+		})
+	}
+}
+
+func (mw *MainWindow) Minimize() {
+	ctx, ok := mw.Window.(driver.NativeWindow)
+	if ok {
+		ctx.RunNative(func(c any) {
+			switch t := c.(type) {
+			case driver.WindowsWindowContext:
+				PostMessage(t.HWND, WM_SYSCOMMAND, SC_MINIMIZE, 0)
+			}
+		})
+	}
+}
+
+func (mw *MainWindow) Restore() {
+	ctx, ok := mw.Window.(driver.NativeWindow)
+	if ok {
+		ctx.RunNative(func(c any) {
+			switch t := c.(type) {
+			case driver.WindowsWindowContext:
+				PostMessage(t.HWND, WM_SYSCOMMAND, SC_RESTORE, 0)
+			}
+		})
+	}
+}
+*/

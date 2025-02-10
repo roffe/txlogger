@@ -108,8 +108,10 @@ func (d *FixedWidthContainer) Layout(objects []fyne.CanvasObject, containerSize 
 	pos := fyne.NewPos(0, 0)
 	for _, o := range objects {
 		size := o.MinSize()
+		size = size.Max(fyne.NewSize(d.width, size.Height))
 		o.Move(pos)
 		o.Resize(fyne.NewSize(d.width, size.Height))
+		//		log.Println("Resize", o, fyne.NewSize(d.width, size.Height))
 		pos = pos.Add(fyne.NewPos(d.width, size.Height))
 	}
 }

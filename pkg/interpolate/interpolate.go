@@ -5,6 +5,7 @@ import (
 )
 
 type InterPolFunc func(xAxis, yAxis, data []int, xValue, yValue int) (float64, float64, float64, error)
+type InterPolFunc64 func(xAxis, yAxis, data []float64, xValue, yValue float64) (float64, float64, float64, error)
 
 // Helper function to clamp offset values
 func clamp(offset, max int) int {
@@ -35,6 +36,79 @@ func findIndexAndFrac(arr []int, value int) (int, float64) {
 	}
 
 	return idx, frac
+}
+
+func Interpolate64(xAxis, yAxis, data []float64, xValue, yValue float64) (float64, float64, float64, error) {
+	if len(xAxis) == 0 || len(yAxis) == 0 || len(data) == 0 {
+		return 0, 0, 0, fmt.Errorf("xAxis, yAxis or data is empty")
+	}
+
+	xIdx, xFrac := findIndexAndFrac64(xAxis, xValue)
+	yIdx, yFrac := findIndexAndFrac64(yAxis, yValue)
+
+	dataLen := len(data)
+	// Calculate the offsets in the data array for the four surrounding data points
+	getOffset := func(i, j int) int {
+		return clamp(i*len(xAxis)+j, dataLen)
+	}
+
+	offsets := [4]int{
+		getOffset(yIdx-1, xIdx-1),
+		getOffset(yIdx-1, xIdx),
+		getOffset(yIdx, xIdx-1),
+		getOffset(yIdx, xIdx),
+	}
+
+	values := [4]float64{
+		data[offsets[0]],
+		data[offsets[1]],
+		data[offsets[2]],
+		data[offsets[3]],
+	}
+
+	// Perform bilinear interpolation
+	interpolatedX0 := (1.0-xFrac)*values[0] + xFrac*values[1]
+	interpolatedX1 := (1.0-xFrac)*values[2] + xFrac*values[3]
+	interpolatedValue := (1.0-yFrac)*interpolatedX0 + yFrac*interpolatedX1
+
+	return float64(xIdx-1) + xFrac, float64(yIdx-1) + yFrac, interpolatedValue, nil
+}
+
+func Interpolate64S(xAxis, yAxis, data []float64, xValue, yValue float64) (float64, float64, error) {
+	if len(xAxis) == 0 || len(yAxis) == 0 || len(data) == 0 {
+		return 0, 0, fmt.Errorf("xAxis, yAxis or data is empty")
+	}
+
+	xIdx, xFrac := findIndexAndFrac64(xAxis, xValue)
+	yIdx, yFrac := findIndexAndFrac64(yAxis, yValue)
+
+	return float64(xIdx-1) + xFrac, float64(yIdx-1) + yFrac, nil
+}
+
+// Finds the index and fraction of the nearest value in the given array
+func findIndexAndFrac64(axis []float64, value float64) (int, float64) {
+	n := len(axis)
+	if value <= axis[0] {
+		return 1, 0.0
+	}
+	if value >= axis[n-1] {
+		return n - 1, 1.0
+	}
+
+	// Binary search to find the index
+	left, right := 0, n-1
+	for right-left > 1 {
+		mid := (left + right) / 2
+		if axis[mid] > value {
+			right = mid
+		} else {
+			left = mid
+		}
+	}
+
+	// Calculate fractional part
+	frac := (value - axis[left]) / (axis[right] - axis[left])
+	return right, frac
 }
 
 // returns x, y, value, err

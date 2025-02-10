@@ -9,14 +9,15 @@ import (
 	"log"
 	"math"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/adapter"
 	"github.com/roffe/gocan/pkg/gmlan"
+	"github.com/roffe/gocan/pkg/serialcommand"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"golang.org/x/sync/errgroup"
@@ -128,12 +129,12 @@ func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
 
 const T8ChunkSize = 235
 
-const lastPresentInterval = 3500 * time.Millisecond
+const lastPresentInterval = 2800 * time.Millisecond
 
 func (c *T8Client) onError(err error) {
 	c.errCount++
 	c.errPerSecond++
-	c.ErrorCounter.Set(c.errCount)
+	c.ErrorCounter(c.errCount)
 	c.OnMessage(err.Error())
 }
 
@@ -141,7 +142,7 @@ func (c *T8Client) Start() error {
 	defer c.lw.Close()
 
 	var txbridge bool
-	if c.Config.Device.Name() == "txbridge" {
+	if strings.HasPrefix(c.Config.Device.Name(), "txbridge") {
 		txbridge = true
 	}
 
@@ -177,22 +178,19 @@ func (c *T8Client) Start() error {
 		order = append(order, EXTERNALWBLSYM)
 	}
 
-	//--------
+	// implement sym.Skip from T7 logger here
 
 	// sort order
 	sort.StringSlice(order).Sort()
 
-	c.ErrorCounter.Set(c.errCount)
-
-	errPerSecond := 0
-	//c.ErrorPerSecondCounter.Set(errPerSecond)
+	c.ErrorCounter(0)
 
 	cps := 0
 	count := 0
 	retries := 0
 
 	if txbridge {
-		if err := cl.SendFrame(adapter.SystemMsg, []byte("8"), gocan.Outgoing); err != nil {
+		if err := cl.SendFrame(gocan.SystemMsg, []byte("8"), gocan.Outgoing); err != nil {
 			return err
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -201,7 +199,7 @@ func (c *T8Client) Start() error {
 	err = retry.Do(func() error {
 		gm := gmlan.New(cl, 0x7e0, 0x7e8)
 
-		if err := gm.InitiateDiagnosticOperation(ctx, 0x02); err != nil {
+		if err := gm.InitiateDiagnosticOperation(ctx, 0x03); err != nil {
 			return err
 		}
 
@@ -231,24 +229,6 @@ func (c *T8Client) Start() error {
 		errg, gctx := errgroup.WithContext(ctx)
 
 		errg.Go(func() error {
-			for {
-				select {
-				case <-c.quitChan:
-					return nil
-				case <-gctx.Done():
-					return nil
-				case <-secondTicker.C:
-					c.FpsCounter.Set(cps)
-					cps = 0
-					if errPerSecond > 10 {
-						return errors.New("too many errors, reconnecting")
-					}
-					errPerSecond = 0
-				}
-			}
-		})
-
-		errg.Go(func() error {
 			var timeStamp time.Time
 			var chunkSize uint32
 
@@ -261,6 +241,7 @@ func (c *T8Client) Start() error {
 
 			testerPresent := func() {
 				if time.Since(lastPresent) > lastPresentInterval {
+					//log.Println("sending tester present")
 					if err := gm.TesterPresentNoResponseAllowed(); err != nil {
 						c.onError(fmt.Errorf("failed to send tester present: %w", err))
 					}
@@ -268,13 +249,13 @@ func (c *T8Client) Start() error {
 				}
 			}
 
-			tx := cl.Subscribe(ctx, adapter.SystemMsgDataResponse, adapter.SystemMsgError)
+			tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse, gocan.SystemMsgError)
 			defer tx.Close()
 
 			if txbridge {
 				//log.Println("stopped timer, using txbridge")
 				t.Stop()
-				if err := cl.SendFrame(adapter.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
+				if err := cl.SendFrame(gocan.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
 					return err
 				}
 			}
@@ -284,11 +265,22 @@ func (c *T8Client) Start() error {
 			var currtimestamp uint32
 			for {
 				select {
+				case err := <-cl.Err():
+					log.Println("error from adapter", err)
+					return retry.Unrecoverable(err)
 				case <-c.quitChan:
 					c.OnMessage("Finished logging")
 					return nil
 				case <-gctx.Done():
+					log.Println("gctx done")
 					return nil
+				case <-secondTicker.C:
+					c.FpsCounter(cps)
+					cps = 0
+					if c.errPerSecond > 10 {
+						return errors.New("too many errors, reconnecting")
+					}
+					c.errPerSecond = 0
 				case symbols := <-c.symbolChan:
 					c.Symbols = symbols
 					expectedPayloadSize = 0
@@ -331,8 +323,8 @@ func (c *T8Client) Start() error {
 						continue
 					}
 					read.Complete(nil)
-					time.Sleep(12 * time.Millisecond)
 				case upd := <-c.writeChan:
+					log.Printf("Updating RAM 0x%X %d", upd.Address, T8ChunkSize)
 					if txbridge {
 						if err := c.handleWriteTxbridge(ctx, cl, upd); err != nil {
 							upd.Complete(err)
@@ -340,23 +332,22 @@ func (c *T8Client) Start() error {
 						continue
 					}
 					chunkSize = uint32(math.Min(float64(upd.Length), T8ChunkSize))
-					log.Printf("Updating RAM 0x%X %d", upd.Address, chunkSize)
 					if err := gm.WriteDataByAddress(ctx, upd.Address, upd.Data[:chunkSize]); err != nil {
 						upd.Complete(err)
 						continue
 					}
 
-					upd.Length -= chunkSize
 					upd.Address += chunkSize
+					upd.Length -= chunkSize
 					upd.Data = upd.Data[chunkSize:]
 
 					if upd.Length > 0 {
 						c.writeChan <- upd
+						t.Reset(time.Second / time.Duration(c.Rate))
 						continue
 					}
 					upd.Complete(nil)
 					time.Sleep(12 * time.Millisecond)
-
 				case <-t.C:
 					timeStamp = time.Now()
 					if len(c.Symbols) == 0 {
@@ -399,19 +390,17 @@ func (c *T8Client) Start() error {
 					cps++
 					count++
 					if count%10 == 0 {
-						c.CaptureCounter.Set(count)
+						c.CaptureCounter(count)
 					}
 					testerPresent()
-				case msg := <-tx.C():
-					if msg == nil {
-						return retry.Unrecoverable(errors.New("nil message received"))
+				case msg, ok := <-tx.Chan():
+					if !ok {
+						return retry.Unrecoverable(errors.New("txbridge recv channel closed"))
 					}
-
-					if msg.Identifier() == adapter.SystemMsgError {
+					if msg.Identifier() == gocan.SystemMsgError {
 						c.onError(errors.New("read timeout"))
 						continue
 					}
-
 					databuff := msg.Data()
 					if len(databuff) != int(expectedPayloadSize+4) {
 						return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize+4, len(databuff)))
@@ -452,7 +441,7 @@ func (c *T8Client) Start() error {
 					cps++
 					count++
 					if count%10 == 0 {
-						c.CaptureCounter.Set(count)
+						c.CaptureCounter(count)
 					}
 					testerPresent()
 				}
@@ -473,36 +462,36 @@ func (c *T8Client) Start() error {
 }
 
 func (c *T8Client) handleWriteTxbridge(ctx context.Context, cl *gocan.Client, write *WriteRequest) error {
-	toRead := min(write.Length, T8ChunkSize)
-	log.Printf("Writing RAM $%X:%d", write.Address, toRead)
-	cmd := gocan.SerialCommand{
+	toWrite := min(write.Length, T8ChunkSize)
+	// log.Printf("Writing RAM $%X:%d", write.Address, toWrite)
+	cmd := serialcommand.SerialCommand{
 		Command: 'W',
 		Data: []byte{
 			byte(write.Address),
 			byte(write.Address >> 8),
 			byte(write.Address >> 16),
 			byte(write.Address >> 24),
-			byte(toRead),
+			byte(toWrite),
 		},
 	}
 
-	cmd.Data = append(cmd.Data, write.Data[:toRead]...)
+	cmd.Data = append(cmd.Data, write.Data[:toWrite]...)
 
 	payload, err := cmd.MarshalBinary()
 	if err != nil {
 		return err
 	}
-	frame := gocan.NewFrame(adapter.SystemMsg, payload, gocan.Outgoing)
-	resp, err := cl.SendAndPoll(ctx, frame, 1*time.Second, adapter.SystemMsgWriteResponse, adapter.SystemMsgError)
+	frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
+	resp, err := cl.SendAndWait(ctx, frame, 1*time.Second, gocan.SystemMsgWriteResponse, gocan.SystemMsgError)
 	if err != nil {
 		return err
 	}
-	if resp.Identifier() == adapter.SystemMsgError {
+	if resp.Identifier() == gocan.SystemMsgError {
 		return fmt.Errorf("error: %X", resp.Data())
 	}
-	write.Address += uint32(toRead)
-	write.Length -= toRead
-	write.Data = write.Data[toRead:]
+	write.Address += uint32(toWrite)
+	write.Length -= toWrite
+	write.Data = write.Data[toWrite:]
 
 	if write.Length > 0 {
 		c.writeChan <- write
@@ -514,8 +503,8 @@ func (c *T8Client) handleWriteTxbridge(ctx context.Context, cl *gocan.Client, wr
 
 func (c *T8Client) handleReadTxbridge(ctx context.Context, cl *gocan.Client, read *ReadRequest) error {
 	toRead := min(T8ChunkSize, read.Length)
-	log.Printf("Reading RAM $%X:%d", read.Address, toRead)
-	cmd := gocan.SerialCommand{
+	// log.Printf("Reading RAM $%X:%d", read.Address, toRead)
+	cmd := serialcommand.SerialCommand{
 		Command: 'R',
 		Data: []byte{
 			byte(read.Address),
@@ -530,8 +519,8 @@ func (c *T8Client) handleReadTxbridge(ctx context.Context, cl *gocan.Client, rea
 		return err
 	}
 
-	frame := gocan.NewFrame(adapter.SystemMsg, payload, gocan.Outgoing)
-	resp, err := cl.SendAndPoll(ctx, frame, 4*time.Second, adapter.SystemMsgDataRequest)
+	frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
+	resp, err := cl.SendAndWait(ctx, frame, 4*time.Second, gocan.SystemMsgDataRequest)
 	if err != nil {
 		return err
 	}

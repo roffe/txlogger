@@ -1,0 +1,70 @@
+package mapviewer
+
+import "fyne.io/fyne/v2"
+
+// Update the mapLayout struct to include textSize calculation
+type mapLayout struct {
+	mv      *MapViewer
+	oldSize fyne.Size
+	minSize fyne.Size
+}
+
+// Modify the Layout method to update text sizes
+func (l *mapLayout) Layout(_ []fyne.CanvasObject, size fyne.Size) {
+	if l.oldSize == size {
+		return
+	}
+	l.oldSize = size
+
+	// Calculate shared factors
+	l.mv.widthFactor = size.Width / float32(l.mv.numColumns)
+	l.mv.heightFactor = size.Height / float32(l.mv.numRows)
+
+	// Calculate and update text sizes
+	newTextSize := calculateTextSize(l.mv.widthFactor, l.mv.heightFactor)
+	for _, text := range l.mv.textValues {
+		if text.TextSize != newTextSize {
+			text.TextSize = newTextSize
+			text.Refresh()
+		}
+	}
+
+	/*
+		for _, text := range l.mv.xAxisTexts {
+			if text.TextSize != newTextSize {
+				text.TextSize = newTextSize
+				text.Refresh()
+			}
+		}
+
+		for _, text := range l.mv.yAxisTexts {
+			if text.TextSize != newTextSize {
+				text.TextSize = newTextSize
+				text.Refresh()
+			}
+		}
+	*/
+
+	l.mv.valueRects.Resize(size)
+	l.mv.valueTexts.Resize(size)
+
+	// Position and resize crosshair
+	l.mv.crosshair.Resize(fyne.NewSize(l.mv.widthFactor, l.mv.heightFactor))
+	l.mv.crosshair.Move(
+		fyne.NewPos(
+			float32(l.mv.xIndex)*l.mv.widthFactor,
+			float32(float64(l.mv.numRows)-1-l.mv.yIndex)*l.mv.heightFactor,
+		),
+	)
+
+	l.mv.resizeCursor()
+	l.mv.updateCursor()
+}
+
+func (l *mapLayout) Size(objects []fyne.CanvasObject) fyne.Size {
+	return l.oldSize
+}
+
+func (l *mapLayout) MinSize([]fyne.CanvasObject) fyne.Size {
+	return l.minSize
+}

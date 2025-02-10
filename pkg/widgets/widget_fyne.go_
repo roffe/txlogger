@@ -1,0 +1,59 @@
+// go;build android
+package widgets
+
+import (
+	"log"
+
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/dialog"
+)
+
+func SelectFolder(cbc func(str string)) {
+	cb := func(d fyne.ListableURI, err error) {
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		if d == nil {
+			log.Println("d is nil")
+			return
+		}
+		cbc(d.Path())
+	}
+	w := fyne.CurrentApp().Driver().AllWindows()[0]
+	dialog.ShowFolderOpen(cb, w)
+}
+
+func SelectFile(cbc func(r fyne.URIReadCloser), desc string, exts ...string) {
+	cb := func(reader fyne.URIReadCloser, err error) {
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		if reader == nil {
+			log.Println("reader is nil")
+			return
+		}
+		cbc(reader)
+	}
+
+	w := fyne.CurrentApp().Driver().AllWindows()[0]
+	dialog.ShowFileOpen(cb, w)
+}
+
+func SaveFile(cbc func(str string), desc, ext string) {
+	cb := func(writer fyne.URIWriteCloser, err error) {
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		defer writer.Close()
+		if writer == nil {
+			log.Println("reader is nil")
+			return
+		}
+		cbc(writer.URI().Path())
+	}
+	w := fyne.CurrentApp().Driver().AllWindows()[0]
+	dialog.ShowFileSave(cb, w)
+}

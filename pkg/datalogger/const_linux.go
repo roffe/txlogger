@@ -1,17 +1,19 @@
 //go:build linux
-// +build linux
 
 package datalogger
 
 import (
-	"fmt"
-	"strings"
+	"log"
+	"os"
 )
 
 const (
 	LOGPATH = "logs/"
 )
 
-func fullPath(path, filename string) string {
-	return fmt.Sprintf("%s/%s", strings.TrimSuffix(path, "/"), filename)
+func init() {
+	if err := os.MkdirAll(LOGPATH, os.ModePerm); err != nil {
+		log.Println("Error creating log directory: ", err)
+	}
+	log.Println("LOGPATH: ", LOGPATH)
 }

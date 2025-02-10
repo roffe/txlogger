@@ -6,7 +6,6 @@ import (
 	"log"
 	"time"
 
-	"fyne.io/fyne/v2/data/binding"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 )
@@ -40,14 +39,15 @@ type LambdaProvider interface {
 }
 
 type Config struct {
+	FilenamePrefix string
 	ECU            string
 	Device         gocan.Adapter
 	Symbols        []*symbol.Symbol
 	Rate           int
 	OnMessage      func(string)
-	CaptureCounter binding.Int
-	ErrorCounter   binding.Int
-	FpsCounter     binding.Int
+	CaptureCounter func(int)
+	ErrorCounter   func(int)
+	FpsCounter     func(int)
 	LogFormat      string
 	LogPath        string
 	WidebandConfig WidebandConfig
@@ -104,9 +104,9 @@ func New(cfg Config) (IClient, error) {
 }
 
 func (d *Client) Start() error {
-	d.cfg.ErrorCounter.Set(0)
-	d.cfg.CaptureCounter.Set(0)
-	d.cfg.FpsCounter.Set(0)
+	d.cfg.ErrorCounter(0)
+	d.cfg.CaptureCounter(0)
+	d.cfg.FpsCounter(0)
 	return d.IClient.Start()
 }
 
@@ -169,7 +169,7 @@ func NewRamUpdate(address uint32, data []byte) *WriteRequest {
 		Address:  address,
 		Data:     data,
 		Length:   uint32(len(data)),
-		respChan: make(chan error, 1),
+		respChan: make(chan error, 4),
 	}
 }
 

@@ -4,177 +4,231 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"strings"
+	"log"
+	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/theme"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/ebus"
-	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/mainmenu"
 	"github.com/roffe/txlogger/pkg/widgets"
-	"github.com/skratchdot/open-golang/open"
-	sdialog "github.com/sqweek/dialog"
+	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
+	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
+	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
+	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmmod"
+	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmstatus"
+	"github.com/roffe/txlogger/pkg/widgets/txupdater"
+	// "github.com/skratchdot/open-golang/open"
 )
 
 func (mw *MainWindow) setupMenu() {
 	otherFunc := func(str string) {
 		switch str {
 		case "Register EU0D":
-			mr := NewMyrtilosRegistration(mw.app, mw)
-			mr.Show()
+			if w := mw.wm.HasWindow("Register EU0D"); w != nil {
+				mw.wm.Raise(w)
+				return
+			}
+			inner := multiwindow.NewInnerWindow("Register EU0D", NewMyrtilosRegistration(mw))
+			inner.Icon = theme.InfoIcon()
+			mw.wm.Add(inner)
 		}
 	}
 
-	menus := []*fyne.Menu{
+	leading := []*fyne.Menu{
 		fyne.NewMenu("File",
-			fyne.NewMenuItem("Load binary", mw.loadBinary),
-			fyne.NewMenuItem("Play log", mw.playLog),
-			fyne.NewMenuItem("Open log folder", func() {
-				if err := open.Run(mw.settings.GetLogPath()); err != nil {
-					mw.Log("failed to open logs folder: " + err.Error())
+			fyne.NewMenuItem("About", func() {
+				if w := mw.wm.HasWindow("About"); w != nil {
+					mw.wm.Raise(w)
+					return
 				}
+				inner := multiwindow.NewInnerWindow("About", About())
+				inner.Icon = theme.HelpIcon()
+				mw.wm.Add(inner)
+			}),
+			fyne.NewMenuItem("Open binary", mw.loadBinary),
+			fyne.NewMenuItem("Open log", func() {
+				cb := func(r fyne.URIReadCloser) {
+					defer r.Close()
+					filename := r.URI().Path()
+					log.Println("open log", filename)
+					mw.LoadLogfile(filename, r, fyne.NewPos(10, 10))
+				}
+				widgets.SelectFile(cb, "Log file", "csv", "t5l", "t7l", "t8l")
+			}),
+			//fyne.NewMenuItem("Open log folder", func() {
+			//	if err := open.Run(mw.settings.GetLogPath()); err != nil {
+			//		mw.Error(fmt.Errorf("failed to open logs folder: %w", err))
+			//	}
+			//}),
+			fyne.NewMenuItem("Settings", func() {
+				mw.openSettings()
+			}),
+			fyne.NewMenuItem("Update txbridge", func() {
+				port := mw.settings.CanSettings.GetSerialPort()
+				if mw.settings.CanSettings.GetAdapterName() == "txbridge wifi" {
+					port = "tcp"
+				}
+				updater := multiwindow.NewInnerWindow("txbridge firmware updater", txupdater.New(port))
+				updater.Icon = theme.DownloadIcon()
+				updater.Resize(fyne.NewSize(400, 300))
+				mw.wm.Add(updater)
+			}),
+			fyne.NewMenuItem("What's new", func() {
+				mw.showWhatsNew()
 			}),
 		),
-		fyne.NewMenu("Preset",
-			fyne.NewMenuItem("Save", mw.savePreset),
-			fyne.NewMenuItem("New", mw.newPreset),
-			fyne.NewMenuItem("Import", mw.importPreset),
-			fyne.NewMenuItem("Export", mw.exportPreset),
-			fyne.NewMenuItem("Delete", mw.deletePreset),
-		),
-		fyne.NewMenu("Other",
-			fyne.NewMenuItem("Update txbridge firmware", func() {
-				w := mw.app.NewWindow("txbridge firmware updater")
-				w.SetContent(
-					widgets.NewTxUpdater(
-						mw.settings.CanSettings.GetSerialPort(),
-					),
-				)
-				w.Show()
+		//fyne.NewMenu("Preset",
+		//	fyne.NewMenuItem("Save", mw.savePreset),
+		//	fyne.NewMenuItem("New", mw.newPreset),
+		//	fyne.NewMenuItem("Import", mw.importPreset),
+		//	fyne.NewMenuItem("Export", mw.exportPreset),
+		//	fyne.NewMenuItem("Delete", mw.deletePreset),
+		//),
+
+	}
+
+	trailing := []*fyne.Menu{
+		fyne.NewMenu("Arrange",
+			fyne.NewMenuItem("Grid", func() {
+				mw.wm.Arrange(&multiwindow.GridArranger{})
+			}),
+			fyne.NewMenuItem("Floating", func() {
+				mw.wm.Arrange(&multiwindow.FloatingArranger{})
+			}),
+			fyne.NewMenuItem("Pack", func() {
+				mw.wm.Arrange(&multiwindow.PackArranger{})
+			}),
+			fyne.NewMenuItem("Preserve", func() {
+				mw.wm.Arrange(&multiwindow.PreservingArranger{})
 			}),
 		),
 	}
-	mw.menu = mainmenu.New(mw, menus, mw.openMap, mw.openMapz, otherFunc)
+
+	mw.menu = mainmenu.New(mw, leading, trailing, mw.openMap, otherFunc)
 }
 
 func (mw *MainWindow) loadBinary() {
 	if mw.dlc != nil {
-		dialog.ShowError(errors.New("stop logging before loading a new binary"), mw.Window)
+		mw.Error(errors.New("stop logging before loading a new binary"))
 		return
 	}
-	filename, err := sdialog.File().Filter("Binary file", "bin").Load()
-	if err != nil {
-		if err.Error() == "Cancelled" {
+	cb := func(r fyne.URIReadCloser) {
+		defer r.Close()
+		filename := r.URI().Path()
+		if err := mw.LoadSymbolsFromFile(filename, r); err != nil {
+			mw.Error(err)
 			return
 		}
-		// dialog.ShowError(err, mw)
-		mw.Log(err.Error())
-		return
 	}
-	if err := mw.LoadSymbolsFromFile(filename); err != nil {
-		// dialog.ShowError(err, mw)
-		mw.Log(err.Error())
-		return
-	}
+	widgets.SelectFile(cb, "Binary file", "bin")
 }
 
-func (mw *MainWindow) playLog() {
-	filename, err := sdialog.File().Filter("logfile", "t5l", "t7l", "t8l", "csv").SetStartDir(mw.settings.GetLogPath()).Load()
-	if err != nil {
-		if err.Error() == "Cancelled" {
-			return
-		}
-		// dialog.ShowError(err, mw)
-		mw.Log(err.Error())
-		return
-	}
-	go NewLogPlayer(mw.app, filename, mw.fw)
-}
-
-func (mw *MainWindow) openMapz(typ symbol.ECUType, mapNames ...string) {
-	if mw.fw == nil {
-		mw.Log("No binary loaded")
-		return
-	}
-	joinedNames := strings.Join(mapNames, "|")
-	mv, found := mw.openMaps[joinedNames]
-	if !found {
-		w := mw.app.NewWindow(strings.Join(mapNames, ", ") + " - Map Viewer")
-		view, err := widgets.NewMapViewerMulti(typ, mw.fw, mapNames...)
-		if err != nil {
-			mw.Log(err.Error())
-			return
-		}
-
-		mw.openMaps[joinedNames] = w
-
-		var cancelFuncs []func()
-		for _, mv := range view.Children() {
-			xf := mv.Info().XFrom
-			yf := mv.Info().YFrom
-			if xf != "" {
-				cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(xf, func(value float64) {
-					mv.SetValue(xf, value)
-				}))
-			}
-			if yf != "" {
-				cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(yf, func(value float64) {
-					mv.SetValue(yf, value)
-				}))
-			}
-		}
-
-		w.SetCloseIntercept(func() {
-			delete(mw.openMaps, joinedNames)
-			for _, f := range cancelFuncs {
-				f()
-			}
-			w.Close()
-		})
-
-		w.SetContent(view)
-		w.Show()
-		return
-	}
-	mv.RequestFocus()
-}
+var openMapLock sync.Mutex
 
 func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	if mw.fw == nil {
-		mw.Log("No binary loaded")
-		return
-	}
-	axis := symbol.GetInfo(typ, mapName)
-	mww, found := mw.openMaps[axis.Z]
-	if found {
-		mww.RequestFocus()
-		return
-	}
-	xData, yData, zData, xCorrFac, yCorrFac, zCorrFac, err := mw.fw.GetXYZ(axis.X, axis.Y, axis.Z)
-	if err != nil {
-		mw.Log(err.Error())
+		mw.Error(fmt.Errorf("no binary loaded"))
 		return
 	}
 
+	axis := symbol.GetInfo(typ, mapName)
+
+	if w := mw.wm.HasWindow(axis.Z + " - " + axis.ZDescription); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+
+	log.Println(axis)
+
+	symX := mw.fw.GetByName(axis.X)
+	if symX == nil && axis.X == "BstKnkCal.fi_offsetXSP" {
+		symX = mw.fw.GetByName("BstKnkCal.OffsetXSP")
+	}
+
+	symY := mw.fw.GetByName(axis.Y)
 	symZ := mw.fw.GetByName(axis.Z)
 
-	var mv *widgets.MapViewer
+	if symZ == nil {
+		mw.Error(fmt.Errorf("failed to find symbol %s", axis.Z))
+		return
+	}
 
-	updateFunc := func(idx int, value []int) {
+	var xData, yData, zData []float64
+	zData = symZ.Float64s()
+
+	if symX != nil {
+		xData = symX.Float64s()
+	} else {
+		xData = []float64{0}
+	}
+
+	if symY != nil {
+		yData = symY.Float64s()
+	} else {
+		yData = []float64{0}
+		if symZ.Name == "Batt_korr_tab!" {
+			yData = []float64{15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5}
+		} else if len(xData) <= 1 && len(yData) <= 1 && len(zData) > 1 {
+			yData = make([]float64, len(zData))
+			for i := range yData {
+				yData[i] = float64(i)
+			}
+		} else {
+			yData = []float64{0}
+		}
+	}
+
+	if axis.X == "Pwm_ind_trot!" {
+		xData = xData[:8]
+	}
+
+	// Special cases
+	switch mapName {
+	case "Pgm_mod!":
+		pgm := pgmmod.New()
+		pgm.LoadFunc = func() ([]byte, error) {
+			return symZ.Bytes(), nil
+		}
+		pgm.Set(symZ.Bytes())
+		mapWindow := multiwindow.NewInnerWindow("Pgm_mod!", pgm)
+		mapWindow.Icon = theme.GridIcon()
+		mw.wm.Add(mapWindow)
+		return
+	case "Pgm_status":
+		if w := mw.wm.HasWindow("Pgm_status"); w != nil {
+			return
+		}
+		pgs := pgmstatus.New()
+		cancel := ebus.SubscribeFunc("Pgm_status", pgs.Set)
+		iw := multiwindow.NewInnerWindow("Pgm_status", pgs)
+		iw.Icon = theme.InfoIcon()
+		iw.OnClose = func() {
+			if cancel != nil {
+				cancel()
+			}
+		}
+		mw.wm.Add(iw)
+		return
+	}
+
+	var mv *mapviewer.MapViewer
+
+	updateFunc := func(idx int, value []float64) {
 		if mw.dlc != nil && mw.settings.GetAutoSave() {
 			buff := bytes.NewBuffer([]byte{})
 			var dataLen int
 			for i, val := range value {
-				buff.Write(symZ.EncodeInt(val))
+				buff.Write(symZ.EncodeFloat64(val))
 				if i == 0 {
 					dataLen = buff.Len()
 				}
 			}
 
 			var addr uint32
-			switch mw.ecuSelect.Selected {
+			switch mw.selects.ecuSelect.Selected {
 			case "T5":
 				addr = symZ.SramOffset
 			case "T7":
@@ -185,8 +239,10 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 			start := time.Now()
 			if err := mw.dlc.SetRAM(addr+uint32(idx*dataLen), buff.Bytes()); err != nil {
-				mw.Log(err.Error())
+				mw.Error(err)
+				return
 			}
+			//mw.Log(fmt.Sprintf("set $%d %s %s", addr, axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 			mw.Log(fmt.Sprintf("set %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 		}
 	}
@@ -196,7 +252,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			start := time.Now()
 			var addr uint32
 
-			switch mw.ecuSelect.Selected {
+			switch mw.selects.ecuSelect.Selected {
 			case "T5":
 				addr = symZ.SramOffset
 			case "T7":
@@ -207,23 +263,26 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 			data, err := mw.dlc.GetRAM(addr, uint32(symZ.Length))
 			if err != nil {
-				mw.Log(err.Error())
+				mw.Error(err)
 				return
 			}
-			ints := symZ.BytesToInts(data)
-			mv.SetZ(ints)
+
+			if err := mv.SetZData(symZ.BytesToFloat64s(data)); err != nil {
+				mw.Error(err)
+				return
+			}
 			mw.Log(fmt.Sprintf("load %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 		}
 	}
 
-	saveFunc := func(data []int) {
+	saveFunc := func(data []float64) {
 		if mw.dlc == nil {
 			return
 		}
 		start := time.Now()
-		buff := bytes.NewBuffer(symZ.EncodeInts(data))
+		buff := bytes.NewBuffer(symZ.EncodeFloat64s(data))
 		var startPos uint32
-		switch mw.ecuSelect.Selected {
+		switch mw.selects.ecuSelect.Selected {
 		case "T7":
 			startPos = symZ.Address
 		case "T8":
@@ -231,104 +290,103 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		}
 
 		if err := mw.dlc.SetRAM(startPos, buff.Bytes()); err != nil {
-			mw.Log(err.Error())
+			mw.Error(err)
 			return
 		}
 		buff.Reset()
 
+		//mw.Log(fmt.Sprintf("save %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 		mw.Log(fmt.Sprintf("save %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 	}
 
-	saveFileFunc := func(data []int) {
+	saveFileFunc := func(data []float64) {
 		ss := mw.fw.GetByName(axis.Z)
 		if ss == nil {
 			mw.Log(fmt.Sprintf("failed to find symbol %s", axis.Z))
 			return
 		}
-		if err := ss.SetData(ss.EncodeInts(data)); err != nil {
-			mw.Log(err.Error())
+		if err := ss.SetData(ss.EncodeFloat64s(data)); err != nil {
+			mw.Error(err)
 			return
 		}
 		if err := mw.fw.Save(mw.filename); err != nil {
-			mw.Log(err.Error())
+			mw.Error(err)
 			return
 		}
 		mw.Log(fmt.Sprintf("Saved %s", axis.Z))
 	}
 
-	if axis.X == "Pwm_ind_trot!" {
-		xData = xData[:8]
-
+	var xPrecision, yPrecision, zPrecision int
+	if symX != nil {
+		xPrecision = symbol.GetPrecision(symX.Correctionfactor)
 	}
 
-	mv, err = widgets.NewMapViewer(
-		widgets.WithSymbol(symZ),
-		widgets.WithXData(xData),
-		widgets.WithYData(yData),
-		widgets.WithZData(zData),
-		widgets.WithXCorrFac(xCorrFac),
-		widgets.WithYCorrFac(yCorrFac),
-		widgets.WithZCorrFac(zCorrFac),
-		widgets.WithXOffset(symbol.T5Offsets[axis.X]),
-		widgets.WithYOffset(symbol.T5Offsets[axis.Y]),
-		widgets.WithZOffset(symbol.T5Offsets[axis.Z]),
-		widgets.WithXFrom(axis.XFrom),
-		widgets.WithYFrom(axis.YFrom),
-		widgets.WithInterPolFunc(interpolate.Interpolate),
-		widgets.WithUpdateECUFunc(updateFunc),
-		widgets.WithLoadECUFunc(loadFunc),
-		widgets.WithSaveECUFunc(saveFunc),
-		widgets.WithSaveFileFunc(saveFileFunc),
-		widgets.WithMeshView(mw.settings.GetMeshView()),
-		widgets.WithWidebandSymbolName(mw.settings.GetWidebandSymbolName()),
-		widgets.WithEditable(true),
-		widgets.WithButtons(true),
-		widgets.WithWBL(mw.settings.GetWidebandType() != "None"),
-		widgets.WithFollowCrosshair(mw.settings.GetCursorFollowCrosshair()),
-		widgets.WithAxisLabels(axis.XDescription, axis.YDescription, axis.ZDescription),
+	if symY != nil {
+		yPrecision = symbol.GetPrecision(symY.Correctionfactor)
+	}
+
+	zPrecision = symbol.GetPrecision(symZ.Correctionfactor)
+
+	mv, err := mapviewer.New(
+		mapviewer.WithSymbol(symZ),
+		mapviewer.WithXData(xData),
+		mapviewer.WithYData(yData),
+		mapviewer.WithZData(zData),
+		mapviewer.WithXPrecision(xPrecision),
+		mapviewer.WithYPrecision(yPrecision),
+		mapviewer.WithZPrecision(zPrecision),
+		mapviewer.WithXFrom(axis.XFrom),
+		mapviewer.WithYFrom(axis.YFrom),
+		mapviewer.WithUpdateECUFunc(updateFunc),
+		mapviewer.WithLoadECUFunc(loadFunc),
+		mapviewer.WithSaveECUFunc(saveFunc),
+		mapviewer.WithSaveFileFunc(saveFileFunc),
+		mapviewer.WithMeshView(mw.settings.GetMeshView()),
+		mapviewer.WithEditable(true),
+		mapviewer.WithButtons(true),
+		mapviewer.WithFollowCrosshair(mw.settings.GetCursorFollowCrosshair()),
+		mapviewer.WithAxisLabels(axis.XDescription, axis.YDescription, axis.ZDescription),
 	)
 	if err != nil {
-		mw.Log(err.Error())
+		mw.Error(err)
 		return
 	}
 
-	var cancelFuncs []func()
+	if mw.settings.GetAutoLoad() && mw.dlc != nil {
+		go func() {
+			openMapLock.Lock()
+			defer openMapLock.Unlock()
+			p := progressmodal.New(mw.Window.Canvas(), "Loading "+axis.Z)
+			fyne.DoAndWait(p.Show)
+			loadFunc()
+			fyne.Do(p.Hide)
+		}()
+	}
 
+	mapWindow := multiwindow.NewInnerWindow(axis.Z+" - "+axis.ZDescription, mv)
+	mapWindow.Icon = theme.GridIcon()
+
+	mv.OnMouseDown = func() {
+		mw.wm.Raise(mapWindow)
+	}
+
+	var cancelFuncs []func()
 	if axis.XFrom != "" {
 		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.XFrom, func(value float64) {
-			mv.SetValue(axis.XFrom, value)
+			mv.SetX(value)
 		}))
 	}
-
 	if axis.YFrom != "" {
 		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.YFrom, func(value float64) {
-			mv.SetValue(axis.YFrom, value)
+			mv.SetY(value)
 		}))
 	}
-
-	//if mw.settings.GetWidebandType() != "ECU" {
-	cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(mw.settings.GetWidebandSymbolName(), func(value float64) {
-		mv.SetValue(mw.settings.GetWidebandSymbolName(), value)
-	}))
-	//}
-
-	if mw.settings.GetAutoLoad() && mw.dlc != nil {
-		p := widgets.NewProgressModal(mw.Window.Content(), "Loading "+axis.Z)
-		p.Show()
-		loadFunc()
-		p.Hide()
-	}
-	// mw.tab.Append(container.NewTabItem(axis.Z, mv))
-	w := mw.app.NewWindow(axis.Z + " - " + axis.ZDescription)
-	w.Canvas().SetOnTypedKey(mv.TypedKey)
-	mw.openMaps[axis.Z] = w
-	w.SetCloseIntercept(func() {
-		delete(mw.openMaps, axis.Z)
+	mapWindow.OnClose = func() {
 		for _, f := range cancelFuncs {
 			f()
 		}
-		w.Close()
-	})
-	w.SetContent(mv)
-	w.Show()
+	}
+
+	mw.wm.Add(mapWindow)
+
 }
