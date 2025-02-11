@@ -207,13 +207,13 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	mw.startup = false
 
 	if !fyne.CurrentApp().Driver().Device().IsMobile() {
-		mw.gocanGWClient()
+		mw.gocanGatewayClient()
 	}
 
 	return mw
 }
 
-func (mw *MainWindow) gocanGWClient() {
+func (mw *MainWindow) gocanGatewayClient() {
 	var socketFile string
 	if cacheDir, err := os.UserCacheDir(); err == nil {
 		socketFile = filepath.Join(cacheDir, "gocan.sock")

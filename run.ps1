@@ -1,4 +1,4 @@
-# .\buildcangw.ps1
+# .\build_cangateway.ps1
 $env:GOARCH = "amd64"
 $env:CGO_ENABLED = "1" 
 $env:GOGC = "100"

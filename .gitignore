@@ -15,5 +15,6 @@ symbols.txt
 *.o
 lzhuf/lzhuf.dll
 libusb-1.0.dll
+canlib32.dll
 logs
 layouts/*

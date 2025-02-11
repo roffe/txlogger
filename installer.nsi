@@ -75,9 +75,10 @@ Section "core" SecCore
   SetOutPath "$InstDir"
   
   ;ADD YOUR OWN FILES HERE...
-  FILE cangw.exe
+  FILE cangateway.exe
   FILE txlogger.exe
   FILE libusb-1.0.dll
+  FILE canlib32.dll
   FILE debug.bat
   
   ;Store installation folder
@@ -138,8 +139,9 @@ SectionEnd
 
 Section "Uninstall"
   !insertmacro DeleteFileOrAskAbort "$InstDir\txlogger.exe"
-  Delete "$InstDir\cangw.exe"
+  Delete "$InstDir\cangateway.exe"
   Delete "$InstDir\libusb-1.0.dll"
+  Delete "$InstDir\canlib32.dll"
   Delete "$InstDir\debug.bat"
   Delete "$InstDir\Uninstall.exe"
   RMDir "$InstDir"

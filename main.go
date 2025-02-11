@@ -60,10 +60,10 @@ func signalHandler(tx fyne.App) {
 	}()
 }
 
-func startCanGW(errFunc func(error), readyChan chan<- bool) *os.Process {
+func startCanGateway(errFunc func(error), readyChan chan<- bool) *os.Process {
 
 	if wd, err := os.Getwd(); err == nil {
-		command := filepath.Join(wd, "cangw.exe")
+		command := filepath.Join(wd, "cangateway.exe")
 		cmd := exec.Command(command)
 		//cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 		rc, err := cmd.StderrPipe()
@@ -142,7 +142,7 @@ func mainDesktop() {
 		log.Print(err.Error())
 	}
 
-	if p := startCanGW(errFunc, readyChan); p != nil {
+	if p := startCanGateway(errFunc, readyChan); p != nil {
 		defer p.Kill()
 	}
 

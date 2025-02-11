@@ -1,4 +1,4 @@
-.\buildcangw.ps1
+.\build_cangateway.ps1
 #$env:PKG_CONFIG_PATH = "/vcpkg/packages/libusb_x86-windows/lib/pkgconfig"
 #$env:CGO_CFLAGS = "-I/vcpkg/packages/libusb_x86-windows/include/libusb-1.0"
 #$env:PKG_CONFIG_PATH = "/vcpkg/packages/libusb_x64-windows/lib/pkgconfig"

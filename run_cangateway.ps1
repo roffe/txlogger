@@ -16,4 +16,4 @@ $env:GOGC = "100"
 $env:CC = "clang.exe"
 $env:CXX = "clang.exe"
 
-go run -tags="combi,j2534,kvaser" ..\gocan\cangw
+go run -tags="canlib,combi,j2534,kvaser" ..\gocan\cangateway

@@ -12,4 +12,4 @@ $env:GOGC = "100"
 # $env:CXX = "C:\\mingw32\\bin\g++.exe"
 $env:CC = "clang.exe"
 $env:CXX = "clang.exe"
-go build -tags="combi,j2534,kvaser" -ldflags '-s -w -H=windowsgui' ..\gocan\cangw
+go build -tags="canlib,combi,j2534,kvaser" -ldflags '-s -w -H=windowsgui' ..\gocan\cangateway

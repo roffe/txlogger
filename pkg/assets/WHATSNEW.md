@@ -1,3 +1,7 @@
+# 2.0.1
+
+
+
 # 2.0.0
 
 This is a huge milestone release. 
@@ -30,15 +34,12 @@ Or why not create your own gauges and make it just like you want :)
 - goCAN now supports Kvaser Canlib for all Kvaser products
 - The CANbus communication has been broken out to a separate binary that is compiled as 32-bit due to the requirements for j2534 dll's.
 
-
-
-
 # 1.0.19
 
 - Added E85.X_EthAct_Tech2 to Trionic 7 calibration shortcuts
 - Added T5 support for TXbridge
 - Improved TXbridge T8 support
-- Added OTA firmware update for TXbridge
+- Added OTA firmware update for txbridge
 - Trionic 7 & 8: Added support for offloading read & write by memory address to TXbridge
 - When hovering over symbols in the legend for the plotter, the symbol will be highlighted in the plot
 - Hovering over labels in the log player plotter will make them bold and make the series' drawn line thicker
