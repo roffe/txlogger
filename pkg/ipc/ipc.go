@@ -100,6 +100,9 @@ func ipcHandler(srv *Server) {
 	for {
 		conn, err := srv.l.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
 			log.Println(err)
 			return
 		}
@@ -109,7 +112,6 @@ func ipcHandler(srv *Server) {
 
 func handleConn(conn net.Conn, r Router) {
 	defer conn.Close()
-
 	gb := gob.NewDecoder(conn)
 	ge := gob.NewEncoder(conn)
 

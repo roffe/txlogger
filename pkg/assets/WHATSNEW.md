@@ -1,3 +1,8 @@
+# 2.0.1
+
+- improved kvaser CANlib drivers in goCAN
+- fixed so Lambda.External's value is properly displayed in plotter legend
+
 # 2.0.0
 
 This is a huge milestone release. 

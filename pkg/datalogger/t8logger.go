@@ -202,6 +202,7 @@ func (c *T8Client) Start() error {
 		if err := gm.InitiateDiagnosticOperation(ctx, 0x03); err != nil {
 			return err
 		}
+		defer gm.ReturnToNormalMode(ctx)
 
 		if err := gm.RequestSecurityAccess(ctx, 0xFD, 1, ecu.CalculateT8AccessKey); err != nil {
 			return err

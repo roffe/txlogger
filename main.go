@@ -60,7 +60,7 @@ func signalHandler(tx fyne.App) {
 	}()
 }
 
-func startCanGateway(errFunc func(error), readyChan chan<- bool) *os.Process {
+func startCanGateway(errFunc func(error), readyChan chan<- struct{}) *os.Process {
 
 	if wd, err := os.Getwd(); err == nil {
 		command := filepath.Join(wd, "cangateway.exe")
@@ -84,7 +84,7 @@ func startCanGateway(errFunc func(error), readyChan chan<- bool) *os.Process {
 				}
 				fmt.Print(str)
 				if strings.Contains(str, "server listening") {
-					readyChan <- true
+					close(readyChan)
 				}
 			}
 		}()
@@ -130,13 +130,13 @@ func mainDesktop() {
 	}
 
 	if workDirectory != "" {
-		log.Println("changing working directory to", workDirectory)
+		debug.Log("changing working directory to" + workDirectory)
 		if err := os.Chdir(workDirectory); err != nil {
-			log.Println(err)
+			debug.Log(fmt.Sprintf("failed to change working directory to %s: %v", workDirectory, err))
 		}
 	}
 
-	readyChan := make(chan bool)
+	readyChan := make(chan struct{})
 
 	var errFunc = func(err error) {
 		log.Print(err.Error())
@@ -147,14 +147,10 @@ func mainDesktop() {
 	}
 
 	select {
-	case ready := <-readyChan:
-		if ready {
-			log.Println("GoCAN Gateway is ready")
-		} else {
-			log.Fatal("GoCAN Gateway did not start")
-		}
+	case <-readyChan:
+		debug.Log("GoCAN Gateway is ready")
 	case <-time.After(5 * time.Second):
-		fyne.LogError("GoCAN Gateway did not start", errors.New("timeout"))
+		debug.Log("GoCAN Gateway was not ready after 5 seconds")
 	}
 
 	tx := app.NewWithID("com.roffe.txlogger")

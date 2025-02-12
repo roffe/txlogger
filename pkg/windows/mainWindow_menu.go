@@ -141,7 +141,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		return
 	}
 
-	log.Println(axis)
+	//log.Println(axis)
 
 	symX := mw.fw.GetByName(axis.X)
 	if symX == nil && axis.X == "BstKnkCal.fi_offsetXSP" {

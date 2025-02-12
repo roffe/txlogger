@@ -159,6 +159,9 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		labelText := NewTappableText(k, p.ts[n].Color, onTapped, onColorUpdate, onHover)
 
 		labelText.precission = symbol.GetPrecision(symbol.GetCorrectionfactor(k))
+		if k == "Lambda.External" {
+			labelText.precission = 3
+		}
 
 		p.legendTexts = append(p.legendTexts, labelText)
 		p.legend.Add(labelText)
@@ -324,6 +327,9 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 	case "ECMStat.p_Diff":
 		ts.Min = -1
 		ts.Max = 2
+	case "Lambda.External":
+		ts.Min = 0.5
+		ts.Max = 1.5
 	default:
 		ts.Min, ts.Max = findMinMaxFloat64(data)
 	}
