@@ -236,6 +236,9 @@ func (l *Logplayer) render() {
 	for {
 		if rec := l.logFile.Next(); !rec.EOF {
 			for k, v := range rec.Values {
+				if k == "Pgm_status" {
+					continue
+				}
 				values[k] = append(values[k], v)
 			}
 		} else {

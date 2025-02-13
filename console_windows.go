@@ -114,7 +114,7 @@ func init() {
 		return
 	}
 	if lasterr != nil {
-		log.Printf("attachConsole failed : %v", lasterr)
+		log.Printf("attachConsole failed: %v", lasterr)
 	}
 
 }

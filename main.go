@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"image/color"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -72,10 +73,11 @@ func startCanGateway(errFunc func(error), readyChan chan<- struct{}) *os.Process
 		}
 		r := bufio.NewReader(rc)
 		go func() {
+			starting := true
 			for {
 				str, err := r.ReadString('\n')
 				if err != nil {
-					if err.Error() == "EOF" {
+					if err == io.EOF {
 						errFunc(errors.New("GoCAN Gateway exited"))
 						return
 					}
@@ -83,8 +85,9 @@ func startCanGateway(errFunc func(error), readyChan chan<- struct{}) *os.Process
 					return
 				}
 				fmt.Print(str)
-				if strings.Contains(str, "server listening") {
+				if strings.Contains(str, "server listening") && starting {
 					close(readyChan)
+					starting = false
 				}
 			}
 		}()
@@ -143,7 +146,12 @@ func mainDesktop() {
 	}
 
 	if p := startCanGateway(errFunc, readyChan); p != nil {
-		defer p.Kill()
+		defer func(p *os.Process) {
+			if p != nil {
+				p.Kill()
+				p.Wait()
+			}
+		}(p)
 	}
 
 	select {
