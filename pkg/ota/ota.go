@@ -208,9 +208,9 @@ func openTcpPort() (io.ReadWriteCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	if t, ok := p.(*net.TCPConn); ok {
-		t.SetNoDelay(true)
-	}
+	// if t, ok := p.(*net.TCPConn); ok {
+	// 	t.SetNoDelay(true)
+	// }
 
 	return p, nil
 }

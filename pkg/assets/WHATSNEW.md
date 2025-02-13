@@ -2,6 +2,10 @@
 
 - improved kvaser CANlib drivers in goCAN
 - fixed so Lambda.External's value is properly displayed in plotter legend
+- txbride firmware updater now supports both wifi and bluetooth.  
+  To update the firmware from Bluetooth to wifi select "txbridge bluetooth" as device in CAN settings and select the corresponding bluetooth port then update the firmware from the file menu.  
+  After the firmware has been updated your txbridge will create a wifi hotspot with the same name the Bluetooth device had.  
+  Change the CAN device to "txbridge wifi" and connect to the wifi network with password **123456789**. after that you can continue logging as before.
 
 # 2.0.0
 
