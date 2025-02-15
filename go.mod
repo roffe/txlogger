@@ -15,6 +15,7 @@ require (
 	github.com/lusingander/colorpicker v0.7.4
 	github.com/roffe/ecusymbol v0.0.0-20250202020823-4b5104c7ac0a
 	github.com/roffe/gocan v0.0.0-20250212004108-7c0f20146184
+	github.com/roffe/gocanflasher v0.0.0-20250213230444-21112500ff5b
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.2
 	golang.org/x/image v0.24.0
@@ -28,8 +29,9 @@ require (
 require (
 	fyne.io/systray v1.11.0 // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
-	github.com/TheTitanrain/w32 v0.0.0-20180517000239-4f5cfb03fabf // indirect
+	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
+	github.com/avast/retry-go v3.0.0+incompatible // indirect
 	github.com/bendikro/dl v0.0.0-20190410215913-e41fdb9069d4 // indirect
 	github.com/creack/goselect v0.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -69,7 +71,7 @@ require (
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/tools v0.30.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250207221924-e9438ea467c6 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250212204824-5a70512c5d8b // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 
 )

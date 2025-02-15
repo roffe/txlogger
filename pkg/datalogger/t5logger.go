@@ -210,7 +210,7 @@ func (c *T5Client) Start() error {
 						continue
 					}
 					frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
-					resp, err := cl.SendAndWait(ctx, frame, 3000*time.Millisecond, gocan.SystemMsgDataRequest)
+					resp, err := cl.SendAndWait(ctx, frame, 300*time.Millisecond, gocan.SystemMsgDataRequest)
 					if err != nil {
 						read.Complete(err)
 						continue

@@ -329,6 +329,9 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 	case "Lambda.External":
 		ts.Min = 0.5
 		ts.Max = 1.5
+	case "P_medel", " Max_tryck", "Regl_tryck":
+		ts.Min = -1
+		ts.Max = 3
 	default:
 		ts.Min, ts.Max = findMinMaxFloat64(data)
 	}

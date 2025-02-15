@@ -18,6 +18,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -27,6 +28,7 @@ import (
 	"github.com/roffe/txlogger/pkg/ipc"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/windows"
+	sdialog "github.com/sqweek/dialog"
 
 	"net/http"
 	_ "net/http/pprof"
@@ -124,7 +126,37 @@ func mainAndroid() {
 	mw.ShowAndRun()
 }
 
+type RTL_OSVERSIONINFOEXW struct {
+	OSVersionInfoSize uint32
+	MajorVersion      uint32
+	MinorVersion      uint32
+	BuildNumber       uint32
+	PlatformId        uint32
+	CSDVersion        [128]uint16
+	ServicePackMajor  uint16
+	ServicePackMinor  uint16
+	SuiteMask         uint16
+	ProductType       byte
+	Reserved          byte
+}
+
+func RtlGetVersion() RTL_OSVERSIONINFOEXW {
+	ntdll := syscall.NewLazyDLL("ntdll.dll")
+	rtlGetVersion := ntdll.NewProc("RtlGetVersion")
+	var info RTL_OSVERSIONINFOEXW
+	info.OSVersionInfoSize = 5*4 + 128*2 + 3*2 + 2*1
+	rtlGetVersion.Call(uintptr(unsafe.Pointer(&info)))
+	return info
+}
+
 func mainDesktop() {
+	ver := RtlGetVersion()
+	log.Println("Windows version", ver.MajorVersion, ver.MinorVersion, ver.BuildNumber)
+	if ver.MajorVersion < 12 {
+		sdialog.Message("txlogger requires Windows 10 or later").Title("Unsupported Windows version").Error()
+		return
+	}
+
 	//startpprof()
 	socketFile := filepath.Join(os.TempDir(), "txlogger.sock")
 

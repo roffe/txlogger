@@ -27,6 +27,7 @@ import (
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/mainmenu"
+	"github.com/roffe/txlogger/pkg/widgets/canflasher"
 	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/ledicon"
@@ -351,17 +352,22 @@ func (mw *MainWindow) render() {
 			widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
 				mw.wm.CloseAll()
 			}),
-			/*
-				widget.NewButtonWithIcon("x", theme.SettingsIcon(), func() {
-					ctx := context.Background()
-					resp, err := mw.gclient.SendCommand(ctx, &proto.Command{Data: []byte("ping")})
-					if err != nil {
-						mw.Error(fmt.Errorf("failed to send command: %w", err))
-						return
-					}
-					log.Println("response:", string(resp.Data))
-				}),
-			*/
+
+			widget.NewButtonWithIcon("", theme.UploadIcon(), func() {
+				if w := mw.wm.HasWindow("Canflasher"); w != nil {
+					mw.wm.Raise(w)
+					return
+				}
+				inner := multiwindow.NewInnerWindow("Canflasher", canflasher.New(&canflasher.Config{
+					CSW: mw.settings.CanSettings,
+					GetECU: func() string {
+						return mw.selects.ecuSelect.Selected
+					},
+				}))
+				inner.Icon = theme.UploadIcon()
+				inner.Resize(fyne.NewSize(450, 250))
+				mw.wm.Add(inner)
+			}),
 		),
 
 		container.NewBorder(
