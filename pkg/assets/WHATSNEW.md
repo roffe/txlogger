@@ -1,3 +1,8 @@
+# 2.0.2
+
+- fixed a bugg where the knock icon would not hide after a few seconds on the dashboard
+
+
 # 2.0.1
 
 - improved kvaser CANlib drivers in goCAN

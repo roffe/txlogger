@@ -240,7 +240,6 @@ func (c *T5Client) Start() error {
 						c.onError(err)
 						continue
 					}
-
 					r := bytes.NewReader(resp)
 					if err := sym.Read(r); err != nil {
 						return err

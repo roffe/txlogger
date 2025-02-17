@@ -1,7 +1,9 @@
 .\build_cangateway.ps1
-$env:CGO_FLAGS = ""
 $env:GOARCH = "amd64"
 $env:CGO_ENABLED = "1"
+$env:PKG_CONFIG_PATH = ""
+$env:CGO_FLAGS = ""
+$env:CGO_LDFLAGS = ""
 $env:GOGC = "100"
 $env:CC = "clang.exe"
 $env:CXX = "clang.exe"

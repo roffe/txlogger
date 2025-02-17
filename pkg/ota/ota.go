@@ -45,7 +45,7 @@ func UpdateOTA(cfg Config) error {
 	}
 
 	start := time.Now()
-	cfg.Logfunc("Opening port ", cfg.Port)
+	cfg.Logfunc("Opening %s port", cfg.Port)
 
 	var err error
 	var sp io.ReadWriteCloser

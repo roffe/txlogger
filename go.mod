@@ -4,6 +4,8 @@ go 1.23.5
 
 replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
 
+replace github.com/roffe/gocanflasher => C:\Users\flejd\go\src\github.com\roffe\gocanflasher
+
 replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
 
 replace fyne.io/fyne/v2 => C:\Users\flejd\go\src\github.com\fyne-io\fyne
@@ -14,7 +16,7 @@ require (
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/lusingander/colorpicker v0.7.4
 	github.com/roffe/ecusymbol v0.0.0-20250202020823-4b5104c7ac0a
-	github.com/roffe/gocan v0.0.0-20250212004108-7c0f20146184
+	github.com/roffe/gocan v1.0.0
 	github.com/roffe/gocanflasher v0.0.0-20250213230444-21112500ff5b
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.2
@@ -73,5 +75,4 @@ require (
 	golang.org/x/tools v0.30.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250212204824-5a70512c5d8b // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-
 )

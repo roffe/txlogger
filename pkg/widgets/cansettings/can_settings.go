@@ -26,7 +26,7 @@ const (
 	prefsSpeed   = "speed"
 	prefsDebug   = "debug"
 
-	MinimumtxbridgeVersion = "1.0.6"
+	MinimumtxbridgeVersion = "1.0.8"
 )
 
 var portSpeeds = []string{"9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600", "1mbit", "2mbit", "3mbit"}

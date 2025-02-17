@@ -92,9 +92,7 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	t.logList = widget.NewListWithData(
 		t.logValues,
 		func() fyne.CanvasObject {
-			w := &widget.Label{
-				Truncation: fyne.TextTruncateEllipsis,
-			}
+			w := widget.NewLabel("")
 			w.TextStyle.Monospace = true
 			return w
 		},

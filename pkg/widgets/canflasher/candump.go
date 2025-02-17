@@ -2,10 +2,12 @@ package canflasher
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
 	"fyne.io/fyne/v2"
+	"github.com/avast/retry-go/v4"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocanflasher/pkg/ecu"
 	sdialog "github.com/sqweek/dialog"
@@ -45,8 +47,12 @@ func (t *CanFlasherWidget) ecuDump() {
 		tr, err := ecu.New(c, &ecu.Config{
 			Name:       translateName(t.cfg.GetECU()),
 			OnProgress: t.progress,
-			OnMessage:  func(s string) { t.logValues.Append(s) },
-			OnError:    func(err error) { t.logValues.Append(err.Error()) },
+			OnMessage: func(s string) {
+				t.logValues.Append(fmt.Sprintf("%s - %s\n", time.Now().Format("15:04:05.000"), s))
+			},
+			OnError: func(err error) {
+				t.logValues.Append(fmt.Sprintf("%s - %s\n", time.Now().Format("15:04:05.000"), err.Error()))
+			},
 		})
 		if err != nil {
 			t.log(err.Error())
@@ -54,18 +60,25 @@ func (t *CanFlasherWidget) ecuDump() {
 		}
 
 		bin, err := tr.DumpECU(ctx)
-		if err == nil {
-			t.app.SendNotification(fyne.NewNotification("", "Dump done"))
-			if err := os.WriteFile(filename, bin, 0644); err == nil {
-				t.log("Saved as " + filename)
-			} else {
-				t.log(err.Error())
-			}
-		} else {
+		if err != nil {
 			t.log(err.Error())
+			return
 		}
 
-		if err := tr.ResetECU(ctx); err != nil {
+		if err := os.WriteFile(filename, bin, 0644); err == nil {
+			t.log("Saved as " + filename)
+		} else {
+			t.log(err.Error())
+			return
+		}
+
+		t.app.SendNotification(fyne.NewNotification("txlogger", "ECU download completed"))
+
+		err = retry.Do(func() error {
+			return tr.ResetECU(ctx)
+		}, retry.Attempts(3), retry.Delay(1*time.Second), retry.LastErrorOnly(true))
+
+		if err != nil {
 			t.log(err.Error())
 		}
 	}()
