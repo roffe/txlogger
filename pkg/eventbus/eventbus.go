@@ -235,7 +235,7 @@ func (e *Controller) SubscribeFunc(topic string, fn func(float64)) (cancel func(
 
 func (e *Controller) Subscribe(topic string) chan float64 {
 	//log.Println("Subscribe", topic)
-	respChan := make(chan float64, 10)
+	respChan := make(chan float64, 20)
 	e.sub <- newSub{topic: topic, resp: respChan}
 	return respChan
 }

@@ -243,7 +243,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 				return
 			}
 			//mw.Log(fmt.Sprintf("set $%d %s %s", addr, axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
-			mw.Log(fmt.Sprintf("set %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
+			mw.Log(fmt.Sprintf("set %s %dms", axis.Z, time.Since(start).Truncate(10*time.Millisecond).Milliseconds()))
 		}
 	}
 

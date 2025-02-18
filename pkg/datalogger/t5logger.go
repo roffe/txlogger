@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -20,107 +18,39 @@ import (
 )
 
 type T5Client struct {
-	symbolChan chan []*symbol.Symbol
-	updateChan chan *WriteRequest
-	readChan   chan *ReadRequest
-
-	quitChan chan struct{}
-
-	closeOnce sync.Once
-
-	lamb LambdaProvider
-
-	lw LogWriter
-
-	errCount     int
-	errPerSecond int
-
-	Config
+	BaseLogger
 }
 
 func NewT5(cfg Config, lw LogWriter) (IClient, error) {
-	return &T5Client{
-		Config:     cfg,
-		lw:         lw,
-		symbolChan: make(chan []*symbol.Symbol, 1),
-		updateChan: make(chan *WriteRequest, 1),
-		readChan:   make(chan *ReadRequest, 1),
-		quitChan:   make(chan struct{}),
-	}, nil
-}
-
-func (c *T5Client) Close() {
-	c.closeOnce.Do(func() {
-		close(c.quitChan)
-	})
-}
-
-func (c *T5Client) SetRAM(address uint32, data []byte) error {
-	upd := NewRamUpdate(address, data)
-	c.updateChan <- upd
-	return upd.Wait()
-}
-
-func (c *T5Client) GetRAM(address uint32, length uint32) ([]byte, error) {
-	req := NewReadRequest(address, length)
-	c.readChan <- req
-	return req.Data, req.Wait()
-}
-
-func (c *T5Client) SetSymbols(symbols []*symbol.Symbol) error {
-	select {
-	case c.symbolChan <- symbols:
-	default:
-		return fmt.Errorf("pending")
-	}
-	return nil
+	return &T5Client{BaseLogger: NewBaseLogger(cfg, lw)}, nil
 }
 
 func (c *T5Client) Start() error {
+	c.ErrorCounter(0)
+	defer c.secondTicker.Stop()
 	defer c.lw.Close()
-
-	var txbridge bool
-	if strings.HasPrefix(c.Config.Device.Name(), "txbridge") {
-		txbridge = true
-	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cl, err := gocan.NewWithOpts(
-		ctx,
-		c.Device,
-	)
+	cl, err := gocan.NewWithOpts(ctx, c.Device)
 	if err != nil {
 		return err
 	}
 	defer cl.Close()
 
-	secondTicker := time.NewTicker(1000 * time.Millisecond)
-	defer secondTicker.Stop()
-
 	t := time.NewTicker(time.Second / time.Duration(c.Rate))
 	defer t.Stop()
-	cps := 0
 	t5 := t5can.NewClient(cl)
-	count := 0
-	sysvars := NewThreadSafeMap()
+
 	order := make([]string, len(c.Symbols))
 	for n, s := range c.Symbols {
 		//		log.Println(s.String())
 		order[n] = s.Name
 		s.Correctionfactor = 0.1
 	}
-	// Wideband lambda
-	cfg := &WBLConfig{
-		WBLType:  c.Config.WidebandConfig.Type,
-		Port:     c.Config.WidebandConfig.Port,
-		Log:      c.OnMessage,
-		Txbridge: txbridge,
-	}
 
-	c.lamb, err = NewWBL(ctx, cl, cfg)
-	if err != nil {
+	if err := c.setupWBL(ctx, cl); err != nil {
 		return err
 	}
 
@@ -130,7 +60,7 @@ func (c *T5Client) Start() error {
 	}
 
 	var expectedPayloadSize uint16
-	if txbridge {
+	if c.txbridge {
 		if err := cl.SendFrame(gocan.SystemMsg, []byte("5"), gocan.Outgoing); err != nil {
 			return err
 		}
@@ -158,38 +88,44 @@ func (c *T5Client) Start() error {
 	}
 
 	err = retry.Do(func() error {
-		tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse, gocan.SystemMsgError)
+		tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
 		defer tx.Close()
 
-		if txbridge {
+		messages := cl.Subscribe(ctx, gocan.SystemMsg)
+		defer messages.Close()
+
+		if c.txbridge {
 			t.Stop()
 			if err := cl.SendFrame(gocan.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
 				return err
 			}
 		}
 
-		var firstTime time.Time
-		var firstTimestamp uint32
-		var databuff []byte
-		var currtimestamp uint32
-
 		for {
 			select {
+			case msg := <-messages.Chan():
+				c.OnMessage(string(msg.Data()))
+			case err := <-cl.Err():
+				if gocan.IsRecoverable(err) {
+					c.onError(err)
+					continue
+				}
+				return retry.Unrecoverable(err)
 			case <-c.quitChan:
 				c.OnMessage("Stopped logging..")
 				return nil
-			case <-secondTicker.C:
-				c.FpsCounter(cps)
+			case <-c.secondTicker.C:
+				c.FpsCounter(c.cps)
 				if c.errPerSecond > 5 {
 					c.errPerSecond = 0
 					return fmt.Errorf("too many errors per second")
 				}
-				cps = 0
+				c.cps = 0
 				c.errPerSecond = 0
 			case symbols := <-c.symbolChan:
 				_ = symbols
 			case read := <-c.readChan:
-				if txbridge {
+				if c.txbridge {
 					// log.Println(read.Length)
 					toRead := min(234, read.Length)
 					read.Length -= toRead
@@ -230,7 +166,7 @@ func (c *T5Client) Start() error {
 				}
 				read.Data = data
 				read.Complete(nil)
-			case upd := <-c.updateChan:
+			case upd := <-c.writeChan:
 				upd.Complete(fmt.Errorf("not implemented"))
 			case <-t.C:
 				ts := time.Now()
@@ -245,7 +181,7 @@ func (c *T5Client) Start() error {
 						return err
 					}
 					val := c.converto(sym.Name, sym.Bytes())
-					sysvars.Set(sym.Name, val)
+					c.sysvars.Set(sym.Name, val)
 					if err := ebus.Publish(sym.Name, val); err != nil {
 						c.onError(err)
 					}
@@ -253,55 +189,45 @@ func (c *T5Client) Start() error {
 
 				if c.lamb != nil {
 					lambda := c.lamb.GetLambda()
-					sysvars.Set(EXTERNALWBLSYM, lambda)
+					c.sysvars.Set(EXTERNALWBLSYM, lambda)
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				if err := c.lw.Write(sysvars, []*symbol.Symbol{}, ts, order); err != nil {
+				if err := c.lw.Write(c.sysvars, []*symbol.Symbol{}, ts, order); err != nil {
 					return err
 				}
-				count++
-				cps++
-				if count%15 == 0 {
-					c.CaptureCounter(count)
+				c.captureCount++
+				c.cps++
+				if c.captureCount%15 == 0 {
+					c.CaptureCounter(c.captureCount)
 				}
 			case msg, ok := <-tx.Chan():
 				if !ok {
-					return retry.Unrecoverable(errors.New("txbridge recv channel closed"))
-				}
-				if msg.Identifier() == gocan.SystemMsgError {
-					data := msg.Data()
-					switch data[0] {
-					case 0x31:
-						c.onError(fmt.Errorf("read timeout"))
-					case 0x06:
-						c.onError(fmt.Errorf("invalid sequence"))
-					}
-					continue
+					return retry.Unrecoverable(errors.New("txbridge sub closed"))
 				}
 
-				databuff = msg.Data()
+				databuff := msg.Data()
 				if len(databuff) != int(expectedPayloadSize+4) {
 					c.onError(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize+4, len(databuff)))
 					continue
 				}
 
 				r := bytes.NewReader(databuff)
-				binary.Read(r, binary.LittleEndian, &currtimestamp)
+				binary.Read(r, binary.LittleEndian, &c.currtimestamp)
 
-				if firstTime.IsZero() {
-					firstTime = time.Now()
-					firstTimestamp = currtimestamp
+				if c.firstTime.IsZero() {
+					c.firstTime = time.Now()
+					c.firstTimestamp = c.currtimestamp
 				}
 
-				timeStamp := calculateCompensatedTimestamp(firstTime, firstTimestamp, currtimestamp)
+				timeStamp := c.calculateCompensatedTimestamp()
 
 				for _, sym := range c.Symbols {
 					if err := sym.Read(r); err != nil {
 						return err
 					}
 					val := c.converto(sym.Name, sym.Bytes())
-					sysvars.Set(sym.Name, val)
+					c.sysvars.Set(sym.Name, val)
 					if err := ebus.Publish(sym.Name, val); err != nil {
 						c.onError(err)
 					}
@@ -309,20 +235,20 @@ func (c *T5Client) Start() error {
 
 				if c.lamb != nil {
 					lambda := c.lamb.GetLambda()
-					sysvars.Set(EXTERNALWBLSYM, lambda)
+					c.sysvars.Set(EXTERNALWBLSYM, lambda)
 					if err := ebus.Publish(EXTERNALWBLSYM, lambda); err != nil {
 						c.onError(err)
 					}
 				}
 
-				if err := c.lw.Write(sysvars, []*symbol.Symbol{}, timeStamp, order); err != nil {
+				if err := c.lw.Write(c.sysvars, []*symbol.Symbol{}, timeStamp, order); err != nil {
 					return err
 				}
 
-				count++
-				cps++
-				if count%15 == 0 {
-					c.CaptureCounter(count)
+				c.captureCount++
+				c.cps++
+				if c.captureCount%15 == 0 {
+					c.CaptureCounter(c.captureCount)
 				}
 			}
 		}
@@ -331,18 +257,11 @@ func (c *T5Client) Start() error {
 		retry.Delay(1500*time.Millisecond),
 		retry.Attempts(3),
 		retry.OnRetry(func(n uint, err error) {
-			c.onError(fmt.Errorf("retry %d: %w", n, err))
+			c.OnMessage(fmt.Sprintf("Retry %d: %v", n, err))
 		}),
 		retry.LastErrorOnly(true),
 	)
 	return err
-}
-
-func (c *T5Client) onError(err error) {
-	c.errCount++
-	c.errPerSecond++
-	c.ErrorCounter(c.errCount)
-	c.OnMessage(err.Error())
 }
 
 const (
@@ -461,7 +380,7 @@ func ConvertByteToI16(ecudata []byte) int16 {
 func ConvertByteStringToDoubleStatus(ecudata []byte) float64 {
 	var retval float64
 	// Iterate over the bytes in ecudata and accumulate the result
-	for i := 0; i < len(ecudata); i++ {
+	for i := range len(ecudata) {
 		// Multiply the current byte by the appropriate power of 256 and add it to the result
 		retval += float64(ecudata[i]) * math.Pow(256, float64(i))
 	}

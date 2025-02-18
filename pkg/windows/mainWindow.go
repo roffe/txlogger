@@ -52,7 +52,8 @@ const (
 )
 
 var _ fyne.Tappable = (*SecretText)(nil)
-var _ desktop.Mouseable = (*SecretText)(nil)
+
+// var _ desktop.Mouseable = (*SecretText)(nil)
 
 type SecretText struct {
 	*widget.Label
@@ -87,6 +88,7 @@ func (s *SecretText) Tapped(*fyne.PointEvent) {
 	}
 }
 
+/*
 func (s *SecretText) MouseDown(e *desktop.MouseEvent) {
 	log.Println("MouseDown", e)
 }
@@ -94,6 +96,7 @@ func (s *SecretText) MouseDown(e *desktop.MouseEvent) {
 func (s *SecretText) MouseUp(e *desktop.MouseEvent) {
 	log.Println("MouseUp", e)
 }
+*/
 
 type MainWindow struct {
 	fyne.Window
@@ -543,8 +546,13 @@ func (mw *MainWindow) Log(s string) {
 	mw.outputData.Append(s)
 }
 
+func (mw *MainWindow) Log3(s string) {
+	debug.LogDepth(3, s)
+	mw.outputData.Append(s)
+}
+
 func (mw *MainWindow) Error(err error) {
-	debug.Log("error:" + err.Error())
+	debug.LogDepth(2, err.Error())
 	mw.outputData.Append(err.Error())
 	go fyne.Do(func() {
 		dialog.ShowError(err, mw.Window)

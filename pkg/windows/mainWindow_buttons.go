@@ -348,7 +348,7 @@ func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, er
 		Device:         device,
 		Symbols:        mw.symbolList.Symbols(),
 		Rate:           mw.settings.GetFreq(),
-		OnMessage:      mw.Log,
+		OnMessage:      mw.Log3,
 		CaptureCounter: func(i int) {
 			fyne.Do(func() {
 				mw.counters.capturedCounterLabel.SetText("Cap: " + strconv.Itoa(i))

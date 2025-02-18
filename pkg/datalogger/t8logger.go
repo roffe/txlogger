@@ -9,12 +9,9 @@ import (
 	"log"
 	"math"
 	"sort"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/gmlan"
 	"github.com/roffe/gocan/pkg/serialcommand"
@@ -23,98 +20,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func AirDemToStringT8(v float64) string {
-	switch v {
-	case 10:
-		return "PedalMap"
-	case 11:
-		return "Cruise Control"
-	case 12:
-		return "Idle Control"
-	case 20:
-		return "Max Engine Torque"
-	case 21:
-		return "Traction Control"
-	case 22:
-		return "Manual Gearbox Limit"
-	case 23:
-		return "Automatic Gearbox Lim"
-	case 24:
-		return "Stall Limit (Automatic)"
-	case 25:
-		return "Hardcoded Limit"
-	case 26:
-		return "Reverse Limit (Automatic)"
-	case 27:
-		return "Max Vehicle speed"
-	case 28:
-		return "Brake Management"
-	case 29:
-		return "System Action"
-	case 30:
-		return "Max Engine Speed"
-	case 40:
-		return "Min Load"
-	case 50:
-		return "Knock Airmass Limit"
-	case 52:
-		return "Max Turbo Speed"
-	default:
-		return "Unknown"
-	}
-}
-
 type T8Client struct {
-	symbolChan chan []*symbol.Symbol
-	writeChan  chan *WriteRequest
-	readChan   chan *ReadRequest
-
-	quitChan chan struct{}
-	sysvars  *ThreadSafeMap
-
-	lamb LambdaProvider
-
-	lw LogWriter
-
-	errCount     int
-	errPerSecond int
-
-	closeOnce sync.Once
-	Config
+	BaseLogger
 }
 
 func NewT8(cfg Config, lw LogWriter) (IClient, error) {
-	return &T8Client{
-		Config:     cfg,
-		symbolChan: make(chan []*symbol.Symbol, 1),
-		writeChan:  make(chan *WriteRequest, 1),
-		readChan:   make(chan *ReadRequest, 1),
-		quitChan:   make(chan struct{}, 2),
-		sysvars:    NewThreadSafeMap(),
-		lw:         lw,
-	}, nil
-}
-
-func (c *T8Client) Close() {
-	c.closeOnce.Do(func() {
-		close(c.quitChan)
-		time.Sleep(150 * time.Millisecond)
-	})
-}
-
-func (c *T8Client) SetSymbols(symbols []*symbol.Symbol) error {
-	select {
-	case c.symbolChan <- symbols:
-	default:
-		return fmt.Errorf("pending")
-	}
-	return nil
-}
-
-func (c *T8Client) SetRAM(address uint32, data []byte) error {
-	upd := NewRamUpdate(address, data)
-	c.writeChan <- upd
-	return upd.Wait()
+	return &T8Client{BaseLogger: NewBaseLogger(cfg, lw)}, nil
 }
 
 func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
@@ -128,31 +39,17 @@ func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
 }
 
 const T8ChunkSize = 235
-
 const lastPresentInterval = 2800 * time.Millisecond
 
-func (c *T8Client) onError(err error) {
-	c.errCount++
-	c.errPerSecond++
-	c.ErrorCounter(c.errCount)
-	c.OnMessage(err.Error())
-}
-
 func (c *T8Client) Start() error {
+	c.ErrorCounter(0)
+	defer c.secondTicker.Stop()
 	defer c.lw.Close()
-
-	var txbridge bool
-	if strings.HasPrefix(c.Config.Device.Name(), "txbridge") {
-		txbridge = true
-	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cl, err := gocan.NewWithOpts(
-		ctx,
-		c.Device,
-	)
+	cl, err := gocan.NewWithOpts(ctx, c.Device)
 	if err != nil {
 		return err
 	}
@@ -160,16 +57,7 @@ func (c *T8Client) Start() error {
 
 	order := c.sysvars.Keys()
 
-	// Wideband lambda setup
-	cfg := &WBLConfig{
-		WBLType:  c.Config.WidebandConfig.Type,
-		Port:     c.Config.WidebandConfig.Port,
-		Log:      c.OnMessage,
-		Txbridge: txbridge,
-	}
-
-	c.lamb, err = NewWBL(ctx, cl, cfg)
-	if err != nil {
+	if err := c.setupWBL(ctx, cl); err != nil {
 		return err
 	}
 
@@ -183,13 +71,7 @@ func (c *T8Client) Start() error {
 	// sort order
 	sort.StringSlice(order).Sort()
 
-	c.ErrorCounter(0)
-
-	cps := 0
-	count := 0
-	retries := 0
-
-	if txbridge {
+	if c.txbridge {
 		if err := cl.SendFrame(gocan.SystemMsg, []byte("8"), gocan.Outgoing); err != nil {
 			return err
 		}
@@ -221,9 +103,6 @@ func (c *T8Client) Start() error {
 		}
 		c.OnMessage("Configured dynamic register")
 
-		secondTicker := time.NewTicker(time.Second)
-		defer secondTicker.Stop()
-
 		t := time.NewTicker(time.Second / time.Duration(c.Rate))
 		defer t.Stop()
 
@@ -250,10 +129,13 @@ func (c *T8Client) Start() error {
 				}
 			}
 
-			tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse, gocan.SystemMsgError)
+			tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
 			defer tx.Close()
 
-			if txbridge {
+			messages := cl.Subscribe(ctx, gocan.SystemMsg)
+			defer messages.Close()
+
+			if c.txbridge {
 				//log.Println("stopped timer, using txbridge")
 				t.Stop()
 				if err := cl.SendFrame(gocan.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
@@ -261,13 +143,15 @@ func (c *T8Client) Start() error {
 				}
 			}
 
-			var firstTime time.Time
-			var firstTimestamp uint32
-			var currtimestamp uint32
 			for {
 				select {
+				case msg := <-messages.Chan():
+					c.OnMessage(string(msg.Data()))
 				case err := <-cl.Err():
-					log.Println("error from adapter", err)
+					if gocan.IsRecoverable(err) {
+						c.onError(err)
+						continue
+					}
 					return retry.Unrecoverable(err)
 				case <-c.quitChan:
 					c.OnMessage("Finished logging")
@@ -275,9 +159,9 @@ func (c *T8Client) Start() error {
 				case <-gctx.Done():
 					log.Println("gctx done")
 					return nil
-				case <-secondTicker.C:
-					c.FpsCounter(cps)
-					cps = 0
+				case <-c.secondTicker.C:
+					c.FpsCounter(c.cps)
+					c.cps = 0
 					if c.errPerSecond > 10 {
 						return errors.New("too many errors, reconnecting")
 					}
@@ -302,7 +186,7 @@ func (c *T8Client) Start() error {
 						c.OnMessage("Configured dynamic register")
 					}
 				case read := <-c.readChan:
-					if txbridge {
+					if c.txbridge {
 						if err := c.handleReadTxbridge(ctx, cl, read); err != nil {
 							read.Complete(err)
 						}
@@ -326,7 +210,7 @@ func (c *T8Client) Start() error {
 					read.Complete(nil)
 				case upd := <-c.writeChan:
 					log.Printf("Updating RAM 0x%X %d", upd.Address, T8ChunkSize)
-					if txbridge {
+					if c.txbridge {
 						if err := c.handleWriteTxbridge(ctx, cl, upd); err != nil {
 							upd.Complete(err)
 						}
@@ -388,19 +272,15 @@ func (c *T8Client) Start() error {
 					if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
 						c.onError(fmt.Errorf("failed to write log: %w", err))
 					}
-					cps++
-					count++
-					if count%10 == 0 {
-						c.CaptureCounter(count)
+					c.cps++
+					c.captureCount++
+					if c.captureCount%15 == 0 {
+						c.CaptureCounter(c.captureCount)
 					}
 					testerPresent()
 				case msg, ok := <-tx.Chan():
 					if !ok {
 						return retry.Unrecoverable(errors.New("txbridge recv channel closed"))
-					}
-					if msg.Identifier() == gocan.SystemMsgError {
-						c.onError(errors.New("read timeout"))
-						continue
 					}
 					databuff := msg.Data()
 					if len(databuff) != int(expectedPayloadSize+4) {
@@ -408,14 +288,14 @@ func (c *T8Client) Start() error {
 					}
 
 					r := bytes.NewReader(databuff)
-					binary.Read(r, binary.LittleEndian, &currtimestamp)
+					binary.Read(r, binary.LittleEndian, &c.currtimestamp)
 
-					if firstTime.IsZero() {
-						firstTime = time.Now()
-						firstTimestamp = currtimestamp
+					if c.firstTime.IsZero() {
+						c.firstTime = time.Now()
+						c.firstTimestamp = c.currtimestamp
 					}
 
-					timeStamp := calculateCompensatedTimestamp(firstTime, firstTimestamp, currtimestamp)
+					timeStamp := c.calculateCompensatedTimestamp()
 
 					for _, va := range c.Symbols {
 						if err := va.Read(r); err != nil {
@@ -432,17 +312,20 @@ func (c *T8Client) Start() error {
 					}
 
 					if c.lamb != nil {
-						ebus.Publish(EXTERNALWBLSYM, c.lamb.GetLambda())
-						c.sysvars.Set(EXTERNALWBLSYM, c.lamb.GetLambda())
+						lambda := c.lamb.GetLambda()
+						c.sysvars.Set(EXTERNALWBLSYM, lambda)
+						if err := ebus.Publish(EXTERNALWBLSYM, lambda); err != nil {
+							c.onError(err)
+						}
 					}
 
 					if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
 						c.onError(fmt.Errorf("failed to write log: %w", err))
 					}
-					cps++
-					count++
-					if count%10 == 0 {
-						c.CaptureCounter(count)
+					c.cps++
+					c.captureCount++
+					if c.captureCount%15 == 0 {
+						c.CaptureCounter(c.captureCount)
 					}
 					testerPresent()
 				}
@@ -455,7 +338,6 @@ func (c *T8Client) Start() error {
 		retry.Attempts(4),
 		retry.LastErrorOnly(true),
 		retry.OnRetry(func(n uint, err error) {
-			retries++
 			c.OnMessage(fmt.Sprintf("Retry %d: %v", n, err))
 		}),
 	)
@@ -557,4 +439,45 @@ func setUpDynamicallyDefinedRegisterBySymbol(ctx context.Context, gm *gmlan.Clie
 		return fmt.Errorf("SetUpDynamicallyDefinedRegisterBySymbol: %w", err)
 	}
 	return nil
+}
+
+func AirDemToStringT8(v float64) string {
+	switch v {
+	case 10:
+		return "PedalMap"
+	case 11:
+		return "Cruise Control"
+	case 12:
+		return "Idle Control"
+	case 20:
+		return "Max Engine Torque"
+	case 21:
+		return "Traction Control"
+	case 22:
+		return "Manual Gearbox Limit"
+	case 23:
+		return "Automatic Gearbox Lim"
+	case 24:
+		return "Stall Limit (Automatic)"
+	case 25:
+		return "Hardcoded Limit"
+	case 26:
+		return "Reverse Limit (Automatic)"
+	case 27:
+		return "Max Vehicle speed"
+	case 28:
+		return "Brake Management"
+	case 29:
+		return "System Action"
+	case 30:
+		return "Max Engine Speed"
+	case 40:
+		return "Min Load"
+	case 50:
+		return "Knock Airmass Limit"
+	case 52:
+		return "Max Turbo Speed"
+	default:
+		return "Unknown"
+	}
 }

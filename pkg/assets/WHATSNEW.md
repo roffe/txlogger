@@ -1,7 +1,12 @@
+# 2.0.3
+
+- optimized most adapter drivers in goCAN
+
 # 2.0.2
 
 - fixed a bugg where the knock icon would not hide after a few seconds on the dashboard
-
+- huge rewrite of the goCAN canbus drivers to have better error handling and a clearer path on how to propagate messages to the UI
+- started adding support for dumping and flashing ECU's, dumping and info should work on all 3 platforms. (no txbridge support yet)
 
 # 2.0.1
 

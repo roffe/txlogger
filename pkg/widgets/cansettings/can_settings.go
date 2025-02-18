@@ -2,9 +2,6 @@ package cansettings
 
 import (
 	"errors"
-	"fmt"
-	"log"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -234,21 +231,12 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 	return adapter.NewClient(
 		cs.adapterSelector.Selected,
 		&gocan.AdapterConfig{
-			Port:         cs.portSelector.Selected,
-			PortBaudrate: baudrate,
-			CANRate:      canRate,
-			CANFilter:    canFilter,
-			OnMessage:    logger,
-			Debug:        cs.debugCheckbox.Checked,
-			OnError: func(err error) {
-				_, file, no, ok := runtime.Caller(1)
-				if ok {
-					fmt.Printf("%s#%d %v\n", file, no, err)
-				} else {
-					log.Println(err)
-				}
-				logger(err.Error())
-			},
+			Port:                   cs.portSelector.Selected,
+			PortBaudrate:           baudrate,
+			CANRate:                canRate,
+			CANFilter:              canFilter,
+			OnMessage:              logger,
+			Debug:                  cs.debugCheckbox.Checked,
 			MinimumFirmwareVersion: minimumVersion,
 			PrintVersion:           true,
 		},

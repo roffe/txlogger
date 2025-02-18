@@ -65,16 +65,11 @@ func newInnovate(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaP
 		wblSub := cl.Subscribe(ctx, gocan.SystemMsgWBLReading)
 		go func() {
 			ch := wblSub.Chan()
-			for {
-				select {
-				case msg, ok := <-ch:
-					if !ok {
-						cfg.Log("wbl channel closed")
-						return
-					}
-					wblClient.SetData(msg.Data())
-				}
+			defer cfg.Log("wbl channel closed")
+			for msg := range ch {
+				wblClient.SetData(msg.Data())
 			}
+
 		}()
 	}
 	return wblClient, nil
@@ -93,23 +88,18 @@ func newAEM(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 		wblSub := cl.Subscribe(ctx, gocan.SystemMsgWBLReading)
 		go func() {
 			ch := wblSub.Chan()
-			for {
-				select {
-				case msg, ok := <-ch:
-					if !ok {
-						cfg.Log("wbl reading channel closed")
-						return
-					}
-					// create a float from the message
-					f, err := strconv.ParseFloat(string(msg.Data()), 64)
-					if err != nil {
-						cfg.Log("could not decode WBL value")
-						continue
-					}
-					//lambda := float64(binary.BigEndian.Uint16(msg.Data()[0:2])) / 100
-					wblClient.SetLambda(f / 10)
+			defer cfg.Log("wbl reading channel closed")
+			for msg := range ch {
+				// create a float from the message
+				f, err := strconv.ParseFloat(string(msg.Data()), 64)
+				if err != nil {
+					cfg.Log("could not decode WBL value")
+					continue
 				}
+				//lambda := float64(binary.BigEndian.Uint16(msg.Data()[0:2])) / 100
+				wblClient.SetLambda(f / 10)
 			}
+
 		}()
 	} else if cfg.Port == "CAN" {
 		cfg.Log("Starting AEM CAN client")
@@ -117,15 +107,9 @@ func newAEM(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 		go func() {
 			// defer wblSub.Close()
 			ch := wblSub.Chan()
-			for {
-				select {
-				case msg, ok := <-ch:
-					if !ok {
-						cfg.Log("wbl channel closed")
-						return
-					}
-					wblClient.SetData(msg.Data())
-				}
+			defer cfg.Log("wbl channel closed")
+			for msg := range ch {
+				wblClient.SetData(msg.Data())
 			}
 		}()
 	} else {
@@ -150,17 +134,11 @@ func newPLX(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 
 		go func() {
 			ch := wblSub.Chan()
-			for {
-				select {
-				case msg, ok := <-ch:
-					if !ok {
-						cfg.Log("wbl channel closed")
-						return
-					}
-					if err := wblClient.Parse(msg.Data()); err != nil {
-						cfg.Log(err.Error())
-						log.Println(err)
-					}
+			defer cfg.Log("wbl channel closed")
+			for msg := range ch {
+				if err := wblClient.Parse(msg.Data()); err != nil {
+					cfg.Log(err.Error())
+					log.Println(err)
 				}
 			}
 		}()

@@ -486,12 +486,9 @@ func (t *Client) splitRequest(payload []byte, responseRequired bool) []gocan.CAN
 
 	var results []gocan.CANFrame
 
-	for i := 0; i < msgCount; i++ {
+	for i := range msgCount {
 		start := chunkSize * i
-		end := start + chunkSize
-		if end > len(payload) {
-			end = len(payload)
-		}
+		end := min(start+chunkSize, len(payload))
 
 		count := end - start
 
@@ -957,8 +954,10 @@ func (t *Client) RequestUpload(ctx context.Context, address, length uint32) erro
 func (t *Client) sendLong(ctx context.Context, data []byte) error {
 	messages := t.splitRequest(data, true)
 	for i, msg := range messages {
-		log.Println(msg.String())
+		// log.Printf("msg %x: %X", msg.Identifier(), msg.Data())
 		if i == len(messages)-1 {
+			// log.Println(msg.Type())
+
 			//if err := t.c.Send(msg); err != nil {
 			//	return err
 			//}
@@ -967,7 +966,7 @@ func (t *Client) sendLong(ctx context.Context, data []byte) error {
 			if err != nil {
 				return err
 			}
-			log.Println(resp.String())
+			// log.Println(resp.String())
 			if err := checkErr(resp); err != nil {
 				return err
 			}
@@ -979,7 +978,7 @@ func (t *Client) sendLong(ctx context.Context, data []byte) error {
 			if err := checkErr(resp); err != nil {
 				return err
 			}
-			log.Println(resp.String())
+			// log.Printf("chunk %d: %X", i, resp.Data())
 		}
 	}
 	return nil
