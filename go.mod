@@ -16,7 +16,7 @@ require (
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/lusingander/colorpicker v0.7.4
 	github.com/roffe/ecusymbol v0.0.0-20250202020823-4b5104c7ac0a
-	github.com/roffe/gocan v1.0.0
+	github.com/roffe/gocan v1.0.1
 	github.com/roffe/gocanflasher v0.0.0-20250213230444-21112500ff5b
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.2
