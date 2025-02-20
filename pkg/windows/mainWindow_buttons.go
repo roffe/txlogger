@@ -326,6 +326,9 @@ func (mw *MainWindow) startLogging() {
 
 	mw.canLED.On()
 	go func() {
+
+		mw.Log("Connecting to " + device.Name())
+		defer mw.Log(device.Name() + " disconnected")
 		if err := mw.dlc.Start(); err != nil {
 			mw.Error(err)
 		}
@@ -348,7 +351,7 @@ func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, er
 		Device:         device,
 		Symbols:        mw.symbolList.Symbols(),
 		Rate:           mw.settings.GetFreq(),
-		OnMessage:      mw.Log3,
+		OnMessage:      mw.Log,
 		CaptureCounter: func(i int) {
 			fyne.Do(func() {
 				mw.counters.capturedCounterLabel.SetText("Cap: " + strconv.Itoa(i))

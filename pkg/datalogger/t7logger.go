@@ -95,7 +95,7 @@ func (c *T7Client) Start() error {
 	go c.startBroadcastListener(bctx, cl)
 
 	c.OnMessage("Watching for broadcast messages")
-	<-time.After(350 * time.Millisecond)
+	<-time.After(550 * time.Millisecond)
 	order := c.sysvars.Keys()
 	sort.StringSlice(order).Sort()
 	c.OnMessage(fmt.Sprintf("Found %s", order))
@@ -184,7 +184,8 @@ func (c *T7Client) Start() error {
 		testerPresent := func() {
 			if time.Since(lastPresent) > lastPresentInterval {
 				if err := kwp.TesterPresent(ctx); err != nil {
-					c.onError(err)
+					c.onError()
+					c.OnMessage(err.Error())
 					return
 				}
 				lastPresent = time.Now()
@@ -212,7 +213,8 @@ func (c *T7Client) Start() error {
 				c.OnMessage(string(msg.Data()))
 			case err := <-cl.Err():
 				if gocan.IsRecoverable(err) {
-					c.onError(err)
+					c.onError()
+					c.OnMessage(err.Error())
 					continue
 				}
 				return retry.Unrecoverable(err)
@@ -268,7 +270,8 @@ func (c *T7Client) Start() error {
 					read.Address += uint32(toRead)
 					payload, err := cmd.MarshalBinary()
 					if err != nil {
-						c.onError(err)
+						c.onError()
+						c.OnMessage(err.Error())
 						continue
 					}
 					frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
@@ -370,12 +373,14 @@ func (c *T7Client) Start() error {
 
 				databuff, err := kwp.ReadDataByIdentifier(ctx, 0xF0)
 				if err != nil {
-					c.onError(err)
+					c.onError()
+					c.OnMessage(err.Error())
 					continue
 				}
 
 				if len(databuff) != int(expectedPayloadSize) {
-					c.onError(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
+					c.onError()
+					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
 					continue
 					//return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
 				}
@@ -388,7 +393,8 @@ func (c *T7Client) Start() error {
 					}
 					if err := va.Read(r); err != nil {
 						log.Printf("data ex %d %X len %d", expectedPayloadSize, databuff, len(databuff))
-						c.onError(err)
+						c.onError()
+						c.OnMessage(err.Error())
 						break
 					}
 					if va.Name == "DisplProt.AD_Scanner" {
@@ -416,7 +422,8 @@ func (c *T7Client) Start() error {
 
 				//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
 				if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
-					c.onError(fmt.Errorf("failed to write log: %w", err))
+					c.onError()
+					c.OnMessage("failed to write log: " + err.Error())
 				}
 				c.captureCount++
 				c.cps++
@@ -430,7 +437,8 @@ func (c *T7Client) Start() error {
 
 				databuff := msg.Data()
 				if len(databuff) != int(expectedPayloadSize+4) {
-					c.onError(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize+4, len(databuff)))
+					c.onError()
+					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, len(databuff)))
 					log.Printf("unexpected data %X", databuff)
 					continue
 					//return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
@@ -454,7 +462,8 @@ func (c *T7Client) Start() error {
 					}
 					if err := va.Read(r); err != nil {
 						log.Printf("data ex %d %X len %d", expectedPayloadSize, databuff, len(databuff))
-						c.onError(err)
+						c.onError()
+						c.OnMessage(err.Error())
 						break
 					}
 					if va.Name == "DisplProt.AD_Scanner" {
@@ -468,7 +477,8 @@ func (c *T7Client) Start() error {
 					}
 
 					if err := ebus.Publish(va.Name, va.Float64()); err != nil {
-						c.onError(err)
+						c.onError()
+						c.OnMessage(err.Error())
 					}
 				}
 
@@ -480,13 +490,15 @@ func (c *T7Client) Start() error {
 					lambda := c.lamb.GetLambda()
 					c.sysvars.Set(EXTERNALWBLSYM, lambda)
 					if err := ebus.Publish(EXTERNALWBLSYM, lambda); err != nil {
-						c.onError(err)
+						c.onError()
+						c.OnMessage(err.Error())
 					}
 				}
 
 				//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
 				if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
-					c.onError(fmt.Errorf("failed to write log: %w", err))
+					c.onError()
+					c.OnMessage("failed to write log: " + err.Error())
 				}
 				c.captureCount++
 				c.cps++

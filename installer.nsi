@@ -77,6 +77,7 @@ Section "core" SecCore
   ;ADD YOUR OWN FILES HERE...
   FILE cangateway.exe
   FILE txlogger.exe
+  FILE canusbdrv64.dll
   FILE libusb-1.0.dll
   FILE canlib32.dll
   FILE debug.bat
@@ -140,6 +141,7 @@ SectionEnd
 Section "Uninstall"
   !insertmacro DeleteFileOrAskAbort "$InstDir\txlogger.exe"
   Delete "$InstDir\cangateway.exe"
+  Delete "$InstDir\canusbdrv64.dll"
   Delete "$InstDir\libusb-1.0.dll"
   Delete "$InstDir\canlib32.dll"
   Delete "$InstDir\debug.bat"

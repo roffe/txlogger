@@ -5,6 +5,7 @@ $files = @(
     "debug.bat",
     "libusb-1.0.dll", 
     "canlib32.dll",
+    "canusbdrv64.dll",
     "txlogger.exe"
     "cangateway.exe"
 )

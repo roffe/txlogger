@@ -82,11 +82,10 @@ func (bl *BaseLogger) SetSymbols(symbols []*symbol.Symbol) error {
 	return nil
 }
 
-func (bl *BaseLogger) onError(err error) {
+func (bl *BaseLogger) onError() {
 	bl.errCount++
 	bl.errPerSecond++
 	bl.ErrorCounter(bl.errCount)
-	bl.OnMessage(err.Error())
 }
 
 func (bl *BaseLogger) calculateCompensatedTimestamp() time.Time {

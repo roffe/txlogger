@@ -107,7 +107,8 @@ func (c *T5Client) Start() error {
 				c.OnMessage(string(msg.Data()))
 			case err := <-cl.Err():
 				if gocan.IsRecoverable(err) {
-					c.onError(err)
+					c.onError()
+					c.OnMessage(err.Error())
 					continue
 				}
 				return retry.Unrecoverable(err)
@@ -142,7 +143,8 @@ func (c *T5Client) Start() error {
 					read.Address += uint32(toRead)
 					payload, err := cmd.MarshalBinary()
 					if err != nil {
-						c.onError(err)
+						c.onError()
+						c.OnMessage(err.Error())
 						continue
 					}
 					frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
@@ -161,7 +163,8 @@ func (c *T5Client) Start() error {
 				}
 				data, err := t5.ReadRam(ctx, read.Address, read.Length)
 				if err != nil {
-					c.onError(err)
+					c.onError()
+					c.OnMessage(err.Error())
 					continue
 				}
 				read.Data = data
@@ -173,7 +176,8 @@ func (c *T5Client) Start() error {
 				for _, sym := range c.Symbols {
 					resp, err := t5.ReadRam(ctx, sym.SramOffset, uint32(sym.Length))
 					if err != nil {
-						c.onError(err)
+						c.onError()
+						c.OnMessage(err.Error())
 						continue
 					}
 					r := bytes.NewReader(resp)
@@ -183,7 +187,8 @@ func (c *T5Client) Start() error {
 					val := c.converto(sym.Name, sym.Bytes())
 					c.sysvars.Set(sym.Name, val)
 					if err := ebus.Publish(sym.Name, val); err != nil {
-						c.onError(err)
+						c.onError()
+						c.OnMessage(err.Error())
 					}
 				}
 
@@ -208,7 +213,8 @@ func (c *T5Client) Start() error {
 
 				databuff := msg.Data()
 				if len(databuff) != int(expectedPayloadSize+4) {
-					c.onError(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize+4, len(databuff)))
+					c.onError()
+					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, len(databuff)))
 					continue
 				}
 
@@ -229,7 +235,8 @@ func (c *T5Client) Start() error {
 					val := c.converto(sym.Name, sym.Bytes())
 					c.sysvars.Set(sym.Name, val)
 					if err := ebus.Publish(sym.Name, val); err != nil {
-						c.onError(err)
+						c.onError()
+						c.OnMessage(err.Error())
 					}
 				}
 
@@ -237,7 +244,8 @@ func (c *T5Client) Start() error {
 					lambda := c.lamb.GetLambda()
 					c.sysvars.Set(EXTERNALWBLSYM, lambda)
 					if err := ebus.Publish(EXTERNALWBLSYM, lambda); err != nil {
-						c.onError(err)
+						c.onError()
+						c.OnMessage(err.Error())
 					}
 				}
 

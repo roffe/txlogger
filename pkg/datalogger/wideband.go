@@ -126,7 +126,7 @@ func newPLX(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 	if err != nil {
 		return nil, err
 	}
-	if cfg.Txbridge || cfg.Port == "txbridge" {
+	if cfg.Txbridge && cfg.Port == "txbridge" {
 		if err := cl.SendFrame(gocan.SystemMsg, []byte{'w', 1, 'p', 'p'}, gocan.Outgoing); err != nil {
 			return nil, err
 		}

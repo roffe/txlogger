@@ -123,7 +123,8 @@ func (c *T8Client) Start() error {
 				if time.Since(lastPresent) > lastPresentInterval {
 					//log.Println("sending tester present")
 					if err := gm.TesterPresentNoResponseAllowed(); err != nil {
-						c.onError(fmt.Errorf("failed to send tester present: %w", err))
+						c.onError()
+						c.OnMessage("Failed to send tester present: " + err.Error())
 					}
 					lastPresent = time.Now()
 				}
@@ -149,7 +150,8 @@ func (c *T8Client) Start() error {
 					c.OnMessage(string(msg.Data()))
 				case err := <-cl.Err():
 					if gocan.IsRecoverable(err) {
-						c.onError(err)
+						c.onError()
+						c.OnMessage(err.Error())
 						continue
 					}
 					return retry.Unrecoverable(err)
@@ -241,7 +243,8 @@ func (c *T8Client) Start() error {
 					}
 					databuff, err := gm.ReadDataByIdentifier(ctx, 0x18)
 					if err != nil {
-						c.onError(fmt.Errorf("failed to read data: %w", err))
+						c.onError()
+						c.OnMessage("failed to read data: " + err.Error())
 						continue
 					}
 					if len(databuff) != int(expectedPayloadSize) {
@@ -251,11 +254,13 @@ func (c *T8Client) Start() error {
 
 					for _, va := range c.Symbols {
 						if err := va.Read(r); err != nil {
-							c.onError(fmt.Errorf("failed to set data: %w", err))
+							c.onError()
+							c.OnMessage("failed to set data: " + err.Error())
 							break
 						}
 						if err := ebus.Publish(va.Name, va.Float64()); err != nil {
-							c.onError(err)
+							c.onError()
+							c.OnMessage(err.Error())
 						}
 					}
 
@@ -270,7 +275,8 @@ func (c *T8Client) Start() error {
 
 					//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
 					if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
-						c.onError(fmt.Errorf("failed to write log: %w", err))
+						c.onError()
+						c.OnMessage("failed to write log: " + err.Error())
 					}
 					c.cps++
 					c.captureCount++
@@ -299,11 +305,13 @@ func (c *T8Client) Start() error {
 
 					for _, va := range c.Symbols {
 						if err := va.Read(r); err != nil {
-							c.onError(fmt.Errorf("failed to set data: %w", err))
+							c.onError()
+							c.OnMessage("failed to read symbol data: " + err.Error())
 							break
 						}
 						if err := ebus.Publish(va.Name, va.Float64()); err != nil {
-							c.onError(fmt.Errorf("failed to publish data: %w", err))
+							c.onError()
+							c.OnMessage("failed to publish data: " + err.Error())
 						}
 					}
 
@@ -315,12 +323,14 @@ func (c *T8Client) Start() error {
 						lambda := c.lamb.GetLambda()
 						c.sysvars.Set(EXTERNALWBLSYM, lambda)
 						if err := ebus.Publish(EXTERNALWBLSYM, lambda); err != nil {
-							c.onError(err)
+							c.onError()
+							c.OnMessage(err.Error())
 						}
 					}
 
 					if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
-						c.onError(fmt.Errorf("failed to write log: %w", err))
+						c.onError()
+						c.OnMessage("failed to write log: " + err.Error())
 					}
 					c.cps++
 					c.captureCount++

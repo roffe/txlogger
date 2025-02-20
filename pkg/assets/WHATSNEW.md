@@ -1,3 +1,10 @@
+# 2.0.4
+
+- Added support for Lawicel CANUSB dll. No more fiddling with VCP COM ports and latencies <3
+- Moved back all CAN communications except for J2534 dll's to the main program to not incur performance pentaly of using cangateway when not necessary
+- updated libusb to 64 bit for use with CombiAdapter
+- added canusb x64 dll 
+
 # 2.0.3
 
 - optimized most adapter drivers in goCAN

@@ -77,6 +77,10 @@ func NewCanSettingsWidget() *Widget {
 		csw.portSelector.Refresh()
 	})
 
+	for _, adapter := range adapter.ListAdapters() {
+		csw.adapters[adapter.Name] = &adapter
+	}
+
 	csw.loadPrefs()
 	return csw
 }
@@ -228,19 +232,36 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 	if strings.HasPrefix(cs.adapterSelector.Selected, "txbridge") {
 		minimumVersion = MinimumtxbridgeVersion
 	}
-	return adapter.NewClient(
-		cs.adapterSelector.Selected,
-		&gocan.AdapterConfig{
-			Port:                   cs.portSelector.Selected,
-			PortBaudrate:           baudrate,
-			CANRate:                canRate,
-			CANFilter:              canFilter,
-			OnMessage:              logger,
-			Debug:                  cs.debugCheckbox.Checked,
-			MinimumFirmwareVersion: minimumVersion,
-			PrintVersion:           true,
-		},
-	)
+
+	if strings.HasPrefix(cs.adapterSelector.Selected, "J2534") {
+		return adapter.NewClient(
+			cs.adapterSelector.Selected,
+			&gocan.AdapterConfig{
+				Port:                   cs.portSelector.Selected,
+				PortBaudrate:           baudrate,
+				CANRate:                canRate,
+				CANFilter:              canFilter,
+				OnMessage:              logger,
+				Debug:                  cs.debugCheckbox.Checked,
+				MinimumFirmwareVersion: minimumVersion,
+				PrintVersion:           true,
+			},
+		)
+	} else {
+		return adapter.New(
+			cs.adapterSelector.Selected,
+			&gocan.AdapterConfig{
+				Port:                   cs.portSelector.Selected,
+				PortBaudrate:           baudrate,
+				CANRate:                canRate,
+				CANFilter:              canFilter,
+				OnMessage:              logger,
+				Debug:                  cs.debugCheckbox.Checked,
+				MinimumFirmwareVersion: minimumVersion,
+				PrintVersion:           true,
+			},
+		)
+	}
 }
 
 func (cs *Widget) CreateRenderer() fyne.WidgetRenderer {
