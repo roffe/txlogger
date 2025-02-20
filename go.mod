@@ -1,6 +1,6 @@
 module github.com/roffe/txlogger
 
-go 1.23.5
+go 1.24.0
 
 replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
 
@@ -16,7 +16,7 @@ require (
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/lusingander/colorpicker v0.7.4
 	github.com/roffe/ecusymbol v0.0.0-20250202020823-4b5104c7ac0a
-	github.com/roffe/gocan v1.0.1
+	github.com/roffe/gocan v1.0.2
 	github.com/roffe/gocanflasher v0.0.0-20250213230444-21112500ff5b
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.2
@@ -62,6 +62,8 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.5.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/roffe/gocanlib v1.0.1 // indirect
+	github.com/roffe/gocanusb v1.0.0 // indirect
 	github.com/rymdport/portal v0.3.0 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect

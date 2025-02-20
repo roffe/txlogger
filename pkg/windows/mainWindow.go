@@ -62,8 +62,9 @@ type SecretText struct {
 }
 
 func NewSecretText(text string) *SecretText {
+	label := widget.NewLabel(text)
 	return &SecretText{
-		Label: widget.NewLabel(text),
+		Label: label,
 	}
 }
 

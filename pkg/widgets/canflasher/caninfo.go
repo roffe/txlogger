@@ -21,6 +21,7 @@ func (t *CanFlasherWidget) ecuInfo() {
 	}
 
 	go func() {
+
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
@@ -32,6 +33,7 @@ func (t *CanFlasherWidget) ecuInfo() {
 			t.logValues.Append(err.Error())
 			return
 		}
+		defer c.Close()
 
 		tr, err := ecu.New(c, &ecu.Config{
 			Name:       translateName(t.cfg.GetECU()),

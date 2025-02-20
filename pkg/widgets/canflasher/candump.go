@@ -43,6 +43,7 @@ func (t *CanFlasherWidget) ecuDump() {
 			t.logValues.Append(err.Error())
 			return
 		}
+		defer c.Close()
 
 		tr, err := ecu.New(c, &ecu.Config{
 			Name:       translateName(t.cfg.GetECU()),

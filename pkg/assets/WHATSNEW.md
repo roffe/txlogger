@@ -1,24 +1,25 @@
 # 2.0.4
 
-- Added support for Lawicel CANUSB dll. No more fiddling with VCP COM ports and latencies <3
-- Moved back all CAN communications except for J2534 dll's to the main program to not incur performance pentaly of using cangateway when not necessary
-- updated libusb to 64 bit for use with CombiAdapter
-- added canusb x64 dll 
+- Added support for Lawicel CANUSB DLL. No more fiddling with VCP and latencies. required 64-bit DLL is included with txlogger.
+- Moved back all CAN communications except for J2534 DLL's to the main program to not incur performance pentaly of using cangateway when not necessary
+- Updated libusb to 64-bit for use with CombiAdapter
+- Updated Kvaser drivers to use 64-bit
+- Added ECU dump & info on all 3 Trionic versions (no txbridge support yet) 
 
 # 2.0.3
 
-- optimized most adapter drivers in goCAN
+- Optimized most adapter drivers in goCAN
 
 # 2.0.2
 
-- fixed a bugg where the knock icon would not hide after a few seconds on the dashboard
-- huge rewrite of the goCAN canbus drivers to have better error handling and a clearer path on how to propagate messages to the UI
-- started adding support for dumping and flashing ECU's, dumping and info should work on all 3 platforms. (no txbridge support yet)
+- Fixed a bugg where the knock icon would not hide after a few seconds on the dashboard
+- Huge rewrite of the goCAN canbus drivers to have better error handling and a clearer path on how to propagate messages to the UI
+- Started adding support for dumping and flashing ECU's, dumping and info should work on all 3 platforms. (no txbridge support yet)
 
 # 2.0.1
 
-- improved kvaser CANlib drivers in goCAN
-- fixed so Lambda.External's value is properly displayed in plotter legend
+- Improved kvaser CANlib drivers in goCAN
+- Fixed so Lambda.External's value is properly displayed in plotter legend
 - txbride firmware updater now supports both wifi and bluetooth.  
   To update the firmware from Bluetooth to wifi select "txbridge bluetooth" as device in CAN settings and select the corresponding bluetooth port then update the firmware from the file menu.  
   After the firmware has been updated your txbridge will create a wifi hotspot with the same name the Bluetooth device had.  
@@ -31,7 +32,7 @@ This is a huge milestone release.
 The user interface has been competely revamped to allow inline windows, custom gauges and plotters to be created, moved around and layouts saved & restored.
 
 The logplayer has moved into the main UI and starts with a plotter & playback controls. You are then free to open a Dashboard if you want one or view the values in the symbol list.
-Or why not create your own gauges and make it just like you want :)
+Or why not create your own gauges and make it just like you want
 
 - Competely new UI - most windows & maps now opens inside the main window and is resizeable and arrangeable
 - Reworked legend to have a more "fixed size" and value moved to the left
