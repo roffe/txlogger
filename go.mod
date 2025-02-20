@@ -4,9 +4,9 @@ go 1.24.0
 
 replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
 
-replace github.com/roffe/gocanflasher => C:\Users\flejd\go\src\github.com\roffe\gocanflasher
+// replace github.com/roffe/gocanflasher => C:\Users\flejd\go\src\github.com\roffe\gocanflasher
 
-replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
+// replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
 
 replace fyne.io/fyne/v2 => C:\Users\flejd\go\src\github.com\fyne-io\fyne
 
@@ -15,9 +15,9 @@ require (
 	fyne.io/x/fyne v0.0.0-20250106132206-3228f6c50107
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/lusingander/colorpicker v0.7.4
-	github.com/roffe/ecusymbol v0.0.0-20250202020823-4b5104c7ac0a
+	github.com/roffe/ecusymbol v1.0.0
 	github.com/roffe/gocan v1.0.2
-	github.com/roffe/gocanflasher v0.0.0-20250213230444-21112500ff5b
+	github.com/roffe/gocanflasher v1.0.1
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.2
 	golang.org/x/image v0.24.0
@@ -33,7 +33,6 @@ require (
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
-	github.com/avast/retry-go v3.0.0+incompatible // indirect
 	github.com/bendikro/dl v0.0.0-20190410215913-e41fdb9069d4 // indirect
 	github.com/creack/goselect v0.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
