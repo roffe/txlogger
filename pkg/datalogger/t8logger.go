@@ -147,7 +147,7 @@ func (c *T8Client) Start() error {
 			for {
 				select {
 				case msg := <-messages.Chan():
-					c.OnMessage(string(msg.Data()))
+					c.OnMessage(string(msg.Data))
 				case err := <-cl.Err():
 					if gocan.IsRecoverable(err) {
 						c.onError()
@@ -288,12 +288,12 @@ func (c *T8Client) Start() error {
 					if !ok {
 						return retry.Unrecoverable(errors.New("txbridge recv channel closed"))
 					}
-					databuff := msg.Data()
-					if len(databuff) != int(expectedPayloadSize+4) {
-						return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize+4, len(databuff)))
+
+					if msg.Length() != int(expectedPayloadSize+4) {
+						return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize+4, msg.Length()))
 					}
 
-					r := bytes.NewReader(databuff)
+					r := bytes.NewReader(msg.Data)
 					binary.Read(r, binary.LittleEndian, &c.currtimestamp)
 
 					if c.firstTime.IsZero() {
@@ -379,8 +379,8 @@ func (c *T8Client) handleWriteTxbridge(ctx context.Context, cl *gocan.Client, wr
 	if err != nil {
 		return err
 	}
-	if resp.Identifier() == gocan.SystemMsgError {
-		return fmt.Errorf("error: %X", resp.Data())
+	if resp.Identifier == gocan.SystemMsgError {
+		return fmt.Errorf("error: %X", resp.Data)
 	}
 	write.Address += uint32(toWrite)
 	write.Length -= toWrite
@@ -419,7 +419,7 @@ func (c *T8Client) handleReadTxbridge(ctx context.Context, cl *gocan.Client, rea
 	}
 	read.Address += uint32(toRead)
 	read.Length -= toRead
-	read.Data = append(read.Data, resp.Data()...)
+	read.Data = append(read.Data, resp.Data...)
 	if read.Length > 0 {
 		c.readChan <- read
 	} else {

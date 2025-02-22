@@ -9,4 +9,5 @@ $env:CC = "clang.exe"
 $env:CXX = "clang.exe"
 Copy-Item -Path $Env:USERPROFILE\Documents\PlatformIO\Projects\txbridge\.pio\build\esp32dev\firmware.bin -Destination .\pkg\ota\
 go generate ./...
-go run -tags="canusb,combi,canlib" . $args
+# go run -tags="canusb,combi,canlib" . $args
+go run -tags="combi,canusb" . $args

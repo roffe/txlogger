@@ -104,7 +104,7 @@ func (c *T5Client) Start() error {
 		for {
 			select {
 			case msg := <-messages.Chan():
-				c.OnMessage(string(msg.Data()))
+				c.OnMessage(string(msg.Data))
 			case err := <-cl.Err():
 				if gocan.IsRecoverable(err) {
 					c.onError()
@@ -153,7 +153,7 @@ func (c *T5Client) Start() error {
 						read.Complete(err)
 						continue
 					}
-					read.Data = append(read.Data, resp.Data()...)
+					read.Data = append(read.Data, resp.Data...)
 					if read.Length > 0 {
 						c.readChan <- read
 					} else {
@@ -211,14 +211,13 @@ func (c *T5Client) Start() error {
 					return retry.Unrecoverable(errors.New("txbridge sub closed"))
 				}
 
-				databuff := msg.Data()
-				if len(databuff) != int(expectedPayloadSize+4) {
+				if msg.Length() != int(expectedPayloadSize+4) {
 					c.onError()
-					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, len(databuff)))
+					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, msg.Length()))
 					continue
 				}
 
-				r := bytes.NewReader(databuff)
+				r := bytes.NewReader(msg.Data)
 				binary.Read(r, binary.LittleEndian, &c.currtimestamp)
 
 				if c.firstTime.IsZero() {

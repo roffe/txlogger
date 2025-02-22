@@ -2,13 +2,17 @@ module github.com/roffe/txlogger
 
 go 1.24.0
 
-replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
+replace github.com/roffe/gocan => ..\gocan
 
-// replace github.com/roffe/gocanflasher => C:\Users\flejd\go\src\github.com\roffe\gocanflasher
+// replace github.com/roffe/gocanflasher => ..\gocanflasher
 
-// replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
+// replace github.com/roffe/gocanusb => ..\gocanusb
 
-replace fyne.io/fyne/v2 => C:\Users\flejd\go\src\github.com\fyne-io\fyne
+// replace github.com/roffe/ecusymbol => ..\ecusymbol
+
+// replace github.com/roffe/gocanlib => ..\gocanlib
+
+replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 
 require (
 	fyne.io/fyne/v2 v2.5.5-0.20250210105257-a0a3e580d0cd
@@ -16,8 +20,8 @@ require (
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/lusingander/colorpicker v0.7.4
 	github.com/roffe/ecusymbol v1.0.0
-	github.com/roffe/gocan v1.0.2
-	github.com/roffe/gocanflasher v1.0.1
+	github.com/roffe/gocan v1.1.0
+	github.com/roffe/gocanflasher v1.0.2
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.2
 	golang.org/x/image v0.24.0
@@ -61,8 +65,8 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.5.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/roffe/gocanlib v1.0.1 // indirect
-	github.com/roffe/gocanusb v1.0.0 // indirect
+	github.com/roffe/gocanlib v1.0.2 // indirect
+	github.com/roffe/gocanusb v1.0.2 // indirect
 	github.com/rymdport/portal v0.3.0 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect

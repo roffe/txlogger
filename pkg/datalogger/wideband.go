@@ -26,9 +26,17 @@ func NewWBL(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 			log.Println(str)
 		}
 	}
-	switch cfg.WBLType {
-	case "ECU", "None":
+
+	if cfg.WBLType == "ECU" || cfg.WBLType == "None" {
 		return nil, nil
+	}
+
+	if !cfg.Txbridge && cfg.Port == "txbridge" {
+		cfg.Log("please correct your WBL configuration. txbridge port is selected but not using txbridge adapter")
+		return nil, nil
+	}
+
+	switch cfg.WBLType {
 	case ecumaster.ProductString:
 		return newECUMaster(ctx, cl)
 	case innovate.ProductString:
@@ -67,7 +75,7 @@ func newInnovate(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaP
 			ch := wblSub.Chan()
 			defer cfg.Log("wbl channel closed")
 			for msg := range ch {
-				wblClient.SetData(msg.Data())
+				wblClient.SetData(msg.Data)
 			}
 
 		}()
@@ -91,7 +99,7 @@ func newAEM(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 			defer cfg.Log("wbl reading channel closed")
 			for msg := range ch {
 				// create a float from the message
-				f, err := strconv.ParseFloat(string(msg.Data()), 64)
+				f, err := strconv.ParseFloat(string(msg.Data), 64)
 				if err != nil {
 					cfg.Log("could not decode WBL value")
 					continue
@@ -109,7 +117,7 @@ func newAEM(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 			ch := wblSub.Chan()
 			defer cfg.Log("wbl channel closed")
 			for msg := range ch {
-				wblClient.SetData(msg.Data())
+				wblClient.SetData(msg.Data)
 			}
 		}()
 	} else {
@@ -136,7 +144,7 @@ func newPLX(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 			ch := wblSub.Chan()
 			defer cfg.Log("wbl channel closed")
 			for msg := range ch {
-				if err := wblClient.Parse(msg.Data()); err != nil {
+				if err := wblClient.Parse(msg.Data); err != nil {
 					cfg.Log(err.Error())
 					log.Println(err)
 				}

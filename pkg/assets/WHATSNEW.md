@@ -1,3 +1,7 @@
+# 2.0.5
+
+- Rewrote large parts of the CAN library to pass along a pointer to a message instead of a interface with methods to lower cpu usage
+
 # 2.0.4
 
 - Added support for Lawicel CANUSB DLL. No more fiddling with VCP and latencies. required 64-bit DLL is included with txlogger.

@@ -36,32 +36,30 @@ func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client)
 		sub.Close()
 	}()
 	for msg := range sub.Chan() {
-		switch msg.Identifier() {
+		switch msg.Identifier {
 		case 0x1A0:
-			rpm = binary.BigEndian.Uint16(msg.Data()[1:3])
-			throttle = float64(msg.Data()[5])
+			rpm = binary.BigEndian.Uint16(msg.Data[1:3])
+			throttle = float64(msg.Data[5])
 			c.sysvars.Set("ActualIn.n_Engine", float64(rpm))
 			c.sysvars.Set("Out.X_AccPedal", throttle)
 		case 0x280:
-			data := msg.Data()[4]
-			data2 := msg.Data()[3]
-			if data2&0x01 == 1 {
+			if msg.Data[3]&0x01 == 1 {
 				ebus.Publish("LIMP", 1)
 			} else {
 				ebus.Publish("LIMP", 0)
 			}
-			if data&0x20 == 0x20 {
+			if msg.Data[4]&0x20 == 0x20 {
 				ebus.Publish("CRUISE", 1)
 			} else {
 				ebus.Publish("CRUISE", 0)
 			}
-			if data&0x80 == 0x80 {
+			if msg.Data[4]&0x80 == 0x80 {
 				ebus.Publish("CEL", 1)
 			} else {
 				ebus.Publish("CEL", 0)
 			}
 		case 0x3A0:
-			speed = uint16(msg.Data()[4]) | uint16(msg.Data()[3])<<8
+			speed = uint16(msg.Data[4]) | uint16(msg.Data[3])<<8
 			realSpeed = float64(speed) / 10
 			c.sysvars.Set("In.v_Vehicle", realSpeed)
 		}
@@ -210,7 +208,7 @@ func (c *T7Client) Start() error {
 		for {
 			select {
 			case msg := <-messages.Chan():
-				c.OnMessage(string(msg.Data()))
+				c.OnMessage(string(msg.Data))
 			case err := <-cl.Err():
 				if gocan.IsRecoverable(err) {
 					c.onError()
@@ -280,7 +278,7 @@ func (c *T7Client) Start() error {
 						read.Complete(err)
 						continue
 					}
-					read.Data = append(read.Data, resp.Data()...)
+					read.Data = append(read.Data, resp.Data...)
 					if read.Length > 0 {
 						c.readChan <- read
 					} else {
@@ -329,7 +327,7 @@ func (c *T7Client) Start() error {
 						continue
 					}
 
-					if resp.Identifier() == gocan.SystemMsgError {
+					if resp.Identifier == gocan.SystemMsgError {
 						write.Complete(fmt.Errorf("error response"))
 						continue
 					}
@@ -434,17 +432,15 @@ func (c *T7Client) Start() error {
 				if !ok {
 					return retry.Unrecoverable(errors.New("txbridge recv channel closed"))
 				}
-
-				databuff := msg.Data()
-				if len(databuff) != int(expectedPayloadSize+4) {
+				if msg.Length() != int(expectedPayloadSize+4) {
 					c.onError()
-					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, len(databuff)))
-					log.Printf("unexpected data %X", databuff)
+					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, msg.Length()))
+					log.Printf("unexpected data %X", msg.Data)
 					continue
 					//return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
 				}
 
-				r := bytes.NewReader(databuff)
+				r := bytes.NewReader(msg.Data)
 
 				binary.Read(r, binary.LittleEndian, &c.currtimestamp)
 
@@ -461,7 +457,7 @@ func (c *T7Client) Start() error {
 						continue
 					}
 					if err := va.Read(r); err != nil {
-						log.Printf("data ex %d %X len %d", expectedPayloadSize, databuff, len(databuff))
+						log.Printf("data ex %d %X len %d", expectedPayloadSize, msg.Data, msg.Length())
 						c.onError()
 						c.OnMessage(err.Error())
 						break
