@@ -36,7 +36,7 @@ type Widget struct {
 	portSelector    *widget.Select
 	speedSelector   *widget.Select
 	refreshBtn      *widget.Button
-	adapters        map[string]*adapter.AdapterInfo
+	adapters        map[string]*gocan.AdapterInfo
 
 	mu sync.Mutex
 }
@@ -44,7 +44,7 @@ type Widget struct {
 func NewCanSettingsWidget() *Widget {
 	csw := &Widget{
 		app:      fyne.CurrentApp(),
-		adapters: make(map[string]*adapter.AdapterInfo),
+		adapters: make(map[string]*gocan.AdapterInfo),
 	}
 	csw.ExtendBaseWidget(csw)
 
@@ -77,7 +77,7 @@ func NewCanSettingsWidget() *Widget {
 		csw.portSelector.Refresh()
 	})
 
-	for _, adapter := range adapter.ListAdapters() {
+	for _, adapter := range gocan.ListAdapters() {
 		csw.adapters[adapter.Name] = &adapter
 	}
 
@@ -89,10 +89,10 @@ func (c *Widget) AddAdapters(adapters []*proto.AdapterInfo) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, a := range adapters {
-		adapter := &adapter.AdapterInfo{
+		adapter := &gocan.AdapterInfo{
 			Name:        a.GetName(),
 			Description: a.GetDescription(),
-			Capabilities: adapter.AdapterCapabilities{
+			Capabilities: gocan.AdapterCapabilities{
 				HSCAN: a.GetCapabilities().GetHSCAN(),
 				SWCAN: a.GetCapabilities().GetSWCAN(),
 				KLine: a.GetCapabilities().GetKLine(),
@@ -117,10 +117,6 @@ func (c *Widget) AddAdapters(adapters []*proto.AdapterInfo) {
 	if ad := c.app.Preferences().String(prefsAdapter); ad != "" {
 		c.adapterSelector.SetSelected(ad)
 	}
-}
-
-func (c *Widget) AddAdapter(adapter *adapter.AdapterInfo) {
-
 }
 
 func (c *Widget) Disable() {
@@ -233,7 +229,7 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 		minimumVersion = MinimumtxbridgeVersion
 	}
 
-	if strings.HasPrefix(cs.adapterSelector.Selected, "J2534") || strings.HasPrefix(cs.adapterSelector.Selected, "CANlib") { // || (strings.HasPrefix(cs.adapterSelector.Selected, "CANUSB ") && cs.adapterSelector.Selected != "CANUSB VCP") {
+	if strings.HasPrefix(cs.adapterSelector.Selected, "J2534") { // || strings.HasPrefix(cs.adapterSelector.Selected, "CANlib") { // || (strings.HasPrefix(cs.adapterSelector.Selected, "CANUSB ") && cs.adapterSelector.Selected != "CANUSB VCP") {
 		return adapter.NewClient(
 			cs.adapterSelector.Selected,
 			&gocan.AdapterConfig{
@@ -248,7 +244,7 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 			},
 		)
 	} else {
-		return adapter.New(
+		return gocan.NewAdapter(
 			cs.adapterSelector.Selected,
 			&gocan.AdapterConfig{
 				Port:                   cs.portSelector.Selected,
