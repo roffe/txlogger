@@ -33,7 +33,7 @@ func (t *CanFlasherWidget) ecuDump() {
 		ctx, cancel := context.WithTimeout(context.Background(), 900*time.Second)
 		defer cancel()
 
-		defer dev.Close()
+		//defer dev.Close()
 
 		fyne.Do(t.Disable)
 		defer fyne.Do(t.Enable)
