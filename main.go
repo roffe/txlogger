@@ -150,6 +150,7 @@ func RtlGetVersion() RTL_OSVERSIONINFOEXW {
 }
 
 func mainDesktop() {
+	defer log.Println("txlogger exit")
 	ver := RtlGetVersion()
 	if ver.MajorVersion < 10 {
 		sdialog.Message("txlogger requires Windows 10 or later").Title("Unsupported Windows version").Error()
