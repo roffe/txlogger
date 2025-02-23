@@ -61,7 +61,7 @@ func (c *T5Client) Start() error {
 
 	var expectedPayloadSize uint16
 	if c.txbridge {
-		if err := cl.SendFrame(gocan.SystemMsg, []byte("5"), gocan.Outgoing); err != nil {
+		if err := cl.Send(gocan.SystemMsg, []byte("5"), gocan.Outgoing); err != nil {
 			return err
 		}
 
@@ -81,7 +81,7 @@ func (c *T5Client) Start() error {
 		if err != nil {
 			return err
 		}
-		if err := cl.SendFrame(gocan.SystemMsg, payload, gocan.Outgoing); err != nil {
+		if err := cl.Send(gocan.SystemMsg, payload, gocan.Outgoing); err != nil {
 			return err
 		}
 		c.OnMessage("Symbol list configured")
@@ -96,7 +96,7 @@ func (c *T5Client) Start() error {
 
 		if c.txbridge {
 			t.Stop()
-			if err := cl.SendFrame(gocan.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
+			if err := cl.Send(gocan.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
 				return err
 			}
 		}

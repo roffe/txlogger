@@ -64,7 +64,7 @@ func newInnovate(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaP
 		return nil, err
 	}
 	if cfg.Txbridge {
-		if err := cl.SendFrame(gocan.SystemMsg, []byte{'w', 1, 'i', 'i'}, gocan.Outgoing); err != nil {
+		if err := cl.Send(gocan.SystemMsg, []byte{'w', 1, 'i', 'i'}, gocan.Outgoing); err != nil {
 			return nil, err
 		}
 	}
@@ -90,7 +90,7 @@ func newAEM(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 	}
 	if cfg.Port == "txbridge" {
 		cfg.Log("Starting AEM txbridge client")
-		if err := cl.SendFrame(gocan.SystemMsg, []byte{'w', 1, 'a', 'a'}, gocan.Outgoing); err != nil {
+		if err := cl.Send(gocan.SystemMsg, []byte{'w', 1, 'a', 'a'}, gocan.Outgoing); err != nil {
 			return nil, err
 		}
 		wblSub := cl.Subscribe(ctx, gocan.SystemMsgWBLReading)
@@ -135,7 +135,7 @@ func newPLX(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 		return nil, err
 	}
 	if cfg.Txbridge && cfg.Port == "txbridge" {
-		if err := cl.SendFrame(gocan.SystemMsg, []byte{'w', 1, 'p', 'p'}, gocan.Outgoing); err != nil {
+		if err := cl.Send(gocan.SystemMsg, []byte{'w', 1, 'p', 'p'}, gocan.Outgoing); err != nil {
 			return nil, err
 		}
 		wblSub := cl.Subscribe(ctx, gocan.SystemMsgWBLReading)

@@ -66,9 +66,7 @@ func (t *Client) StartSession(ctx context.Context, id, responseID uint32) error 
 }
 
 func (t *Client) StopSession(ctx context.Context) error {
-	payload := []byte{0x40, 0xA1, 0x02, STOP_COMMUNICATION}
-	frame := gocan.NewFrame(REQ_MSG_ID, payload, gocan.ResponseRequired)
-	return t.c.Send(frame)
+	return t.c.Send(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, STOP_COMMUNICATION}, gocan.ResponseRequired)
 }
 
 func (t *Client) TesterPresent(ctx context.Context) error {
@@ -373,7 +371,7 @@ func (t *Client) DynamicallyDefineLocalIdRequest(ctx context.Context, index int,
 	message := append([]byte{byte(buff.Len() + 1), DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER}, buff.Bytes()...)
 	for _, msg := range t.splitRequest(message, false) {
 		if msg.FrameType.Type == 1 {
-			if err := t.c.Send(msg); err != nil {
+			if err := t.c.SendFrame(msg); err != nil {
 				return fmt.Errorf("DynamicallyDefineLocalIdRequest1: %w", err)
 			}
 		} else {
@@ -440,9 +438,8 @@ func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 
 // 266h Send acknowledgement, has 0x3F on 3rd!
 func (t *Client) Ack(val byte, typ gocan.CANFrameType) error {
-	frame := gocan.NewFrame(0x266, []byte{0x40, 0xA1, 0x3F, val & 0xBF}, typ)
 	//debug.Log(fmt.Sprintf("Ack: %s", frame.String()))
-	return t.c.Send(frame)
+	return t.c.Send(0x266, []byte{0x40, 0xA1, 0x3F, val & 0xBF}, typ)
 }
 
 func CalcKey(seed int, method int) int {
@@ -563,10 +560,8 @@ func (t *Client) splitRequest43(payload []byte, responseRequired bool) []gocan.C
 func (t *Client) recvData2(ctx context.Context, length int) ([]byte, error) {
 	var receivedBytes, payloadLeft int
 	out := bytes.NewBuffer([]byte{})
-
 	sub := t.c.Subscribe(ctx, t.responseID)
-	startTransfer := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, READ_DATA_BY_IDENTIFIER, 0xF0, 0x00, 0x00, 0x00}, gocan.ResponseRequired)
-	if err := t.c.Send(startTransfer); err != nil {
+	if err := t.c.Send(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, READ_DATA_BY_IDENTIFIER, 0xF0, 0x00, 0x00, 0x00}, gocan.ResponseRequired); err != nil {
 		return nil, err
 	}
 
@@ -660,7 +655,7 @@ func (t *Client) ReadFlash(ctx context.Context, addr, length int) ([]byte, error
 
 func (t *Client) ReadMemoryByAddressF0(ctx context.Context, address, length int) ([]byte, error) {
 	// Jump to read adress
-	t.c.SendFrame(REQ_MSG_ID, []byte{0x41, 0xA1, 0x08, DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER, 0xF0, 0x03, 0x00, byte(length)}, gocan.Outgoing)
+	t.c.Send(REQ_MSG_ID, []byte{0x41, 0xA1, 0x08, DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER, 0xF0, 0x03, 0x00, byte(length)}, gocan.Outgoing)
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x00, 0xA1, byte((address >> 16) & 0xFF), byte((address >> 8) & 0xFF), byte(address & 0xFF), 0x00, 0x00, 0x00}, gocan.ResponseRequired)
 	f, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout*2, t.responseID)
 	if err != nil {
@@ -690,8 +685,7 @@ func (t *Client) recvData(ctx context.Context, length int) ([]byte, error) {
 	// Subscribe to responseID and send the start transfer command
 	sub := t.c.Subscribe(ctx, t.responseID)
 	startTransferCmd := []byte{0x40, 0xA1, 0x02, READ_DATA_BY_IDENTIFIER, 0xF0, 0x00, 0x00, 0x00}
-	startTransfer := gocan.NewFrame(REQ_MSG_ID, startTransferCmd, gocan.ResponseRequired)
-	if err := t.c.Send(startTransfer); err != nil {
+	if err := t.c.Send(REQ_MSG_ID, startTransferCmd, gocan.ResponseRequired); err != nil {
 		return nil, err
 	}
 
@@ -1011,7 +1005,7 @@ func (t *Client) SaveROM(ctx context.Context, address uint32, data []byte) error
 	for _, msg := range msgs {
 		log.Println(msg.String())
 		if msg.FrameType.Type == 1 {
-			if err := t.c.Send(msg); err != nil {
+			if err := t.c.SendFrame(msg); err != nil {
 				return fmt.Errorf("%s1: %w", getFunctionName(), err)
 			}
 		} else {
@@ -1090,7 +1084,7 @@ func (t *Client) RequestDownload(ctx context.Context, address uint32, length uin
 	for _, msg := range t.splitRequest2(message) {
 		log.Println(msg.String())
 		if msg.FrameType.Type == 1 {
-			if err := t.c.Send(msg); err != nil {
+			if err := t.c.SendFrame(msg); err != nil {
 				return fmt.Errorf("%s1: %w", getFunctionName(), err)
 			}
 		} else {

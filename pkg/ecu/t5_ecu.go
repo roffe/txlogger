@@ -82,8 +82,7 @@ func sendCommand(ctx context.Context, c *gocan.Client, cmd []byte) error {
 }
 
 func ack(c *gocan.Client) error {
-	frame := gocan.NewFrame(0x05, []byte{0xC6, 0x00}, gocan.Outgoing)
-	return c.Send(frame)
+	return c.Send(0x05, []byte{0xC6, 0x00}, gocan.Outgoing)
 }
 
 func recvDataEND(ctx context.Context, c *gocan.Client) ([]byte, error) {

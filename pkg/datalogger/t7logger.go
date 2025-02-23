@@ -119,7 +119,7 @@ func (c *T7Client) Start() error {
 	}
 
 	if c.txbridge {
-		if err := cl.SendFrame(gocan.SystemMsg, []byte("7"), gocan.Outgoing); err != nil {
+		if err := cl.Send(gocan.SystemMsg, []byte("7"), gocan.Outgoing); err != nil {
 			return err
 		}
 	}
@@ -199,7 +199,7 @@ func (c *T7Client) Start() error {
 		if c.txbridge {
 			//			log.Println("stopped timer, using txbridge")
 			t.Stop()
-			if err := cl.SendFrame(gocan.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
+			if err := cl.Send(gocan.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
 				return err
 			}
 		}
