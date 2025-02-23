@@ -90,12 +90,6 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/roffe/ecusymbol v1.0.0 h1:6F7S8ghGMHw+C1mKjd3RiYhOf0chhoxZYZZfCY37Cv4=
 github.com/roffe/ecusymbol v1.0.0/go.mod h1:0nrbfx99ecWTXVjNbaqA9iZYlLlLdXWLE//Hb5hCajQ=
-github.com/roffe/gocanflasher v1.0.2 h1:rYWrBUj4oibv1OomjhsFsZim7XYbMijR/V7p3GVYSNM=
-github.com/roffe/gocanflasher v1.0.2/go.mod h1:mdoA4C6vKejVaXe0gjZU3ogWCM1Rdtl3p4SP0mddSiU=
-github.com/roffe/gocanlib v1.0.2 h1:w5NoPeP/Dor+4YSIrpZSH6aox4j6ClNaMQH5wCxoRFU=
-github.com/roffe/gocanlib v1.0.2/go.mod h1:YfsBq3MPnBTaBjLBgoLTfvXvJ2eQDJT5O9H7mK6222A=
-github.com/roffe/gocanusb v1.0.2 h1:X54ylmSdzrBdPUFejh6teg7UUiFCr8JJyzpIzP6OU1U=
-github.com/roffe/gocanusb v1.0.2/go.mod h1:zRgZyTCvOyLIMeW+d9aUPmoJC3PId0PUJF0IVNQ70Z4=
 github.com/rymdport/portal v0.3.0 h1:QRHcwKwx3kY5JTQcsVhmhC3TGqGQb9LFghVNUy8AdB8=
 github.com/rymdport/portal v0.3.0/go.mod h1:kFF4jslnJ8pD5uCi17brj/ODlfIidOxlgUDTO5ncnC4=
 github.com/sqweek/dialog v0.0.0-20240226140203-065105509627 h1:2JL2wmHXWIAxDofCK+AdkFi1KEg3dgkefCsm7isADzQ=
