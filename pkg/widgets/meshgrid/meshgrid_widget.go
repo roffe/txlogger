@@ -40,11 +40,15 @@ type Meshgrid struct {
 
 	rotationMatrix Matrix3x3
 	scale          float64
-	panX, panY     float64 // Add pan offset tracking
 
-	mousePosition image.Point
+	cameraRotation Matrix3x3  // Camera's rotation matrix
+	cameraPosition [3]float64 // Camera's position in world space
+	mousePosition  image.Point
 
 	xlabel, ylabel, zlabel string
+
+	// New camera state variables
+
 }
 
 // NewMeshgrid creates a new Meshgrid given width, height, depth and spacing.
@@ -64,12 +68,15 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 		rows:   rows,
 		cols:   cols,
 		// Set up the cell size based on the space available and desired spacing
-		cellWidth:      32,
-		cellHeight:     32,
-		depth:          400,
-		size:           fyne.NewSize(200, 200),
-		scale:          1,
-		rotationMatrix: NewMatrix3x3(), // Initialize identity matrix
+		cellWidth:  32,
+		cellHeight: 32,
+		depth:      400,
+		size:       fyne.NewSize(200, 200),
+		scale:      1,
+
+		rotationMatrix: NewMatrix3x3(),
+		cameraRotation: NewMatrix3x3(),
+		cameraPosition: [3]float64{0, 0, 0},
 
 		xlabel: xlabel,
 		ylabel: ylabel,
@@ -124,22 +131,29 @@ func (m *Meshgrid) createVertices(width, height float32) {
 
 func (m *Meshgrid) scaleMeshgrid(factor float64) {
 	m.scale = m.scale * factor
-	for i, row := range m.vertices {
-		for j := range row {
-			m.vertices[i][j].X = m.vertices[i][j].X * factor
-			m.vertices[i][j].Y = m.vertices[i][j].Y * factor
-			m.vertices[i][j].Z = m.vertices[i][j].Z * factor
-		}
-	}
+	m.updateVertexPositions()
 }
-func (m *Meshgrid) rotateMeshgrid(x, y, z float64) {
-	rotX := RotationMatrixX(x)
-	rotY := RotationMatrixY(y)
-	rotZ := RotationMatrixZ(z)
 
-	newRotation := rotX.Multiply(rotY).Multiply(rotZ)
-	m.rotationMatrix = m.rotationMatrix.Multiply(newRotation)
+// Replace rotateMeshgrid with this camera-centric approach
+func (m *Meshgrid) rotateMeshgrid(pitchDelta, yawDelta, rollDelta float64) {
+	// Create rotation matrices for each axis
+	rotX := RotationMatrixX(pitchDelta) // Pitch (around X axis)
+	rotY := RotationMatrixY(yawDelta)   // Yaw (around Y axis)
+	rotZ := RotationMatrixZ(rollDelta)  // Roll (around Z axis)
 
+	// Combine the new rotations
+	deltaRotation := rotX.Multiply(rotY).Multiply(rotZ)
+
+	// Update the camera rotation
+	// For camera-relative rotations, we multiply the delta rotation first
+	m.cameraRotation = deltaRotation.Multiply(m.cameraRotation)
+
+	// Update all vertex positions based on the new camera
+	m.updateVertexPositions()
+}
+
+// New method to compute vertex positions based on camera state
+func (m *Meshgrid) updateVertexPositions() {
 	// Calculate the true center of the mesh using original coordinates
 	var sumX, sumY, sumZ float64
 	var count int
@@ -155,7 +169,12 @@ func (m *Meshgrid) rotateMeshgrid(x, y, z float64) {
 	centerY := sumY / float64(count)
 	centerZ := sumZ / float64(count)
 
-	// Apply rotation to all vertices around the calculated center
+	// Compute the view matrix (inverse of camera transform)
+	// For simplicity, we're just using the transpose of the rotation
+	// since we're assuming orthographic projection
+	viewMatrix := m.cameraRotation
+
+	// Apply transformations to all vertices
 	for i := range m.vertices {
 		for j := range m.vertices[i] {
 			// Scale the original coordinates
@@ -163,18 +182,23 @@ func (m *Meshgrid) rotateMeshgrid(x, y, z float64) {
 			vy := m.vertices[i][j].Oy * m.scale
 			vz := m.vertices[i][j].Oz * m.scale
 
-			// Translate to origin (subtract scaled center)
+			// Translate to mesh center
 			vx -= centerX * m.scale
 			vy -= centerY * m.scale
 			vz -= centerZ * m.scale
 
-			// Apply rotation matrix
-			rotated := m.rotationMatrix.MultiplyVector([3]float64{vx, vy, vz})
+			// Apply view matrix (camera rotation)
+			viewVec := viewMatrix.MultiplyVector([3]float64{vx, vy, vz})
 
-			// Translate back (add scaled center) and add pan offset
-			m.vertices[i][j].X = rotated[0] + centerX*m.scale + m.panX
-			m.vertices[i][j].Y = rotated[1] + centerY*m.scale + m.panY
-			m.vertices[i][j].Z = rotated[2] + centerZ*m.scale
+			// Apply camera position offset
+			viewVec[0] -= m.cameraPosition[0]
+			viewVec[1] -= m.cameraPosition[1]
+			viewVec[2] -= m.cameraPosition[2]
+
+			// Store final transformed coordinates
+			m.vertices[i][j].X = viewVec[0] + centerX*m.scale
+			m.vertices[i][j].Y = viewVec[1] + centerY*m.scale
+			m.vertices[i][j].Z = viewVec[2] + centerZ*m.scale
 		}
 	}
 }
@@ -195,6 +219,7 @@ func (m *Meshgrid) SetFloat642(idx int, value float64) {
 	m.refresh()
 }
 
+// Update LoadFloat64s to use the new vertex position update method
 func (m *Meshgrid) LoadFloat64s(min, max float64, floats []float64) {
 	m.zmin = min
 	m.zmax = max
@@ -205,54 +230,11 @@ func (m *Meshgrid) LoadFloat64s(min, max float64, floats []float64) {
 		return
 	}
 
-	// Store current pan values
-	oldPanX := m.panX
-	oldPanY := m.panY
-
 	// Reset vertices with new values
 	m.createVertices(fyne.Min(float32(m.cols), 1), fyne.Min(float32(m.rows), 1))
 
-	// Calculate the true center of the mesh using original coordinates
-	var sumX, sumY, sumZ float64
-	var count int
-	for i := range m.vertices {
-		for j := range m.vertices[i] {
-			sumX += m.vertices[i][j].Ox
-			sumY += m.vertices[i][j].Oy
-			sumZ += m.vertices[i][j].Oz
-			count++
-		}
-	}
-	centerX := sumX / float64(count)
-	centerY := sumY / float64(count)
-	centerZ := sumZ / float64(count)
-
-	// Apply scale, current rotation matrix, and restore pan
-	for i := range m.vertices {
-		for j := range m.vertices[i] {
-			// First scale the original coordinates
-			vx := m.vertices[i][j].Ox * m.scale
-			vy := m.vertices[i][j].Oy * m.scale
-			vz := m.vertices[i][j].Oz * m.scale
-
-			// Translate to origin (subtract scaled center)
-			vx -= centerX * m.scale
-			vy -= centerY * m.scale
-			vz -= centerZ * m.scale
-
-			// Apply current rotation matrix
-			rotated := m.rotationMatrix.MultiplyVector([3]float64{vx, vy, vz})
-
-			// Translate back (add scaled center) and restore pan offset
-			m.vertices[i][j].X = rotated[0] + centerX*m.scale + oldPanX
-			m.vertices[i][j].Y = rotated[1] + centerY*m.scale + oldPanY
-			m.vertices[i][j].Z = rotated[2] + centerZ*m.scale
-		}
-	}
-
-	// Restore the pan values
-	m.panX = oldPanX
-	m.panY = oldPanY
+	// Update vertex positions based on current camera state
+	m.updateVertexPositions()
 
 	m.refresh()
 }

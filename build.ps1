@@ -11,6 +11,6 @@ $env:CXX = "clang.exe"
 # copy $Env:USERPROFILE\Documents\PlatformIO\Projects\txbridge\.pio\build\esp32dev\firmware.bin .\pkg\ota\"
 Copy-Item -Path $Env:USERPROFILE\Documents\PlatformIO\Projects\txbridge\.pio\build\esp32dev\firmware.bin -Destination .\pkg\ota\
 go generate ./...
-fyne package -tags="canusb,combi,canlib" --release
+fyne package -tags="canusb,combi,canlib,j2534" --release
 
 

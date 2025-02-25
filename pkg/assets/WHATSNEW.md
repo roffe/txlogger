@@ -1,3 +1,9 @@
+# 2.0.6
+
+  - FINALLY fixed the cameras on the 3d mesh view. Now it behaves like any normal 3d software and is very intuitive to use. Mouse1, 2 & middle are the modifiers to use when dragging
+  - 64 bit j2534 support added in gocan, Devices are prefixed "x64 J2534" and should be used if you see both 32-bit and 64-bit drivers for your adapter in the list
+  - fixed a bug in the j2534 driver where 4 bytes would be appended to the can packages
+
 # 2.0.5
 
 - Rewrote large parts of the CAN library to pass along a pointer to a message instead of a interface with methods to lower cpu usage

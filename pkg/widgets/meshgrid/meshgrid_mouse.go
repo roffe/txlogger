@@ -54,20 +54,24 @@ func (m *Meshgrid) MouseMoved(event *desktop.MouseEvent) {
 	dy := float64(event.Position.Y - m.lastMouseY)
 
 	if event.Button&desktop.MouseButtonPrimary == desktop.MouseButtonPrimary {
-		m.rotateMeshgrid(0, dy*rotationScale, dx*rotationScale)
+		// Primary button: vertical drag (dy) controls tilting toward/away (pitch)
+		// Horizontal drag (dx) controls rotation around vertical axis (yaw)
+		m.rotateMeshgrid(-dy*rotationScale, dx*rotationScale, 0)
 		m.refresh()
 	} else if event.Button&desktop.MouseButtonSecondary == desktop.MouseButtonSecondary {
+		// Secondary button: control roll rotation
 		roll := (dx + dy) * rollScale
-		m.rotateMeshgrid(-roll, 0, 0)
+		m.rotateMeshgrid(0, 0, roll)
 		m.refresh()
 	} else if event.Button&desktop.MouseButtonTertiary == desktop.MouseButtonTertiary {
-		m.panMeshgrid(dx*panScale, dy*panScale)
+		// Tertiary button (middle): control panning
+		// Swap left-right direction by negating dx
+		m.panMeshgrid(-dx*panScale, dy*panScale)
 		m.refresh()
 	}
 
 	m.lastMouseX = event.Position.X
 	m.lastMouseY = event.Position.Y
-
 }
 
 func (m *Meshgrid) MouseDown(event *desktop.MouseEvent) {
@@ -140,16 +144,24 @@ func (m *Meshgrid) findValueAtPosition(pos image.Point) (float64, bool) {
 	return 0, false
 }
 
+// New method to handle panning in camera space
 func (m *Meshgrid) panMeshgrid(dx, dy float64) {
-	// Update the stored pan offsets
-	m.panX += dx
-	m.panY += dy
+	// Convert screen-space movement to camera-space movement
+	// For this, we need to use the camera's right and up vectors
+	rightVector := m.cameraRotation.MultiplyVector([3]float64{1, 0, 0})
+	upVector := m.cameraRotation.MultiplyVector([3]float64{0, -1, 0}) // Negative because screen Y is down
 
-	// Apply the pan to all vertices
-	for i := range m.vertices {
-		for j := range m.vertices[i] {
-			m.vertices[i][j].X += dx
-			m.vertices[i][j].Y += dy
-		}
+	// Scale the movement
+	for i := range rightVector {
+		rightVector[i] *= dx
+		upVector[i] *= dy
 	}
+
+	// Update camera position by moving along right and up vectors
+	for i := range m.cameraPosition {
+		m.cameraPosition[i] += rightVector[i] + upVector[i]
+	}
+
+	// Update all vertex positions based on the new camera
+	m.updateVertexPositions()
 }

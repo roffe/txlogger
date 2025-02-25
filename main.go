@@ -36,11 +36,7 @@ import (
 
 var (
 	workDirectory string
-	ma            = &mainApp{}
 )
-
-type mainApp struct {
-}
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
