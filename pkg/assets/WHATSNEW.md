@@ -1,3 +1,40 @@
+# 2.0.6
+
+  - FINALLY fixed the cameras on the 3d mesh view. Now it behaves like any normal 3d software and is very intuitive to use. Mouse1, 2 & middle are the modifiers to use when dragging
+  - 64 bit j2534 support added in gocan, Devices are prefixed "x64 J2534" and should be used if you see both 32-bit and 64-bit drivers for your adapter in the list
+  - fixed a bug in the j2534 driver where 4 bytes would be appended to the can packages
+
+# 2.0.5
+
+- Rewrote large parts of the CAN library to pass along a pointer to a message instead of a interface with methods to lower cpu usage
+
+# 2.0.4
+
+- Added support for Lawicel CANUSB DLL. No more fiddling with VCP and latencies. required 64-bit DLL is included with txlogger.
+- Moved back all CAN communications except for J2534 DLL's to the main program to not incur performance pentaly of using cangateway when not necessary
+- Updated libusb to 64-bit for use with CombiAdapter
+- Updated Kvaser drivers to use 64-bit
+- Added ECU dump & info on all 3 Trionic versions (no txbridge support yet) 
+
+# 2.0.3
+
+- Optimized most adapter drivers in goCAN
+
+# 2.0.2
+
+- Fixed a bugg where the knock icon would not hide after a few seconds on the dashboard
+- Huge rewrite of the goCAN canbus drivers to have better error handling and a clearer path on how to propagate messages to the UI
+- Started adding support for dumping and flashing ECU's, dumping and info should work on all 3 platforms. (no txbridge support yet)
+
+# 2.0.1
+
+- Improved kvaser CANlib drivers in goCAN
+- Fixed so Lambda.External's value is properly displayed in plotter legend
+- txbride firmware updater now supports both wifi and bluetooth.  
+  To update the firmware from Bluetooth to wifi select "txbridge bluetooth" as device in CAN settings and select the corresponding bluetooth port then update the firmware from the file menu.  
+  After the firmware has been updated your txbridge will create a wifi hotspot with the same name the Bluetooth device had.  
+  Change the CAN device to "txbridge wifi" and connect to the wifi network with password **123456789**. after that you can continue logging as before.
+
 # 2.0.0
 
 This is a huge milestone release. 
@@ -5,7 +42,7 @@ This is a huge milestone release.
 The user interface has been competely revamped to allow inline windows, custom gauges and plotters to be created, moved around and layouts saved & restored.
 
 The logplayer has moved into the main UI and starts with a plotter & playback controls. You are then free to open a Dashboard if you want one or view the values in the symbol list.
-Or why not create your own gauges and make it just like you want :)
+Or why not create your own gauges and make it just like you want
 
 - Competely new UI - most windows & maps now opens inside the main window and is resizeable and arrangeable
 - Reworked legend to have a more "fixed size" and value moved to the left
@@ -30,15 +67,12 @@ Or why not create your own gauges and make it just like you want :)
 - goCAN now supports Kvaser Canlib for all Kvaser products
 - The CANbus communication has been broken out to a separate binary that is compiled as 32-bit due to the requirements for j2534 dll's.
 
-
-
-
 # 1.0.19
 
 - Added E85.X_EthAct_Tech2 to Trionic 7 calibration shortcuts
 - Added T5 support for TXbridge
 - Improved TXbridge T8 support
-- Added OTA firmware update for TXbridge
+- Added OTA firmware update for txbridge
 - Trionic 7 & 8: Added support for offloading read & write by memory address to TXbridge
 - When hovering over symbols in the legend for the plotter, the symbol will be highlighted in the plot
 - Hovering over labels in the log player plotter will make them bold and make the series' drawn line thicker

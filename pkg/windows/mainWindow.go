@@ -27,6 +27,7 @@ import (
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/mainmenu"
+	"github.com/roffe/txlogger/pkg/widgets/canflasher"
 	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/ledicon"
@@ -51,7 +52,8 @@ const (
 )
 
 var _ fyne.Tappable = (*SecretText)(nil)
-var _ desktop.Mouseable = (*SecretText)(nil)
+
+// var _ desktop.Mouseable = (*SecretText)(nil)
 
 type SecretText struct {
 	*widget.Label
@@ -60,8 +62,9 @@ type SecretText struct {
 }
 
 func NewSecretText(text string) *SecretText {
+	label := widget.NewLabel(text)
 	return &SecretText{
-		Label: widget.NewLabel(text),
+		Label: label,
 	}
 }
 
@@ -86,6 +89,7 @@ func (s *SecretText) Tapped(*fyne.PointEvent) {
 	}
 }
 
+/*
 func (s *SecretText) MouseDown(e *desktop.MouseEvent) {
 	log.Println("MouseDown", e)
 }
@@ -93,6 +97,7 @@ func (s *SecretText) MouseDown(e *desktop.MouseEvent) {
 func (s *SecretText) MouseUp(e *desktop.MouseEvent) {
 	log.Println("MouseUp", e)
 }
+*/
 
 type MainWindow struct {
 	fyne.Window
@@ -207,13 +212,13 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	mw.startup = false
 
 	if !fyne.CurrentApp().Driver().Device().IsMobile() {
-		mw.gocanGWClient()
+		mw.gocanGatewayClient()
 	}
 
 	return mw
 }
 
-func (mw *MainWindow) gocanGWClient() {
+func (mw *MainWindow) gocanGatewayClient() {
 	var socketFile string
 	if cacheDir, err := os.UserCacheDir(); err == nil {
 		socketFile = filepath.Join(cacheDir, "gocan.sock")
@@ -351,17 +356,22 @@ func (mw *MainWindow) render() {
 			widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
 				mw.wm.CloseAll()
 			}),
-			/*
-				widget.NewButtonWithIcon("x", theme.SettingsIcon(), func() {
-					ctx := context.Background()
-					resp, err := mw.gclient.SendCommand(ctx, &proto.Command{Data: []byte("ping")})
-					if err != nil {
-						mw.Error(fmt.Errorf("failed to send command: %w", err))
-						return
-					}
-					log.Println("response:", string(resp.Data))
-				}),
-			*/
+
+			widget.NewButtonWithIcon("", theme.UploadIcon(), func() {
+				if w := mw.wm.HasWindow("Canflasher"); w != nil {
+					mw.wm.Raise(w)
+					return
+				}
+				inner := multiwindow.NewInnerWindow("Canflasher", canflasher.New(&canflasher.Config{
+					CSW: mw.settings.CanSettings,
+					GetECU: func() string {
+						return mw.selects.ecuSelect.Selected
+					},
+				}))
+				inner.Icon = theme.UploadIcon()
+				inner.Resize(fyne.NewSize(450, 250))
+				mw.wm.Add(inner)
+			}),
 		),
 
 		container.NewBorder(
@@ -537,8 +547,13 @@ func (mw *MainWindow) Log(s string) {
 	mw.outputData.Append(s)
 }
 
+func (mw *MainWindow) Log3(s string) {
+	debug.LogDepth(3, s)
+	mw.outputData.Append(s)
+}
+
 func (mw *MainWindow) Error(err error) {
-	debug.Log("error:" + err.Error())
+	debug.LogDepth(2, err.Error())
 	mw.outputData.Append(err.Error())
 	go fyne.Do(func() {
 		dialog.ShowError(err, mw.Window)

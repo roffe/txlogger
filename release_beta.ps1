@@ -1,11 +1,13 @@
-.\buildcangw.ps1
+.\build_cangateway.ps1
 .\build.ps1
 # Files to include in the archive
 $files = @(
     "debug.bat",
     "libusb-1.0.dll", 
+    "canlib32.dll",
+    "canusbdrv64.dll",
     "txlogger.exe"
-    "cangw.exe"
+    "cangateway.exe"
 )
 
 # Check if WinRAR is installed in common locations

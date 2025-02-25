@@ -17,6 +17,8 @@ func start() {
 	dir, err := os.UserHomeDir()
 	if err != nil {
 		log.Println("error getting user home dir: %w", err)
+	} else {
+		dir = filepath.Join(dir, "txlogger")
 	}
 	fh, err = os.OpenFile(filepath.Join(dir, "txlogger.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {

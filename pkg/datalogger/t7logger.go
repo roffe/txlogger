@@ -8,12 +8,9 @@ import (
 	"fmt"
 	"log"
 	"sort"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/serialcommand"
 	"github.com/roffe/txlogger/pkg/ebus"
@@ -21,63 +18,11 @@ import (
 )
 
 type T7Client struct {
-	symbolChan chan []*symbol.Symbol
-	updateChan chan *WriteRequest
-	readChan   chan *ReadRequest
-
-	quitChan chan struct{}
-	sysvars  *ThreadSafeMap
-
-	lamb LambdaProvider
-
-	lw LogWriter
-
-	closeOnce sync.Once
-
-	errCount     int
-	errPerSecond int
-
-	Config
+	BaseLogger
 }
 
 func NewT7(cfg Config, lw LogWriter) (IClient, error) {
-	return &T7Client{
-		Config:     cfg,
-		symbolChan: make(chan []*symbol.Symbol, 1),
-		updateChan: make(chan *WriteRequest, 10),
-		readChan:   make(chan *ReadRequest, 10),
-		quitChan:   make(chan struct{}),
-		sysvars:    NewThreadSafeMap(),
-		lw:         lw,
-	}, nil
-}
-
-func (c *T7Client) Close() {
-	c.closeOnce.Do(func() {
-		close(c.quitChan)
-		time.Sleep(200 * time.Millisecond)
-	})
-}
-
-func (c *T7Client) SetSymbols(symbols []*symbol.Symbol) error {
-	select {
-	case c.symbolChan <- symbols:
-	default:
-		return fmt.Errorf("pending")
-	}
-	return nil
-}
-
-func (c *T7Client) SetRAM(address uint32, data []byte) error {
-	upd := NewRamUpdate(address, data)
-	c.updateChan <- upd
-	return upd.Wait()
-}
-
-func (c *T7Client) GetRAM(address uint32, length uint32) ([]byte, error) {
-	req := NewReadRequest(address, length)
-	c.readChan <- req
-	return req.Data, req.Wait()
+	return &T7Client{BaseLogger: NewBaseLogger(cfg, lw)}, nil
 }
 
 func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client) {
@@ -91,32 +36,30 @@ func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client)
 		sub.Close()
 	}()
 	for msg := range sub.Chan() {
-		switch msg.Identifier() {
+		switch msg.Identifier {
 		case 0x1A0:
-			rpm = binary.BigEndian.Uint16(msg.Data()[1:3])
-			throttle = float64(msg.Data()[5])
+			rpm = binary.BigEndian.Uint16(msg.Data[1:3])
+			throttle = float64(msg.Data[5])
 			c.sysvars.Set("ActualIn.n_Engine", float64(rpm))
 			c.sysvars.Set("Out.X_AccPedal", throttle)
 		case 0x280:
-			data := msg.Data()[4]
-			data2 := msg.Data()[3]
-			if data2&0x01 == 1 {
+			if msg.Data[3]&0x01 == 1 {
 				ebus.Publish("LIMP", 1)
 			} else {
 				ebus.Publish("LIMP", 0)
 			}
-			if data&0x20 == 0x20 {
+			if msg.Data[4]&0x20 == 0x20 {
 				ebus.Publish("CRUISE", 1)
 			} else {
 				ebus.Publish("CRUISE", 0)
 			}
-			if data&0x80 == 0x80 {
+			if msg.Data[4]&0x80 == 0x80 {
 				ebus.Publish("CEL", 1)
 			} else {
 				ebus.Publish("CEL", 0)
 			}
 		case 0x3A0:
-			speed = uint16(msg.Data()[4]) | uint16(msg.Data()[3])<<8
+			speed = uint16(msg.Data[4]) | uint16(msg.Data[3])<<8
 			realSpeed = float64(speed) / 10
 			c.sysvars.Set("In.v_Vehicle", realSpeed)
 		}
@@ -125,27 +68,15 @@ func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client)
 	c.OnMessage("Stopped broadcast listener")
 }
 
-func (c *T7Client) onError(err error) {
-	c.errCount++
-	c.errPerSecond++
-	c.ErrorCounter(c.errCount)
-	c.OnMessage(err.Error())
-}
-
 func (c *T7Client) Start() error {
+	c.ErrorCounter(0)
+	defer c.secondTicker.Stop()
 	defer c.lw.Close()
 
-	var txbridge bool
-	if strings.HasPrefix(c.Config.Device.Name(), "txbridge") {
-		txbridge = true
-	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cl, err := gocan.NewWithOpts(
-		ctx,
-		c.Device,
-	)
+	cl, err := gocan.NewWithOpts(ctx, c.Device)
 	if err != nil {
 		return fmt.Errorf("failed to create t7 client: %w", err)
 	}
@@ -162,7 +93,7 @@ func (c *T7Client) Start() error {
 	go c.startBroadcastListener(bctx, cl)
 
 	c.OnMessage("Watching for broadcast messages")
-	<-time.After(350 * time.Millisecond)
+	<-time.After(550 * time.Millisecond)
 	order := c.sysvars.Keys()
 	sort.StringSlice(order).Sort()
 	c.OnMessage(fmt.Sprintf("Found %s", order))
@@ -171,17 +102,8 @@ func (c *T7Client) Start() error {
 		bcancel()
 	}
 
-	// Wideband lambda
-	cfg := &WBLConfig{
-		WBLType:  c.Config.WidebandConfig.Type,
-		Port:     c.Config.WidebandConfig.Port,
-		Log:      c.OnMessage,
-		Txbridge: txbridge,
-	}
-
-	c.lamb, err = NewWBL(ctx, cl, cfg)
-	if err != nil {
-		return fmt.Errorf("failed to create wideband lambda: %w", err)
+	if err := c.setupWBL(ctx, cl); err != nil {
+		return err
 	}
 
 	if c.lamb != nil {
@@ -191,16 +113,13 @@ func (c *T7Client) Start() error {
 
 	for _, sym := range c.Symbols {
 		if c.sysvars.Exists(sym.Name) {
-			//			log.Println("Skipping", sym.Name)
+			// log.Println("Skipping", sym.Name)
 			sym.Skip = true
 		}
 	}
-	cps := 0
-	count := 0
-	retries := 0
 
-	if txbridge {
-		if err := cl.SendFrame(gocan.SystemMsg, []byte("7"), gocan.Outgoing); err != nil {
+	if c.txbridge {
+		if err := cl.Send(gocan.SystemMsg, []byte("7"), gocan.Outgoing); err != nil {
 			return err
 		}
 	}
@@ -247,9 +166,6 @@ func (c *T7Client) Start() error {
 		}
 		c.OnMessage("Configured dynamic register")
 
-		secondTicker := time.NewTicker(1000 * time.Millisecond)
-		defer secondTicker.Stop()
-
 		t := time.NewTicker(time.Second / time.Duration(c.Rate))
 		defer t.Stop()
 
@@ -266,43 +182,50 @@ func (c *T7Client) Start() error {
 		testerPresent := func() {
 			if time.Since(lastPresent) > lastPresentInterval {
 				if err := kwp.TesterPresent(ctx); err != nil {
-					c.onError(err)
+					c.onError()
+					c.OnMessage(err.Error())
 					return
 				}
 				lastPresent = time.Now()
 			}
 		}
 
-		tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse, gocan.SystemMsgError)
+		tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
 		defer tx.Close()
 
-		if txbridge {
+		messages := cl.Subscribe(ctx, gocan.SystemMsg)
+		defer messages.Close()
+
+		if c.txbridge {
 			//			log.Println("stopped timer, using txbridge")
 			t.Stop()
-			if err := cl.SendFrame(gocan.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
+			if err := cl.Send(gocan.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
 				return err
 			}
 		}
 
 		//buf := bytes.NewBuffer(nil)
-		var firstTime time.Time
-		var firstTimestamp uint32
-		var databuff []byte
-		var currtimestamp uint32
 		for {
 			select {
+			case msg := <-messages.Chan():
+				c.OnMessage(string(msg.Data))
 			case err := <-cl.Err():
+				if gocan.IsRecoverable(err) {
+					c.onError()
+					c.OnMessage(err.Error())
+					continue
+				}
 				return retry.Unrecoverable(err)
 			case <-c.quitChan:
-				c.OnMessage("Stopped logging..")
+				c.OnMessage("Stop logging")
 				return nil
-			case <-secondTicker.C:
-				c.FpsCounter(cps)
+			case <-c.secondTicker.C:
+				c.FpsCounter(c.cps)
 				if c.errPerSecond > 5 {
 					c.errPerSecond = 0
 					return fmt.Errorf("too many errors per second")
 				}
-				cps = 0
+				c.cps = 0
 				c.errPerSecond = 0
 			case symbols := <-c.symbolChan:
 				c.Symbols = symbols
@@ -329,7 +252,7 @@ func (c *T7Client) Start() error {
 					c.OnMessage("Configured dynamic register")
 				}
 			case read := <-c.readChan:
-				if txbridge {
+				if c.txbridge {
 					toRead := min(235, read.Length)
 					read.Length -= toRead
 					cmd := serialcommand.SerialCommand{
@@ -345,7 +268,8 @@ func (c *T7Client) Start() error {
 					read.Address += uint32(toRead)
 					payload, err := cmd.MarshalBinary()
 					if err != nil {
-						c.onError(err)
+						c.onError()
+						c.OnMessage(err.Error())
 						continue
 					}
 					frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
@@ -354,7 +278,7 @@ func (c *T7Client) Start() error {
 						read.Complete(err)
 						continue
 					}
-					read.Data = append(read.Data, resp.Data()...)
+					read.Data = append(read.Data, resp.Data...)
 					if read.Length > 0 {
 						c.readChan <- read
 					} else {
@@ -370,8 +294,8 @@ func (c *T7Client) Start() error {
 				}
 				read.Data = data
 				read.Complete(nil)
-			case write := <-c.updateChan:
-				if txbridge {
+			case write := <-c.writeChan:
+				if c.txbridge {
 					toRead := min(235, write.Length)
 					cmd := serialcommand.SerialCommand{
 						Command: 'W',
@@ -397,20 +321,20 @@ func (c *T7Client) Start() error {
 
 					frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
 
-					resp, err := cl.SendAndWait(ctx, frame, 1*time.Second, gocan.SystemMsgWriteResponse, gocan.SystemMsgError)
+					resp, err := cl.SendAndWait(ctx, frame, 1*time.Second, gocan.SystemMsgWriteResponse)
 					if err != nil {
 						write.Complete(err)
 						continue
 					}
 
-					if resp.Identifier() == gocan.SystemMsgError {
+					if resp.Identifier == gocan.SystemMsgError {
 						write.Complete(fmt.Errorf("error response"))
 						continue
 					}
 
 					if write.Length > 0 {
 						select {
-						case c.updateChan <- write:
+						case c.writeChan <- write:
 						default:
 							log.Println("kisskorv updateChan full")
 						}
@@ -419,8 +343,24 @@ func (c *T7Client) Start() error {
 					write.Complete(nil)
 					continue
 				}
+				toWrite := min(36, write.Length)
 
-				write.Complete(kwp.WriteDataByAddress(ctx, write.Address, write.Data))
+				if err := kwp.WriteDataByAddress(ctx, write.Address, write.Data[:toWrite]); err != nil {
+					write.Complete(err)
+					continue
+				}
+				write.Data = write.Data[toWrite:]
+				write.Address += uint32(toWrite)
+				write.Length -= toWrite
+				if write.Length > 0 {
+					select {
+					case c.writeChan <- write:
+					default:
+						log.Println("kisskorv updateChan full")
+					}
+					continue
+				}
+				write.Complete(nil)
 
 			case <-t.C:
 				timeStamp = time.Now()
@@ -429,14 +369,16 @@ func (c *T7Client) Start() error {
 					continue
 				}
 
-				databuff, err = kwp.ReadDataByIdentifier(ctx, 0xF0)
+				databuff, err := kwp.ReadDataByIdentifier(ctx, 0xF0)
 				if err != nil {
-					c.onError(err)
+					c.onError()
+					c.OnMessage(err.Error())
 					continue
 				}
 
 				if len(databuff) != int(expectedPayloadSize) {
-					c.onError(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
+					c.onError()
+					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
 					continue
 					//return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
 				}
@@ -449,7 +391,8 @@ func (c *T7Client) Start() error {
 					}
 					if err := va.Read(r); err != nil {
 						log.Printf("data ex %d %X len %d", expectedPayloadSize, databuff, len(databuff))
-						c.onError(err)
+						c.onError()
+						c.OnMessage(err.Error())
 						break
 					}
 					if va.Name == "DisplProt.AD_Scanner" {
@@ -477,46 +420,36 @@ func (c *T7Client) Start() error {
 
 				//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
 				if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
-					c.onError(fmt.Errorf("failed to write log: %w", err))
+					c.onError()
+					c.OnMessage("failed to write log: " + err.Error())
 				}
-				count++
-				cps++
-				if count%15 == 0 {
-					c.CaptureCounter(count)
+				c.captureCount++
+				c.cps++
+				if c.captureCount%15 == 0 {
+					c.CaptureCounter(c.captureCount)
 				}
 			case msg, ok := <-tx.Chan():
 				if !ok {
 					return retry.Unrecoverable(errors.New("txbridge recv channel closed"))
 				}
-				if msg.Identifier() == gocan.SystemMsgError {
-					data := msg.Data()
-					switch data[0] {
-					case 0x31:
-						c.onError(fmt.Errorf("read timeout"))
-					case 0x06:
-						c.onError(fmt.Errorf("invalid sequence"))
-					}
-					continue
-				}
-
-				databuff = msg.Data()
-				if len(databuff) != int(expectedPayloadSize+4) {
-					c.onError(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize+4, len(databuff)))
-					log.Printf("unexpected data %X", databuff)
+				if msg.Length() != int(expectedPayloadSize+4) {
+					c.onError()
+					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, msg.Length()))
+					log.Printf("unexpected data %X", msg.Data)
 					continue
 					//return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
 				}
 
-				r := bytes.NewReader(databuff)
+				r := bytes.NewReader(msg.Data)
 
-				binary.Read(r, binary.LittleEndian, &currtimestamp)
+				binary.Read(r, binary.LittleEndian, &c.currtimestamp)
 
-				if firstTime.IsZero() {
-					firstTime = time.Now()
-					firstTimestamp = currtimestamp
+				if c.firstTime.IsZero() {
+					c.firstTime = time.Now()
+					c.firstTimestamp = c.currtimestamp
 				}
 
-				timeStamp := calculateCompensatedTimestamp(firstTime, firstTimestamp, currtimestamp)
+				timeStamp := c.calculateCompensatedTimestamp()
 
 				for _, va := range c.Symbols {
 					if va.Skip {
@@ -524,8 +457,9 @@ func (c *T7Client) Start() error {
 						continue
 					}
 					if err := va.Read(r); err != nil {
-						log.Printf("data ex %d %X len %d", expectedPayloadSize, databuff, len(databuff))
-						c.onError(err)
+						log.Printf("data ex %d %X len %d", expectedPayloadSize, msg.Data, msg.Length())
+						c.onError()
+						c.OnMessage(err.Error())
 						break
 					}
 					if va.Name == "DisplProt.AD_Scanner" {
@@ -539,7 +473,8 @@ func (c *T7Client) Start() error {
 					}
 
 					if err := ebus.Publish(va.Name, va.Float64()); err != nil {
-						c.onError(err)
+						c.onError()
+						c.OnMessage(err.Error())
 					}
 				}
 
@@ -550,17 +485,21 @@ func (c *T7Client) Start() error {
 				if c.lamb != nil {
 					lambda := c.lamb.GetLambda()
 					c.sysvars.Set(EXTERNALWBLSYM, lambda)
-					ebus.Publish(EXTERNALWBLSYM, lambda)
+					if err := ebus.Publish(EXTERNALWBLSYM, lambda); err != nil {
+						c.onError()
+						c.OnMessage(err.Error())
+					}
 				}
 
 				//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
 				if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
-					c.onError(fmt.Errorf("failed to write log: %w", err))
+					c.onError()
+					c.OnMessage("failed to write log: " + err.Error())
 				}
-				count++
-				cps++
-				if count%15 == 0 {
-					c.CaptureCounter(count)
+				c.captureCount++
+				c.cps++
+				if c.captureCount%15 == 0 {
+					c.CaptureCounter(c.captureCount)
 				}
 			}
 		}
@@ -571,7 +510,6 @@ func (c *T7Client) Start() error {
 		retry.Delay(1500*time.Millisecond),
 		retry.Attempts(3),
 		retry.OnRetry(func(n uint, err error) {
-			retries++
 			c.OnMessage(fmt.Sprintf("Retry %d: %v", n, err))
 		}),
 		retry.LastErrorOnly(true),
@@ -579,6 +517,7 @@ func (c *T7Client) Start() error {
 	return err
 }
 
+/*
 func calculateOptimalReadSize(remainingBytes uint32) uint32 {
 	const (
 		maxReadSize          = 235 // Maximum bytes we can request at once
@@ -611,6 +550,7 @@ func calculateOptimalReadSize(remainingBytes uint32) uint32 {
 
 	return optimalSize
 }
+*/
 
 func AirDemToStringT7(v float64) string {
 	switch v {
@@ -720,10 +660,7 @@ func FCutToStringT7(value float64) string {
 	}
 }
 
-func calculateCompensatedTimestamp(firstTime time.Time, firstTimestamp, currentTimestamp uint32) time.Time {
-	return firstTime.Add(time.Duration(currentTimestamp-firstTimestamp) * time.Millisecond)
-}
-
+/*
 func calculateCompensatedTimestampZ(firstTime time.Time, firstTimestamp, currentTimestamp uint32) time.Time {
 	// Calculate elapsed milliseconds since the first reading
 	elapsedMs := currentTimestamp - firstTimestamp
@@ -748,3 +685,4 @@ func calculateCompensatedTimestampZ(firstTime time.Time, firstTimestamp, current
 
 	return compensatedTime
 }
+*/

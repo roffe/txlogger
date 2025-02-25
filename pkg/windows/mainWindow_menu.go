@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os/exec"
 	"sync"
 	"time"
 
@@ -58,11 +59,12 @@ func (mw *MainWindow) setupMenu() {
 				}
 				widgets.SelectFile(cb, "Log file", "csv", "t5l", "t7l", "t8l")
 			}),
-			//fyne.NewMenuItem("Open log folder", func() {
-			//	if err := open.Run(mw.settings.GetLogPath()); err != nil {
-			//		mw.Error(fmt.Errorf("failed to open logs folder: %w", err))
-			//	}
-			//}),
+			fyne.NewMenuItem("Open log folder", func() {
+				cmd := exec.Command("explorer.exe", mw.settings.GetLogPath())
+				if err := cmd.Start(); err != nil {
+					mw.Error(err)
+				}
+			}),
 			fyne.NewMenuItem("Settings", func() {
 				mw.openSettings()
 			}),
@@ -141,7 +143,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		return
 	}
 
-	log.Println(axis)
+	//log.Println(axis)
 
 	symX := mw.fw.GetByName(axis.X)
 	if symX == nil && axis.X == "BstKnkCal.fi_offsetXSP" {
@@ -243,7 +245,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 				return
 			}
 			//mw.Log(fmt.Sprintf("set $%d %s %s", addr, axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
-			mw.Log(fmt.Sprintf("set %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
+			mw.Log(fmt.Sprintf("set %s %dms", axis.Z, time.Since(start).Truncate(10*time.Millisecond).Milliseconds()))
 		}
 	}
 

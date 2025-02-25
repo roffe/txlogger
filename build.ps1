@@ -1,18 +1,16 @@
-.\buildcangw.ps1
-#$env:PKG_CONFIG_PATH = "/vcpkg/packages/libusb_x86-windows/lib/pkgconfig"
-#$env:CGO_CFLAGS = "-I/vcpkg/packages/libusb_x86-windows/include/libusb-1.0"
-#$env:PKG_CONFIG_PATH = "/vcpkg/packages/libusb_x64-windows/lib/pkgconfig"
-#$env:CGO_CFLAGS = "-I/vcpkg/packages/libusb_x64-windows/include/libusb-1.0"
-#$env:GOARCH = "386"
+.\build_cangateway.ps1
 $env:GOARCH = "amd64"
 $env:CGO_ENABLED = "1"
+$env:PKG_CONFIG_PATH = "C:\vcpkg\packages\libusb_x64-windows\lib\pkgconfig"
+$env:CGO_CFLAGS = "-IC:\vcpkg\packages\libusb_x64-windows\include\libusb-1.0 -IC:\local\Canlib\INC"
+$env:CGO_LDFLAGS = "-LC:\local\Canlib\Lib\x64"
 $env:GOGC = "100"
 $env:CC = "clang.exe"
 $env:CXX = "clang.exe"
-
 # Invoke-Expression "rsrc -arch 386 -manifest manifest.xml"
-Invoke-Expression "copy $Env:USERPROFILE\Documents\PlatformIO\Projects\txbridge\.pio\build\esp32dev\firmware.bin .\pkg\ota\"
+# copy $Env:USERPROFILE\Documents\PlatformIO\Projects\txbridge\.pio\build\esp32dev\firmware.bin .\pkg\ota\"
+Copy-Item -Path $Env:USERPROFILE\Documents\PlatformIO\Projects\txbridge\.pio\build\esp32dev\firmware.bin -Destination .\pkg\ota\
 go generate ./...
-fyne package --release
+fyne package -tags="canusb,combi,canlib,j2534" --release
 
 

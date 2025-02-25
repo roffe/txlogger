@@ -52,10 +52,10 @@ func (c *Client) sendReadCommand(ctx context.Context, address uint32) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	if resp.Data()[0] != 0xC7 {
+	if resp.Data[0] != 0xC7 {
 		return nil, fmt.Errorf("invalid response")
 	}
-	respData := resp.Data()[2:]
+	respData := resp.Data[2:]
 	for j := 0; j < 3; j++ {
 		respData[j], respData[5-j] = respData[5-j], respData[j]
 	}
@@ -70,7 +70,7 @@ func sendCommand(ctx context.Context, c *gocan.Client, cmd []byte) error {
 		if err != nil {
 			return err
 		}
-		if resp.Data()[0] != 0xC6 {
+		if resp.Data[0] != 0xC6 {
 			return fmt.Errorf("invalid response")
 		}
 	}
@@ -78,8 +78,7 @@ func sendCommand(ctx context.Context, c *gocan.Client, cmd []byte) error {
 }
 
 func ack(c *gocan.Client) error {
-	frame := gocan.NewFrame(0x05, []byte{0xC6, 0x00}, gocan.Outgoing)
-	return c.Send(frame)
+	return c.Send(0x05, []byte{0xC6, 0x00}, gocan.Outgoing)
 }
 
 func recvDataEND(ctx context.Context, c *gocan.Client) ([]byte, error) {
@@ -98,11 +97,10 @@ func recvDataEND(ctx context.Context, c *gocan.Client) ([]byte, error) {
 			os.WriteFile("dump", buff.Bytes(), 0644)
 			return nil, err
 		}
-		data := resp.Data()
-		if data[0] != 0xC6 && data[1] != 0x00 {
+		if resp.Data[0] != 0xC6 && resp.Data[1] != 0x00 {
 			return nil, fmt.Errorf("invalid response")
 		}
-		buff.WriteByte(data[2])
+		buff.WriteByte(resp.Data[2])
 		if bytes.HasSuffix(buff.Bytes(), pattern) {
 			return bytes.TrimSuffix(buff.Bytes(), pattern), nil
 		}
@@ -120,14 +118,13 @@ func recvData(ctx context.Context, c *gocan.Client) ([]byte, error) {
 			log.Printf("%s", buff.Bytes())
 			return nil, err
 		}
-		data := resp.Data()
-		if data[0] != 0xC6 && data[1] != 0x00 {
+		if resp.Data[0] != 0xC6 && resp.Data[1] != 0x00 {
 			return nil, fmt.Errorf("invalid response")
 		}
-		if lastByte == 0x0D && data[2] == 0x0A {
+		if lastByte == 0x0D && resp.Data[2] == 0x0A {
 			return bytes.TrimSuffix(buff.Bytes(), []byte{0x0D}), nil
 		}
-		buff.WriteByte(data[2])
-		lastByte = data[2]
+		buff.WriteByte(resp.Data[2])
+		lastByte = resp.Data[2]
 	}
 }

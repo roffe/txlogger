@@ -20,8 +20,7 @@ func (t *Client) StartEOL(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		data = f.Data()
-		t.Ack(data[0], gocan.Outgoing)
+		t.Ack(f.Data[0], gocan.Outgoing)
 		count++
 		if count > 10 {
 			return errors.New("failed to start EOL session")
@@ -40,9 +39,8 @@ func (t *Client) EndEOL(ctx context.Context) error {
 		return err
 	}
 	log.Println(f)
-	d := f.Data()
-	if d[3] == 0x7F {
-		return fmt.Errorf("EndEOL: %w", TranslateErrorCode(d[5]))
+	if f.Data[3] == 0x7F {
+		return fmt.Errorf("EndEOL: %w", TranslateErrorCode(f.Data[5]))
 	}
 
 	return nil

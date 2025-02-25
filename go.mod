@@ -1,20 +1,27 @@
 module github.com/roffe/txlogger
 
-go 1.23.5
+go 1.24.0
 
-replace github.com/roffe/gocan => C:\Users\flejd\go\src\github.com\roffe\gocan
+replace github.com/roffe/gocan => ..\gocan
 
-replace github.com/roffe/ecusymbol => C:\Users\flejd\go\src\github.com\roffe\ecusymbol
+replace github.com/roffe/gocanflasher => ..\gocanflasher
 
-replace fyne.io/fyne/v2 => C:\Users\flejd\go\src\github.com\fyne-io\fyne
+replace github.com/roffe/gocanusb => ..\gocanusb
+
+// replace github.com/roffe/ecusymbol => ..\ecusymbol
+
+// replace github.com/roffe/gocanlib => ..\gocanlib
+
+replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 
 require (
 	fyne.io/fyne/v2 v2.5.5-0.20250210105257-a0a3e580d0cd
 	fyne.io/x/fyne v0.0.0-20250106132206-3228f6c50107
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/lusingander/colorpicker v0.7.4
-	github.com/roffe/ecusymbol v0.0.0-20250202020823-4b5104c7ac0a
-	github.com/roffe/gocan v0.0.0-20250210201942-7f0e51b4924d
+	github.com/roffe/ecusymbol v1.0.0
+	github.com/roffe/gocan v1.1.1
+	github.com/roffe/gocanflasher v1.0.2
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.2
 	golang.org/x/image v0.24.0
@@ -28,7 +35,7 @@ require (
 require (
 	fyne.io/systray v1.11.0 // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
-	github.com/TheTitanrain/w32 v0.0.0-20180517000239-4f5cfb03fabf // indirect
+	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
 	github.com/bendikro/dl v0.0.0-20190410215913-e41fdb9069d4 // indirect
 	github.com/creack/goselect v0.1.2 // indirect
@@ -58,6 +65,7 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.5.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/roffe/gocanusb v1.0.8 // indirect
 	github.com/rymdport/portal v0.3.0 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
@@ -69,7 +77,6 @@ require (
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/tools v0.30.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250207221924-e9438ea467c6 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250212204824-5a70512c5d8b // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-
 )

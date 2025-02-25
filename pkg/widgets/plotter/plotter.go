@@ -1,11 +1,11 @@
 package plotter
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"log"
 	"sort"
-	"strconv"
 	"unicode"
 	"unicode/utf8"
 
@@ -13,7 +13,6 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
-	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/colors"
 )
 
@@ -158,7 +157,10 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 
 		labelText := NewTappableText(k, p.ts[n].Color, onTapped, onColorUpdate, onHover)
 
-		labelText.precission = symbol.GetPrecision(symbol.GetCorrectionfactor(k))
+		//labelText.precission = symbol.GetPrecision(symbol.GetCorrectionfactor(k))
+		//if k == "Lambda.External" {
+		//	labelText.precission = 3
+		//}
 
 		p.legendTexts = append(p.legendTexts, labelText)
 		p.legend.Add(labelText)
@@ -241,8 +243,8 @@ func (p *Plotter) Seek(pos int) {
 	for i, v := range p.valueOrder {
 		valueIndex := min(p.dataLength, p.cursorPos)
 		obj := p.legendTexts[i]
-		//newValue := fmt.Sprintf("%g", p.values[v][valueIndex])
-		newValue := strconv.FormatFloat(p.values[v][valueIndex], 'f', obj.precission, 64)
+		newValue := fmt.Sprintf("%.4g", p.values[v][valueIndex])
+		//newValue := strconv.FormatFloat(p.values[v][valueIndex], 'f', obj.precission, 64)
 		if obj.value.Text == newValue {
 			continue
 		}
@@ -324,6 +326,12 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 	case "ECMStat.p_Diff":
 		ts.Min = -1
 		ts.Max = 2
+	case "Lambda.External":
+		ts.Min = 0.5
+		ts.Max = 1.5
+	case "P_medel", "Max_tryck", "Regl_tryck":
+		ts.Min = -1
+		ts.Max = 3
 	default:
 		ts.Min, ts.Max = findMinMaxFloat64(data)
 	}

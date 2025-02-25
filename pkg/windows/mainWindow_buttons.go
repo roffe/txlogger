@@ -326,6 +326,9 @@ func (mw *MainWindow) startLogging() {
 
 	mw.canLED.On()
 	go func() {
+
+		mw.Log("Connecting to " + device.Name())
+		defer mw.Log(device.Name() + " disconnected")
 		if err := mw.dlc.Start(); err != nil {
 			mw.Error(err)
 		}

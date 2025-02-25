@@ -16,9 +16,9 @@ type Config struct {
 }
 
 var DefaultConfig = &Config{
-	IncomingBuffer:    1000,
-	SubscribeBuffer:   100,
-	UnsubscribeBuffer: 100,
+	IncomingBuffer:    1024,
+	SubscribeBuffer:   20,
+	UnsubscribeBuffer: 20,
 	// CacheTTL:          time.Minute,
 }
 
@@ -79,28 +79,30 @@ func (e *Controller) SetOnMessage(f func(string, float64)) {
 }
 
 func (e *Controller) run() {
-	for i := 0; i < 1; i++ {
-		go func() {
-			log.Println("Worker", i, "started")
-			for {
-				select {
-				case <-e.quit:
-					log.Println("Worker", i, "stopped")
-					return
-				case msg := <-e.incoming:
-					e.handleMessage(msg)
+	/*
+		for i := range runtime.NumCPU() {
+			go func() {
+				log.Println("Worker", i, "started")
+				for {
+					select {
+					case <-e.quit:
+						log.Println("Worker", i, "stopped")
+						return
+					case msg := <-e.incoming:
+						e.handleMessage(msg)
+					}
 				}
-			}
-		}()
-	}
+			}()
+		}
+	*/
 
 	for {
 		select {
 		case <-e.quit:
 			e.cleanup()
 			return
-		// case msg := <-e.incoming:
-		// 	e.handleMessage(msg)
+		case msg := <-e.incoming:
+			e.handleMessage(msg)
 		case sub := <-e.sub:
 			e.handleSubscription(sub)
 		case unsub := <-e.unsub:
@@ -233,7 +235,7 @@ func (e *Controller) SubscribeFunc(topic string, fn func(float64)) (cancel func(
 
 func (e *Controller) Subscribe(topic string) chan float64 {
 	//log.Println("Subscribe", topic)
-	respChan := make(chan float64, 10)
+	respChan := make(chan float64, 20)
 	e.sub <- newSub{topic: topic, resp: respChan}
 	return respChan
 }

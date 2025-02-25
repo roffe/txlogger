@@ -14,10 +14,10 @@ func NewMatrix3x3() Matrix3x3 {
 
 func (m Matrix3x3) Multiply(other Matrix3x3) Matrix3x3 {
 	var result Matrix3x3
-	for i := 0; i < 3; i++ {
-		for j := 0; j < 3; j++ {
+	for i := range 3 {
+		for j := range 3 {
 			sum := 0.0
-			for k := 0; k < 3; k++ {
+			for k := range 3 {
 				sum += m[i][k] * other[k][j]
 			}
 			result[i][j] = sum
@@ -28,9 +28,9 @@ func (m Matrix3x3) Multiply(other Matrix3x3) Matrix3x3 {
 
 func (m Matrix3x3) MultiplyVector(v [3]float64) [3]float64 {
 	var result [3]float64
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		sum := 0.0
-		for j := 0; j < 3; j++ {
+		for j := range 3 {
 			sum += m[i][j] * v[j]
 		}
 		result[i] = sum

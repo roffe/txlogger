@@ -2,9 +2,6 @@ package cansettings
 
 import (
 	"errors"
-	"fmt"
-	"log"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -26,7 +23,7 @@ const (
 	prefsSpeed   = "speed"
 	prefsDebug   = "debug"
 
-	MinimumtxbridgeVersion = "1.0.6"
+	MinimumtxbridgeVersion = "1.0.8"
 )
 
 var portSpeeds = []string{"9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600", "1mbit", "2mbit", "3mbit"}
@@ -39,7 +36,7 @@ type Widget struct {
 	portSelector    *widget.Select
 	speedSelector   *widget.Select
 	refreshBtn      *widget.Button
-	adapters        map[string]*adapter.AdapterInfo
+	adapters        map[string]*gocan.AdapterInfo
 
 	mu sync.Mutex
 }
@@ -47,7 +44,7 @@ type Widget struct {
 func NewCanSettingsWidget() *Widget {
 	csw := &Widget{
 		app:      fyne.CurrentApp(),
-		adapters: make(map[string]*adapter.AdapterInfo),
+		adapters: make(map[string]*gocan.AdapterInfo),
 	}
 	csw.ExtendBaseWidget(csw)
 
@@ -80,6 +77,10 @@ func NewCanSettingsWidget() *Widget {
 		csw.portSelector.Refresh()
 	})
 
+	for _, adapter := range gocan.ListAdapters() {
+		csw.adapters[adapter.Name] = &adapter
+	}
+
 	csw.loadPrefs()
 	return csw
 }
@@ -88,10 +89,10 @@ func (c *Widget) AddAdapters(adapters []*proto.AdapterInfo) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, a := range adapters {
-		adapter := &adapter.AdapterInfo{
+		adapter := &gocan.AdapterInfo{
 			Name:        a.GetName(),
 			Description: a.GetDescription(),
-			Capabilities: adapter.AdapterCapabilities{
+			Capabilities: gocan.AdapterCapabilities{
 				HSCAN: a.GetCapabilities().GetHSCAN(),
 				SWCAN: a.GetCapabilities().GetSWCAN(),
 				KLine: a.GetCapabilities().GetKLine(),
@@ -116,10 +117,6 @@ func (c *Widget) AddAdapters(adapters []*proto.AdapterInfo) {
 	if ad := c.app.Preferences().String(prefsAdapter); ad != "" {
 		c.adapterSelector.SetSelected(ad)
 	}
-}
-
-func (c *Widget) AddAdapter(adapter *adapter.AdapterInfo) {
-
 }
 
 func (c *Widget) Disable() {
@@ -231,28 +228,36 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 	if strings.HasPrefix(cs.adapterSelector.Selected, "txbridge") {
 		minimumVersion = MinimumtxbridgeVersion
 	}
-	return adapter.NewClient(
-		cs.adapterSelector.Selected,
-		&gocan.AdapterConfig{
-			Port:         cs.portSelector.Selected,
-			PortBaudrate: baudrate,
-			CANRate:      canRate,
-			CANFilter:    canFilter,
-			OnMessage:    logger,
-			Debug:        cs.debugCheckbox.Checked,
-			OnError: func(err error) {
-				_, file, no, ok := runtime.Caller(1)
-				if ok {
-					fmt.Printf("%s#%d %v\n", file, no, err)
-				} else {
-					log.Println(err)
-				}
-				logger(err.Error())
+
+	if strings.HasPrefix(cs.adapterSelector.Selected, "J2534") { // || strings.HasPrefix(cs.adapterSelector.Selected, "CANlib") { // || (strings.HasPrefix(cs.adapterSelector.Selected, "CANUSB ") && cs.adapterSelector.Selected != "CANUSB VCP") {
+		return adapter.NewClient(
+			cs.adapterSelector.Selected,
+			&gocan.AdapterConfig{
+				Port:                   cs.portSelector.Selected,
+				PortBaudrate:           baudrate,
+				CANRate:                canRate,
+				CANFilter:              canFilter,
+				OnMessage:              logger,
+				Debug:                  cs.debugCheckbox.Checked,
+				MinimumFirmwareVersion: minimumVersion,
+				PrintVersion:           true,
 			},
-			MinimumFirmwareVersion: minimumVersion,
-			PrintVersion:           true,
-		},
-	)
+		)
+	} else {
+		return gocan.NewAdapter(
+			cs.adapterSelector.Selected,
+			&gocan.AdapterConfig{
+				Port:                   cs.portSelector.Selected,
+				PortBaudrate:           baudrate,
+				CANRate:                canRate,
+				CANFilter:              canFilter,
+				OnMessage:              logger,
+				Debug:                  cs.debugCheckbox.Checked,
+				MinimumFirmwareVersion: minimumVersion,
+				PrintVersion:           true,
+			},
+		)
+	}
 }
 
 func (cs *Widget) CreateRenderer() fyne.WidgetRenderer {

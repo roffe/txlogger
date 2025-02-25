@@ -74,7 +74,7 @@ func sendCommand(ctx context.Context, c *gocan.Client, cmd []byte) error {
 		if err != nil {
 			return err
 		}
-		if resp.Data()[0] != 0xC6 {
+		if resp.Data[0] != 0xC6 {
 			return fmt.Errorf("invalid response")
 		}
 	}
@@ -82,8 +82,7 @@ func sendCommand(ctx context.Context, c *gocan.Client, cmd []byte) error {
 }
 
 func ack(c *gocan.Client) error {
-	frame := gocan.NewFrame(0x05, []byte{0xC6, 0x00}, gocan.Outgoing)
-	return c.Send(frame)
+	return c.Send(0x05, []byte{0xC6, 0x00}, gocan.Outgoing)
 }
 
 func recvDataEND(ctx context.Context, c *gocan.Client) ([]byte, error) {
@@ -102,11 +101,10 @@ func recvDataEND(ctx context.Context, c *gocan.Client) ([]byte, error) {
 			os.WriteFile("dump", buff.Bytes(), 0644)
 			return nil, err
 		}
-		data := resp.Data()
-		if data[0] != 0xC6 && data[1] != 0x00 {
+		if resp.Data[0] != 0xC6 && resp.Data[1] != 0x00 {
 			return nil, fmt.Errorf("invalid response")
 		}
-		buff.WriteByte(data[2])
+		buff.WriteByte(resp.Data[2])
 		if bytes.HasSuffix(buff.Bytes(), pattern) {
 			return bytes.TrimSuffix(buff.Bytes(), pattern), nil
 		}

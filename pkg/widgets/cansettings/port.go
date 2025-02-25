@@ -1,4 +1,5 @@
-// go:build (windows | linux) && !wasm
+//go:build (windows || linux) && !wasm
+
 package cansettings
 
 import (

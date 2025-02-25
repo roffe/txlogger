@@ -138,17 +138,18 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 	}
 
 	if len(mv.zData) == 0 {
-		return nil, fmt.Errorf("MapViewer zData is empty")
+		return nil, fmt.Errorf("mapViewer zData is empty")
 	}
 	mv.zMin, mv.zMax = widgets.FindMinMax(mv.zData)
 
 	if mv.numColumns*mv.numRows != mv.numData && mv.numColumns > 1 && mv.numRows > 1 {
-		return nil, fmt.Errorf("MapViewer columns * rows != datalen")
+		return nil, fmt.Errorf("mapViewer columns * rows != data length")
 	}
 
 	mv.crosshair = NewCrosshair(color.RGBA{165, 55, 253, 180}, 3)
 	mv.selectionRect = NewRectangle(color.RGBA{0x30, 0x70, 0xFF, 0xFF}, 3)
-	log.Printf("MapViewer c: %d r: %d dlen: %d x: %s y: %s z: %s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom, mv.symbol.Name)
+
+	log.Printf("mapViewer c:%d r:%d len:%d x:%s y:%s z:%s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom, mv.symbol.Name)
 
 	mv.createYAxis()
 	mv.createXAxis()
@@ -524,7 +525,7 @@ func (mv *MapViewer) createButtons() *fyne.Container {
 		return container.NewGridWithColumns(4,
 			widget.NewButtonWithIcon("Load File", theme.DocumentIcon(), func() {
 				if mv.symbol != nil {
-					log.Println("symbol loaded")
+					log.Println("load", mv.symbol.Name)
 					mv.zData = mv.symbol.Float64s()
 					mv.Refresh()
 				}

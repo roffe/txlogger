@@ -221,8 +221,10 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 	rightCorner := newDraggableCorner(w, false)
 
 	objects := []fyne.CanvasObject{w.bg, contentBG, bar, w.content, leftCorner, rightCorner}
-	return &innerWindowRenderer{ShadowingRenderer: NewShadowingRenderer(objects, DialogLevel),
+	r := &innerWindowRenderer{ShadowingRenderer: NewShadowingRenderer(objects, DialogLevel),
 		win: w, bar: bar, buttons: []*borderButton{min, max, close}, bg: w.bg, leftCorner: leftCorner, rightCorner: rightCorner, contentBG: contentBG}
+	r.Layout(w.Size())
+	return r
 }
 
 func (w *InnerWindow) SetContent(obj fyne.CanvasObject) {

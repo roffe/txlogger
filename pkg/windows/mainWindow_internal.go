@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
@@ -47,14 +48,15 @@ func newOtoContext() *oto.Context {
 */
 
 func (mw *MainWindow) closeIntercept() {
+	if mw.dlc != nil {
+		mw.dlc.Close()
+		time.Sleep(500 * time.Millisecond)
+	}
 	if mw.gclient != nil {
 		mw.gclient.SendCommand(context.Background(), &proto.Command{Data: []byte("quit")})
 	}
-
-	if mw.dlc != nil {
-		mw.dlc.Close()
-	}
 	debug.Close()
+
 	mw.Close()
 }
 

@@ -599,6 +599,7 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 
 func (sw *SettingsWidget) newFreqSlider() *widget.Slider {
 	slider := widget.NewSlider(5, 300)
+	slider.Step = 5
 	slider.OnChanged = func(f float64) {
 		sw.freqValue.SetText(strconv.FormatFloat(f, 'f', 0, 64))
 	}

@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"image/color"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -17,6 +18,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -26,6 +28,7 @@ import (
 	"github.com/roffe/txlogger/pkg/ipc"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/windows"
+	sdialog "github.com/sqweek/dialog"
 
 	"net/http"
 	_ "net/http/pprof"
@@ -33,11 +36,7 @@ import (
 
 var (
 	workDirectory string
-	ma            = &mainApp{}
 )
-
-type mainApp struct {
-}
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
@@ -60,10 +59,10 @@ func signalHandler(tx fyne.App) {
 	}()
 }
 
-func startCanGW(errFunc func(error), readyChan chan<- bool) *os.Process {
+func startCanGateway(errFunc func(error), readyChan chan<- struct{}) *os.Process {
 
 	if wd, err := os.Getwd(); err == nil {
-		command := filepath.Join(wd, "cangw.exe")
+		command := filepath.Join(wd, "cangateway.exe")
 		cmd := exec.Command(command)
 		//cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 		rc, err := cmd.StderrPipe()
@@ -72,10 +71,11 @@ func startCanGW(errFunc func(error), readyChan chan<- bool) *os.Process {
 		}
 		r := bufio.NewReader(rc)
 		go func() {
+			starting := true
 			for {
 				str, err := r.ReadString('\n')
 				if err != nil {
-					if err.Error() == "EOF" {
+					if err == io.EOF {
 						errFunc(errors.New("GoCAN Gateway exited"))
 						return
 					}
@@ -83,8 +83,9 @@ func startCanGW(errFunc func(error), readyChan chan<- bool) *os.Process {
 					return
 				}
 				fmt.Print(str)
-				if strings.Contains(str, "server listening") {
-					readyChan <- true
+				if strings.Contains(str, "server listening") && starting {
+					close(readyChan)
+					starting = false
 				}
 			}
 		}()
@@ -121,7 +122,37 @@ func mainAndroid() {
 	mw.ShowAndRun()
 }
 
+type RTL_OSVERSIONINFOEXW struct {
+	OSVersionInfoSize uint32
+	MajorVersion      uint32
+	MinorVersion      uint32
+	BuildNumber       uint32
+	PlatformId        uint32
+	CSDVersion        [128]uint16
+	ServicePackMajor  uint16
+	ServicePackMinor  uint16
+	SuiteMask         uint16
+	ProductType       byte
+	Reserved          byte
+}
+
+func RtlGetVersion() RTL_OSVERSIONINFOEXW {
+	ntdll := syscall.NewLazyDLL("ntdll.dll")
+	rtlGetVersion := ntdll.NewProc("RtlGetVersion")
+	var info RTL_OSVERSIONINFOEXW
+	info.OSVersionInfoSize = 5*4 + 128*2 + 3*2 + 2*1
+	rtlGetVersion.Call(uintptr(unsafe.Pointer(&info)))
+	return info
+}
+
 func mainDesktop() {
+	defer log.Println("txlogger exit")
+	ver := RtlGetVersion()
+	if ver.MajorVersion < 10 {
+		sdialog.Message("txlogger requires Windows 10 or later").Title("Unsupported Windows version").Error()
+		return
+	}
+
 	//startpprof()
 	socketFile := filepath.Join(os.TempDir(), "txlogger.sock")
 
@@ -130,31 +161,32 @@ func mainDesktop() {
 	}
 
 	if workDirectory != "" {
-		log.Println("changing working directory to", workDirectory)
+		debug.Log("changing working directory to" + workDirectory)
 		if err := os.Chdir(workDirectory); err != nil {
-			log.Println(err)
+			debug.Log(fmt.Sprintf("failed to change working directory to %s: %v", workDirectory, err))
 		}
 	}
 
-	readyChan := make(chan bool)
+	readyChan := make(chan struct{})
 
 	var errFunc = func(err error) {
 		log.Print(err.Error())
 	}
 
-	if p := startCanGW(errFunc, readyChan); p != nil {
-		defer p.Kill()
+	if p := startCanGateway(errFunc, readyChan); p != nil {
+		defer func(p *os.Process) {
+			if p != nil {
+				p.Kill()
+				p.Wait()
+			}
+		}(p)
 	}
 
 	select {
-	case ready := <-readyChan:
-		if ready {
-			log.Println("GoCAN Gateway is ready")
-		} else {
-			log.Fatal("GoCAN Gateway did not start")
-		}
+	case <-readyChan:
+		debug.Log("GoCAN Gateway is ready")
 	case <-time.After(5 * time.Second):
-		fyne.LogError("GoCAN Gateway did not start", errors.New("timeout"))
+		debug.Log("GoCAN Gateway was not ready after 5 seconds")
 	}
 
 	tx := app.NewWithID("com.roffe.txlogger")

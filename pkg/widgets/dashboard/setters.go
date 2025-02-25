@@ -3,7 +3,6 @@ package dashboard
 import (
 	"fmt"
 	"image/color"
-	"log"
 	"strconv"
 	"time"
 
@@ -57,10 +56,9 @@ func knkDetSetter(icon *icon.Icon) func(float64) {
 
 		showTime = time.Now()
 		go func() {
-			log.Println("knkDetSetter: sleeping")
 			time.Sleep(5 * time.Second)
-			if time.Since(showTime) < 5*time.Second {
-				fyne.Do(icon.Hide)
+			if time.Since(showTime) > 4*time.Second {
+				icon.Hide()
 			}
 		}()
 
