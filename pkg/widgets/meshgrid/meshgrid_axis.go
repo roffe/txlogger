@@ -32,18 +32,24 @@ func (m *Meshgrid) drawAxisIndicator(img *image.RGBA) {
 	cornerOffset := 60.0
 	indicatorScale := 60.0
 
-	indicator := NewAxisIndicator(indicatorScale)
-
+	// Create the indicator at corner position
 	origin := Vertex{
 		X: cornerOffset,
 		Y: float64(m.size.Height) - cornerOffset,
 	}
 
-	// Transform axis endpoints using the current rotation matrix
-	transformedX := m.rotationMatrix.MultiplyVector([3]float64{indicator.axisScale, 0, 0})
-	transformedY := m.rotationMatrix.MultiplyVector([3]float64{0, -indicator.axisScale, 0}) // Negative Y scale
-	transformedZ := m.rotationMatrix.MultiplyVector([3]float64{0, 0, indicator.axisScale})
+	// Instead of using just the rotation matrix, we should use the same
+	// camera transformation that's applied to the mesh vertices
 
+	// Use the camera's view matrix (same as in updateVertexPositions)
+	viewMatrix := m.cameraRotation
+
+	// Transform axis endpoints using the camera's view matrix
+	transformedX := viewMatrix.MultiplyVector([3]float64{indicatorScale, 0, 0})
+	transformedY := viewMatrix.MultiplyVector([3]float64{0, -indicatorScale, 0}) // Negative Y scale
+	transformedZ := viewMatrix.MultiplyVector([3]float64{0, 0, indicatorScale})
+
+	// Calculate endpoints
 	xEnd := Vertex{
 		X: origin.X + transformedX[0],
 		Y: origin.Y + transformedX[1],

@@ -28,8 +28,8 @@ github.com/fsnotify/fsnotify v1.8.0 h1:dAwr6QBTBZIkG8roQaJjGof0pp0EeF+tNV7YBP3F/
 github.com/fsnotify/fsnotify v1.8.0/go.mod h1:8jBTzvmWwFyi3Pb8djgCCO5IBqzKJ/Jwo8TRcHyHii0=
 github.com/fyne-io/gl-js v0.1.0 h1:8luJzNs0ntEAJo+8x8kfUOXujUlP8gB3QMOxO2mUdpM=
 github.com/fyne-io/gl-js v0.1.0/go.mod h1:ZcepK8vmOYLu96JoxbCKJy2ybr+g1pTnaBDdl7c3ajI=
-github.com/fyne-io/glfw-js v0.1.0 h1:RGGMmVjcsG17Oifl3X2UJ5vH3PgS4B1UY3ASeN5BXbI=
-github.com/fyne-io/glfw-js v0.1.0/go.mod h1:Ri6te7rdZtBgBpxLW19uBpp3Dl6K9K/bRaYdJ22G8Jk=
+github.com/fyne-io/glfw-js v0.2.0 h1:8GUZtN2aCoTPNqgRDxK5+kn9OURINhBEBc7M4O1KrmM=
+github.com/fyne-io/glfw-js v0.2.0/go.mod h1:Ri6te7rdZtBgBpxLW19uBpp3Dl6K9K/bRaYdJ22G8Jk=
 github.com/fyne-io/image v0.1.0 h1:Vm2TQJ2PWGHCf3jYi1/XroaNNMu+GfI/O2QpSbZd4XQ=
 github.com/fyne-io/image v0.1.0/go.mod h1:xrfYBh6yspc+KjkgdZU/ifUC9sPA5Iv7WYUBzQKK7JM=
 github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71 h1:5BVwOaUSBTlVZowGO6VZGw2H/zl9nrd3eCZfYV+NfQA=
@@ -90,6 +90,10 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/roffe/ecusymbol v1.0.0 h1:6F7S8ghGMHw+C1mKjd3RiYhOf0chhoxZYZZfCY37Cv4=
 github.com/roffe/ecusymbol v1.0.0/go.mod h1:0nrbfx99ecWTXVjNbaqA9iZYlLlLdXWLE//Hb5hCajQ=
+github.com/roffe/gocanusb v1.1.1 h1:1Tdd2PqbWA0fOYR89Sm3Un/Hh2NsllwWe+8aKCF7jNs=
+github.com/roffe/gocanusb v1.1.1/go.mod h1:zRgZyTCvOyLIMeW+d9aUPmoJC3PId0PUJF0IVNQ70Z4=
+github.com/roffe/goftdi v0.0.0-20250227120900-5e1895d2a9af h1:z3mCs8gudEv0SU2YmXDwK3ND1DTiBqsgoWRUDgl62kU=
+github.com/roffe/goftdi v0.0.0-20250227120900-5e1895d2a9af/go.mod h1:oWL500yi96TiZ8QuWArPYkkbli5DyX3y+9N03yboXIw=
 github.com/rymdport/portal v0.3.0 h1:QRHcwKwx3kY5JTQcsVhmhC3TGqGQb9LFghVNUy8AdB8=
 github.com/rymdport/portal v0.3.0/go.mod h1:kFF4jslnJ8pD5uCi17brj/ODlfIidOxlgUDTO5ncnC4=
 github.com/sqweek/dialog v0.0.0-20240226140203-065105509627 h1:2JL2wmHXWIAxDofCK+AdkFi1KEg3dgkefCsm7isADzQ=

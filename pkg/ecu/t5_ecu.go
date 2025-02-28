@@ -14,7 +14,7 @@ import (
 )
 
 func GetSymbolsT5(ctx context.Context, dev gocan.Adapter, cb func(string)) (symbol.SymbolCollection, error) {
-	cl, err := gocan.NewClient(context.TODO(), dev)
+	cl, err := gocan.NewWithAdapter(context.TODO(), dev)
 	if err != nil {
 		return nil, err
 	}

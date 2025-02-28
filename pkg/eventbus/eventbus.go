@@ -159,7 +159,7 @@ func (e *Controller) handleSubscription(sub newSub) {
 }
 
 func (e *Controller) handleUnsubscription(unsub chan float64) {
-	e.subs.Range(func(key, value interface{}) bool {
+	e.subs.Range(func(key, value any) bool {
 		topic := key.(string)
 		subs := value.([]chan float64)
 		for i, sub := range subs {
@@ -186,7 +186,7 @@ func (e *Controller) Close() {
 
 func (e *Controller) cleanup() {
 	//e.cache.DeleteAll()
-	e.subs.Range(func(key, value interface{}) bool {
+	e.subs.Range(func(key, value any) bool {
 		subs := value.([]chan float64)
 		for _, sub := range subs {
 			close(sub)
@@ -215,8 +215,8 @@ func (e *Controller) Publish(topic string, data float64) error {
 	}
 }
 
-// SubscribeFunc returns a function that can be used to unsubscribe the function
-func (e *Controller) SubscribeFunc(topic string, fn func(float64)) (cancel func()) {
+// SubscribeFunc returns a cancel function is used to unsubscribe the function
+func (e *Controller) SubscribeFunc(topic string, fn func(float64)) func() {
 	// log.Println("SubscribeFunc", topic)
 	respChan := e.Subscribe(topic)
 	go func() {
@@ -226,11 +226,10 @@ func (e *Controller) SubscribeFunc(topic string, fn func(float64)) (cancel func(
 			})
 		}
 	}()
-	cancel = func() {
+	return func() {
 		// log.Println("UnsubscribeFunc", topic)
 		e.Unsubscribe(respChan)
 	}
-	return
 }
 
 func (e *Controller) Subscribe(topic string) chan float64 {

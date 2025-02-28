@@ -1,3 +1,7 @@
+# 2.0.7
+
+  - Added FTDI d2xx drivers which should autodetect OBDLink SX and EX. This driver will automatically set latency for you so no more fiddling in the device manager or Windows resetting it. Look for the drivers starting with "d2xx" to use the new one. The old VCP drivers are still available and will probably be dropped for the FTDI one in the future
+
 # 2.0.6
 
   - FINALLY fixed the cameras on the 3d mesh view. Now it behaves like any normal 3d software and is very intuitive to use. Mouse1, 2 & middle are the modifiers to use when dragging

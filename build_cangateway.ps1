@@ -12,4 +12,4 @@ $env:CC = "clang.exe"
 $env:CXX = "clang.exe"
 # go-winres simply --icon Icon.png --manifest gui
 # go build -tags="canusb,canlib,combi,j2534,kvaser" -ldflags '-s -w -H=windowsgui' ..\gocan\cangateway
-go build -tags="j2534" -ldflags '-s -w -H=windowsgui' ..\gocan\cangateway
+go build -tags="j2534" -ldflags '-s -w -H=windowsgui' ..\gocan\cmd\cangateway
