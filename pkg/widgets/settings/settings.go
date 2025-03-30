@@ -379,6 +379,10 @@ func New(cfg *Config) *SettingsWidget {
 		),
 	)))
 
+	tabs.Append(container.NewTabItem("Security", container.NewVBox(
+		widget.NewLabel("Security settings"),
+	)))
+
 	sw.mtxl = newImageFromResource("mtx-l")
 	sw.lc2 = newImageFromResource("lc-2")
 	sw.uego = newImageFromResource("uego")

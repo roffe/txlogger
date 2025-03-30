@@ -46,8 +46,9 @@ type InnerWindow struct {
 	OnMouseDown                                         func()                `json:"-"`
 	Icon                                                fyne.Resource
 
-	Persist    bool // Persist through layout changes
-	IgnoreSave bool // Ignore saving to layout
+	DisableResize bool // Allow resizing
+	Persist       bool // Persist through layout changes
+	IgnoreSave    bool // Ignore saving to layout
 
 	//minBtn, maxBtn, closeBtn *borderButton
 
@@ -217,12 +218,25 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 	w.bg = canvas.NewRectangle(th.Color(theme.ColorNameOverlayBackground, v))
 	contentBG := canvas.NewRectangle(th.Color(theme.ColorNameBackground, v))
 
-	leftCorner := newDraggableCorner(w, true)
-	rightCorner := newDraggableCorner(w, false)
+	var leftCorner, rightCorner *draggableCorner
 
-	objects := []fyne.CanvasObject{w.bg, contentBG, bar, w.content, leftCorner, rightCorner}
-	r := &innerWindowRenderer{ShadowingRenderer: NewShadowingRenderer(objects, DialogLevel),
-		win: w, bar: bar, buttons: []*borderButton{min, max, close}, bg: w.bg, leftCorner: leftCorner, rightCorner: rightCorner, contentBG: contentBG}
+	objects := []fyne.CanvasObject{w.bg, contentBG, bar, w.content}
+
+	if !w.DisableResize {
+		leftCorner = newDraggableCorner(w, true)
+		rightCorner = newDraggableCorner(w, false)
+		objects = append(objects, leftCorner, rightCorner)
+	}
+
+	r := &innerWindowRenderer{
+		ShadowingRenderer: NewShadowingRenderer(objects, DialogLevel),
+		win:               w,
+		bar:               bar,
+		buttons:           []*borderButton{min, max, close},
+		bg:                w.bg,
+		leftCorner:        leftCorner,
+		rightCorner:       rightCorner,
+		contentBG:         contentBG}
 	r.Layout(w.Size())
 	return r
 }
@@ -291,7 +305,9 @@ func (i *innerWindowRenderer) Layout(size fyne.Size) {
 	i.win.content.Resize(contentDimensions)
 
 	// Layout corners
-	i.layoutCorners(size, padding/2)
+	if !i.win.DisableResize {
+		i.layoutCorners(size, padding/2)
+	}
 }
 
 // Helper method to handle corner layout

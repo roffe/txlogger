@@ -1,14 +1,27 @@
-# 2.0.6
+# 2.0.8 
+
+- Added ESP calibration settings for T7. Found under "Calibration" in the menu
+- Updated to latest goCAN
+
+# 2.0.7 Zero conf drivers für alles
+
+The new FTDI d2xx driver has been implemented to leverage zero conf for several adapters.  
+The OBDLink SX & EX and CANUSB will be autodetected on startup and all you need to do is select the driver starting with "d2xx" in CAN settings. No more selecting ports or setting latency in device manager.
+
+  - Added FTDI d2xx driver
+  - fixed mouse panning in mesh viewer so it doesn't behave strange after you rotate the mesh
+
+# 2.0.6 3d updates baby
 
   - FINALLY fixed the cameras on the 3d mesh view. Now it behaves like any normal 3d software and is very intuitive to use. Mouse1, 2 & middle are the modifiers to use when dragging
   - 64 bit j2534 support added in gocan, Devices are prefixed "x64 J2534" and should be used if you see both 32-bit and 64-bit drivers for your adapter in the list
   - fixed a bug in the j2534 driver where 4 bytes would be appended to the can packages
 
-# 2.0.5
+# 2.0.5 CAN library rework
 
 - Rewrote large parts of the CAN library to pass along a pointer to a message instead of a interface with methods to lower cpu usage
 
-# 2.0.4
+# 2.0.4 CANUSB optimization
 
 - Added support for Lawicel CANUSB DLL. No more fiddling with VCP and latencies. required 64-bit DLL is included with txlogger.
 - Moved back all CAN communications except for J2534 DLL's to the main program to not incur performance pentaly of using cangateway when not necessary

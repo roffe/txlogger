@@ -26,7 +26,6 @@ import (
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/logfile"
-	"github.com/roffe/txlogger/pkg/mainmenu"
 	"github.com/roffe/txlogger/pkg/widgets/canflasher"
 	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
@@ -102,7 +101,7 @@ func (s *SecretText) MouseUp(e *desktop.MouseEvent) {
 type MainWindow struct {
 	fyne.Window
 	app             fyne.App
-	menu            *mainmenu.MainMenu
+	menu            *MainMenu
 	outputData      binding.StringList
 	selects         *mainWindowSelects
 	buttons         *mainWindowButtons

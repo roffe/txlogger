@@ -1,4 +1,4 @@
-package mainmenu
+package windows
 
 import (
 	"strings"
@@ -64,14 +64,16 @@ var T7SymbolsTuningOrder = []string{
 
 var T7SymbolsTuning = map[string][]string{
 	"Diagnostics": {
-		"KnkDetAdap.KnkCntMap",
+		"Firmware information",
 		"F_KnkDetAdap.FKnkCntMap",
 		"F_KnkDetAdap.RKnkCntMap",
+		"KnkDetAdap.KnkCntMap",
 		"MissfAdap.MissfCntMap",
 	},
 	"Calibration": {
 		"AirCompCal.PressMap",
 		"E85.X_EthAct_Tech2",
+		"ESP Calibration",
 		"MAFCal.m_RedundantAirMap",
 		"PedalMapCal.m_RequestMap",
 		"TCompCal.EnrFacE85Tab",
@@ -80,8 +82,8 @@ var T7SymbolsTuning = map[string][]string{
 		"VIOSMAFCal.Q_AirInletTab2",
 	},
 	"Injectors": {
-		"InjCorrCal.BattCorrTab",
 		"InjCorrCal.BattCorrSP",
+		"InjCorrCal.BattCorrTab",
 		"InjCorrCal.InjectorConst",
 	},
 	"Limiters": {
@@ -190,16 +192,16 @@ type MainMenu struct {
 	leading, trailing []*fyne.Menu
 	oneFunc           func(symbol.ECUType, string)
 	multiFunc         func(symbol.ECUType, ...string)
-	otherFunc         func(string)
+	funcMap           map[string]func(string)
 }
 
-func New(w fyne.Window, leading, trailing []*fyne.Menu, oneFunc func(symbol.ECUType, string), otherFunc func(string)) *MainMenu {
+func NewMenu(w fyne.Window, leading, trailing []*fyne.Menu, oneFunc func(symbol.ECUType, string), funcMap map[string]func(string)) *MainMenu {
 	return &MainMenu{
-		w:         w,
-		oneFunc:   oneFunc,
-		leading:   leading,
-		trailing:  trailing,
-		otherFunc: otherFunc,
+		w:        w,
+		oneFunc:  oneFunc,
+		leading:  leading,
+		trailing: trailing,
+		funcMap:  funcMap,
 	}
 }
 
@@ -228,13 +230,23 @@ func (mw *MainMenu) GetMenu(name string) *fyne.MainMenu {
 	for _, category := range order {
 		var items []*fyne.MenuItem
 		for _, mapName := range ecuM[category] {
-			if mapName == "Register EU0D" {
+			if f, ok := mw.funcMap[mapName]; ok {
 				itm := fyne.NewMenuItem(mapName, func() {
-					mw.otherFunc(mapName)
+					f(mapName)
 				})
 				items = append(items, itm)
 				continue
 			}
+
+			/*
+				if mapName == "Register EU0D" {
+					itm := fyne.NewMenuItem(mapName, func() {
+						mw.otherFunc(mapName)
+					})
+					items = append(items, itm)
+					continue
+				}
+			*/
 
 			if strings.Contains(mapName, "|") {
 				parts := strings.Split(mapName, "|")

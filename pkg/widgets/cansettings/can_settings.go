@@ -12,7 +12,6 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/adapter"
 	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/layout"
 )
@@ -209,7 +208,7 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 		canFilter = []uint32{0xC}
 		canRate = 615.384
 	case "T7":
-		if strings.HasPrefix(cs.adapterSelector.Selected, "STN") || strings.HasPrefix(cs.adapterSelector.Selected, "OBDLink") || strings.HasSuffix(cs.adapterSelector.Selected, "Wifi") {
+		if strings.Contains(cs.adapterSelector.Selected, "STN") || strings.Contains(cs.adapterSelector.Selected, "OBDLink") || strings.HasSuffix(cs.adapterSelector.Selected, "Wifi") {
 			canFilter = []uint32{0x238, 0x258, 0x270}
 		} else {
 			canFilter = []uint32{0x180, 0x1A0, 0x238, 0x258, 0x270, 0x280, 0x3A0, 0x664, 0x665}
@@ -217,7 +216,7 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 
 		canRate = 500
 	case "T8":
-		if strings.HasPrefix(cs.adapterSelector.Selected, "STN") || strings.HasPrefix(cs.adapterSelector.Selected, "OBDLink") {
+		if strings.Contains(cs.adapterSelector.Selected, "STN") || strings.Contains(cs.adapterSelector.Selected, "OBDLink") {
 			canFilter = []uint32{0x7e8}
 		} else {
 			canFilter = []uint32{0x180, 0x7e8, 0x664, 0x665}
@@ -229,8 +228,10 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 		minimumVersion = MinimumtxbridgeVersion
 	}
 
-	if strings.HasPrefix(cs.adapterSelector.Selected, "J2534") { // || strings.HasPrefix(cs.adapterSelector.Selected, "CANlib") { // || (strings.HasPrefix(cs.adapterSelector.Selected, "CANUSB ") && cs.adapterSelector.Selected != "CANUSB VCP") {
-		return adapter.NewClient(
+	gocan.ListAdapters()
+
+	if strings.HasPrefix(cs.adapterSelector.Selected, "J2534") || strings.HasPrefix(cs.adapterSelector.Selected, "CANlib") { // || (strings.HasPrefix(cs.adapterSelector.Selected, "CANUSB ") && cs.adapterSelector.Selected != "CANUSB VCP") {
+		return gocan.NewGWClient(
 			cs.adapterSelector.Selected,
 			&gocan.AdapterConfig{
 				Port:                   cs.portSelector.Selected,

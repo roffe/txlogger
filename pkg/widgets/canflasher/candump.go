@@ -38,7 +38,7 @@ func (t *CanFlasherWidget) ecuDump() {
 		fyne.Do(t.Disable)
 		defer fyne.Do(t.Enable)
 
-		c, err := gocan.NewClient(ctx, dev)
+		c, err := gocan.NewWithAdapter(ctx, dev)
 		if err != nil {
 			t.logValues.Append(err.Error())
 			return
