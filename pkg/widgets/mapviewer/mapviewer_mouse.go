@@ -149,11 +149,15 @@ func (mv *MapViewer) calculateCellDimensions() (float32, float32) {
 // calculateSelectionBounds computes the bounding box of the selection area.
 func (mv *MapViewer) calculateSelectionBounds(eventPos fyne.Position) (int, int) {
 	cellWidth, cellHeight := mv.calculateCellDimensions()
-	xAxisOffset := mv.yAxisLabelContainer.Size().Width + (theme.Padding() * 2)
-	yAxisOffset := mv.xAxisLabelContainer.Size().Height + (theme.Padding() * 2)
+	//xAxisOffset := mv.yAxisLabelContainer.Size().Width
+	//yAxisOffset := mv.xAxisLabelContainer.Size().Height
 
-	nselectedX := max(0, min(int(eventPos.X-xAxisOffset)/int(cellWidth), mv.numColumns-1))
-	nSelectedY := max(0, min(mv.numRows-int(eventPos.Y-yAxisOffset)/int(cellHeight)-1, mv.numRows-1))
+	// Adjust for inner view position relative to the parent container
+	// This accounts for any extra padding or layout adjustments
+	innerViewPos := mv.innerView.Position()
+
+	nselectedX := max(0, min(int((eventPos.X-innerViewPos.X))/int(cellWidth), mv.numColumns-1))
+	nSelectedY := max(0, min(mv.numRows-int((eventPos.Y-innerViewPos.Y))/int(cellHeight)-1, mv.numRows-1))
 
 	return nselectedX, nSelectedY
 }

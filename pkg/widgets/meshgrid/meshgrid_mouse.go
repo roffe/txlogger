@@ -65,7 +65,7 @@ func (m *Meshgrid) MouseMoved(event *desktop.MouseEvent) {
 	} else if event.Button&desktop.MouseButtonTertiary == desktop.MouseButtonTertiary {
 		// Tertiary button (middle): control panning
 		// Swap left-right direction by negating dx
-		m.panMeshgrid(-dx*panScale, dy*1.4)
+		m.panMeshgrid(dx*panScale, dy*panScale)
 		m.throttledRefresh()
 	}
 
@@ -90,46 +90,8 @@ func (m *Meshgrid) Scrolled(event *fyne.ScrollEvent) {
 	m.throttledRefresh()
 }
 
-// New method to handle panning in screen space
 func (m *Meshgrid) panMeshgrid(dx, dy float64) {
-	// For screen-space panning, we need to determine what a horizontal/vertical
-	// screen movement means in the 3D world space
-
-	// First, establish our screen-space directions
-	screenRight := [3]float64{1, 0, 0}
-	screenUp := [3]float64{0, -1, 0} // Screen y is down, so up is negative
-
-	// Project these directions into 3D world space using the camera's inverse transform
-	// For orthographic projection, we can use the camera's rotation matrix
-	// to convert from screen space to world space
-
-	// Get the camera's current orientation (rotation) matrix
-	viewMatrix := m.cameraRotation
-
-	// Create a simple inverse by transposing (this works for rotation matrices)
-	inverseView := transposeMatrix(viewMatrix)
-
-	// Transform screen directions to world space
-	worldRight := inverseView.MultiplyVector(screenRight)
-	worldUp := inverseView.MultiplyVector(screenUp)
-
-	// Apply the movement in world space
-	for i := range m.cameraPosition {
-		m.cameraPosition[i] += worldRight[i] * dx
-		m.cameraPosition[i] += worldUp[i] * dy
-	}
-
-	// Update all vertex positions based on the new camera
+	m.cameraPosition[0] -= dx * panScale // X axis (left/right)
+	m.cameraPosition[1] -= dy * panScale // Y axis (up/down)
 	m.updateVertexPositions()
-}
-
-// Helper function to transpose a 3x3 matrix
-func transposeMatrix(m Matrix3x3) Matrix3x3 {
-	var result Matrix3x3
-	for i := range 3 {
-		for j := range 3 {
-			result[i][j] = m[j][i]
-		}
-	}
-	return result
 }

@@ -466,6 +466,15 @@ func CalcKey(seed int, method int) int {
 	return key
 }
 
+func CalcKeyCustom(seed int, xor, minus int) int {
+	key := seed << 2
+	key &= 0xFFFF
+	key ^= xor
+	key -= minus
+	key &= 0xFFFF
+	return key
+}
+
 func (t *Client) splitRequest(payload []byte, responseRequired bool) []*gocan.CANFrame {
 	chunkSize := 6
 	msgCount := (len(payload) + chunkSize - 1) / chunkSize

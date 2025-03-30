@@ -228,7 +228,9 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 		minimumVersion = MinimumtxbridgeVersion
 	}
 
-	if strings.HasPrefix(cs.adapterSelector.Selected, "J2534") { // || strings.HasPrefix(cs.adapterSelector.Selected, "CANlib") { // || (strings.HasPrefix(cs.adapterSelector.Selected, "CANUSB ") && cs.adapterSelector.Selected != "CANUSB VCP") {
+	gocan.ListAdapters()
+
+	if strings.HasPrefix(cs.adapterSelector.Selected, "J2534") || strings.HasPrefix(cs.adapterSelector.Selected, "CANlib") { // || (strings.HasPrefix(cs.adapterSelector.Selected, "CANUSB ") && cs.adapterSelector.Selected != "CANUSB VCP") {
 		return gocan.NewGWClient(
 			cs.adapterSelector.Selected,
 			&gocan.AdapterConfig{

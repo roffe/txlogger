@@ -13,21 +13,21 @@ import (
 	"fyne.io/fyne/v2/theme"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/ebus"
-	"github.com/roffe/txlogger/pkg/mainmenu"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmmod"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmstatus"
+	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7esp"
+	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7fwinfo"
 	"github.com/roffe/txlogger/pkg/widgets/txupdater"
 	// "github.com/skratchdot/open-golang/open"
 )
 
 func (mw *MainWindow) setupMenu() {
-	otherFunc := func(str string) {
-		switch str {
-		case "Register EU0D":
+	funcMap := map[string]func(string){
+		"Register EU0D": func(str string) {
 			if w := mw.wm.HasWindow("Register EU0D"); w != nil {
 				mw.wm.Raise(w)
 				return
@@ -35,7 +35,34 @@ func (mw *MainWindow) setupMenu() {
 			inner := multiwindow.NewInnerWindow("Register EU0D", NewMyrtilosRegistration(mw))
 			inner.Icon = theme.InfoIcon()
 			mw.wm.Add(inner)
-		}
+		},
+		"ESP Calibration": func(str string) {
+			if w := mw.wm.HasWindow("ESP Calibration selection"); w != nil {
+				mw.wm.Raise(w)
+				return
+			}
+			if t, ok := mw.fw.(*symbol.T7File); ok {
+				esp := t7esp.New(mw.filename, t)
+				inner := multiwindow.NewInnerWindow("ESP Calibration selection", esp)
+				inner.Icon = theme.InfoIcon()
+				inner.DisableResize = true
+				mw.wm.Add(inner)
+			} else {
+				mw.Error(errors.New("not a T7 file"))
+			}
+		},
+		"Firmware information": func(str string) {
+			if w := mw.wm.HasWindow("Firmware info"); w != nil {
+				mw.wm.Raise(w)
+				return
+			}
+			if t, ok := mw.fw.(*symbol.T7File); ok {
+				fwinfo := t7fwinfo.New(t)
+				inner := multiwindow.NewInnerWindow("Firmware info", fwinfo)
+				inner.Icon = theme.InfoIcon()
+				mw.wm.Add(inner)
+			}
+		},
 	}
 
 	leading := []*fyne.Menu{
@@ -109,7 +136,7 @@ func (mw *MainWindow) setupMenu() {
 		),
 	}
 
-	mw.menu = mainmenu.New(mw, leading, trailing, mw.openMap, otherFunc)
+	mw.menu = NewMenu(mw, leading, trailing, mw.openMap, funcMap)
 }
 
 func (mw *MainWindow) loadBinary() {
@@ -375,11 +402,13 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	var cancelFuncs []func()
 	if axis.XFrom != "" {
 		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.XFrom, func(value float64) {
+			// log.Printf("set %s %f", axis.XFrom, value)
 			mv.SetX(value)
 		}))
 	}
 	if axis.YFrom != "" {
 		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.YFrom, func(value float64) {
+			// log.Printf("set %s %f", axis.YFrom, value)
 			mv.SetY(value)
 		}))
 	}
