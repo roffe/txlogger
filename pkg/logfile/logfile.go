@@ -11,7 +11,7 @@ type Logfile interface {
 	Get() Record
 	Next() Record
 	Prev() Record
-	Seek(int) Record
+	Seek(int)
 	Pos() int
 	Len() int
 	Start() time.Time

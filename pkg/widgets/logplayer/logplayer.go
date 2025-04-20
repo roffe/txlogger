@@ -393,14 +393,15 @@ func (l *Logplayer) playLog() {
 			case OpPlaybackSpeed:
 				speedMultiplier = op.Rate
 			case OpSeek:
-				// log.Println("Seeking to", op.Pos)
 				l.logFile.Seek(op.Pos)
 				if rec := l.logFile.Get(); !rec.EOF {
+					l.objs.positionSlider.Value = float64(op.Pos)
+
 					if f := l.cfg.TimeSetter; f != nil {
 						f(rec.Time)
 					}
 					if l.state == statePlaying {
-						timer.Reset(10 * time.Millisecond)
+						timer.Reset(0)
 					} else {
 						for k, v := range rec.Values {
 							if err := l.cfg.EBus.Publish(k, v); err != nil {

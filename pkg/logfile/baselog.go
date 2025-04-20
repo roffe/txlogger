@@ -12,7 +12,7 @@ type BaseLogfile struct {
 }
 
 func (l *BaseLogfile) Get() Record {
-	return l.records[l.pos]
+	return l.records[max(l.pos, 0)]
 }
 
 // Next returns the current record and advances the position to the next record.
@@ -39,15 +39,14 @@ func (l *BaseLogfile) Prev() Record {
 	return l.records[l.pos]
 }
 
-func (l *BaseLogfile) Seek(pos int) Record {
+func (l *BaseLogfile) Seek(pos int) {
 	l.pos = pos
 	if l.pos >= l.end {
 		l.pos = l.end
 	}
 	if l.pos < 0 {
-		l.pos = 0
+		l.pos = -1
 	}
-	return l.records[l.pos]
 }
 
 func (l *BaseLogfile) Pos() int {

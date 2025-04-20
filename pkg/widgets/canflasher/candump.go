@@ -3,6 +3,7 @@ package canflasher
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -29,7 +30,21 @@ func (t *CanFlasherWidget) ecuDump() {
 	filename = addSuffix(filename, ".bin")
 	t.progressBar.SetValue(0)
 
+	done := make(chan struct{})
+
 	go func() {
+		for {
+			select {
+			case err := <-dev.Err():
+				log.Println("Error:", err)
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	go func() {
+		defer close(done)
 		ctx, cancel := context.WithTimeout(context.Background(), 900*time.Second)
 		defer cancel()
 

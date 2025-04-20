@@ -24,9 +24,11 @@ foreach ($path in $winrarPaths) {
     }
 }
 
+$zipfile = "txlogger_beta.zip"
+
 if ($winrarExe) {
     # Create archive command
-    $argz = "a -afzip `"txlogger_beta.zip`" $($files -join ' ')"
+    $argz = "a -afzip $zipfile $($files -join ' ')"
     
     # Execute WinRAR
     Start-Process -FilePath $winrarExe -ArgumentList $argz -NoNewWindow -Wait

@@ -528,6 +528,30 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.ReadCloser, p fyne.Posit
 		EBus:    ebus.CONTROLLER,
 		Logfile: logz,
 	})
+	/*
+		content := container.NewBorder(
+			container.NewHBox(
+				widget.NewButton("Lambda", func() {
+
+					mv, err := mapviewer.New(
+						mapviewer.WithAxisLabels("RPM", "Airmass", "Lambda"),
+					)
+					if err != nil {
+						mw.Error(fmt.Errorf("failed to create mapviewer: %w", err))
+						return
+					}
+
+					iw := multiwindow.NewInnerWindow("Lambda feedback", mv)
+					iw.Icon = theme.InfoIcon()
+
+				}),
+			),
+			nil,
+			nil,
+			nil,
+			lp,
+		)
+	*/
 	iw := multiwindow.NewSystemWindow(fp, lp)
 	iw.Icon = theme.MediaPlayIcon()
 

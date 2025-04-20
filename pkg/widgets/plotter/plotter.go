@@ -311,7 +311,7 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 	case "ActualIn.T_Engine", "ActualIn.T_AirInlet":
 		ts.Min = -20
 		ts.Max = 120
-	case "m_Request", "MAF.m_AirInlet", "AirMassMast.m_Request":
+	case "m_Request", "MAF.m_AirInlet", "AirMassMast.m_Request", "MAF.m_AirFromp_AirInlet":
 		ts.Min = 0
 		ts.Max = 2200
 	case "ActualIn.p_AirInlet", "In.p_AirInlet", "ActualIn.p_AirBefThrottle", "In.p_AirBefThrottle":

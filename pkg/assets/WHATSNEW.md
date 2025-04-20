@@ -1,3 +1,9 @@
+# 2.0.9
+
+- Set min/max values for MAF.m_AirFromp_AirInlet to match other airmass values in the plotter
+- fix bug when using page up and down would not advance more than one step in logplayer
+- added setting to use AD Scanner as ECU lambda source
+
 # 2.0.8 
 
 - Added ESP calibration settings for T7. Found under "Calibration" in the menu

@@ -41,6 +41,7 @@ const (
 	prefsmaximumVoltageWideband = "maximumVoltageWideband"
 	prefslowAFR                 = "lowAFR"
 	prefshighAFR                = "highAFR"
+	prefsUseADScanner           = "useADScanner"
 )
 
 type SettingsWidget struct {
@@ -63,11 +64,11 @@ type SettingsWidget struct {
 	container             *container.AppTabs
 
 	// WBL Specific
+	wblADscanner                *widget.Check
 	wblSource                   *widget.Select
 	wblPortLabel                *widget.Label
 	wblPortSelect               *widget.Select
 	wblPortRefreshButton        *widget.Button
-	warningLabel                *widget.Label
 	minimumVoltageWidebandLabel *widget.Label
 	minimumVoltageWidebandEntry *widget.Entry
 	maximumVoltageWidebandLabel *widget.Label
@@ -104,6 +105,9 @@ func (sw *SettingsWidget) GetWidebandSymbolName() string {
 		case "T5":
 			return "AD_EGR"
 		case "T7":
+			if sw.wblADscanner.Checked {
+				return "DisplProt.AD_Scanner"
+			}
 			return "DisplProt.LambdaScanner"
 		case "T8":
 			return "LambdaScan.LambdaScanner"
@@ -238,8 +242,6 @@ func New(cfg *Config) *SettingsWidget {
 		sw.wblPortSelect.Options = append([]string{"txbridge", "CAN"}, sw.CanSettings.ListPorts()...)
 		sw.wblPortSelect.Refresh()
 	})
-
-	sw.warningLabel = widget.NewLabel("The settings below ONLY applies to T5")
 
 	sw.minimumVoltageWidebandLabel = widget.NewLabel("Minimum voltage")
 	sw.minimumVoltageWidebandEntry = widget.NewEntry()
@@ -379,9 +381,9 @@ func New(cfg *Config) *SettingsWidget {
 		),
 	)))
 
-	tabs.Append(container.NewTabItem("Security", container.NewVBox(
-		widget.NewLabel("Security settings"),
-	)))
+	//tabs.Append(container.NewTabItem("Security", container.NewVBox(
+	//	widget.NewLabel("Security settings"),
+	//)))
 
 	sw.mtxl = newImageFromResource("mtx-l")
 	sw.lc2 = newImageFromResource("lc-2")
@@ -391,13 +393,20 @@ func New(cfg *Config) *SettingsWidget {
 	sw.plx = newImageFromResource("plx")
 
 	wblSel := sw.newWBLSelector()
+	sw.wblADscanner = sw.newADscannerCheck()
 
 	tabs.Append(container.NewTabItem("WBL", container.NewVBox(
 		container.NewHBox(
 			layout.NewSpacer(), sw.mtxl, sw.lc2, sw.uego, sw.lambdatocan, sw.t7, sw.plx, layout.NewSpacer(),
 		),
 		wblSel,
-		sw.warningLabel,
+		container.NewBorder(
+			nil,
+			nil,
+			nil,
+			nil,
+			sw.wblADscanner,
+		),
 		container.NewBorder(
 			nil,
 			nil,
@@ -569,17 +578,19 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 		}
 
 		if ecuSet {
-			sw.warningLabel.Show()
-			sw.minimumVoltageWidebandLabel.Show()
-			sw.maximumVoltageWidebandLabel.Show()
-			sw.lowAFRLabel.Show()
-			sw.highAFRLabel.Show()
-			sw.minimumVoltageWidebandEntry.Show()
-			sw.maximumVoltageWidebandEntry.Show()
-			sw.lowAFREntry.Show()
-			sw.highAFREntry.Show()
+			sw.wblADscanner.Show()
+			if sw.wblADscanner.Checked {
+				sw.minimumVoltageWidebandLabel.Show()
+				sw.maximumVoltageWidebandLabel.Show()
+				sw.lowAFRLabel.Show()
+				sw.highAFRLabel.Show()
+				sw.minimumVoltageWidebandEntry.Show()
+				sw.maximumVoltageWidebandEntry.Show()
+				sw.lowAFREntry.Show()
+				sw.highAFREntry.Show()
+			}
 		} else {
-			sw.warningLabel.Hide()
+			sw.wblADscanner.Hide()
 			sw.minimumVoltageWidebandLabel.Hide()
 			sw.maximumVoltageWidebandLabel.Hide()
 			sw.lowAFRLabel.Hide()
@@ -611,6 +622,31 @@ func (sw *SettingsWidget) newFreqSlider() *widget.Slider {
 		fyne.CurrentApp().Preferences().SetInt(prefsFreq, int(f))
 	}
 	return slider
+}
+
+func (sw *SettingsWidget) newADscannerCheck() *widget.Check {
+	return widget.NewCheck("use AD Scanner (don't forget to add symbol)", func(b bool) {
+		fyne.CurrentApp().Preferences().SetBool(prefsUseADScanner, b)
+		if b {
+			sw.minimumVoltageWidebandLabel.Show()
+			sw.maximumVoltageWidebandLabel.Show()
+			sw.lowAFRLabel.Show()
+			sw.highAFRLabel.Show()
+			sw.minimumVoltageWidebandEntry.Show()
+			sw.maximumVoltageWidebandEntry.Show()
+			sw.lowAFREntry.Show()
+			sw.highAFREntry.Show()
+		} else {
+			sw.minimumVoltageWidebandLabel.Hide()
+			sw.maximumVoltageWidebandLabel.Hide()
+			sw.lowAFRLabel.Hide()
+			sw.highAFRLabel.Hide()
+			sw.minimumVoltageWidebandEntry.Hide()
+			sw.maximumVoltageWidebandEntry.Hide()
+			sw.lowAFREntry.Hide()
+			sw.highAFREntry.Hide()
+		}
+	})
 }
 
 func (sw *SettingsWidget) newMeshView() *widget.Check {
@@ -679,6 +715,7 @@ func (sw *SettingsWidget) loadPrefs() {
 	sw.logFormat.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogFormat, "TXL"))
 	sw.logPath.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogPath, datalogger.LOGPATH))
 	sw.wblSource.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLambdaSource, "None"))
+	sw.wblADscanner.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsUseADScanner, false))
 	sw.useMPH.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsUseMPH, false))
 	sw.swapRPMandSpeed.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsSwapRPMandSpeed, false))
 	sw.plotResolution.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsPlotResolution, "Full"))
@@ -687,6 +724,26 @@ func (sw *SettingsWidget) loadPrefs() {
 	sw.maximumVoltageWidebandEntry.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefsmaximumVoltageWideband, "5.0"))
 	sw.lowAFREntry.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefslowAFR, "0.5"))
 	sw.highAFREntry.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefshighAFR, "1.5"))
+
+	if sw.wblADscanner.Checked {
+		sw.minimumVoltageWidebandLabel.Show()
+		sw.maximumVoltageWidebandLabel.Show()
+		sw.lowAFRLabel.Show()
+		sw.highAFRLabel.Show()
+		sw.minimumVoltageWidebandEntry.Show()
+		sw.maximumVoltageWidebandEntry.Show()
+		sw.lowAFREntry.Show()
+		sw.highAFREntry.Show()
+	} else {
+		sw.minimumVoltageWidebandLabel.Hide()
+		sw.maximumVoltageWidebandLabel.Hide()
+		sw.lowAFRLabel.Hide()
+		sw.highAFRLabel.Hide()
+		sw.minimumVoltageWidebandEntry.Hide()
+		sw.maximumVoltageWidebandEntry.Hide()
+		sw.lowAFREntry.Hide()
+		sw.highAFREntry.Hide()
+	}
 
 }
 

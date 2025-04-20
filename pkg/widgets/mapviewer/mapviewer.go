@@ -99,8 +99,6 @@ type MapViewer struct {
 	heightFactor float32
 
 	OnMouseDown func()
-
-	updateChan chan float64
 }
 
 type opts struct {
@@ -127,7 +125,6 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 			saveECUFunc:   func(data []float64) {},
 			updateECUFunc: func(idx int, value []float64) {},
 		},
-		updateChan: make(chan float64, 10),
 	}
 	mv.ExtendBaseWidget(mv)
 
@@ -194,13 +191,6 @@ func (mv *MapViewer) Dragged(ev *fyne.DragEvent) {
 func (mv *MapViewer) DragEnd() {}
 
 func (mv *MapViewer) CreateRenderer() fyne.WidgetRenderer {
-	go func() {
-		for msg := range mv.updateChan {
-			mv.setY(msg)
-		}
-		log.Println("MapViewer updateChan closed")
-	}()
-
 	mv.content = mv.render()
 	return widget.NewSimpleRenderer(mv.content)
 	//return &mapViewerRenderer{mv: mv}
@@ -368,15 +358,17 @@ func (mv *MapViewer) SetX(xValue float64) {
 	mv.xValue = xValue
 }
 
-func (mv *MapViewer) SetY(yValue float64) {
+/*
+func (mv *MapViewer) SetY2(yValue float64) {
 	select {
 	case mv.updateChan <- yValue:
 	default:
 		log.Println("MapViewer updateChan full")
 	}
 }
+*/
 
-func (mv *MapViewer) setY(yValue float64) {
+func (mv *MapViewer) SetY(yValue float64) {
 	mv.yValue = yValue
 	if mv.crosshair.Hidden {
 		size := fyne.Size{Width: mv.widthFactor, Height: mv.heightFactor}
