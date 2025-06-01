@@ -44,7 +44,12 @@ const (
 	prefsUseADScanner           = "useADScanner"
 )
 
-type SettingsWidget struct {
+type SettingsWidgetInterface interface {
+	Get(key string) (string, error)
+	Widget() fyne.Widget
+}
+
+type Widget struct {
 	cfg *Config
 
 	CanSettings           *cansettings.Widget
@@ -83,22 +88,26 @@ type SettingsWidget struct {
 	lowAFR                 float64
 	highAFR                float64
 
-	//images
-	mtxl        *canvas.Image
-	lc2         *canvas.Image
-	uego        *canvas.Image
-	lambdatocan *canvas.Image
-	t7          *canvas.Image
-	plx         *canvas.Image
+	wblImage *canvas.Image
+
+	images struct {
+		mtxl        *canvas.Image
+		lc2         *canvas.Image
+		uego        *canvas.Image
+		lambdatocan *canvas.Image
+		t7          *canvas.Image
+		plx         *canvas.Image
+		combi       *canvas.Image
+	}
 
 	widget.BaseWidget
 }
 
-func (sw *SettingsWidget) GetWidebandType() string {
+func (sw *Widget) GetWidebandType() string {
 	return sw.wblSource.Selected
 }
 
-func (sw *SettingsWidget) GetWidebandSymbolName() string {
+func (sw *Widget) GetWidebandSymbolName() string {
 	switch sw.wblSource.Selected {
 	case "ECU":
 		switch sw.cfg.GetEcu() {
@@ -114,74 +123,74 @@ func (sw *SettingsWidget) GetWidebandSymbolName() string {
 		default:
 			return "None"
 		}
-	case ecumaster.ProductString, innovate.ProductString, aem.ProductString, plx.ProductString:
+	case ecumaster.ProductString, innovate.ProductString, aem.ProductString, plx.ProductString, "CombiAdapter":
 		return datalogger.EXTERNALWBLSYM // Lambda.External
 	default:
 		return "None"
 	}
 }
 
-func (sw *SettingsWidget) GetWidebandPort() string {
+func (sw *Widget) GetWidebandPort() string {
 	return sw.wblPortSelect.Selected
 }
 
-func (sw *SettingsWidget) GetMinimumVoltageWideband() float64 {
+func (sw *Widget) GetMinimumVoltageWideband() float64 {
 	return sw.minimumVoltageWideband
 }
 
-func (sw *SettingsWidget) GetMaximumVoltageWideband() float64 {
+func (sw *Widget) GetMaximumVoltageWideband() float64 {
 	return sw.maximumVoltageWideband
 }
 
-func (sw *SettingsWidget) GetLowAFR() float64 {
+func (sw *Widget) GetLowAFR() float64 {
 	return sw.lowAFR
 }
 
-func (sw *SettingsWidget) GetHighAFR() float64 {
+func (sw *Widget) GetHighAFR() float64 {
 	return sw.highAFR
 }
 
-func (sw *SettingsWidget) GetFreq() int {
+func (sw *Widget) GetFreq() int {
 	return int(sw.freqSlider.Value)
 }
 
-func (sw *SettingsWidget) GetAutoSave() bool {
+func (sw *Widget) GetAutoSave() bool {
 	return sw.autoSave.Checked
 }
 
-func (sw *SettingsWidget) GetAutoLoad() bool {
+func (sw *Widget) GetAutoLoad() bool {
 	return sw.autoLoad.Checked
 }
 
-func (sw *SettingsWidget) GetLivePreview() bool {
+func (sw *Widget) GetLivePreview() bool {
 	return sw.livePreview.Checked
 }
 
-func (sw *SettingsWidget) GetRealtimeBars() bool {
+func (sw *Widget) GetRealtimeBars() bool {
 	return sw.realtimeBars.Checked
 }
 
-func (sw *SettingsWidget) GetMeshView() bool {
+func (sw *Widget) GetMeshView() bool {
 	return sw.meshView.Checked
 }
 
-func (sw *SettingsWidget) GetLogFormat() string {
+func (sw *Widget) GetLogFormat() string {
 	return sw.logFormat.Selected
 }
 
-func (sw *SettingsWidget) GetLogPath() string {
+func (sw *Widget) GetLogPath() string {
 	return sw.logPath.Text
 }
 
-func (sw *SettingsWidget) GetUseMPH() bool {
+func (sw *Widget) GetUseMPH() bool {
 	return sw.useMPH.Checked
 }
 
-func (sw *SettingsWidget) GetSwapRPMandSpeed() bool {
+func (sw *Widget) GetSwapRPMandSpeed() bool {
 	return sw.swapRPMandSpeed.Checked
 }
 
-func (sw *SettingsWidget) GetPlotResolution() float32 {
+func (sw *Widget) GetPlotResolution() float32 {
 	switch sw.plotResolution.Selected {
 	case "Full":
 		return 1
@@ -194,7 +203,7 @@ func (sw *SettingsWidget) GetPlotResolution() float32 {
 	}
 }
 
-func (sw *SettingsWidget) GetCursorFollowCrosshair() bool {
+func (sw *Widget) GetCursorFollowCrosshair() bool {
 	return sw.cursorFollowCrosshair.Checked
 }
 
@@ -203,8 +212,8 @@ type Config struct {
 	GetEcu func() string
 }
 
-func New(cfg *Config) *SettingsWidget {
-	sw := &SettingsWidget{
+func New(cfg *Config) *Widget {
+	sw := &Widget{
 		cfg: cfg,
 	}
 	sw.ExtendBaseWidget(sw)
@@ -385,19 +394,31 @@ func New(cfg *Config) *SettingsWidget {
 	//	widget.NewLabel("Security settings"),
 	//)))
 
-	sw.mtxl = newImageFromResource("mtx-l")
-	sw.lc2 = newImageFromResource("lc-2")
-	sw.uego = newImageFromResource("uego")
-	sw.lambdatocan = newImageFromResource("lambdatocan")
-	sw.t7 = newImageFromResource("t7")
-	sw.plx = newImageFromResource("plx")
+	sw.images.mtxl = newImageFromResource("mtx-l")
+	sw.images.lc2 = newImageFromResource("lc-2")
+	sw.images.uego = newImageFromResource("uego")
+	sw.images.lambdatocan = newImageFromResource("lambdatocan")
+	sw.images.t7 = newImageFromResource("t7")
+	sw.images.plx = newImageFromResource("plx")
+	sw.images.combi = newImageFromResource("combi")
 
 	wblSel := sw.newWBLSelector()
 	sw.wblADscanner = sw.newADscannerCheck()
 
+	sw.wblImage = &canvas.Image{}
+
 	tabs.Append(container.NewTabItem("WBL", container.NewVBox(
 		container.NewHBox(
-			layout.NewSpacer(), sw.mtxl, sw.lc2, sw.uego, sw.lambdatocan, sw.t7, sw.plx, layout.NewSpacer(),
+			layout.NewSpacer(),
+			sw.images.mtxl,
+			sw.images.lc2,
+			sw.images.uego,
+			sw.images.lambdatocan,
+			sw.images.t7,
+			sw.images.plx,
+			sw.images.combi,
+			//sw.wblImage,
+			layout.NewSpacer(),
 		),
 		wblSel,
 		container.NewBorder(
@@ -489,6 +510,9 @@ func newImageFromResource(name string) *canvas.Image {
 	case "plx":
 		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.PLXSMAFR))
 		img.SetMinSize(fyne.NewSize(470, 224))
+	case "combi":
+		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.CombiV2))
+		img.SetMinSize(fyne.NewSize(360, 245))
 	}
 	img.FillMode = canvas.ImageFillContain
 	img.ScaleMode = canvas.ImageScaleFastest
@@ -496,13 +520,13 @@ func newImageFromResource(name string) *canvas.Image {
 	return img
 }
 
-func (sw *SettingsWidget) newLogFormat() *widget.Select {
+func (sw *Widget) newLogFormat() *widget.Select {
 	return widget.NewSelect([]string{"CSV", "TXL"}, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsLogFormat, s)
 	})
 }
 
-func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
+func (sw *Widget) newWBLSelector() *fyne.Container {
 	sw.wblSource = widget.NewSelect([]string{
 		"None",
 		"ECU",
@@ -510,6 +534,7 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 		innovate.ProductString,
 		aem.ProductString,
 		plx.ProductString,
+		"CombiAdapter",
 	}, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsLambdaSource, s)
 		fyne.CurrentApp().Preferences().SetString(prefsWidebandSymbolName, sw.GetWidebandSymbolName())
@@ -517,53 +542,68 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 		var portSelect bool
 		switch s {
 		case "ECU":
-			sw.mtxl.Hide()
-			sw.lc2.Hide()
-			sw.uego.Hide()
-			sw.lambdatocan.Hide()
-			sw.t7.Show()
-			sw.plx.Hide()
+			sw.images.mtxl.Hide()
+			sw.images.lc2.Hide()
+			sw.images.uego.Hide()
+			sw.images.lambdatocan.Hide()
+			sw.images.t7.Show()
+			sw.images.plx.Hide()
+			sw.images.combi.Hide()
 			ecuSet = true
 			portSelect = false
 		case ecumaster.ProductString:
-			sw.mtxl.Hide()
-			sw.lc2.Hide()
-			sw.uego.Hide()
-			sw.lambdatocan.Show()
-			sw.t7.Hide()
-			sw.plx.Hide()
+			sw.images.mtxl.Hide()
+			sw.images.lc2.Hide()
+			sw.images.uego.Hide()
+			sw.images.lambdatocan.Show()
+			sw.images.t7.Hide()
+			sw.images.plx.Hide()
+			sw.images.combi.Hide()
 			portSelect = false
 		case innovate.ProductString:
-			sw.mtxl.Show()
-			sw.lc2.Show()
-			sw.uego.Hide()
-			sw.lambdatocan.Hide()
-			sw.t7.Hide()
-			sw.plx.Hide()
+			sw.images.mtxl.Show()
+			sw.images.lc2.Show()
+			sw.images.uego.Hide()
+			sw.images.lambdatocan.Hide()
+			sw.images.t7.Hide()
+			sw.images.plx.Hide()
+			sw.images.combi.Hide()
 			portSelect = true
 		case aem.ProductString:
-			sw.mtxl.Hide()
-			sw.lc2.Hide()
-			sw.uego.Show()
-			sw.lambdatocan.Hide()
-			sw.t7.Hide()
-			sw.plx.Hide()
+			sw.images.mtxl.Hide()
+			sw.images.lc2.Hide()
+			sw.images.uego.Show()
+			sw.images.lambdatocan.Hide()
+			sw.images.t7.Hide()
+			sw.images.plx.Hide()
+			sw.images.combi.Hide()
 			portSelect = true
 		case plx.ProductString:
-			sw.mtxl.Hide()
-			sw.lc2.Hide()
-			sw.uego.Hide()
-			sw.lambdatocan.Hide()
-			sw.t7.Hide()
-			sw.plx.Show()
+			sw.images.mtxl.Hide()
+			sw.images.lc2.Hide()
+			sw.images.uego.Hide()
+			sw.images.lambdatocan.Hide()
+			sw.images.t7.Hide()
+			sw.images.plx.Show()
+			sw.images.combi.Hide()
 			portSelect = true
+		case "CombiAdapter":
+			sw.images.mtxl.Hide()
+			sw.images.lc2.Hide()
+			sw.images.uego.Hide()
+			sw.images.lambdatocan.Hide()
+			sw.images.t7.Hide()
+			sw.images.plx.Hide()
+			sw.images.combi.Show()
+			portSelect = false
 		default:
-			sw.mtxl.Hide()
-			sw.lc2.Hide()
-			sw.uego.Hide()
-			sw.lambdatocan.Hide()
-			sw.t7.Hide()
-			sw.plx.Hide()
+			sw.images.mtxl.Hide()
+			sw.images.lc2.Hide()
+			sw.images.uego.Hide()
+			sw.images.lambdatocan.Hide()
+			sw.images.t7.Hide()
+			sw.images.plx.Hide()
+			sw.images.combi.Hide()
 			portSelect = false
 		}
 
@@ -577,7 +617,7 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 			sw.wblPortRefreshButton.Hide()
 		}
 
-		if ecuSet {
+		if ecuSet || s == "CombiAdapter" {
 			sw.wblADscanner.Show()
 			if sw.wblADscanner.Checked {
 				sw.minimumVoltageWidebandLabel.Show()
@@ -612,7 +652,7 @@ func (sw *SettingsWidget) newWBLSelector() *fyne.Container {
 	)
 }
 
-func (sw *SettingsWidget) newFreqSlider() *widget.Slider {
+func (sw *Widget) newFreqSlider() *widget.Slider {
 	slider := widget.NewSlider(5, 300)
 	slider.Step = 5
 	slider.OnChanged = func(f float64) {
@@ -624,7 +664,7 @@ func (sw *SettingsWidget) newFreqSlider() *widget.Slider {
 	return slider
 }
 
-func (sw *SettingsWidget) newADscannerCheck() *widget.Check {
+func (sw *Widget) newADscannerCheck() *widget.Check {
 	return widget.NewCheck("use AD Scanner (don't forget to add symbol)", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsUseADScanner, b)
 		if b {
@@ -649,61 +689,61 @@ func (sw *SettingsWidget) newADscannerCheck() *widget.Check {
 	})
 }
 
-func (sw *SettingsWidget) newMeshView() *widget.Check {
+func (sw *Widget) newMeshView() *widget.Check {
 	return widget.NewCheck("3D Mesh on map viewing", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsMeshView, b)
 	})
 }
 
-func (sw *SettingsWidget) newAutoUpdateLoad() *widget.Check {
+func (sw *Widget) newAutoUpdateLoad() *widget.Check {
 	return widget.NewCheck("Load maps from ECU when connected", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsAutoUpdateLoadEcu, b)
 	})
 }
 
-func (sw *SettingsWidget) newAutoUpdateSave() *widget.Check {
+func (sw *Widget) newAutoUpdateSave() *widget.Check {
 	return widget.NewCheck("Save changes automaticly if connected to ECU (requires open bin)", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsAutoUpdateSaveEcu, b)
 	})
 }
 
-func (sw *SettingsWidget) newCursorFollowCrosshair() *widget.Check {
+func (sw *Widget) newCursorFollowCrosshair() *widget.Check {
 	return widget.NewCheck("Cursor follows crosshair in MapViewer (one hand mapping)", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsCursorFollowCrosshair, b)
 	})
 }
 
-func (sw *SettingsWidget) newLivePreview() *widget.Check {
+func (sw *Widget) newLivePreview() *widget.Check {
 	return widget.NewCheck("Live preview values in symbollist (uncheck if you have a slow pc)", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsLivePreview, b)
 	})
 }
 
-func (sw *SettingsWidget) newRealtimeBars() *widget.Check {
+func (sw *Widget) newRealtimeBars() *widget.Check {
 	return widget.NewCheck("Bars on live preview values (uncheck if you have a slow pc)", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsRealtimeBars, b)
 	})
 }
 
-func (sw *SettingsWidget) newUserMPH() *widget.Check {
+func (sw *Widget) newUserMPH() *widget.Check {
 	return widget.NewCheck("Use mph instead of km/h", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsUseMPH, b)
 	})
 }
 
-func (sw *SettingsWidget) newSwapRPMandSpeed() *widget.Check {
+func (sw *Widget) newSwapRPMandSpeed() *widget.Check {
 	return widget.NewCheck("Swap RPM and speed gauge position", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsSwapRPMandSpeed, b)
 	})
 }
 
-func (sw *SettingsWidget) newPlotResolution() *widget.Select {
+func (sw *Widget) newPlotResolution() *widget.Select {
 	return widget.NewSelect([]string{"Full", "Half", "Quarter"}, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsPlotResolution, s)
 	})
 }
 
-func (sw *SettingsWidget) loadPrefs() {
+func (sw *Widget) loadPrefs() {
 	freq := fyne.CurrentApp().Preferences().IntWithFallback(prefsFreq, 25)
 	sw.freqSlider.SetValue(float64(freq))
 	sw.autoLoad.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsAutoUpdateLoadEcu, true))
@@ -747,7 +787,7 @@ func (sw *SettingsWidget) loadPrefs() {
 
 }
 
-func (sw *SettingsWidget) CreateRenderer() fyne.WidgetRenderer {
+func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(sw.container)
 }
 

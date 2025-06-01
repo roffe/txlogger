@@ -113,7 +113,7 @@ type MainWindow struct {
 	dlc             datalogger.IClient
 	gclient         proto.GocanClient
 	buttonsDisabled bool
-	settings        *settings.SettingsWidget
+	settings        *settings.Widget
 	statusText      *SecretText
 	wm              *multiwindow.MultipleWindows
 	content         *fyne.Container

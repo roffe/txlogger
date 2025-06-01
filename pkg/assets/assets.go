@@ -31,6 +31,9 @@ var LeftCornerBytes []byte
 //go:embed WHATSNEW.md
 var WhatsNew string
 
+//go:embed combiv2.jpg
+var CombiV2 []byte
+
 //go:embed mtx-l.jpg
 var MtxL []byte
 

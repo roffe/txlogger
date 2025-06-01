@@ -19,7 +19,7 @@ replace github.com/roffe/ecusymbol => ..\ecusymbol
 replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 
 require (
-	fyne.io/fyne/v2 v2.5.5-0.20250210105257-a0a3e580d0cd
+	fyne.io/fyne/v2 v2.6.1-rc1.0.20250531151750-1b5bf7aa3fa7
 	fyne.io/x/fyne v0.0.0-20250106132206-3228f6c50107
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/lusingander/colorpicker v0.7.4

@@ -1,13 +1,14 @@
 package analyzer
 
 import (
-	"fmt"
+	"math"
 
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/logfile"
 )
 
-func AnalyzeLambda(fw symbol.SymbolCollection, xFrom, yFrom string, logfile logfile.Logfile) {
+// AnalyzeLambda analyzes lambda values based on stable pedal conditions
+func AnalyzeLambda(fw symbol.SymbolCollection, xFrom, yFrom string, logfile logfile.Logfile) ([]int, []int, [][]float64) {
 	x := fw.GetByName("IgnNormCal.m_AirXSP")
 	y := fw.GetByName("IgnNormCal.n_EngYSP")
 
@@ -19,84 +20,92 @@ func AnalyzeLambda(fw symbol.SymbolCollection, xFrom, yFrom string, logfile logf
 		zData[i] = make([]float64, 0, len(xsp)) // Preallocate with a reasonable capacity
 	}
 
+	// Ring buffer to store the last 5 pedal positions
+
 	for rec := logfile.Next(); !rec.EOF; rec = logfile.Next() {
 		rpm := rec.Values["ActualIn.n_Engine"]
-
 		air := rec.Values["MAF.m_AirInlet"]
-
-		//pedal := rec.Values["Out.X_AccPedal"]
-
 		lambda := rec.Values["Lambda.External"]
-
-		//oldPos := lf.Pos()
-		//lf.Seek(oldPos + 3)
-		//rec2 := lf.Get()
-		//lambda := rec2.Values["Lambda.External"]
-		//lf.Seek(oldPos)
+		//
+		//// Lambda range check
+		//if lambda < 0.6 || lambda > 1.2 {
+		//	continue
+		//}
 
 		xIdx, xFrac := findIndexAndFrac(xsp, air)
 		yIdx, yFrac := findIndexAndFrac(ysp, rpm)
 
-		if xFrac > 0.2 {
-			if yFrac > 0.85 {
-				xIdx++
-			} else {
-				continue
-			}
-		}
+		const fracThreshold = 0.50
 
-		if yFrac > 0.2 {
-			if xFrac > 0.85 {
-				yIdx++
-			} else {
-				continue
-			}
+		if xFrac > fracThreshold {
+			continue
 		}
-
-		if lambda < 0.6 || lambda > 1.2 {
+		if yFrac > fracThreshold {
 			continue
 		}
 
-		zPos := clamp(yIdx-1, len(ysp))*len(xsp) + clamp(xIdx-1, len(xsp))
+		// Apply any index corrections if needed for boundary cases
+		if xIdx >= len(xsp) {
+			xIdx = len(xsp) - 1
+		}
+		if yIdx >= len(ysp) {
+			yIdx = len(ysp) - 1
+		}
 
+		zPos := clamp(yIdx-1, len(ysp))*len(xsp) + clamp(xIdx-1, len(xsp))
 		zData[zPos] = append(zData[zPos], lambda)
 	}
 
-	fmt.Printf("\t\033[1;34m")
-	for i := 0; i < len(xsp); i++ {
-		fmt.Printf("%d\t", xsp[i])
+	return xsp, ysp, zData
+}
+
+// isPedalStable checks if the pedal values in the buffer are within the threshold
+func isPedalStable(buffer []float64, threshold float64) bool {
+	if len(buffer) == 0 {
+		return false
 	}
-	fmt.Println("\033[0m")
-	for i := len(ysp) - 1; i >= 0; i-- {
-		fmt.Printf("\033[1;34m%d\033[0m\t", ysp[i])
-		for j := 0; j < len(xsp); j++ {
 
-			zzs := zData[i*len(xsp)+j]
-			// calculate average of zzs
-			var sum float64
-			for _, value := range zzs {
-				sum += value
-			}
-			var value float64
-			if len(zzs) > 0 {
-				value = sum / float64(len(zzs))
-			} else {
-				value = 0.0
-			}
-
-			color := "\033[0;36m"
-			if value < 0.8 {
-				color = "\033[0;33m"
-			} else if value < 1.0 {
-				color = "\033[0;32m"
-			} else if value > 1.0 {
-				color = "\033[0;31m"
-			}
-
-			fmt.Printf("%s%4.2f\033[0m\t", color, value)
+	min, max := buffer[0], buffer[0]
+	for _, val := range buffer {
+		if val < min {
+			min = val
 		}
-		fmt.Println()
+		if val > max {
+			max = val
+		}
 	}
+
+	// Alternative: use standard deviation
+	// return stdDev(buffer) < threshold
+
+	// Check if range is within threshold
+	return (max - min) <= threshold
+}
+
+// stdDev calculates standard deviation of values
+// Can be used as alternative stability check
+func stdDev(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+
+	// Calculate mean
+	var sum float64
+	for _, v := range values {
+		sum += v
+	}
+	mean := sum / float64(len(values))
+
+	// Calculate variance
+	var variance float64
+	for _, v := range values {
+		diff := v - mean
+		variance += diff * diff
+	}
+	variance /= float64(len(values))
+
+	// Return standard deviation
+	return math.Sqrt(variance)
 }
 
 func clamp(i, max int) int {
