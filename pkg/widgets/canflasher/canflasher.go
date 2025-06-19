@@ -11,7 +11,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 
-	"github.com/roffe/txlogger/pkg/widgets/cansettings"
+	"github.com/roffe/txlogger/pkg/widgets/settings/cansettings"
 
 	// Import ecu packages
 

@@ -189,7 +189,7 @@ func (mw *MainWindow) newSymbolnameTypeahead() {
 			return
 		}
 		// Get the list of possible completion
-		var results []string
+		results := []string{"ADC1", "ADC2", "ADC3", "ADC4", "ADC5"}
 		for _, sym := range mw.fw.Symbols() {
 			if sym.Length > 8 {
 				continue

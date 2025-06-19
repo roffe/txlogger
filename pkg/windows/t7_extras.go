@@ -50,8 +50,7 @@ func (t *T7Extras) CreateRenderer() fyne.WidgetRenderer {
 			nil,
 			nil,
 			widget.NewLabel("Set E85 %"),
-			widget.NewButtonWithIcon("Save", theme.DocumentSaveIcon(), func() {
-			}),
+			widget.NewButtonWithIcon("Save", theme.DocumentSaveIcon(), func() {}),
 			widget.NewEntry(),
 		),
 	)
@@ -64,7 +63,7 @@ func (t *T7Extras) CreateRenderer() fyne.WidgetRenderer {
 
 func (t *T7Extras) resetECU() error {
 
-	adapter, err := t.mw.settings.CanSettings.GetAdapter("T7", t.mw.Log)
+	adapter, err := t.mw.settings.CANSettings.GetAdapter("T7", t.mw.Log)
 	if err != nil {
 		return err
 	}

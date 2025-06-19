@@ -25,7 +25,7 @@ func NewT7(cfg Config, lw LogWriter) (IClient, error) {
 	return &T7Client{BaseLogger: NewBaseLogger(cfg, lw)}, nil
 }
 
-func (c *T7Client) startBroadcastListener(ctx context.Context, cl *gocan.Client) {
+func (c *T7Client) broadcastListener(ctx context.Context, cl *gocan.Client) {
 	sub := cl.Subscribe(ctx, 0x1A0, 0x280, 0x3A0)
 	var speed uint16
 	var rpm uint16
@@ -90,7 +90,7 @@ func (c *T7Client) Start() error {
 	//}
 	bctx, bcancel := context.WithCancel(ctx)
 	defer bcancel()
-	go c.startBroadcastListener(bctx, cl)
+	go c.broadcastListener(bctx, cl)
 
 	c.OnMessage("Watching for broadcast messages")
 	<-time.After(550 * time.Millisecond)
@@ -114,7 +114,10 @@ func (c *T7Client) Start() error {
 	for _, sym := range c.Symbols {
 		if c.sysvars.Exists(sym.Name) {
 			// log.Println("Skipping", sym.Name)
-			sym.Skip = true
+			sym.Number = -1
+		}
+		if sym.Number < 1000 {
+			order = append(order, sym.Name)
 		}
 	}
 
@@ -154,10 +157,10 @@ func (c *T7Client) Start() error {
 
 		dpos := 0
 		for _, sym := range c.Symbols {
-			if sym.Skip {
+			if sym.Number < 0 {
 				continue
 			}
-			//			log.Println("Defining", sym.Name, dpos)
+			log.Println("Defining", sym.Name, dpos)
 			if err := kwp.DynamicallyDefineLocalIdRequest(ctx, dpos, sym); err != nil {
 				return errors.New("failed to define dynamic register")
 			}
@@ -172,7 +175,7 @@ func (c *T7Client) Start() error {
 		var timeStamp time.Time
 		var expectedPayloadSize uint16
 		for _, sym := range c.Symbols {
-			if sym.Skip {
+			if sym.Number < 0 {
 				continue
 			}
 			expectedPayloadSize += sym.Length
@@ -239,7 +242,7 @@ func (c *T7Client) Start() error {
 					dpos := 0
 					for _, sym := range c.Symbols {
 						if c.sysvars.Exists(sym.Name) {
-							sym.Skip = true
+							sym.Number = -1
 							continue
 						}
 						if err := kwp.DynamicallyDefineLocalIdRequest(ctx, dpos, sym); err != nil {
@@ -385,8 +388,26 @@ func (c *T7Client) Start() error {
 
 				r := bytes.NewReader(databuff)
 				for _, va := range c.Symbols {
-					if va.Skip {
-						ebus.Publish(va.Name, c.sysvars.Get(va.Name))
+					if va.Number < 0 {
+						if va.Number <= -1000 {
+							if ca, ok := cl.Adapter().(*gocan.CombiAdapter); ok {
+								adcNumber := -va.Number - 1000
+								val, err := ca.GetADCValue(ctx, adcNumber)
+								if err != nil {
+									c.onError()
+									c.OnMessage(err.Error())
+									continue
+								}
+								c.sysvars.Set(va.Name, float64(val))
+								if err := ebus.Publish(va.Name, float64(val)); err != nil {
+									c.onError()
+									c.OnMessage(err.Error())
+								}
+								continue
+							}
+						} else {
+							ebus.Publish(va.Name, c.sysvars.Get(va.Name))
+						}
 						continue
 					}
 					if err := va.Read(r); err != nil {
@@ -419,6 +440,7 @@ func (c *T7Client) Start() error {
 				}
 
 				//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
+				//log.Println("writing log line", timeStamp)
 				if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
 					c.onError()
 					c.OnMessage("failed to write log: " + err.Error())
@@ -452,7 +474,7 @@ func (c *T7Client) Start() error {
 				timeStamp := c.calculateCompensatedTimestamp()
 
 				for _, va := range c.Symbols {
-					if va.Skip {
+					if va.Number == -1 {
 						ebus.Publish(va.Name, c.sysvars.Get(va.Name))
 						continue
 					}

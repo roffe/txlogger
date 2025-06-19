@@ -86,7 +86,7 @@ func (c *CSVWriter) Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time
 		record = append(record, strconv.FormatFloat(val, 'f', c.precission, 64))
 	}
 	for _, va := range vars {
-		if va.Skip {
+		if va.Number < 0 {
 			continue
 		}
 		record = append(record, va.StringValue())
@@ -99,7 +99,7 @@ func (c *CSVWriter) writeHeader(vars []*symbol.Symbol, sysvarOrder []string) err
 	header = append(header, "Time")
 	header = append(header, sysvarOrder...)
 	for _, va := range vars {
-		if va.Skip {
+		if va.Number < 0 {
 			continue
 		}
 		header = append(header, va.Name)
@@ -138,7 +138,7 @@ func (t *TXWriter) Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time.
 		t.file.Write([]byte(k + "=" + replaceDot(strconv.FormatFloat(val, 'f', t.precission, 64)) + "|"))
 	}
 	for _, va := range vars {
-		if va.Skip {
+		if va.Number < 0 {
 			continue
 		}
 		t.file.Write([]byte(va.Name + "=" + replaceDot(va.StringValue()) + "|"))

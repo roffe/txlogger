@@ -40,7 +40,7 @@ type Widget struct {
 	mu sync.Mutex
 }
 
-func NewCanSettingsWidget() *Widget {
+func NewCANSettingsWidget() *Widget {
 	csw := &Widget{
 		app:      fyne.CurrentApp(),
 		adapters: make(map[string]*gocan.AdapterInfo),

@@ -18,7 +18,7 @@ import (
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
 	"github.com/roffe/txlogger/pkg/wbl/plx"
 	"github.com/roffe/txlogger/pkg/widgets"
-	"github.com/roffe/txlogger/pkg/widgets/cansettings"
+	"github.com/roffe/txlogger/pkg/widgets/settings/cansettings"
 )
 
 const (
@@ -52,7 +52,7 @@ type SettingsWidgetInterface interface {
 type Widget struct {
 	cfg *Config
 
-	CanSettings           *cansettings.Widget
+	CANSettings           *cansettings.Widget
 	freqSlider            *widget.Slider
 	freqValue             *widget.Label
 	autoSave              *widget.Check
@@ -238,17 +238,17 @@ func New(cfg *Config) *Widget {
 
 	sw.plotResolution = sw.newPlotResolution()
 
-	sw.CanSettings = cansettings.NewCanSettingsWidget()
+	sw.CANSettings = cansettings.NewCANSettingsWidget()
 
 	app := fyne.CurrentApp()
 
 	sw.wblPortLabel = widget.NewLabel("WBL Port")
-	sw.wblPortSelect = widget.NewSelect(append([]string{"txbridge", "CAN"}, sw.CanSettings.ListPorts()...), func(s string) {
+	sw.wblPortSelect = widget.NewSelect(append([]string{"txbridge", "CAN"}, sw.CANSettings.ListPorts()...), func(s string) {
 		app.Preferences().SetString(prefsWBLPort, s)
 	})
 
 	sw.wblPortRefreshButton = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
-		sw.wblPortSelect.Options = append([]string{"txbridge", "CAN"}, sw.CanSettings.ListPorts()...)
+		sw.wblPortSelect.Options = append([]string{"txbridge", "CAN"}, sw.CANSettings.ListPorts()...)
 		sw.wblPortSelect.Refresh()
 	})
 
@@ -302,7 +302,7 @@ func New(cfg *Config) *Widget {
 
 	tabs := container.NewAppTabs()
 
-	tabs.Append(container.NewTabItem("CAN", sw.CanSettings))
+	tabs.Append(container.NewTabItem("CAN", sw.CANSettings))
 
 	tabs.Append(container.NewTabItem("Logging", container.NewVBox(
 		container.NewBorder(

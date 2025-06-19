@@ -105,7 +105,7 @@ func (mr *MyrtilosRegistration) register(key []byte) error {
 		mr.outputData.Append(s)
 	}
 
-	adapter, err := mr.mw.settings.CanSettings.GetAdapter("T7", logFn)
+	adapter, err := mr.mw.settings.CANSettings.GetAdapter("T7", logFn)
 	if err != nil {
 		return err
 	}

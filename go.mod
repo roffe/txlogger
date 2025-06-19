@@ -27,7 +27,7 @@ require (
 	github.com/roffe/gocan v1.1.6
 	github.com/roffe/gocanflasher v1.0.2
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
-	go.bug.st/serial v1.6.2
+	go.bug.st/serial v1.6.4
 	golang.org/x/image v0.24.0
 	golang.org/x/mod v0.23.0
 	golang.org/x/net v0.35.0
@@ -37,7 +37,7 @@ require (
 )
 
 require (
-	fyne.io/systray v1.11.0 // indirect
+	fyne.io/systray v1.11.1-0.20250603113521-ca66a66d8b58 // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
@@ -61,7 +61,7 @@ require (
 	github.com/google/gousb v1.1.3 // indirect
 	github.com/hack-pad/go-indexeddb v0.3.2 // indirect
 	github.com/hack-pad/safejs v0.1.0 // indirect
-	github.com/jeandeaual/go-locale v0.0.0-20241217141322-fcc2cadd6f08 // indirect
+	github.com/jeandeaual/go-locale v0.0.0-20250612000132-0ef82f21eade // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
 	github.com/kr/text v0.2.0 // indirect

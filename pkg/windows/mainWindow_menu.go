@@ -96,8 +96,8 @@ func (mw *MainWindow) setupMenu() {
 				mw.openSettings()
 			}),
 			fyne.NewMenuItem("Update txbridge", func() {
-				port := mw.settings.CanSettings.GetSerialPort()
-				if mw.settings.CanSettings.GetAdapterName() == "txbridge wifi" {
+				port := mw.settings.CANSettings.GetSerialPort()
+				if mw.settings.CANSettings.GetAdapterName() == "txbridge wifi" {
 					port = "tcp"
 				}
 				updater := multiwindow.NewInnerWindow("txbridge firmware updater", txupdater.New(port))

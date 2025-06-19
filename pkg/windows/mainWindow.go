@@ -252,7 +252,7 @@ func (mw *MainWindow) gocanGatewayClient() {
 		mw.Error(fmt.Errorf("failed to get adapters from gocan gateway: %w", err))
 		return
 	}
-	mw.settings.CanSettings.AddAdapters(res.Adapters)
+	mw.settings.CANSettings.AddAdapters(res.Adapters)
 
 	mw.gclient = client
 }
@@ -362,7 +362,7 @@ func (mw *MainWindow) render() {
 					return
 				}
 				inner := multiwindow.NewInnerWindow("Canflasher", canflasher.New(&canflasher.Config{
-					CSW: mw.settings.CanSettings,
+					CSW: mw.settings.CANSettings,
 					GetECU: func() string {
 						return mw.selects.ecuSelect.Selected
 					},
@@ -633,7 +633,7 @@ func (mw *MainWindow) SyncSymbols() {
 }
 
 func (mw *MainWindow) LoadSymbolsFromECU() error {
-	device, err := mw.settings.CanSettings.GetAdapter(mw.selects.ecuSelect.Selected, mw.Log)
+	device, err := mw.settings.CANSettings.GetAdapter(mw.selects.ecuSelect.Selected, mw.Log)
 	if err != nil {
 		return err
 	}

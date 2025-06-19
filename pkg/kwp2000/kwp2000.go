@@ -199,6 +199,7 @@ func (client *Client) ReadDataByIdentifier(ctx context.Context, identifier byte)
 		output.Write(resp.Data[2 : 2+bytesToRead])
 		dataLength -= bytesToRead
 		currentChunkNumber = resp.Data[0] & 0x3F
+		//time.Sleep(5 * time.Millisecond) // Add a small delay to avoid overwhelming the ECU
 	}
 
 	return output.Bytes(), nil

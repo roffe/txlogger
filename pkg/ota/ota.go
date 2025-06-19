@@ -13,7 +13,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
 	"github.com/roffe/gocan/pkg/serialcommand"
-	"github.com/roffe/txlogger/pkg/widgets/cansettings"
+	"github.com/roffe/txlogger/pkg/widgets/settings/cansettings"
 	"go.bug.st/serial"
 	"golang.org/x/mod/semver"
 )
@@ -104,11 +104,9 @@ func UpdateOTA(cfg Config) error {
 				cc <- b
 			}, fyne.CurrentApp().Driver().AllWindows()[0])
 		})
-		select {
-		case t := <-cc:
-			if !t {
-				return errors.New("Update aborted")
-			}
+		t := <-cc
+		if !t {
+			return errors.New("UpdateOTA aborted")
 		}
 
 	}
