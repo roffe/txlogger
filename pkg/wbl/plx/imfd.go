@@ -266,6 +266,7 @@ func (s *IMFDClient) Parse(p []byte) error {
 			s.mu.Lock()
 			s.parsing = false
 			if err := s.parsePackets(s.buffer); err != nil {
+				s.mu.Unlock()
 				return err
 			}
 			s.mu.Unlock()
@@ -285,7 +286,7 @@ func (s *IMFDClient) Start(ctx context.Context) error {
 		BaudRate: 19200,
 	}
 
-	p, err := serial.Open("COM3", mode)
+	p, err := serial.Open(s.portName, mode)
 	if err != nil {
 		return err
 	}
