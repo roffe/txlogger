@@ -277,8 +277,9 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 
 	w.OnMouseDown = func() {
 		if f, ok := w.content.Objects[0].(fyne.Focusable); ok {
-			c := fyne.CurrentApp().Driver().CanvasForObject(w)
-			c.Focus(f)
+			if c := fyne.CurrentApp().Driver().CanvasForObject(w); c != nil {
+				c.Focus(f)
+			}
 			//c.SetOnTypedKey(f.TypedKey)
 		}
 		m.Raise(w)
