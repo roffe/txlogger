@@ -63,11 +63,11 @@ type WidebandConfig struct {
 	Port                   string
 	MinimumVoltageWideband float64
 	MaximumVoltageWideband float64
-	LowAFR                 float64
-	HighAFR                float64
+	Low                    float64
+	High                   float64
 }
 
-func New(cfg Config) (IClient, error) {
+func New(cfg Config) (IClient, string, error) {
 	datalogger := &Client{
 		cfg: cfg,
 	}
@@ -75,32 +75,32 @@ func New(cfg Config) (IClient, error) {
 
 	filename, lw, err := NewWriter(cfg)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	switch cfg.ECU {
 	case "T5":
 		datalogger.IClient, err = NewT5(cfg, lw)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 	case "T7":
 		datalogger.IClient, err = NewT7(cfg, lw)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 	case "T8":
 		datalogger.IClient, err = NewT8(cfg, lw)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 	default:
-		return nil, fmt.Errorf("%s not supported yet", cfg.ECU)
+		return nil, "", fmt.Errorf("%s not supported yet", cfg.ECU)
 	}
 
 	cfg.OnMessage(fmt.Sprintf("Logging to %s", filename))
 
-	return datalogger, nil
+	return datalogger, filename, nil
 }
 
 func (d *Client) Start() error {
