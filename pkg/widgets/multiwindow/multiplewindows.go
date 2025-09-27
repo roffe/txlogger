@@ -217,14 +217,9 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 		//S		log.Println("Dragged", ev.Dragged)
 		// log.Println(m.content.Size())
 		if w.maximized {
-			//mouseRatio := ev.Position.X / w.Size().Width
-			//w.Resize(w.MinSize())
-			//w.Move(fyne.NewPos(ev.AbsolutePosition.X-mouseRatio*w.MinSize().Width, w.Position().Y))
 			w.maximized = false
-
 			w.Move(ev.Position.SubtractXY(w.preMaximizedSize.Width*0.5, 5))
-			w.Resize(w.MinSize())
-
+			w.Resize(w.preMaximizedSize)
 			return
 		}
 
