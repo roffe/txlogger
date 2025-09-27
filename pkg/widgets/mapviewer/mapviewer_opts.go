@@ -2,6 +2,7 @@ package mapviewer
 
 import (
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/txlogger/pkg/widgets"
 )
 
 type MapViewerOption func(*MapViewer) error
@@ -140,6 +141,13 @@ func WithEditable(editable bool) MapViewerOption {
 func WithFollowCrosshair(enabled bool) MapViewerOption {
 	return func(mv *MapViewer) error {
 		mv.opts.cursorFollowCrosshair = enabled
+		return nil
+	}
+}
+
+func WithColorBlindMode(mode widgets.ColorBlindMode) MapViewerOption {
+	return func(mv *MapViewer) error {
+		mv.colorMode = mode
 		return nil
 	}
 }

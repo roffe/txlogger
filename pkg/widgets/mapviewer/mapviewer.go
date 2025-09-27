@@ -99,6 +99,8 @@ type MapViewer struct {
 	heightFactor float32
 
 	OnMouseDown func()
+
+	colorMode widgets.ColorBlindMode
 }
 
 type opts struct {
@@ -177,6 +179,14 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 	return mv, nil
 }
 
+func (mv *MapViewer) SetColorBlindMode(mode widgets.ColorBlindMode) {
+	if mv.colorMode != mode {
+		mv.colorMode = mode
+		mv.Refresh()
+		mv.mesh.SetColorBlindMode(mode)
+	}
+}
+
 // Dragged is called when the user drags the window.
 func (mv *MapViewer) Dragged(ev *fyne.DragEvent) {
 	moveEvent := &desktop.MouseEvent{}
@@ -237,9 +247,6 @@ func (mr *movingRectsLayout) Layout(_ []fyne.CanvasObject, size fyne.Size) {
 }
 
 func (mv *MapViewer) render() fyne.CanvasObject {
-
-	// y must be created before x as it's width is used to calculate x's offset
-
 	//mv.crosshair.CornerRadius = 4
 	mv.crosshair.Resize(fyne.NewSize(34, 14))
 	mv.crosshair.Hide()
@@ -292,6 +299,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 			mv.zData,
 			mv.numColumns,
 			mv.numRows,
+			mv.colorMode,
 		)
 
 		if err == nil {
@@ -305,7 +313,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 					mv.mesh,
 				),
 			)
-			split.Offset = 0.9
+			split.Offset = 0.2
 			return split
 		} else {
 			log.Println("MapViewer meshview failed:", err)
@@ -410,6 +418,7 @@ func (mv *MapViewer) Refresh() {
 			mv.zMin,
 			mv.zMax,
 			value,
+			mv.colorMode,
 		)
 		r := mv.zDataRects[idx]
 		if col != r.FillColor {
@@ -472,7 +481,7 @@ func (mv *MapViewer) createTextValues() {
 func (mv *MapViewer) createZdata() {
 	mv.valueRects = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.32))
 	for _, value := range mv.zData {
-		color := widgets.GetColorInterpolation(mv.zMin, mv.zMax, value)
+		color := widgets.GetColorInterpolation(mv.zMin, mv.zMax, value, mv.colorMode)
 		rect := &canvas.Rectangle{FillColor: color, StrokeColor: color, StrokeWidth: 0}
 		rect.SetMinSize(fyne.NewSize(34, 14))
 		mv.zDataRects = append(mv.zDataRects, rect)
