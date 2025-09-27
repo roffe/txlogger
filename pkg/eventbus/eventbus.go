@@ -28,7 +28,7 @@ type EBusMessage struct {
 }
 
 type Controller struct {
-	subs     sync.Map
+	subs     map[string][]chan float64
 	incoming chan *EBusMessage
 	sub      chan newSub
 	unsub    chan chan float64
@@ -58,6 +58,7 @@ func New(cfg *Config) *Controller {
 		incoming: make(chan *EBusMessage, cfg.IncomingBuffer),
 		sub:      make(chan newSub, cfg.SubscribeBuffer),
 		unsub:    make(chan chan float64, cfg.UnsubscribeBuffer),
+		subs:     make(map[string][]chan float64),
 		//cache:           ttlcache.New[string, float64](ttlcache.WithTTL[string, float64](cfg.CacheTTL)),
 		quit:            make(chan struct{}),
 		aggregatorIndex: make(map[string][]*EventAggregator),
@@ -79,23 +80,6 @@ func (e *Controller) SetOnMessage(f func(string, float64)) {
 }
 
 func (e *Controller) run() {
-	/*
-		for i := range runtime.NumCPU() {
-			go func() {
-				log.Println("Worker", i, "started")
-				for {
-					select {
-					case <-e.quit:
-						log.Println("Worker", i, "stopped")
-						return
-					case msg := <-e.incoming:
-						e.handleMessage(msg)
-					}
-				}
-			}()
-		}
-	*/
-
 	for {
 		select {
 		case <-e.quit:
@@ -117,34 +101,27 @@ func (e *Controller) handleMessage(msg *EBusMessage) {
 	}
 	//e.cache.Set(msg.Topic, msg.Data, ttlcache.DefaultTTL)
 	// Get subscribers
-	if value, ok := e.subs.Load(msg.Topic); ok {
-		if subs, ok := value.([]chan float64); ok {
-			for _, sub := range subs {
-				select {
-				case sub <- msg.Data:
-				default:
-					log.Printf("Channel full for topic %s", msg.Topic)
-				}
-			}
+
+	for _, sub := range e.subs[msg.Topic] {
+		select {
+		case sub <- msg.Data:
+		default:
+			log.Printf("Channel full for topic %s", msg.Topic)
 		}
 	}
+
 	// Process aggregators
 	//e.aggregatorLock.RLock()
 	if aggregators, exists := e.aggregatorIndex[msg.Topic]; exists {
 		for _, agg := range aggregators {
-			go agg.fun(e, msg.Topic, msg.Data)
+			agg.fun(e, msg.Topic, msg.Data)
 		}
 	}
 	//e.aggregatorLock.RUnlock()
 }
 
 func (e *Controller) handleSubscription(sub newSub) {
-	var subs []chan float64
-	if value, ok := e.subs.Load(sub.topic); ok {
-		subs = value.([]chan float64)
-	}
-	subs = append(subs, sub.resp)
-	e.subs.Store(sub.topic, subs)
+	e.subs[sub.topic] = append(e.subs[sub.topic], sub.resp)
 
 	// Send cached value if available
 	/*
@@ -159,23 +136,21 @@ func (e *Controller) handleSubscription(sub newSub) {
 }
 
 func (e *Controller) handleUnsubscription(unsub chan float64) {
-	e.subs.Range(func(key, value any) bool {
-		topic := key.(string)
-		subs := value.([]chan float64)
+	for topic, subs := range e.subs {
 		for i, sub := range subs {
 			if sub == unsub {
 				newSubs := append(subs[:i], subs[i+1:]...)
 				if len(newSubs) == 0 {
-					e.subs.Delete(topic)
+					e.subs[topic] = nil
+					delete(e.subs, topic)
 				} else {
-					e.subs.Store(topic, newSubs)
+					e.subs[topic] = newSubs
 				}
 				close(unsub)
-				return false
+				return
 			}
 		}
-		return true
-	})
+	}
 }
 
 func (e *Controller) Close() {
@@ -186,13 +161,14 @@ func (e *Controller) Close() {
 
 func (e *Controller) cleanup() {
 	//e.cache.DeleteAll()
-	e.subs.Range(func(key, value any) bool {
-		subs := value.([]chan float64)
+	for topic, subs := range e.subs {
 		for _, sub := range subs {
 			close(sub)
+
 		}
-		return true
-	})
+		e.subs[topic] = nil
+		delete(e.subs, topic)
+	}
 }
 
 func (e *Controller) RegisterAggregator(aggs ...*EventAggregator) {
