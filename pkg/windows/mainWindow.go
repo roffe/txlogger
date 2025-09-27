@@ -28,6 +28,7 @@ import (
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/widgets/canflasher"
 	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/ledicon"
@@ -86,6 +87,7 @@ func (s *SecretText) Tapped(*fyne.PointEvent) {
 		an := canvas.NewSizeAnimation(fyne.NewSize(0, 0), fyne.NewSize(370, 386), time.Second, func(size fyne.Size) {
 			cv.Resize(size)
 		})
+
 		an.Start()
 	}
 }
@@ -123,6 +125,8 @@ type MainWindow struct {
 
 	gocanGatewayLED *ledicon.Widget
 	canLED          *ledicon.Widget
+
+	previewFeatures bool
 }
 
 type mainWindowSelects struct {
@@ -164,22 +168,23 @@ func NewMainWindow(app fyne.App) *MainWindow {
 		app:        app,
 		outputData: binding.NewStringList(),
 
-		counters: &mainWindowCounters{
-			//captureCounter: binding.NewInt(),
-			//errorCounter:   binding.NewInt(),
-			//fpsCounter:     binding.NewInt(),
-		},
-		selects: &mainWindowSelects{},
-		buttons: &mainWindowButtons{},
+		counters: &mainWindowCounters{},
+		selects:  &mainWindowSelects{},
+		buttons:  &mainWindowButtons{},
 
 		symbolList: symbollist.New(symbolListConfig),
 
 		gocanGatewayLED: ledicon.New("Gateway"),
 		canLED:          ledicon.New("CAN"),
 		statusText:      NewSecretText("Harder, Better, Faster, Stronger"),
+		previewFeatures: app.Preferences().BoolWithFallback("enable_preview_features", false),
 	}
 
-	ebus.SubscribeFunc(symbollist.EBUS_TOPIC_COLORBLINDMODE, func(v float64) {
+	mw.statusText.SecretFunc = func() {
+		mw.app.Preferences().SetBool("enable_preview_features", true)
+	}
+
+	ebus.SubscribeFunc(ebus.TOPIC_COLORBLINDMODE, func(v float64) {
 		idx := int(v)
 		mw.symbolList.SetColorBlindMode(widgets.ColorBlindMode(idx))
 		mw.symbolList.Refresh()
@@ -345,126 +350,126 @@ func (mw *MainWindow) render() {
 		)
 	*/
 
-	mw.content = container.NewBorder(
-		container.NewHBox(
-			container.NewBorder(
-				nil,
-				nil,
-				widget.NewLabel("ECU"),
-				nil,
-				mw.selects.ecuSelect,
-			),
-			widget.NewSeparator(),
-			mw.buttons.symbolListBtn,
-			mw.buttons.logBtn,
-
-			//mw.buttons.logplayerBtn,
-			mw.buttons.openLogBtn,
-			mw.buttons.dashboardBtn,
-			widget.NewButtonWithIcon("", theme.GridIcon(), func() {
-				mw.wm.Arrange(&multiwindow.GridArranger{})
-			}),
-			mw.buttons.addGaugeBtn,
-			widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
-				mw.wm.CloseAll()
-			}),
-
-			// widget.NewButtonWithIcon("", theme.UploadIcon(), func() {
-			// 	if w := mw.wm.HasWindow("Canflasher"); w != nil {
-			// 		mw.wm.Raise(w)
-			// 		return
-			// 	}
-			// 	/*
-			// 		inner := multiwindow.NewInnerWindow("Canflasher", canflasher.New(&canflasher.Config{
-			// 			CSW: mw.settings.CANSettings,
-			// 			GetECU: func() string {
-			// 				return mw.selects.ecuSelect.Selected
-			// 			},
-			// 		}))
-			// 		inner.Icon = theme.UploadIcon()
-			// 		inner.Resize(fyne.NewSize(450, 250))
-			// 		mw.wm.Add(inner)
-			// 	*/
-			// }),
-			widget.NewButtonWithIcon("", theme.DocumentIcon(), func() {
-				if w := mw.wm.HasWindow("txweb"); w != nil {
-					mw.wm.Raise(w)
-					return
-				}
-				txb := txweb.New()
-				txb.LoadFileFunc = func(name string, data []byte) error {
-					switch filepath.Ext(name) {
-					case ".bin":
-						if err := mw.LoadSymbolsFromBytes(name, data); err != nil {
-							return err
-						}
-						return nil
-					case ".t5l", ".t7l", ".t8l", ".csv":
-						mw.LoadLogfile(name, bytes.NewReader(data), fyne.NewPos(100, 100))
-						return nil
-					}
-					return nil
-				}
-				inner := multiwindow.NewInnerWindow("txweb", txb)
-				inner.Icon = theme.FileApplicationIcon()
-				inner.Resize(fyne.NewSize(700, 500))
-				mw.wm.Add(inner)
-
-			}),
-			/*
-				widget.NewButtonWithIcon("", theme.NavigateNextIcon(), func() {
-					if w := mw.wm.HasWindow("Map"); w != nil {
-						mw.wm.Raise(w)
-						return
-					}
-					mapp := maps.NewMap()
-					cnt := container.NewBorder(
-						nil,
-						widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
-							mapp.SetCenter(59.644810, 17.058252)
-						}),
-						nil,
-						nil,
-						mapp,
-					)
-
-					inner := multiwindow.NewInnerWindow("Map", cnt)
-					inner.Icon = theme.NavigateNextIcon()
-					mw.wm.Add(inner)
-				}),
-			*/
-		),
-
+	toolbar := container.NewHBox(
 		container.NewBorder(
 			nil,
 			nil,
-			container.NewBorder(
-				nil,
-				nil,
-				nil,
-				mw.buttons.layoutRefreshBtn,
-				mw.selects.layoutSelect,
-			),
-			container.NewHBox(
-				container.NewHBox(
-					mw.gocanGatewayLED,
-					mw.canLED,
-					mw.counters.capturedCounterLabel,
-					mw.counters.errorCounterLabel,
-					mw.counters.fpsCounterLabel,
-					mw.buttons.debugBtn,
-				),
-				widget.NewButtonWithIcon("", theme.ComputerIcon(), mw.openEBUSMonitor),
-			),
-
-			mw.statusText,
+			widget.NewLabel("ECU"),
+			nil,
+			mw.selects.ecuSelect,
 		),
-		nil,
-		nil,
-		mw.wm,
-		// mw.tabs,
+		widget.NewSeparator(),
+		mw.buttons.symbolListBtn,
+		mw.buttons.logBtn,
+
+		//mw.buttons.logplayerBtn,
+		mw.buttons.openLogBtn,
+		mw.buttons.dashboardBtn,
+		widget.NewButtonWithIcon("", theme.GridIcon(), func() {
+			mw.wm.Arrange(&multiwindow.GridArranger{})
+		}),
+		mw.buttons.addGaugeBtn,
+		widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
+			mw.wm.CloseAll()
+		}),
 	)
+
+	if mw.previewFeatures {
+		toolbar.Add(widget.NewButtonWithIcon("", theme.UploadIcon(), func() {
+			if w := mw.wm.HasWindow("Canflasher"); w != nil {
+				mw.wm.Raise(w)
+				return
+			}
+			inner := multiwindow.NewInnerWindow("Canflasher", canflasher.New(&canflasher.Config{
+				CSW: mw.settings.CANSettings,
+				GetECU: func() string {
+					return mw.selects.ecuSelect.Selected
+				},
+			}))
+			inner.Icon = theme.UploadIcon()
+			mw.wm.Add(inner)
+			inner.Resize(fyne.NewSize(450, 250))
+
+		}),
+		)
+
+		toolbar.Add(widget.NewButtonWithIcon("", theme.DocumentIcon(), func() {
+			if w := mw.wm.HasWindow("txweb"); w != nil {
+				mw.wm.Raise(w)
+				return
+			}
+			txb := txweb.New()
+			txb.LoadFileFunc = func(name string, data []byte) error {
+				switch filepath.Ext(name) {
+				case ".bin":
+					if err := mw.LoadSymbolsFromBytes(name, data); err != nil {
+						return err
+					}
+					return nil
+				case ".t5l", ".t7l", ".t8l", ".csv":
+					mw.LoadLogfile(name, bytes.NewReader(data), fyne.NewPos(100, 100))
+					return nil
+				}
+				return nil
+			}
+			inner := multiwindow.NewInnerWindow("txweb", txb)
+			inner.Icon = theme.FileApplicationIcon()
+			mw.wm.Add(inner)
+			inner.Resize(fyne.NewSize(700, 500))
+		}),
+		)
+
+		/*
+			widget.NewButtonWithIcon("", theme.NavigateNextIcon(), func() {
+				if w := mw.wm.HasWindow("Map"); w != nil {
+					mw.wm.Raise(w)
+					return
+				}
+				mapp := maps.NewMap()
+				cnt := container.NewBorder(
+					nil,
+					widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
+						mapp.SetCenter(59.644810, 17.058252)
+					}),
+					nil,
+					nil,
+					mapp,
+				)
+
+				inner := multiwindow.NewInnerWindow("Map", cnt)
+				inner.Icon = theme.NavigateNextIcon()
+				mw.wm.Add(inner)
+			}),
+		*/
+	}
+
+	footer := container.NewBorder(
+		nil,
+		nil,
+		container.NewBorder(
+			nil,
+			nil,
+			nil,
+			mw.buttons.layoutRefreshBtn,
+			mw.selects.layoutSelect,
+		),
+		container.NewHBox(
+			container.NewHBox(
+				mw.gocanGatewayLED,
+				mw.canLED,
+				mw.counters.capturedCounterLabel,
+				mw.counters.errorCounterLabel,
+				mw.counters.fpsCounterLabel,
+				mw.buttons.debugBtn,
+			),
+			widget.NewButtonWithIcon("", theme.ComputerIcon(), mw.openEBUSMonitor),
+		),
+		mw.statusText,
+	)
+
+	mw.content = container.NewBorder(toolbar, footer, nil, nil, mw.wm)
 }
+
 func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser, p fyne.Position, fromRoutine bool) {
 	// Just filename, used for Window title
 	fp := filepath.Base(filename)
