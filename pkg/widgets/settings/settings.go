@@ -12,13 +12,17 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/assets"
+	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/datalogger"
+	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/wbl/aem"
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
 	"github.com/roffe/txlogger/pkg/wbl/plx"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/settings/cansettings"
+	"github.com/roffe/txlogger/pkg/widgets/symbollist"
+	"github.com/roffe/txlogger/pkg/widgets/txconfigurator"
 )
 
 const (
@@ -34,14 +38,14 @@ const (
 	prefsWidebandSymbolName     = "widebandSymbolName"
 	prefsUseMPH                 = "useMPH"
 	prefsSwapRPMandSpeed        = "swapRPMandSpeed"
-	prefsPlotResolution         = "plotResolution"
 	prefsCursorFollowCrosshair  = "cursorFollowCrosshair"
 	prefsWBLPort                = "wblPort"
 	prefsminimumVoltageWideband = "minimumVoltageWideband"
 	prefsmaximumVoltageWideband = "maximumVoltageWideband"
-	prefslowAFR                 = "lowAFR"
-	prefshighAFR                = "highAFR"
+	prefslowValue               = "lowValue"
+	prefshighValue              = "highValue"
 	prefsUseADScanner           = "useADScanner"
+	prefsColorBlindMode         = "colorBlindMode"
 )
 
 type SettingsWidgetInterface interface {
@@ -65,7 +69,7 @@ type Widget struct {
 	logPath               *widget.Label
 	useMPH                *widget.Check
 	swapRPMandSpeed       *widget.Check
-	plotResolution        *widget.Select
+	colorBlindMode        *widget.Select
 	container             *container.AppTabs
 
 	// WBL Specific
@@ -78,15 +82,16 @@ type Widget struct {
 	minimumVoltageWidebandEntry *widget.Entry
 	maximumVoltageWidebandLabel *widget.Label
 	maximumVoltageWidebandEntry *widget.Entry
-	lowAFRLabel                 *widget.Label
-	lowAFREntry                 *widget.Entry
-	highAFRLabel                *widget.Label
-	highAFREntry                *widget.Entry
+	lowLabel                    *widget.Label
+	lowEntry                    *widget.Entry
+	highLabel                   *widget.Label
+	highEntry                   *widget.Entry
 
 	minimumVoltageWideband float64
 	maximumVoltageWideband float64
-	lowAFR                 float64
-	highAFR                float64
+
+	low  float64
+	high float64
 
 	wblImage *canvas.Image
 
@@ -130,6 +135,10 @@ func (sw *Widget) GetWidebandSymbolName() string {
 	}
 }
 
+func (sw *Widget) GetColorBlindMode() widgets.ColorBlindMode {
+	return widgets.ColorBlindMode(sw.colorBlindMode.SelectedIndex())
+}
+
 func (sw *Widget) GetWidebandPort() string {
 	return sw.wblPortSelect.Selected
 }
@@ -142,12 +151,12 @@ func (sw *Widget) GetMaximumVoltageWideband() float64 {
 	return sw.maximumVoltageWideband
 }
 
-func (sw *Widget) GetLowAFR() float64 {
-	return sw.lowAFR
+func (sw *Widget) GetLow() float64 {
+	return sw.low
 }
 
-func (sw *Widget) GetHighAFR() float64 {
-	return sw.highAFR
+func (sw *Widget) GetHigh() float64 {
+	return sw.high
 }
 
 func (sw *Widget) GetFreq() int {
@@ -190,19 +199,6 @@ func (sw *Widget) GetSwapRPMandSpeed() bool {
 	return sw.swapRPMandSpeed.Checked
 }
 
-func (sw *Widget) GetPlotResolution() float32 {
-	switch sw.plotResolution.Selected {
-	case "Full":
-		return 1
-	case "Half":
-		return 0.5
-	case "Quarter":
-		return 0.25
-	default:
-		return 1
-	}
-}
-
 func (sw *Widget) GetCursorFollowCrosshair() bool {
 	return sw.cursorFollowCrosshair.Checked
 }
@@ -236,7 +232,7 @@ func New(cfg *Config) *Widget {
 	sw.useMPH = sw.newUserMPH()
 	sw.swapRPMandSpeed = sw.newSwapRPMandSpeed()
 
-	sw.plotResolution = sw.newPlotResolution()
+	sw.colorBlindMode = sw.newColorBlindMode()
 
 	sw.CANSettings = cansettings.NewCANSettingsWidget()
 
@@ -276,70 +272,31 @@ func New(cfg *Config) *Widget {
 		return nil
 	}
 
-	sw.lowAFRLabel = widget.NewLabel("Low AFR")
-	sw.lowAFREntry = widget.NewEntry()
-	sw.lowAFREntry.Validator = func(s string) error {
+	sw.lowLabel = widget.NewLabel("Low")
+	sw.lowEntry = widget.NewEntry()
+	sw.lowEntry.Validator = func(s string) error {
 		val, err := positiveFloatValidator(s)
 		if err != nil {
 			return err
 		}
-		app.Preferences().SetString(prefslowAFR, s)
-		sw.lowAFR = val
+		app.Preferences().SetString(prefslowValue, s)
+		sw.low = val
 		return nil
 	}
 
-	sw.highAFRLabel = widget.NewLabel("High AFR")
-	sw.highAFREntry = widget.NewEntry()
-	sw.highAFREntry.Validator = func(s string) error {
+	sw.highLabel = widget.NewLabel("High")
+	sw.highEntry = widget.NewEntry()
+	sw.highEntry.Validator = func(s string) error {
 		val, err := positiveFloatValidator(s)
 		if err != nil {
 			return err
 		}
-		fyne.CurrentApp().Preferences().SetString(prefshighAFR, s)
-		sw.highAFR = val
+		fyne.CurrentApp().Preferences().SetString(prefshighValue, s)
+		sw.high = val
 		return nil
 	}
 
 	tabs := container.NewAppTabs()
-
-	tabs.Append(container.NewTabItem("CAN", sw.CANSettings))
-
-	tabs.Append(container.NewTabItem("Logging", container.NewVBox(
-		container.NewBorder(
-			nil,
-			nil,
-			widget.NewLabel("Logging rate (Hz)"),
-			sw.freqValue,
-			sw.freqSlider,
-		),
-		widget.NewSeparator(),
-		container.NewBorder(
-			nil,
-			nil,
-			widget.NewLabel("Log format"),
-			nil,
-			sw.logFormat,
-		),
-		container.NewBorder(
-			nil,
-			container.NewGridWithColumns(2,
-				widget.NewButtonWithIcon("Reset", theme.ContentClearIcon(), func() {
-					sw.logPath.SetText(datalogger.LOGPATH)
-					app.Preferences().SetString(prefsLogPath, datalogger.LOGPATH)
-				}),
-				widget.NewButtonWithIcon("Browse", theme.FileIcon(), func() {
-					cb := func(dir string) {
-						sw.logPath.SetText(dir)
-						app.Preferences().SetString(prefsLogPath, dir)
-					}
-					widgets.SelectFolder(cb)
-				}),
-			),
-			widget.NewLabel("Log folder"),
-			nil,
-			sw.logPath,
-		),
-	)))
 
 	tabs.Append(container.NewTabItem("General", container.NewVBox(
 		container.NewBorder(
@@ -383,10 +340,53 @@ func New(cfg *Config) *Widget {
 		container.NewBorder(
 			nil,
 			nil,
-			//widget.NewIcon(theme.ZoomFitIcon()),
-			widget.NewLabel("Plot resolution"),
+			widget.NewLabel("Color blind mode"),
 			nil,
-			sw.plotResolution,
+			sw.colorBlindMode,
+		),
+	)))
+
+	tabs.Append(container.NewTabItem("CAN", sw.CANSettings))
+
+	logPath, err := common.GetLogPath()
+	if err != nil {
+		fyne.LogError("Could not get log path", err)
+	}
+
+	tabs.Append(container.NewTabItem("Logging", container.NewVBox(
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewLabel("Logging rate (Hz)"),
+			sw.freqValue,
+			sw.freqSlider,
+		),
+		widget.NewSeparator(),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewLabel("Log format"),
+			nil,
+			sw.logFormat,
+		),
+		container.NewBorder(
+			nil,
+			container.NewGridWithColumns(2,
+				widget.NewButtonWithIcon("Reset", theme.ContentClearIcon(), func() {
+					sw.logPath.SetText(logPath)
+					app.Preferences().SetString(prefsLogPath, logPath)
+				}),
+				widget.NewButtonWithIcon("Browse", theme.FileIcon(), func() {
+					cb := func(dir string) {
+						sw.logPath.SetText(dir)
+						app.Preferences().SetString(prefsLogPath, dir)
+					}
+					widgets.SelectFolder(cb)
+				}),
+			),
+			widget.NewLabel("Log folder"),
+			nil,
+			sw.logPath,
 		),
 	)))
 
@@ -452,16 +452,16 @@ func New(cfg *Config) *Widget {
 		container.NewBorder(
 			nil,
 			nil,
-			sw.lowAFRLabel,
+			sw.lowLabel,
 			nil,
-			sw.lowAFREntry,
+			sw.lowEntry,
 		),
 		container.NewBorder(
 			nil,
 			nil,
-			sw.highAFRLabel,
+			sw.highLabel,
 			nil,
-			sw.highAFREntry,
+			sw.highEntry,
 		),
 	)))
 
@@ -482,6 +482,8 @@ func New(cfg *Config) *Widget {
 			sw.useMPH,
 		),
 	)))
+
+	tabs.Append(container.NewTabItem("txbridge", txconfigurator.NewConfigurator()))
 
 	sw.container = tabs
 
@@ -508,7 +510,7 @@ func newImageFromResource(name string) *canvas.Image {
 		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.T7))
 		img.SetMinSize(fyne.NewSize(320, 224))
 	case "plx":
-		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.PLXSMAFR))
+		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.PLX))
 		img.SetMinSize(fyne.NewSize(470, 224))
 	case "combi":
 		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.CombiV2))
@@ -622,23 +624,23 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			if sw.wblADscanner.Checked {
 				sw.minimumVoltageWidebandLabel.Show()
 				sw.maximumVoltageWidebandLabel.Show()
-				sw.lowAFRLabel.Show()
-				sw.highAFRLabel.Show()
+				sw.lowLabel.Show()
+				sw.highLabel.Show()
 				sw.minimumVoltageWidebandEntry.Show()
 				sw.maximumVoltageWidebandEntry.Show()
-				sw.lowAFREntry.Show()
-				sw.highAFREntry.Show()
+				sw.lowEntry.Show()
+				sw.highEntry.Show()
 			}
 		} else {
 			sw.wblADscanner.Hide()
 			sw.minimumVoltageWidebandLabel.Hide()
 			sw.maximumVoltageWidebandLabel.Hide()
-			sw.lowAFRLabel.Hide()
-			sw.highAFRLabel.Hide()
+			sw.lowLabel.Hide()
+			sw.highLabel.Hide()
 			sw.minimumVoltageWidebandEntry.Hide()
 			sw.maximumVoltageWidebandEntry.Hide()
-			sw.lowAFREntry.Hide()
-			sw.highAFREntry.Hide()
+			sw.lowEntry.Hide()
+			sw.highEntry.Hide()
 		}
 
 		sw.container.Refresh()
@@ -670,21 +672,21 @@ func (sw *Widget) newADscannerCheck() *widget.Check {
 		if b {
 			sw.minimumVoltageWidebandLabel.Show()
 			sw.maximumVoltageWidebandLabel.Show()
-			sw.lowAFRLabel.Show()
-			sw.highAFRLabel.Show()
+			sw.lowLabel.Show()
+			sw.highLabel.Show()
 			sw.minimumVoltageWidebandEntry.Show()
 			sw.maximumVoltageWidebandEntry.Show()
-			sw.lowAFREntry.Show()
-			sw.highAFREntry.Show()
+			sw.lowEntry.Show()
+			sw.highEntry.Show()
 		} else {
 			sw.minimumVoltageWidebandLabel.Hide()
 			sw.maximumVoltageWidebandLabel.Hide()
-			sw.lowAFRLabel.Hide()
-			sw.highAFRLabel.Hide()
+			sw.lowLabel.Hide()
+			sw.highLabel.Hide()
 			sw.minimumVoltageWidebandEntry.Hide()
 			sw.maximumVoltageWidebandEntry.Hide()
-			sw.lowAFREntry.Hide()
-			sw.highAFREntry.Hide()
+			sw.lowEntry.Hide()
+			sw.highEntry.Hide()
 		}
 	})
 }
@@ -737,15 +739,22 @@ func (sw *Widget) newSwapRPMandSpeed() *widget.Check {
 	})
 }
 
-func (sw *Widget) newPlotResolution() *widget.Select {
-	return widget.NewSelect([]string{"Full", "Half", "Quarter"}, func(s string) {
-		fyne.CurrentApp().Preferences().SetString(prefsPlotResolution, s)
+func (sw *Widget) newColorBlindMode() *widget.Select {
+	return widget.NewSelect([]string{
+		widgets.ModeNormal.String(),
+		widgets.ModeUniversal.String(),
+		widgets.ModeProtanopia.String(),
+		widgets.ModeTritanopia.String(),
+	}, func(s string) {
+		fyne.CurrentApp().Preferences().SetString(prefsColorBlindMode, s)
+		ebus.Publish(symbollist.EBUS_TOPIC_COLORBLINDMODE, float64(sw.colorBlindMode.SelectedIndex()))
 	})
 }
 
 func (sw *Widget) loadPrefs() {
 	freq := fyne.CurrentApp().Preferences().IntWithFallback(prefsFreq, 25)
 	sw.freqSlider.SetValue(float64(freq))
+
 	sw.autoLoad.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsAutoUpdateLoadEcu, true))
 	sw.autoSave.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsAutoUpdateSaveEcu, false))
 	sw.cursorFollowCrosshair.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsCursorFollowCrosshair, false))
@@ -753,36 +762,42 @@ func (sw *Widget) loadPrefs() {
 	sw.meshView.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsMeshView, true))
 	sw.realtimeBars.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsRealtimeBars, true))
 	sw.logFormat.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogFormat, "TXL"))
-	sw.logPath.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogPath, datalogger.LOGPATH))
+
+	logPath, err := common.GetLogPath()
+	if err != nil {
+		fyne.LogError("Could not get log path", err)
+	}
+	sw.logPath.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefsLogPath, logPath))
+
 	sw.wblSource.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsLambdaSource, "None"))
 	sw.wblADscanner.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsUseADScanner, false))
 	sw.useMPH.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsUseMPH, false))
 	sw.swapRPMandSpeed.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(prefsSwapRPMandSpeed, false))
-	sw.plotResolution.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsPlotResolution, "Full"))
 	sw.wblPortSelect.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsWBLPort, ""))
 	sw.minimumVoltageWidebandEntry.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefsminimumVoltageWideband, "0.0"))
 	sw.maximumVoltageWidebandEntry.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefsmaximumVoltageWideband, "5.0"))
-	sw.lowAFREntry.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefslowAFR, "0.5"))
-	sw.highAFREntry.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefshighAFR, "1.5"))
+	sw.lowEntry.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefslowValue, "0.5"))
+	sw.highEntry.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefshighValue, "1.5"))
+	sw.colorBlindMode.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback(prefsColorBlindMode, widgets.ModeNormal.String()))
 
 	if sw.wblADscanner.Checked {
 		sw.minimumVoltageWidebandLabel.Show()
 		sw.maximumVoltageWidebandLabel.Show()
-		sw.lowAFRLabel.Show()
-		sw.highAFRLabel.Show()
+		sw.lowLabel.Show()
+		sw.highLabel.Show()
 		sw.minimumVoltageWidebandEntry.Show()
 		sw.maximumVoltageWidebandEntry.Show()
-		sw.lowAFREntry.Show()
-		sw.highAFREntry.Show()
+		sw.lowEntry.Show()
+		sw.highEntry.Show()
 	} else {
 		sw.minimumVoltageWidebandLabel.Hide()
 		sw.maximumVoltageWidebandLabel.Hide()
-		sw.lowAFRLabel.Hide()
-		sw.highAFRLabel.Hide()
+		sw.lowLabel.Hide()
+		sw.highLabel.Hide()
 		sw.minimumVoltageWidebandEntry.Hide()
 		sw.maximumVoltageWidebandEntry.Hide()
-		sw.lowAFREntry.Hide()
-		sw.highAFREntry.Hide()
+		sw.lowEntry.Hide()
+		sw.highEntry.Hide()
 	}
 
 }
