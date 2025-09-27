@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
+	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/widgets"
@@ -275,8 +276,8 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 			Logplayer:       false,
 			UseMPH:          mw.settings.GetUseMPH(),
 			SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
-			HighAFR:         mw.settings.GetHighAFR(),
-			LowAFR:          mw.settings.GetLowAFR(),
+			High:            mw.settings.GetHigh(),
+			Low:             mw.settings.GetLow(),
 			WidebandSymbol:  mw.settings.GetWidebandSymbolName(),
 		}
 
@@ -350,7 +351,7 @@ func (mw *MainWindow) startLogging() {
 		return
 	}
 
-	mw.dlc, err = newDataLogger(mw, device)
+	mw.dlc, _, err = newDataLogger(mw, device)
 	if err != nil {
 		mw.Error(err)
 		return
@@ -382,7 +383,12 @@ func (mw *MainWindow) startLogging() {
 	}()
 }
 
-func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, error) {
+func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, string, error) {
+	logPath, err := common.GetLogPath()
+	if err != nil {
+		return nil, "", err
+	}
+
 	return datalogger.New(datalogger.Config{
 		FilenamePrefix: strings.TrimSuffix(filepath.Base(mw.filename), filepath.Ext(mw.filename)),
 		ECU:            mw.selects.ecuSelect.Selected,
@@ -406,14 +412,14 @@ func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, er
 			})
 		},
 		LogFormat: mw.settings.GetLogFormat(),
-		LogPath:   mw.settings.GetLogPath(),
+		LogPath:   logPath,
 		WidebandConfig: datalogger.WidebandConfig{
 			Type:                   mw.settings.GetWidebandType(),
 			Port:                   mw.settings.GetWidebandPort(),
 			MinimumVoltageWideband: mw.settings.GetMinimumVoltageWideband(),
 			MaximumVoltageWideband: mw.settings.GetMaximumVoltageWideband(),
-			LowAFR:                 mw.settings.GetLowAFR(),
-			HighAFR:                mw.settings.GetHighAFR(),
+			Low:                    mw.settings.GetLow(),
+			High:                   mw.settings.GetHigh(),
 		},
 	})
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
 	"os/exec"
 	"sync"
 	"time"
@@ -17,11 +16,11 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
+	"github.com/roffe/txlogger/pkg/widgets/symbollist"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmmod"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmstatus"
 	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7esp"
 	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7fwinfo"
-	"github.com/roffe/txlogger/pkg/widgets/txupdater"
 	// "github.com/skratchdot/open-golang/open"
 )
 
@@ -80,8 +79,8 @@ func (mw *MainWindow) setupMenu() {
 			fyne.NewMenuItem("Open log", func() {
 				cb := func(r fyne.URIReadCloser) {
 					defer r.Close()
-					filename := r.URI().Path()
-					log.Println("open log", filename)
+					filename := r.URI().Name()
+					mw.Log("opening logfile " + filename)
 					mw.LoadLogfile(filename, r, fyne.NewPos(10, 10))
 				}
 				widgets.SelectFile(cb, "Log file", "csv", "t5l", "t7l", "t8l")
@@ -95,16 +94,26 @@ func (mw *MainWindow) setupMenu() {
 			fyne.NewMenuItem("Settings", func() {
 				mw.openSettings()
 			}),
-			fyne.NewMenuItem("Update txbridge", func() {
-				port := mw.settings.CANSettings.GetSerialPort()
-				if mw.settings.CANSettings.GetAdapterName() == "txbridge wifi" {
-					port = "tcp"
-				}
-				updater := multiwindow.NewInnerWindow("txbridge firmware updater", txupdater.New(port))
-				updater.Icon = theme.DownloadIcon()
-				updater.Resize(fyne.NewSize(400, 300))
-				mw.wm.Add(updater)
-			}),
+			/*
+				fyne.NewMenuItem("Update txbridge", func() {
+					port := mw.settings.CANSettings.GetSerialPort()
+					if mw.settings.CANSettings.GetAdapterName() == "txbridge wifi" {
+						ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+						defer cancel()
+						addr, err := mdns.Query(ctx, "txbridge.local")
+						if err != nil {
+							mw.Error(fmt.Errorf("mDNS lookup for txbridge.local failed: %w", err))
+							port = "tcp://192.168.4.1:1337"
+						} else {
+							port = "tcp://" + addr.String() + ":1337"
+						}
+					}
+					updater := multiwindow.NewInnerWindow("txbridge firmware updater", txupdater.New(port))
+					updater.Icon = theme.DownloadIcon()
+					updater.Resize(fyne.NewSize(400, 300))
+					mw.wm.Add(updater)
+				}),
+			*/
 			fyne.NewMenuItem("What's new", func() {
 				mw.showWhatsNew()
 			}),
@@ -147,7 +156,7 @@ func (mw *MainWindow) loadBinary() {
 	cb := func(r fyne.URIReadCloser) {
 		defer r.Close()
 		filename := r.URI().Path()
-		if err := mw.LoadSymbolsFromFile(filename, r); err != nil {
+		if err := mw.LoadSymbolsFromFile(filename); err != nil {
 			mw.Error(err)
 			return
 		}
@@ -375,6 +384,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		mapviewer.WithButtons(true),
 		mapviewer.WithFollowCrosshair(mw.settings.GetCursorFollowCrosshair()),
 		mapviewer.WithAxisLabels(axis.XDescription, axis.YDescription, axis.ZDescription),
+		mapviewer.WithColorBlindMode(mw.settings.GetColorBlindMode()),
 	)
 	if err != nil {
 		mw.Error(err)
@@ -412,6 +422,11 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			mv.SetY(value)
 		}))
 	}
+
+	cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(symbollist.EBUS_TOPIC_COLORBLINDMODE, func(value float64) {
+		mv.SetColorBlindMode(widgets.ColorBlindMode(int(value)))
+	}))
+
 	mapWindow.OnClose = func() {
 		for _, f := range cancelFuncs {
 			f()

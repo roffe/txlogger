@@ -3,7 +3,10 @@ package windows
 import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/widget"
+	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/presets"
+	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 )
 
 func (mw *MainWindow) createSelects() {
@@ -43,6 +46,8 @@ func (mw *MainWindow) createSelects() {
 
 	mw.selects.ecuSelect = widget.NewSelect([]string{"T5", "T7", "T8"}, func(s string) {
 		mw.app.Preferences().SetString(prefsSelectedECU, s)
+		idx := symbol.ECUTypeFromString(s)
+		ebus.Publish(dashboard.EBUS_TOPIC_ECU, float64(idx))
 		mw.SetMainMenu(mw.menu.GetMenu(s))
 	})
 }

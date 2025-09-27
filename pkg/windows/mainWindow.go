@@ -1,6 +1,7 @@
 package windows
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,7 +27,7 @@ import (
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/logfile"
-	"github.com/roffe/txlogger/pkg/widgets/canflasher"
+	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/ledicon"
@@ -35,6 +36,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
+	"github.com/roffe/txlogger/pkg/widgets/txweb"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -43,8 +45,8 @@ import (
 )
 
 const (
-	prefsLastBinFile    = "lastBinFile"
-	prefsLastConfig     = "lastConfig"
+	prefsLastBinFile = "lastBinFile"
+	//prefsLastConfig     = "lastConfig"
 	prefsSelectedECU    = "lastECU"
 	prefsSymbolList     = "symbolList"
 	prefsSelectedPreset = "selectedPreset"
@@ -153,6 +155,10 @@ type mainWindowCounters struct {
 }
 
 func NewMainWindow(app fyne.App) *MainWindow {
+	symbolListConfig := &symbollist.Config{
+		EBus:           ebus.CONTROLLER,
+		ColorBlindMode: widgets.ModeNormal,
+	}
 	mw := &MainWindow{
 		Window:     app.NewWindow("txlogger"),
 		app:        app,
@@ -165,14 +171,19 @@ func NewMainWindow(app fyne.App) *MainWindow {
 		},
 		selects: &mainWindowSelects{},
 		buttons: &mainWindowButtons{},
-		symbolList: symbollist.New(&symbollist.Config{
-			EBus: ebus.CONTROLLER,
-		}),
+
+		symbolList: symbollist.New(symbolListConfig),
 
 		gocanGatewayLED: ledicon.New("Gateway"),
 		canLED:          ledicon.New("CAN"),
 		statusText:      NewSecretText("Harder, Better, Faster, Stronger"),
 	}
+
+	ebus.SubscribeFunc(symbollist.EBUS_TOPIC_COLORBLINDMODE, func(v float64) {
+		idx := int(v)
+		mw.symbolList.SetColorBlindMode(widgets.ColorBlindMode(idx))
+		mw.symbolList.Refresh()
+	})
 
 	mw.setupMenu()
 	mw.createButtons()
@@ -189,8 +200,10 @@ func NewMainWindow(app fyne.App) *MainWindow {
 
 	mw.loadPrefs()
 
+	symbolListConfig.ColorBlindMode = mw.settings.GetColorBlindMode()
+
 	mw.wm = multiwindow.NewMultipleWindows()
-	mw.wm.LockViewport = true
+	mw.wm.LockViewport = false
 	mw.wm.OnError = mw.Error
 
 	mw.render()
@@ -356,21 +369,70 @@ func (mw *MainWindow) render() {
 				mw.wm.CloseAll()
 			}),
 
-			widget.NewButtonWithIcon("", theme.UploadIcon(), func() {
-				if w := mw.wm.HasWindow("Canflasher"); w != nil {
+			// widget.NewButtonWithIcon("", theme.UploadIcon(), func() {
+			// 	if w := mw.wm.HasWindow("Canflasher"); w != nil {
+			// 		mw.wm.Raise(w)
+			// 		return
+			// 	}
+			// 	/*
+			// 		inner := multiwindow.NewInnerWindow("Canflasher", canflasher.New(&canflasher.Config{
+			// 			CSW: mw.settings.CANSettings,
+			// 			GetECU: func() string {
+			// 				return mw.selects.ecuSelect.Selected
+			// 			},
+			// 		}))
+			// 		inner.Icon = theme.UploadIcon()
+			// 		inner.Resize(fyne.NewSize(450, 250))
+			// 		mw.wm.Add(inner)
+			// 	*/
+			// }),
+			widget.NewButtonWithIcon("", theme.DocumentIcon(), func() {
+				if w := mw.wm.HasWindow("txweb"); w != nil {
 					mw.wm.Raise(w)
 					return
 				}
-				inner := multiwindow.NewInnerWindow("Canflasher", canflasher.New(&canflasher.Config{
-					CSW: mw.settings.CANSettings,
-					GetECU: func() string {
-						return mw.selects.ecuSelect.Selected
-					},
-				}))
-				inner.Icon = theme.UploadIcon()
-				inner.Resize(fyne.NewSize(450, 250))
+				txb := txweb.New()
+				txb.LoadFileFunc = func(name string, data []byte) error {
+					switch filepath.Ext(name) {
+					case ".bin":
+						if err := mw.LoadSymbolsFromBytes(name, data); err != nil {
+							return err
+						}
+						return nil
+					case ".t5l", ".t7l", ".t8l", ".csv":
+						mw.LoadLogfile(name, bytes.NewReader(data), fyne.NewPos(100, 100))
+						return nil
+					}
+					return nil
+				}
+				inner := multiwindow.NewInnerWindow("txweb", txb)
+				inner.Icon = theme.FileApplicationIcon()
+				inner.Resize(fyne.NewSize(700, 500))
 				mw.wm.Add(inner)
+
 			}),
+			/*
+				widget.NewButtonWithIcon("", theme.NavigateNextIcon(), func() {
+					if w := mw.wm.HasWindow("Map"); w != nil {
+						mw.wm.Raise(w)
+						return
+					}
+					mapp := maps.NewMap()
+					cnt := container.NewBorder(
+						nil,
+						widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
+							mapp.SetCenter(59.644810, 17.058252)
+						}),
+						nil,
+						nil,
+						mapp,
+					)
+
+					inner := multiwindow.NewInnerWindow("Map", cnt)
+					inner.Icon = theme.NavigateNextIcon()
+					mw.wm.Add(inner)
+				}),
+			*/
 		),
 
 		container.NewBorder(
@@ -422,8 +484,8 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 		Logplayer:       true,
 		UseMPH:          mw.settings.GetUseMPH(),
 		SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
-		HighAFR:         mw.settings.GetHighAFR(),
-		LowAFR:          mw.settings.GetLowAFR(),
+		High:            mw.settings.GetHigh(),
+		Low:             mw.settings.GetLow(),
 		WidebandSymbol:  mw.settings.GetWidebandSymbolName(),
 	}
 
@@ -507,7 +569,7 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 	mw.Log("loaded log file " + filename + " in combined logplayer")
 }
 
-func (mw *MainWindow) LoadLogfile(filename string, r io.ReadCloser, p fyne.Position) {
+func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, p fyne.Position) {
 	// Just filename, used for Window title
 	fp := filepath.Base(filename)
 
@@ -672,18 +734,42 @@ func (mw *MainWindow) LoadSymbolsFromECU() error {
 	return nil
 }
 
-func (mw *MainWindow) LoadSymbolsFromFile(filename string, r io.Reader) error {
-	ecuType, symbols, err := symbol.Load(filename, mw.Log)
+func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return fmt.Errorf("error reading file: %w", err)
+	}
+	ecuType, symbols, err := symbol.Load(filename, data, mw.Log)
 	if err != nil {
 		return fmt.Errorf("error loading symbols: %w", err)
 	}
 	mw.SetTitle(filepath.Base(filename))
 	mw.app.Preferences().SetString(prefsLastBinFile, filename)
-	mw.selects.ecuSelect.SetSelected(ecuType.String())
-	mw.fw = symbols
+
+	mw.LoadSymbols(symbols, ecuType.String())
+	//mw.selects.ecuSelect.SetSelected(ecuType.String())
+	//mw.fw = symbols
 	mw.filename = filename
-	mw.SyncSymbols()
+	//mw.SyncSymbols()
 	return nil
+}
+
+func (mw *MainWindow) LoadSymbolsFromBytes(filename string, data []byte) error {
+	ecuType, symbols, err := symbol.Load(filename, data, mw.Log)
+	if err != nil {
+		return fmt.Errorf("error loading symbols: %w", err)
+	}
+	mw.SetTitle(filepath.Base(filename))
+	mw.app.Preferences().SetString(prefsLastBinFile, filename)
+
+	mw.LoadSymbols(symbols, ecuType.String())
+	return nil
+}
+
+func (mw *MainWindow) LoadSymbols(symbols symbol.SymbolCollection, ecuType string) {
+	mw.selects.ecuSelect.SetSelected(ecuType)
+	mw.fw = symbols
+	mw.SyncSymbols()
 }
 
 func (mw *MainWindow) LoadPreset(r io.Reader) error {
