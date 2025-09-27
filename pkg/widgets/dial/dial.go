@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -20,13 +21,13 @@ type Dial struct {
 
 	cfg *widgets.GaugeConfig
 
-	factor float64
-	value  float64
-	//highestObserved float64
+	factor          float64
+	value           float64
+	highestObserved float64
 
-	needle *canvas.Line
-	//highestObservedMarker *canvas.Line
-	//lastHighestObserved   time.Time
+	needle                *canvas.Line
+	highestObservedMarker *canvas.Line
+	lastHighestObserved   time.Time
 
 	pips        []*canvas.Line
 	face        *canvas.Circle
@@ -72,7 +73,7 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 	c.cover = &canvas.Rectangle{FillColor: theme.Color(theme.ColorNameBackground)}
 	c.center = &canvas.Circle{FillColor: color.RGBA{R: 0x01, G: 0x0B, B: 0x13, A: 0xFF}}
 	c.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 3}
-	//c.highestObservedMarker = &canvas.Line{StrokeColor: color.RGBA{R: 216, G: 250, B: 8, A: 0xFF}, StrokeWidth: 4}
+	c.highestObservedMarker = &canvas.Line{StrokeColor: color.RGBA{R: 216, G: 250, B: 8, A: 0xFF}, StrokeWidth: 6}
 
 	c.titleText = &canvas.Text{Text: c.cfg.Title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
 	c.titleText.TextStyle.Monospace = true
@@ -134,8 +135,18 @@ func (c *Dial) SetValue(value float64) {
 		return
 	}
 	c.value = value
-
 	c.rotateNeedle(c.needle, value, c.needleOffset, c.needleLength)
+	if c.value > c.highestObserved {
+		c.highestObserved = c.value
+		c.lastHighestObserved = time.Now()
+		c.rotateNeedle(c.highestObservedMarker, c.value, c.radius-2, 6)
+	} else if time.Since(c.lastHighestObserved) > 10*time.Second {
+		// Reset the highest observed marker after 5 seconds of inactivity
+		c.highestObserved = value
+		c.lastHighestObserved = time.Now()
+		c.rotateNeedle(c.highestObservedMarker, c.value, c.radius-2, 6)
+	}
+
 	c.buf.Reset()
 	fmt.Fprintf(&c.buf, c.displayString, value)
 	c.displayText.Text = c.buf.String()
@@ -219,7 +230,8 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 			c.rotateLines(p, float64(i), radius87, eightRadius-1)
 		}
 	}
-	//c.rotateNeedle(c.highestObservedMarker, c.highestObserved, c.radius, c.eightRadius*0.5)
+	c.highestObservedMarker.StrokeWidth = max(2.0, midStroke)
+	c.rotateNeedle(c.highestObservedMarker, c.highestObserved, c.radius-2, 6)
 }
 
 func (c *DialRenderer) MinSize() fyne.Size {
@@ -237,6 +249,6 @@ func (c *DialRenderer) Objects() []fyne.CanvasObject {
 	for _, v := range c.pips {
 		objs = append(objs, v)
 	}
-	objs = append(objs, c.face, c.cover, c.titleText, c.center /*, c.highestObservedMarker*/, c.needle, c.displayText)
+	objs = append(objs, c.face, c.cover, c.titleText, c.center, c.highestObservedMarker, c.needle, c.displayText)
 	return objs
 }
