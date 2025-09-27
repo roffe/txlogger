@@ -1,4 +1,3 @@
-// go;build android
 package widgets
 
 import (
@@ -6,6 +5,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/storage"
 )
 
 func SelectFolder(cbc func(str string)) {
@@ -38,7 +38,20 @@ func SelectFile(cbc func(r fyne.URIReadCloser), desc string, exts ...string) {
 	}
 
 	w := fyne.CurrentApp().Driver().AllWindows()[0]
-	dialog.ShowFileOpen(cb, w)
+	//dialog.ShowFileOpen(cb, w)
+	d := dialog.NewFileOpen(cb, w)
+
+	log.Println("SelectFile", desc, exts)
+
+	newExts := make([]string, len(exts))
+	for i, ext := range exts {
+		newExts[i] = "." + ext
+	}
+
+	d.SetTitleText(desc)
+	d.SetFilter(storage.NewExtensionFileFilter(newExts))
+	d.Resize(w.Canvas().Size())
+	d.Show()
 }
 
 func SaveFile(cbc func(str string), desc, ext string) {
