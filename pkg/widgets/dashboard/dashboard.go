@@ -16,6 +16,7 @@ import (
 	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/datalogger"
+	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/cbar"
 	"github.com/roffe/txlogger/pkg/widgets/dial"
@@ -25,8 +26,6 @@ import (
 )
 
 const rpmIDCconstant = 1.0 / 1200.0
-
-const EBUS_TOPIC_ECU = "selected_ecu"
 
 type Dashboard struct {
 	cfg *Config
@@ -480,7 +479,7 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		"Myrtilos.InjectorDutyCycle": idcSetter(db.text.idc, "Idc"),   // t7
 		"Insptid_ms10":               idcSetterT5(db.text.idc, "Idc"), // t5
 
-		EBUS_TOPIC_ECU: func(value float64) {
+		ebus.TOPIC_ECU: func(value float64) {
 			switch symbol.ECUType(int(value)) {
 			case symbol.ECU_T5: //T5
 				db.cfg.AirDemToString = func(f float64) string {

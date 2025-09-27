@@ -21,7 +21,6 @@ import (
 	"github.com/roffe/txlogger/pkg/wbl/plx"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/settings/cansettings"
-	"github.com/roffe/txlogger/pkg/widgets/symbollist"
 	"github.com/roffe/txlogger/pkg/widgets/txconfigurator"
 )
 
@@ -747,7 +746,7 @@ func (sw *Widget) newColorBlindMode() *widget.Select {
 		widgets.ModeTritanopia.String(),
 	}, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsColorBlindMode, s)
-		ebus.Publish(symbollist.EBUS_TOPIC_COLORBLINDMODE, float64(sw.colorBlindMode.SelectedIndex()))
+		ebus.Publish(ebus.TOPIC_COLORBLINDMODE, float64(sw.colorBlindMode.SelectedIndex()))
 	})
 }
 

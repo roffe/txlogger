@@ -10,6 +10,11 @@ import (
 var once sync.Once
 var CONTROLLER *eventbus.Controller
 
+const (
+	TOPIC_COLORBLINDMODE = "color_blind_mode"
+	TOPIC_ECU            = "selected_ecu"
+)
+
 func init() {
 	once.Do(func() {
 		CONTROLLER = eventbus.New(eventbus.DefaultConfig)

@@ -19,10 +19,6 @@ import (
 )
 
 const (
-	EBUS_TOPIC_COLORBLINDMODE = "color_blind_mode"
-)
-
-const (
 	barAlpha uint8 = 80
 )
 

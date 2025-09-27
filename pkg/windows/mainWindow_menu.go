@@ -16,7 +16,6 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
-	"github.com/roffe/txlogger/pkg/widgets/symbollist"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmmod"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmstatus"
 	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7esp"
@@ -423,7 +422,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		}))
 	}
 
-	cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(symbollist.EBUS_TOPIC_COLORBLINDMODE, func(value float64) {
+	cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(ebus.TOPIC_COLORBLINDMODE, func(value float64) {
 		mv.SetColorBlindMode(widgets.ColorBlindMode(int(value)))
 	}))
 
