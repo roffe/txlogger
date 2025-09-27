@@ -312,15 +312,18 @@ func (i *innerWindowRenderer) Layout(size fyne.Size) {
 
 // Helper method to handle corner layout
 func (i *innerWindowRenderer) layoutCorners(size fyne.Size, pad float32) {
-	rightSize := i.rightCorner.MinSize()
-	rightPos := fyne.Position{X: size.Width - rightSize.Width + pad, Y: size.Height - rightSize.Height}
-	i.rightCorner.Move(rightPos)
-	i.rightCorner.Resize(rightSize)
+	cornerSize := fyne.NewSize(25, 25)
+	//rightSize := i.rightCorner.MinSize()
 
-	leftSize := i.leftCorner.MinSize()
-	leftPos := fyne.Position{X: -(pad + 2), Y: size.Height - leftSize.Height}
+	rightPos := fyne.Position{X: size.Width - cornerSize.Width + pad, Y: size.Height - cornerSize.Height}
+	i.rightCorner.Move(rightPos)
+	i.rightCorner.Resize(cornerSize)
+
+	//leftSize := i.leftCorner.MinSize()
+
+	leftPos := fyne.Position{X: -(pad + 2), Y: size.Height - cornerSize.Height}
 	i.leftCorner.Move(leftPos)
-	i.leftCorner.Resize(leftSize)
+	i.leftCorner.Resize(cornerSize)
 }
 
 func (i *innerWindowRenderer) MinSize() fyne.Size {
