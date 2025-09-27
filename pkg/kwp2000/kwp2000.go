@@ -47,14 +47,14 @@ func New(c *gocan.Client /*canID uint32, recvID ...uint32*/) *Client {
 }
 
 func (t *Client) StartSession(ctx context.Context, id, responseID uint32) error {
-	payload := []byte{0x3F, START_COMMUNICATION, 0x00, 0x11, byte(REQ_MSG_ID >> 8), byte(REQ_MSG_ID), 0x00, 0x00}
+	payload := []byte{0x3F, START_COM_REQ, 0x00, 0x11, byte(REQ_MSG_ID >> 8), byte(REQ_MSG_ID), 0x00, 0x00}
 	frame := gocan.NewFrame(id, payload, gocan.ResponseRequired)
 	resp, err := t.c.SendAndWait(ctx, frame, 3*time.Second, responseID)
 	if err != nil {
 		return fmt.Errorf("StartSession: %w", err)
 	}
 
-	if resp.Data[3] != START_COMMUNICATION|0x40 {
+	if resp.Data[3] != START_COM_REQ|0x40 {
 		return fmt.Errorf("StartSession: %w", TranslateErrorCode(GENERAL_REJECT))
 	}
 
@@ -66,7 +66,7 @@ func (t *Client) StartSession(ctx context.Context, id, responseID uint32) error 
 }
 
 func (t *Client) StopSession(ctx context.Context) error {
-	return t.c.Send(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, STOP_COMMUNICATION}, gocan.ResponseRequired)
+	return t.c.Send(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, STOP_COM_REQ}, gocan.ResponseRequired)
 }
 
 func (t *Client) TesterPresent(ctx context.Context) error {
