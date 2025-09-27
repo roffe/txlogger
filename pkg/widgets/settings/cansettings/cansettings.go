@@ -1,11 +1,14 @@
 package cansettings
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -14,6 +17,7 @@ import (
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/layout"
+	"github.com/roffe/txlogger/pkg/mdns"
 )
 
 const (
@@ -22,7 +26,7 @@ const (
 	prefsSpeed   = "speed"
 	prefsDebug   = "debug"
 
-	MinimumtxbridgeVersion = "1.0.8"
+	MinimumtxbridgeVersion = "1.0.9"
 )
 
 var portSpeeds = []string{"9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600", "1mbit", "2mbit", "3mbit"}
@@ -47,7 +51,7 @@ func NewCANSettingsWidget() *Widget {
 	}
 	csw.ExtendBaseWidget(csw)
 
-	csw.adapterSelector = widget.NewSelect([]string{}, func(s string) {
+	csw.adapterSelector = widget.NewSelect(gocan.List(), func(s string) {
 		if info, found := csw.adapters[s]; found {
 			csw.app.Preferences().SetString(prefsAdapter, s)
 			if info.RequiresSerialPort {
@@ -85,6 +89,9 @@ func NewCANSettingsWidget() *Widget {
 }
 
 func (c *Widget) AddAdapters(adapters []*proto.AdapterInfo) {
+	if len(adapters) == 0 {
+		return
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, a := range adapters {
@@ -245,19 +252,31 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 			},
 		)
 	} else {
-		return gocan.NewAdapter(
-			cs.adapterSelector.Selected,
-			&gocan.AdapterConfig{
-				Port:                   cs.portSelector.Selected,
-				PortBaudrate:           baudrate,
-				CANRate:                canRate,
-				CANFilter:              canFilter,
-				OnMessage:              logger,
-				Debug:                  cs.debugCheckbox.Checked,
-				MinimumFirmwareVersion: minimumVersion,
-				PrintVersion:           true,
-			},
-		)
+		cfg := &gocan.AdapterConfig{
+			Port:                   cs.portSelector.Selected,
+			PortBaudrate:           baudrate,
+			CANRate:                canRate,
+			CANFilter:              canFilter,
+			OnMessage:              logger,
+			Debug:                  cs.debugCheckbox.Checked,
+			MinimumFirmwareVersion: minimumVersion,
+			PrintVersion:           true,
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if cs.adapterSelector.Selected == "txbridge wifi" {
+			addr, err := mdns.Query(ctx, "txbridge.local")
+			if err != nil {
+				logger(fmt.Sprintf("Failed to resolve txbridge address via mDNS: %v", err))
+			} else {
+				cfg.AdditionalConfig = map[string]string{
+					"address": fmt.Sprintf("%s:%d", addr.String(), 1337),
+				}
+			}
+		}
+
+		return gocan.NewAdapter(cs.adapterSelector.Selected, cfg)
 	}
 }
 
