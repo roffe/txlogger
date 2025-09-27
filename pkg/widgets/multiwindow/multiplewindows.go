@@ -170,7 +170,9 @@ func (m *MultipleWindows) Raise(w *InnerWindow) {
 	defer m.propertyLock.Unlock()
 	m.raise(w)
 	if obj, ok := w.content.Objects[0].(fyne.Focusable); ok {
-		fyne.CurrentApp().Driver().CanvasForObject(w).Focus(obj)
+		if c := fyne.CurrentApp().Driver().CanvasForObject(w); c != nil {
+			c.Focus(obj)
+		}
 	}
 }
 
