@@ -4,6 +4,8 @@ import (
 	"image"
 	"image/color"
 	"math"
+
+	"github.com/roffe/txlogger/pkg/widgets"
 )
 
 // VertexPair represents a line segment between two vertices
@@ -124,7 +126,13 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 // getColorWithDepth combines color interpolation and depth enhancement in one step
 func (m *Meshgrid) getColorWithDepth(value, depthFactor float64) color.RGBA {
 	// Get base color from value
-	baseColor := m.getColorInterpolation(value)
+	//baseColor := m.getColorInterpolation(value)
+	baseColor := widgets.GetColorInterpolation(
+		m.zmin,
+		m.zmax,
+		value,
+		m.colorMode,
+	)
 
 	// Apply depth effects - simpler calculation for performance
 	adjustedFactor := 0.6 + 0.4*depthFactor // Simplify power calculations

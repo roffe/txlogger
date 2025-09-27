@@ -11,10 +11,19 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	xlayout "fyne.io/x/fyne/layout"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/eventbus"
 	"github.com/roffe/txlogger/pkg/widgets"
+)
+
+const (
+	EBUS_TOPIC_COLORBLINDMODE = "color_blind_mode"
+)
+
+const (
+	barAlpha uint8 = 80
 )
 
 type Widget struct {
@@ -30,8 +39,9 @@ type Widget struct {
 }
 
 type Config struct {
-	EBus    *eventbus.Controller
-	Symbols []*symbol.Symbol
+	EBus           *eventbus.Controller
+	Symbols        []*symbol.Symbol
+	ColorBlindMode widgets.ColorBlindMode
 }
 
 func New(cfg *Config) *Widget {
@@ -49,6 +59,13 @@ func New(cfg *Config) *Widget {
 func (s *Widget) render() {
 	s.container = container.NewVBox()
 	s.scroll = container.NewVScroll(s.container)
+
+}
+
+func (s *Widget) SetColorBlindMode(mode widgets.ColorBlindMode) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cfg.ColorBlindMode = mode
 
 }
 
@@ -79,11 +96,12 @@ func (s *Widget) SetValue(name string, value float64) {
 			val.max = value
 		}
 		if s.updateBars {
-			factor := float32((value - val.min) / (val.max - val.min))
-			col := widgets.GetColorInterpolation(val.min, val.max, value)
-			col.A = 30
+			val.valueBarFactor = float32((value - val.min) / (val.max - val.min))
+			col := widgets.GetColorInterpolation(val.min, val.max, value, s.cfg.ColorBlindMode)
+			col.A = barAlpha
 			val.valueBar.FillColor = col
-			val.valueBar.Resize(fyne.Size{Width: factor * 100, Height: 26})
+			totalWidth := val.symbolName.Size().Width
+			val.valueBar.Resize(fyne.Size{Width: val.valueBarFactor * totalWidth, Height: 26})
 		}
 		prec := symbol.GetPrecision(val.symbol.Correctionfactor)
 		textValue := strconv.FormatFloat(value, 'f', prec, 64)
@@ -138,7 +156,7 @@ func (s *Widget) Add(symbols ...*symbol.Symbol) {
 				}
 			}
 		}
-		entry := NewSymbolWidgetEntry(sym, deleteFunc)
+		entry := s.newSymbolWidgetEntry(sym, deleteFunc)
 		s.cfg.Symbols = append(s.cfg.Symbols, sym)
 		s.entries = append(s.entries, entry)
 		s.container.Add(entry)
@@ -204,7 +222,8 @@ func (s *Widget) CreateRenderer() fyne.WidgetRenderer {
 	factor := widget.NewLabel("Factor")
 	factor.TextStyle = fyne.TextStyle{Bold: true}
 
-	header := container.New(&headerLayout{}, widget.NewLabel(""), name, value, num /* typ,*/, factor, widget.NewLabel(""))
+	ll := xlayout.NewHPortion(headerSizes)
+	header := container.New(ll, name, value, num /* typ,*/, factor, widget.NewLabel(""))
 
 	return widget.NewSimpleRenderer(container.NewBorder(
 		header,
@@ -215,67 +234,20 @@ func (s *Widget) CreateRenderer() fyne.WidgetRenderer {
 	))
 }
 
-type headerLayout struct {
-	oldSize fyne.Size
-}
+var headerSizes = []float64{.34, .16, .12, .14, .06}
 
-func (h *headerLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
-	if h.oldSize == size {
-		return
-	}
-	h.oldSize = size
-
-	var x float32
-	padd := size.Width * ((1.0 - sumFloat32(sz)) / float32(len(sz)))
-	for i, o := range objects {
-		o.Resize(fyne.NewSize(size.Width*sz[i], size.Height))
-		o.Move(fyne.NewPos(x, 0))
-		x += o.Size().Width + padd
-	}
-
-}
-
-func (h *headerLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(400, 30)
-}
-
-type SymbolWidgetEntry struct {
-	widget.BaseWidget
-	symbol       *symbol.Symbol
-	copyName     *widget.Button
-	symbolName   *widget.Label
-	symbolValue  *widget.Label
-	symbolNumber *widget.Label
-	//symbolType             *widget.Label
-	symbolCorrectionfactor *widget.Entry
-	deleteBTN              *widget.Button
-	valueBar               *canvas.Rectangle
-
-	deleteFunc func(*SymbolWidgetEntry)
-
-	//valueSet bool
-	value    float64
-	min, max float64
-
-	oldSize fyne.Size
-}
-
-func NewSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry)) *SymbolWidgetEntry {
+func (s *Widget) newSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry)) *SymbolWidgetEntry {
 	sw := &SymbolWidgetEntry{
+		w:          s,
 		symbol:     sym,
 		deleteFunc: deleteFunc,
 	}
 	sw.ExtendBaseWidget(sw)
-	sw.copyName = widget.NewButtonWithIcon("", theme.ContentCopyIcon(), func() {
-		fyne.CurrentApp().Clipboard().SetContent(sym.Name)
-		//fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(sym.Name)
-	})
 	sw.symbolName = widget.NewLabel(sw.symbol.Name)
+	sw.symbolName.Selectable = true
 	sw.symbolValue = widget.NewLabel("---")
 	sw.symbolNumber = widget.NewLabel(strconv.Itoa(sw.symbol.Number))
-	//sw.symbolType = widget.NewLabel(fmt.Sprintf("%02X", sw.symbol.Type))
 	sw.symbolCorrectionfactor = widget.NewEntry()
-
 	sw.symbolCorrectionfactor.OnChanged = func(s string) {
 		f, err := strconv.ParseFloat(s, 64)
 		if err != nil {
@@ -292,19 +264,48 @@ func NewSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry
 		}
 	})
 
-	sw.valueBar = canvas.NewRectangle(color.RGBA{255, 0, 0, 255})
+	sw.valueBar = canvas.NewRectangle(color.RGBA{0, 0, 0, 0})
+
+	layout := xlayout.NewHPortion(headerSizes)
+	sw.body = container.New(layout,
+		sw.symbolName,
+		sw.symbolValue,
+		sw.symbolNumber,
+		sw.symbolCorrectionfactor,
+		sw.deleteBTN,
+	)
+	sw.container = container.NewStack(
+		container.NewWithoutLayout(sw.valueBar),
+		sw.body,
+	)
 
 	return sw
 }
 
-//func (sw *SymbolWidgetEntry) MouseMoved(event *desktop.MouseEvent) {
-//}
-//
-//func (sw *SymbolWidgetEntry) MouseOut() {
-//}
-//
-//func (sw *SymbolWidgetEntry) MouseIn(event *desktop.MouseEvent) {
-//}
+type SymbolWidgetEntry struct {
+	widget.BaseWidget
+
+	w *Widget
+
+	symbol                 *symbol.Symbol
+	symbolName             *widget.Label
+	symbolValue            *widget.Label
+	symbolNumber           *widget.Label
+	symbolCorrectionfactor *widget.Entry
+	deleteBTN              *widget.Button
+	valueBar               *canvas.Rectangle
+	valueBarFactor         float32
+
+	deleteFunc func(*SymbolWidgetEntry)
+
+	value    float64
+	min, max float64
+
+	oldSize fyne.Size
+
+	body      *fyne.Container
+	container *fyne.Container
+}
 
 func (sw *SymbolWidgetEntry) SetCorrectionFactor(f float64) {
 	sw.symbol.Correctionfactor = f
@@ -324,24 +325,7 @@ func (sw *SymbolWidgetEntry) SetCorrectionFactor(f float64) {
 
 func (sw *SymbolWidgetEntry) CreateRenderer() fyne.WidgetRenderer {
 	return &symbolWidgetEntryRenderer{sw}
-}
-
-var sz = []float32{
-	.05, // copy
-	.32, // name
-	.20, // value
-	.12, // number
-	.14, // correctionfactor
-	//.07, // type
-	.06, // deletebtn
-}
-
-func sumFloat32(a []float32) float32 {
-	var sum float32
-	for _, v := range a {
-		sum += v
-	}
-	return sum
+	//return widget.NewSimpleRenderer(sw.container)
 }
 
 type symbolWidgetEntryRenderer struct {
@@ -355,38 +339,10 @@ func (s *symbolWidgetEntryRenderer) Layout(size fyne.Size) {
 	if s.e.oldSize == size {
 		return
 	}
+	s.e.container.Resize(size)
+	s.e.valueBar.Move(fyne.NewPos(0, 6))
+	s.e.valueBar.Resize(fyne.Size{Width: s.e.valueBarFactor * s.e.symbolName.Size().Width, Height: 26})
 	s.e.oldSize = size
-	padd := size.Width * ((1.0 - sumFloat32(sz)) / float32(len(sz)))
-	s.e.copyName.Resize(fyne.NewSize(size.Width*sz[0], size.Height))
-	s.e.symbolName.Resize(fyne.NewSize(size.Width*sz[1], size.Height))
-	s.e.symbolValue.Resize(fyne.NewSize(size.Width*sz[2], size.Height))
-	s.e.symbolNumber.Resize(fyne.NewSize(size.Width*sz[3], size.Height))
-	//s.symbolType.Resize(fyne.NewSize(size.Width*sz[4], size.Height))
-	s.e.symbolCorrectionfactor.Resize(fyne.NewSize(size.Width*sz[4], size.Height))
-	s.e.deleteBTN.Resize(fyne.NewSize(size.Width*sz[5], size.Height))
-
-	var x float32
-
-	s.e.copyName.Move(fyne.NewPos(x, 0))
-	x += s.e.copyName.Size().Width + padd
-
-	s.e.symbolName.Move(fyne.NewPos(x, 0))
-	x += s.e.symbolName.Size().Width + padd
-
-	s.e.symbolValue.Move(fyne.NewPos(x, 0))
-	s.e.valueBar.Move(fyne.NewPos(x, 6))
-	x += s.e.symbolValue.Size().Width + padd
-
-	s.e.symbolNumber.Move(fyne.NewPos(x, 0))
-	x += s.e.symbolNumber.Size().Width + padd
-
-	// s.symbolType.Move(fyne.NewPos(x, 0))
-	// x += s.symbolType.Size().Width + padd
-
-	s.e.symbolCorrectionfactor.Move(fyne.NewPos(x, 0))
-	x += s.e.symbolCorrectionfactor.Size().Width + padd
-
-	s.e.deleteBTN.Move(fyne.NewPos(x, 0))
 }
 
 func (s *symbolWidgetEntryRenderer) MinSize() fyne.Size {
@@ -394,22 +350,18 @@ func (s *symbolWidgetEntryRenderer) MinSize() fyne.Size {
 }
 
 func (s *symbolWidgetEntryRenderer) Refresh() {
-	s.e.copyName.Refresh()
 	s.e.symbolName.Refresh()
 	s.e.symbolValue.Refresh()
 	s.e.symbolNumber.Refresh()
 	s.e.symbolCorrectionfactor.Refresh()
+	col := widgets.GetColorInterpolation(s.e.min, s.e.max, s.e.value, s.e.w.cfg.ColorBlindMode)
+	col.A = barAlpha
+	s.e.valueBar.FillColor = col
+	s.e.valueBar.StrokeColor = col
+	s.e.valueBar.Refresh()
+
 }
 
 func (s *symbolWidgetEntryRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{
-		s.e.copyName,
-		s.e.valueBar,
-		s.e.symbolName,
-		s.e.symbolValue,
-		s.e.symbolNumber,
-		//s.symbolType,
-		s.e.symbolCorrectionfactor,
-		s.e.deleteBTN,
-	}
+	return []fyne.CanvasObject{s.e.container}
 }
