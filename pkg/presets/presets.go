@@ -26,21 +26,19 @@ func Names() []string {
 }
 
 func Set(name string, symbols []*symbol.Symbol) error {
-	if strings.EqualFold(name, "T7 Dash") || strings.EqualFold(name, "T8 Dash") || strings.EqualFold(name, "T5 Dash") {
+	if strings.EqualFold(name, "T5 Dash") || strings.EqualFold(name, "T7 Dash") || strings.EqualFold(name, "T8 Dash") {
 		return fmt.Errorf("cannot replace system presets")
 	}
-
 	data, err := json.Marshal(symbols)
 	if err != nil {
 		return err
 	}
-
 	Map[name] = string(data)
 	return nil
 }
 
 func Delete(name string) error {
-	if strings.EqualFold(name, "T7 Dash") || strings.EqualFold(name, "T8 Dash") || strings.EqualFold(name, "T5 Dash") {
+	if strings.EqualFold(name, "T5 Dash") || strings.EqualFold(name, "T7 Dash") || strings.EqualFold(name, "T8 Dash") {
 		return fmt.Errorf("cannot delete system presets")
 	}
 	delete(Map, name)
