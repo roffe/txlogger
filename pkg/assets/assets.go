@@ -47,7 +47,7 @@ var Uego []byte
 var LambdaToCan []byte
 
 //go:embed plx.jpg
-var PLXSMAFR []byte
+var PLX []byte
 
 //go:embed t7.jpg
 var T7 []byte
