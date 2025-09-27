@@ -15,7 +15,7 @@ type CSVLogfile struct {
 	BaseLogfile
 }
 
-func NewFromCSVLogfile(reader io.ReadCloser) (Logfile, error) {
+func NewFromCSVLogfile(reader io.Reader) (Logfile, error) {
 	c := &CSVLogfile{}
 	c.pos = -1
 	// start := time.Now()
@@ -26,7 +26,7 @@ func NewFromCSVLogfile(reader io.ReadCloser) (Logfile, error) {
 	return c, nil
 }
 
-func (l *CSVLogfile) parseCSVLogfile(reader io.ReadCloser) error {
+func (l *CSVLogfile) parseCSVLogfile(reader io.Reader) error {
 	r := csv.NewReader(reader)
 
 	records, err := r.ReadAll()

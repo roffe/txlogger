@@ -16,7 +16,7 @@ type TxLogfile struct {
 	BaseLogfile
 }
 
-func NewFromTxLogfile(reader io.ReadCloser) (Logfile, error) {
+func NewFromTxLogfile(reader io.Reader) (Logfile, error) {
 	txlog := &TxLogfile{}
 	txlog.pos = -1
 	// start := time.Now()
@@ -45,7 +45,7 @@ func detectTimeFormat(text string) (string, error) {
 	return "", errors.New("could not detect time format")
 }
 
-func (l *TxLogfile) parseTxLogfile(reader io.ReadCloser) error {
+func (l *TxLogfile) parseTxLogfile(reader io.Reader) error {
 	lines := make([]string, 0)
 	buffer := make([]byte, 4*1024)
 	fileScanner := bufio.NewScanner(reader)
