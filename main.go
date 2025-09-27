@@ -18,7 +18,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"unsafe"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -28,9 +27,7 @@ import (
 	"github.com/roffe/txlogger/pkg/ipc"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/windows"
-	sdialog "github.com/sqweek/dialog"
 
-	"net/http"
 	_ "net/http/pprof"
 )
 
@@ -44,23 +41,23 @@ func init() {
 	flag.Parse()
 }
 
-func startpprof() {
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
-}
+/*
+	func startpprof() {
+		go func() {
+			log.Println(http.ListenAndServe("localhost:6060", nil))
+		}()
+	}
 
-func signalHandler(tx fyne.App) {
-	sig := make(chan os.Signal, 2)
-	signal.Notify(sig, syscall.SIGINT)
-	go func() {
-		<-sig
-		//rdebug.PrintStack()
-	}()
-}
-
+	func signalHandler(tx fyne.App) {
+		sig := make(chan os.Signal, 2)
+		signal.Notify(sig, syscall.SIGINT)
+		go func() {
+			<-sig
+			//rdebug.PrintStack()
+		}()
+	}
+*/
 func startCanGateway(errFunc func(error), readyChan chan<- struct{}) *os.Process {
-
 	if wd, err := os.Getwd(); err == nil {
 		command := filepath.Join(wd, "cangateway.exe")
 		cmd := exec.Command(command)
@@ -122,6 +119,7 @@ func mainAndroid() {
 	mw.ShowAndRun()
 }
 
+/*
 type RTL_OSVERSIONINFOEXW struct {
 	OSVersionInfoSize uint32
 	MajorVersion      uint32
@@ -144,14 +142,17 @@ func RtlGetVersion() RTL_OSVERSIONINFOEXW {
 	rtlGetVersion.Call(uintptr(unsafe.Pointer(&info)))
 	return info
 }
+*/
 
 func mainDesktop() {
+	sig := make(chan os.Signal, 2)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	defer log.Println("txlogger exit")
-	ver := RtlGetVersion()
-	if ver.MajorVersion < 10 {
-		sdialog.Message("txlogger requires Windows 10 or later").Title("Unsupported Windows version").Error()
-		return
-	}
+	//ver := RtlGetVersion()
+	//if ver.MajorVersion < 10 {
+	//	sdialog.Message("txlogger requires Windows 10 or later").Title("Unsupported Windows version").Error()
+	//	return
+	//}
 
 	//startpprof()
 	socketFile := filepath.Join(os.TempDir(), "txlogger.sock")
@@ -204,7 +205,10 @@ func mainDesktop() {
 	//log.Printf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir())
 
 	mw := windows.NewMainWindow(tx)
-
+	go func() {
+		<-sig
+		fyne.Do(mw.Close)
+	}()
 	errFunc = mw.Error
 
 	router := ipc.Router{
@@ -214,12 +218,7 @@ func mainDesktop() {
 		"open": func(filename string) *ipc.Message {
 			fyne.Do(mw.Window.RequestFocus) // show window
 			if strings.HasSuffix(filename, ".bin") {
-				f, err := os.Open(filename)
-				if err != nil {
-					mw.Error(err)
-				}
-				defer f.Close()
-				mw.LoadSymbolsFromFile(filename, f)
+				mw.LoadSymbolsFromFile(filename)
 			}
 			if strings.HasSuffix(filename, ".t5l") || strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") || strings.HasSuffix(filename, ".csv") {
 				f, err := os.Open(filename)
@@ -246,12 +245,7 @@ func mainDesktop() {
 		switch strings.ToLower(path.Ext(filename)) {
 		case ".bin":
 			//mw = windows.NewMainWindow(a, filename)
-			f, err := os.Open(filename)
-			if err != nil {
-				mw.Error(err)
-			}
-			defer f.Close()
-			if err := mw.LoadSymbolsFromFile(filename, f); err != nil {
+			if err := mw.LoadSymbolsFromFile(filename); err != nil {
 				mw.Error(err)
 			} else {
 				loadedSymbols = true
@@ -270,13 +264,7 @@ func mainDesktop() {
 
 	if filename := tx.Preferences().String("lastBinFile"); filename != "" && !loadedSymbols {
 		if fileExists(filename) {
-			f, err := os.Open(filename)
-			if err != nil {
-				mw.Error(err)
-			} else {
-				defer f.Close()
-				mw.LoadSymbolsFromFile(filename, f)
-			}
+			mw.LoadSymbolsFromFile(filename)
 		}
 	}
 
