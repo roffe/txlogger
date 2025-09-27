@@ -2,16 +2,20 @@ package dashboard
 
 import (
 	_ "embed"
+	"fmt"
 	"image/color"
 	"log"
+	"strconv"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/common"
+	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/cbar"
 	"github.com/roffe/txlogger/pkg/widgets/dial"
@@ -21,6 +25,8 @@ import (
 )
 
 const rpmIDCconstant = 1.0 / 1200.0
+
+const EBUS_TOPIC_ECU = "selected_ecu"
 
 type Dashboard struct {
 	cfg *Config
@@ -67,8 +73,8 @@ type Config struct {
 	AirDemToString  func(float64) string
 	UseMPH          bool
 	SwapRPMandSpeed bool
-	HighAFR         float64
-	LowAFR          float64
+	Low             float64
+	High            float64
 	WidebandSymbol  string
 	MetricRouter    map[string]func(float64)
 	FullscreenFunc  func(bool)
@@ -234,11 +240,6 @@ func NewDashboard(cfg *Config) *Dashboard {
 		if db.cfg.FullscreenFunc != nil {
 			isFullscreen = !isFullscreen
 			db.cfg.FullscreenFunc(isFullscreen)
-			if true {
-				db.fullscreenBtn.SetText("Exit Fullscreen")
-			} else {
-				db.fullscreenBtn.SetText("Fullscreen")
-			}
 		}
 	})
 
@@ -339,6 +340,42 @@ func interpol(x0, y0, x1, y1, x float64) float64 {
 	return y0 + (x-x0)*(y1-y0)/(x1-x0)
 }
 
+func (db *Dashboard) activeAirDemSetter(obj *canvas.Text) func(float64) {
+	var buf []byte
+	var lastVal float64
+	return func(value float64) {
+		if value == lastVal {
+			return
+		}
+		buf = buf[:0]
+		buf = append(buf, db.cfg.AirDemToString(value)...)
+		buf = append(buf, "("...)
+		buf = strconv.AppendFloat(buf, value, 'f', 0, 64)
+		buf = append(buf, ")"...)
+		obj.Text = string(buf)
+		//obj.Text = string(buf)
+		obj.Refresh()
+		lastVal = value
+	}
+}
+
+func (db *Dashboard) activeAirSetter(value float64) {
+	var buf []byte
+	var lastVal float64
+	if value == lastVal {
+		return
+	}
+	buf = buf[:0]
+	buf = append(buf, db.cfg.AirDemToString(value)...)
+	buf = append(buf, "("...)
+	buf = strconv.AppendFloat(buf, value, 'f', 0, 64)
+	buf = append(buf, ")"...)
+	db.text.activeAirDem.Text = string(buf)
+	//obj.Text = string(buf)
+	db.text.activeAirDem.Refresh()
+	lastVal = value
+}
+
 func (db *Dashboard) createRouter() map[string]func(float64) {
 	var rpm float64
 	t5rpmSetter := func(value float64) {
@@ -355,7 +392,7 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 
 	ioff := ioffSetter(db.text.ioff, db.image.taz)
 
-	activeAirDem := activeAirDemSetter(db.text.activeAirDem, db.cfg.AirDemToString)
+	// activeAirDem := db.activeAirDemSetter(db.text.activeAirDem)
 
 	setVehicleSpeed := db.gauges.speed.SetValue
 	if db.cfg.UseMPH {
@@ -428,7 +465,7 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		"Out.fi_Ignition": textSetter(db.text.ign, "Ign", "", 1),
 		"Ign_angle":       textSetter(db.text.ign, "Ign", "", 1),
 
-		"ECMStat.ST_ActiveAirDem": activeAirDem, // t7 & t8
+		"ECMStat.ST_ActiveAirDem": db.activeAirSetter, // t7 & t8
 
 		"IgnProt.fi_Offset":     ioff, // t7
 		"IgnMastProt.fi_Offset": ioff, // t8
@@ -442,6 +479,19 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 
 		"Myrtilos.InjectorDutyCycle": idcSetter(db.text.idc, "Idc"),   // t7
 		"Insptid_ms10":               idcSetterT5(db.text.idc, "Idc"), // t5
+
+		EBUS_TOPIC_ECU: func(value float64) {
+			switch symbol.ECUType(int(value)) {
+			case symbol.ECU_T5: //T5
+				db.cfg.AirDemToString = func(f float64) string {
+					return fmt.Sprintf("%.1f", f)
+				}
+			case symbol.ECU_T7: //T7
+				db.cfg.AirDemToString = datalogger.AirDemToStringT7
+			case symbol.ECU_T8: //T8
+				db.cfg.AirDemToString = datalogger.AirDemToStringT8
+			}
+		},
 	}
 
 	return router
