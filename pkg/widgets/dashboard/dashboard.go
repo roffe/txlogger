@@ -339,6 +339,7 @@ func interpol(x0, y0, x1, y1, x float64) float64 {
 	return y0 + (x-x0)*(y1-y0)/(x1-x0)
 }
 
+/*
 func (db *Dashboard) activeAirDemSetter(obj *canvas.Text) func(float64) {
 	var buf []byte
 	var lastVal float64
@@ -357,6 +358,7 @@ func (db *Dashboard) activeAirDemSetter(obj *canvas.Text) func(float64) {
 		lastVal = value
 	}
 }
+*/
 
 func (db *Dashboard) activeAirSetter(value float64) {
 	var buf []byte
