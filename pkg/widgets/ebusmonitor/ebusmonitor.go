@@ -42,8 +42,7 @@ func (t *Widget) render() *Widget {
 func (t *Widget) SetText(value string, data float64) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if _, ok := t.values[value]; !ok {
-
+	if itm, ok := t.values[value]; !ok {
 		t.values[value] = canvas.NewText(fmt.Sprintf("%s: %.3g", value, data), colors.GetColor(value))
 		t.order = append(t.order, value)
 		sort.Strings(t.order)
@@ -57,8 +56,8 @@ func (t *Widget) SetText(value string, data float64) {
 		t.container.Refresh()
 		return
 	} else {
-		t.values[value].Text = fmt.Sprintf("%s: %g", value, data)
-		t.Refresh()
+		itm.Text = fmt.Sprintf("%s: %g", value, data)
+		itm.Refresh()
 	}
 }
 
