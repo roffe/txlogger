@@ -11,6 +11,7 @@ import (
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/txlogger/pkg/common"
 )
 
 func NewWriter(cfg Config) (string, LogWriter, error) {
@@ -43,13 +44,16 @@ func createLog(path, prefix, extension string) (*os.File, string, error) {
 		}
 	}
 
-	filename := fmt.Sprintf("%s-%s.%s", strings.Replace(prefix, ".", "_", -1), time.Now().Format("2006-01-02_150405"), extension)
+	filename := fmt.Sprintf("%s-%s.%s", strings.ReplaceAll(prefix, ".", "_"), time.Now().Format("2006-01-02_150405"), extension)
+	filename = common.SanitizeFilename(filename)
 
-	file, err := os.OpenFile(filepath.Join(path, filename), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	fullFilename := filepath.Join(path, filename)
+
+	file, err := os.OpenFile(fullFilename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to open file: %w", err)
 	}
-	return file, filename, nil
+	return file, fullFilename, nil
 }
 
 func NewCSVWriter(f *os.File) *CSVWriter {
