@@ -8,6 +8,8 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -50,8 +52,8 @@ func UpdateOTA(cfg Config) error {
 	var err error
 	var sp io.ReadWriteCloser
 
-	if cfg.Port == "tcp" {
-		sp, err = openTcpPort()
+	if strings.HasPrefix(cfg.Port, "tcp://") {
+		sp, err = openTcpPort(cfg.Port[6:])
 	} else {
 		sp, err = openSerialPort(cfg.Port)
 	}
@@ -106,7 +108,7 @@ func UpdateOTA(cfg Config) error {
 		})
 		t := <-cc
 		if !t {
-			return errors.New("UpdateOTA aborted")
+			return errors.New("OTA update aborted")
 		}
 
 	}
@@ -190,7 +192,7 @@ func checkErr(cmd *serialcommand.SerialCommand) error {
 
 func openSerialPort(port string) (io.ReadWriteCloser, error) {
 	mode := &serial.Mode{
-		BaudRate: COM_SPEED, // 2Mbit
+		BaudRate: COM_SPEED,
 	}
 	p, err := serial.Open(port, mode)
 	if err != nil {
@@ -200,9 +202,18 @@ func openSerialPort(port string) (io.ReadWriteCloser, error) {
 	return p, nil
 }
 
-func openTcpPort() (io.ReadWriteCloser, error) {
+func openTcpPort(address string) (io.ReadWriteCloser, error) {
 	d := net.Dialer{Timeout: 2 * time.Second}
-	p, err := d.Dial("tcp", "192.168.4.1:1337")
+	if address == "" {
+		address = "192.168.4.1:1337"
+	}
+	if value := os.Getenv("TXBRIDGE_ADDRESS"); value != "" {
+		address = value
+	}
+	if !strings.HasSuffix(address, ":1337") {
+		address += ":1337" // Ensure the port is always set
+	}
+	p, err := d.Dial("tcp", address)
 	if err != nil {
 		return nil, err
 	}
