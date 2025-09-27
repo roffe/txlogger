@@ -9,7 +9,7 @@ import (
 )
 
 type ProgressModal struct {
-	p  *widget.PopUp
+	*widget.PopUp
 	pb *widget.ProgressBarInfinite
 }
 
@@ -21,8 +21,8 @@ func New(c fyne.Canvas, message string) *ProgressModal {
 	pb := widget.NewProgressBarInfinite()
 	msg := container.NewBorder(bobrK, pb, nil, nil, widget.NewLabel(message))
 	return &ProgressModal{
-		p:  widget.NewModalPopUp(msg, c),
-		pb: pb,
+		PopUp: widget.NewModalPopUp(msg, c),
+		pb:    pb,
 	}
 }
 
@@ -32,10 +32,10 @@ func (pm *ProgressModal) Stop() {
 
 func (pm *ProgressModal) Show() {
 	pm.pb.Start()
-	pm.p.Show()
+	pm.PopUp.Show()
 }
 
 func (pm *ProgressModal) Hide() {
 	pm.pb.Stop()
-	pm.p.Hide()
+	pm.PopUp.Hide()
 }
