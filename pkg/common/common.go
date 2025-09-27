@@ -1,6 +1,13 @@
 package common
 
-import "math"
+import (
+	"fmt"
+	"math"
+	"os"
+	"path/filepath"
+	"regexp"
+	"time"
+)
 
 const (
 	Pi15            = math.Pi * 1.5
@@ -25,3 +32,51 @@ const (
 	OneTwohundredth = 1.0 / 200.0  // 0.005
 	OneTwelvehundth = 1.0 / 1200.0 // 0.0008333333333333334
 )
+
+var safeNameRE = regexp.MustCompile(`[^\w.\-]+`) // allow letters, numbers, _, -, .
+
+func SanitizeFilename(name string) string {
+	name = filepath.Base(name) // strip directories
+	name = safeNameRE.ReplaceAllString(name, "_")
+	if name == "" || name == "." || name == ".." {
+		name = fmt.Sprintf("file_%d", time.Now().Unix())
+	}
+	return name
+}
+
+func GetLogPath() (string, error) {
+	dir, err := getUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	logPath := getComponentPath(dir, "logs")
+	return logPath, createDirIfNotExists(logPath)
+}
+
+func GetBinPath() (string, error) {
+	dir, err := getUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	binPath := getComponentPath(dir, "bins")
+	return binPath, createDirIfNotExists(binPath)
+}
+
+func getComponentPath(base, typ string) string {
+	return filepath.Join(base, "txlogger", typ)
+}
+
+func getUserHomeDir() (string, error) {
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("could not determine user home directory: %v", err)
+	}
+	return dir, nil
+}
+
+func createDirIfNotExists(path string) error {
+	if err := os.MkdirAll(path, os.ModePerm); err != nil {
+		return fmt.Errorf("could not create log directory: %v", err)
+	}
+	return nil
+}
