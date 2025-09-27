@@ -27,6 +27,7 @@ func New(data binding.StringList) *MsgList {
 		func() fyne.CanvasObject {
 			w := widget.NewLabel("")
 			w.Alignment = fyne.TextAlignLeading
+			w.Selectable = true
 			return w
 		},
 		func(item binding.DataItem, obj fyne.CanvasObject) {
@@ -51,7 +52,7 @@ func (m *MsgList) CreateRenderer() fyne.WidgetRenderer {
 	m.msgs.AddListener(m.listener)
 	return &msgListRenderer{
 		m:         m,
-		container: container.NewVScroll(m.output),
+		container: container.NewScroll(m.output),
 	}
 }
 
@@ -63,7 +64,7 @@ type msgListRenderer struct {
 }
 
 func (r *msgListRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(300, 200)
+	return fyne.NewSize(300, 100)
 }
 
 func (r *msgListRenderer) Layout(size fyne.Size) {
