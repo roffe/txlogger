@@ -7,6 +7,28 @@ import (
 	"github.com/roffe/txlogger/pkg/logfile"
 )
 
+// 75      125     150     180     240     300     360     420     480     540     600     660     720     800     900     1100    1300    1500
+var tolerancces []int = []int{
+	5,  //75
+	10, //125
+	10, //150
+	10, //180
+	10, //240
+	15, //300
+	15, //360
+	15, //420
+	15, //480
+	15, //540
+	15, //600
+	20, //660
+	20, //720
+	20, //800
+	30, //900
+	40, //1100
+	50, //1300
+	50, //1500
+}
+
 // AnalyzeLambda analyzes lambda values based on stable pedal conditions
 func AnalyzeLambda(fw symbol.SymbolCollection, xFrom, yFrom string, logfile logfile.Logfile) ([]int, []int, [][]float64) {
 	x := fw.GetByName("IgnNormCal.m_AirXSP")
@@ -26,23 +48,30 @@ func AnalyzeLambda(fw symbol.SymbolCollection, xFrom, yFrom string, logfile logf
 		rpm := rec.Values["ActualIn.n_Engine"]
 		air := rec.Values["MAF.m_AirInlet"]
 		lambda := rec.Values["Lambda.External"]
-		//
-		//// Lambda range check
-		//if lambda < 0.6 || lambda > 1.2 {
-		//	continue
-		//}
 
-		xIdx, xFrac := findIndexAndFrac(xsp, air)
-		yIdx, yFrac := findIndexAndFrac(ysp, rpm)
+		xIdx, _ := findIndexAndFrac(xsp, air)
+		yIdx, _ := findIndexAndFrac(ysp, rpm)
 
-		const fracThreshold = 0.50
+		//airfoo := xsp[xIdx]
+		//rpmfoo := ysp[yIdx]
 
-		if xFrac > fracThreshold {
-			continue
+		if int(air) < xsp[xIdx]-tolerancces[xIdx] || int(air) > xsp[xIdx]+tolerancces[xIdx] {
+			continue // Skip if air is out of tolerance
 		}
-		if yFrac > fracThreshold {
-			continue
+
+		if int(rpm) < ysp[yIdx]-50 || int(rpm) > ysp[yIdx]+50 {
+			continue // Skip if RPM is out of tolerance
 		}
+
+		/*
+			const fracThreshold = 0.50
+			if xFrac > fracThreshold {
+				continue
+			}
+			if yFrac > fracThreshold {
+				continue
+			}
+		*/
 
 		// Apply any index corrections if needed for boundary cases
 		if xIdx >= len(xsp) {
