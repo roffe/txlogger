@@ -64,7 +64,7 @@ var T7SymbolsTuningOrder = []string{
 
 var T7SymbolsTuning = map[string][]string{
 	"Diagnostics": {
-		"Firmware information",
+		// "Firmware information",
 		"F_KnkDetAdap.FKnkCntMap",
 		"F_KnkDetAdap.RKnkCntMap",
 		"KnkDetAdap.KnkCntMap",
