@@ -160,7 +160,7 @@ func (c *T7Client) Start() error {
 			if sym.Number < 0 {
 				continue
 			}
-			log.Println("Defining", sym.Name, dpos)
+			c.OnMessage("Defining " + sym.Name)
 			if err := kwp.DynamicallyDefineLocalIdRequest(ctx, dpos, sym); err != nil {
 				return errors.New("failed to define dynamic register")
 			}
@@ -390,7 +390,7 @@ func (c *T7Client) Start() error {
 				for _, va := range c.Symbols {
 					if va.Number < 0 {
 						if va.Number <= -1000 {
-							if ca, ok := cl.Adapter().(*gocan.CombiAdapter); ok {
+							if ca, ok := cl.Adapter().(gocan.ADCCapable); ok {
 								adcNumber := -va.Number - 1000
 								val, err := ca.GetADCValue(ctx, adcNumber)
 								if err != nil {
@@ -420,9 +420,9 @@ func (c *T7Client) Start() error {
 						value := va.Float64()
 						voltage := (value / 1023) * (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
 						voltage = clamp(voltage, c.WidebandConfig.MinimumVoltageWideband, c.WidebandConfig.MaximumVoltageWideband)
-						steepness := (c.WidebandConfig.HighAFR - c.WidebandConfig.LowAFR) / (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
-						afr := c.WidebandConfig.LowAFR + (steepness * (voltage - c.WidebandConfig.MinimumVoltageWideband))
-						ebus.Publish(va.Name, afr)
+						steepness := (c.WidebandConfig.High - c.WidebandConfig.Low) / (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
+						result := c.WidebandConfig.Low + (steepness * (voltage - c.WidebandConfig.MinimumVoltageWideband))
+						ebus.Publish(va.Name, result)
 						continue
 					}
 
@@ -457,7 +457,7 @@ func (c *T7Client) Start() error {
 				if msg.Length() != int(expectedPayloadSize+4) {
 					c.onError()
 					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, msg.Length()))
-					log.Printf("unexpected data %X", msg.Data)
+					//log.Printf("unexpected data %X", msg.Data)
 					continue
 					//return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
 				}
@@ -488,9 +488,9 @@ func (c *T7Client) Start() error {
 						value := va.Float64()
 						voltage := (value / 1023) * (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
 						voltage = clamp(voltage, c.WidebandConfig.MinimumVoltageWideband, c.WidebandConfig.MaximumVoltageWideband)
-						steepness := (c.WidebandConfig.HighAFR - c.WidebandConfig.LowAFR) / (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
-						afr := c.WidebandConfig.LowAFR + (steepness * (voltage - c.WidebandConfig.MinimumVoltageWideband))
-						ebus.Publish(va.Name, afr)
+						steepness := (c.WidebandConfig.High - c.WidebandConfig.Low) / (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
+						result := c.WidebandConfig.Low + (steepness * (voltage - c.WidebandConfig.MinimumVoltageWideband))
+						ebus.Publish(va.Name, result)
 						continue
 					}
 
