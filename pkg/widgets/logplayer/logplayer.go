@@ -43,8 +43,6 @@ type Logplayer struct {
 
 	minsize     fyne.Size
 	controlChan chan *controlMsg
-	playChan    chan struct{} // New channel to signal playback state changes
-	pauseChan   chan struct{} // New channel to signal pause
 
 	container *fyne.Container
 	objs      *logplayerObjects
@@ -85,8 +83,6 @@ func New(cfg *Config) *Logplayer {
 		container:   container.NewWithoutLayout(),
 		minsize:     fyne.Size{Width: 150, Height: 50},
 		controlChan: make(chan *controlMsg, 10),
-		playChan:    make(chan struct{}, 2),
-		pauseChan:   make(chan struct{}, 2),
 		state:       stateStopped,
 		objs: &logplayerObjects{
 			positionSlider: NewSlider(),
@@ -322,7 +318,6 @@ func (lr *LogplayerRenderer) Objects() []fyne.CanvasObject {
 }
 
 func (lr *LogplayerRenderer) Destroy() {
-	log.Println("LogplayerRenderer.Destroy")
 	lr.l.Close()
 }
 
@@ -350,22 +345,18 @@ const (
 	OpPrev
 	OpNext
 	OpPlaybackSpeed
+	OpPlay
+	OpPause
 )
 
 func (l *Logplayer) togglePlayback() {
 	switch l.state {
 	case stateStopped, statePaused:
 		l.objs.playbackToggleBtn.SetIcon(theme.MediaPauseIcon())
-		select {
-		case l.playChan <- struct{}{}: // Signal to start/resume playback
-		default:
-		}
+		l.control(&controlMsg{Op: OpPlay})
 	case statePlaying:
 		l.objs.playbackToggleBtn.SetIcon(theme.MediaPlayIcon())
-		select {
-		case l.pauseChan <- struct{}{}: // Signal to pause playback
-		default:
-		}
+		l.control(&controlMsg{Op: OpPause})
 	}
 }
 
@@ -460,18 +451,13 @@ func (l *Logplayer) playLog() {
 					}
 					l.objs.plotter.Seek(pos)
 				}
-
+			case OpPlay:
+				l.state = statePlaying
+				timer.Reset(0) // Start playback immediately
+			case OpPause:
+				l.state = statePaused
+				timer.Stop()
 			}
-
-		case <-l.playChan:
-			l.state = statePlaying
-			timer.Reset(0) // Start playback immediately
-
-		case <-l.pauseChan:
-			l.state = statePaused
-			timer.Stop()
-			continue
-
 		case <-timer.C:
 			if l.state != statePlaying {
 				timer.Stop()
