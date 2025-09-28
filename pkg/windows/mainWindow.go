@@ -160,7 +160,6 @@ type mainWindowCounters struct {
 
 func NewMainWindow(app fyne.App) *MainWindow {
 	symbolListConfig := &symbollist.Config{
-		EBus:           ebus.CONTROLLER,
 		ColorBlindMode: widgets.ModeNormal,
 	}
 	mw := &MainWindow{

@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"fyne.io/fyne/v2"
 	"github.com/roffe/txlogger/pkg/eventbus"
 )
 
@@ -39,7 +40,12 @@ func Publish(topic string, data float64) error {
 	}
 */
 func SubscribeFunc(topic string, f func(float64)) func() {
-	return CONTROLLER.SubscribeFunc(topic, f)
+	wrapFN := func(v float64) {
+		fyne.Do(func() {
+			f(v)
+		})
+	}
+	return CONTROLLER.SubscribeFunc(topic, wrapFN)
 }
 
 func Subscribe(topic string) chan float64 {

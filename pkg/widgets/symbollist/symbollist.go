@@ -14,7 +14,7 @@ import (
 	xlayout "fyne.io/x/fyne/layout"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/datalogger"
-	"github.com/roffe/txlogger/pkg/eventbus"
+	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
@@ -35,7 +35,7 @@ type Widget struct {
 }
 
 type Config struct {
-	EBus           *eventbus.Controller
+	//EBus           *eventbus.Controller
 	Symbols        []*symbol.Symbol
 	ColorBlindMode widgets.ColorBlindMode
 }
@@ -128,12 +128,10 @@ func (s *Widget) Add(symbols ...*symbol.Symbol) {
 			continue
 		}
 
-		if s.cfg.EBus != nil {
-			cancel := s.cfg.EBus.SubscribeFunc(sym.Name, func(value float64) {
-				s.SetValue(sym.Name, value)
-			})
-			s.subs[sym.Name] = cancel
-		}
+		cancel := ebus.SubscribeFunc(sym.Name, func(value float64) {
+			s.SetValue(sym.Name, value)
+		})
+		s.subs[sym.Name] = cancel
 
 		deleteFunc := func(sw *SymbolWidgetEntry) {
 			s.mu.Lock()

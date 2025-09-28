@@ -4,8 +4,6 @@ import (
 	"errors"
 	"log"
 	"sync"
-
-	"fyne.io/fyne/v2"
 )
 
 type Config struct {
@@ -197,9 +195,7 @@ func (e *Controller) SubscribeFunc(topic string, fn func(float64)) func() {
 	respChan := e.Subscribe(topic)
 	go func() {
 		for v := range respChan {
-			fyne.Do(func() {
-				fn(v)
-			})
+			fn(v)
 		}
 	}()
 	return func() {
