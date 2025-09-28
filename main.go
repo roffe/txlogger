@@ -14,7 +14,6 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -97,28 +96,6 @@ func startCanGateway(errFunc func(error), readyChan chan<- struct{}) *os.Process
 	return nil
 }
 
-func main() {
-	isAndroid := runtime.GOOS == "android"
-	if isAndroid {
-		mainAndroid()
-	} else {
-		mainDesktop()
-	}
-}
-
-func mainAndroid() {
-	tx := app.NewWithID("com.roffe.txlogger")
-	tx.Settings().SetTheme(&txTheme{})
-	if err := presets.Load(tx); err != nil {
-		log.Println(err)
-	}
-	meta := tx.Metadata()
-	debug.Log(fmt.Sprintf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir()))
-	log.Printf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir())
-	mw := windows.NewMainWindow(tx)
-	mw.ShowAndRun()
-}
-
 /*
 type RTL_OSVERSIONINFOEXW struct {
 	OSVersionInfoSize uint32
@@ -144,7 +121,7 @@ func RtlGetVersion() RTL_OSVERSIONINFOEXW {
 }
 */
 
-func mainDesktop() {
+func main() {
 	sig := make(chan os.Signal, 2)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	defer log.Println("txlogger exit")
@@ -207,40 +184,28 @@ func mainDesktop() {
 	mw := windows.NewMainWindow(tx)
 	go func() {
 		<-sig
-		fyne.Do(mw.Close)
+		fyne.DoAndWait(mw.Close)
 	}()
-	errFunc = mw.Error
 
-	router := ipc.Router{
-		"ping": func(data string) *ipc.Message {
-			return &ipc.Message{Type: "pong", Data: ""}
-		},
-		"open": func(filename string) *ipc.Message {
-			fyne.Do(mw.Window.RequestFocus) // show window
-			if strings.HasSuffix(filename, ".bin") {
-				mw.LoadSymbolsFromFile(filename)
-			}
-			if strings.HasSuffix(filename, ".t5l") || strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") || strings.HasSuffix(filename, ".csv") {
-				f, err := os.Open(filename)
-				if err != nil {
-					mw.Error(err)
-				}
-				defer f.Close()
-
-				mw.LoadLogfile(filename, f, fyne.Position{})
-			}
-			return nil
-		},
-	}
-
-	sockServ, err := ipc.NewServer(router, socketFile)
+	sockServ, err := ipc.NewServer(
+		createIPCRouter(mw),
+		socketFile,
+	)
 	if err != nil {
 		debug.Log("error: " + err.Error())
+	} else {
+		defer sockServ.Close()
 	}
-	defer sockServ.Close()
 
+	handleArgs(mw, tx)
+
+	//go updateCheck(a, mw)
+
+	mw.ShowAndRun()
+}
+
+func handleArgs(mw *windows.MainWindow, tx fyne.App) {
 	var loadedSymbols bool
-
 	if filename := flag.Arg(0); filename != "" {
 		switch strings.ToLower(path.Ext(filename)) {
 		case ".bin":
@@ -267,10 +232,6 @@ func mainDesktop() {
 			mw.LoadSymbolsFromFile(filename)
 		}
 	}
-
-	//go updateCheck(a, mw)
-
-	mw.ShowAndRun()
 }
 
 func fileExists(name string) bool {
@@ -278,49 +239,29 @@ func fileExists(name string) bool {
 	return !os.IsNotExist(err)
 }
 
-/*
-func socketServer(s net.Listener, mw *windows.MainWindow) {
-	go func() {
-		for {
-			conn, err := s.Accept()
-			if err != nil {
-				log.Println(err)
-				return
+func createIPCRouter(mw *windows.MainWindow) ipc.Router {
+	return ipc.Router{
+		"ping": func(data string) *ipc.Message {
+			return &ipc.Message{Type: "pong", Data: ""}
+		},
+		"open": func(filename string) *ipc.Message {
+			fyne.Do(mw.Window.RequestFocus) // show window
+			if strings.HasSuffix(filename, ".bin") {
+				mw.LoadSymbolsFromFile(filename)
 			}
-			go func() {
-				defer conn.Close()
-				gb := gob.NewDecoder(conn)
-				ge := gob.NewEncoder(conn)
-				var msg ipc.Message
-				err := gb.Decode(&msg)
+			if strings.HasSuffix(filename, ".t5l") || strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") || strings.HasSuffix(filename, ".csv") {
+				f, err := os.Open(filename)
 				if err != nil {
-					if err == io.EOF {
-						return
-					}
-					log.Println(err)
-					return
+					mw.Error(err)
 				}
-				log.Println(msg)
-				switch msg.Type {
-				case "ping":
-					err = ge.Encode(ipc.Message{Type: "pong", Data: ""})
-					if err != nil {
-						log.Println(err)
-					}
-				case "open":
-					mw.Window.RequestFocus // show window
-					if strings.HasSuffix(msg.Data, ".bin") {
-						mw.LoadSymbolsFromFile(msg.Data)
-					}
-					if strings.HasSuffix(msg.Data, ".t5l") || strings.HasSuffix(msg.Data, ".t7l") || strings.HasSuffix(msg.Data, ".t8l") || strings.HasSuffix(msg.Data, ".csv") {
-						mw.LoadLogfile(msg.Data, fyne.Position{}, true)
-					}
-				}
-			}()
-		}
-	}()
+				defer f.Close()
+
+				mw.LoadLogfile(filename, f, fyne.Position{})
+			}
+			return nil
+		},
+	}
 }
-*/
 
 /*
 func updateCheck(a fyne.App, mw fyne.Window) {
