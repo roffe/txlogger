@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func IsRunning(socketFile string) (running bool) {
+func IsRunning(socketFile string) bool {
 	if fileExists(socketFile) {
 		if !ping(socketFile) {
 			log.Println("txlogger is not running, removing stale socket file")
@@ -22,10 +22,10 @@ func IsRunning(socketFile string) (running bool) {
 		} else {
 			log.Println("txlogger is running, sending show request over socket")
 			sendShow(socketFile)
-			running = true
+			return true
 		}
 	}
-	return
+	return false
 }
 
 func sendShow(socketFile string) {
@@ -170,7 +170,6 @@ func ping(socketFile string) bool {
 	}
 
 	if msg.Type == "pong" {
-		log.Println("ipc is alive and running")
 		return true
 	}
 
