@@ -2,32 +2,32 @@ module github.com/roffe/txlogger
 
 go 1.25.0
 
-replace github.com/roffe/gocan => ..\gocan
+// replace github.com/roffe/gocan => ..\gocan
 
-replace github.com/roffe/gocanflasher => ..\gocanflasher
+// replace github.com/roffe/gocanflasher => ..\gocanflasher
 
 // replace github.com/roffe/goftdi => ..\goftdi
 
 // replace github.com/roffe/gocanusb => ..\gocanusb
 
-replace github.com/roffe/ecusymbol => ..\ecusymbol
+//replace github.com/roffe/ecusymbol => ..\ecusymbol
 
 // replace github.com/roffe/gocanlib => ..\gocanlib
 
 // replace github.com/roffe/goftdi => ..\goftdi
 
-replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
+// replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 
 require (
-	fyne.io/fyne/v2 v2.6.2-0.20250801172755-3ee02e83acef
+	fyne.io/fyne/v2 v2.6.2-0.20250924200510-bcb7fe8bb4c4
 	fyne.io/x/fyne v0.0.0-20250106132206-3228f6c50107
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/lusingander/colorpicker v0.7.4
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.0.7
-	github.com/roffe/ecusymbol v1.0.0
-	github.com/roffe/gocan v1.1.6
-	github.com/roffe/gocanflasher v1.0.2
+	github.com/roffe/ecusymbol v1.0.1
+	github.com/roffe/gocan v1.1.7
+	github.com/roffe/gocanflasher v1.0.3
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.4
 	golang.org/x/image v0.24.0
