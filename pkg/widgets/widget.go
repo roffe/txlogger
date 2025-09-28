@@ -1,5 +1,3 @@
-//go:build (windows || linux || darwin) && !android
-
 package widgets
 
 import (
