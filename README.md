@@ -1,13 +1,12 @@
 # txlogger
 ![Windows Build](https://github.com/roffe/txlogger/actions/workflows/windows-release.yml/badge.svg)
 
-Blazing fast data logging for Trionic 7 & 8 ECU's found in Saab 9-5 & 9-3
+Blazing fast data logging for Trionic 5, 7 & 8 ECU's found in Saab 900, 9000, 9-3 & 9-5 1993-2010
+Saab Automobile, Gone but never forgotten
 
 Created after discussions on [TrionicTuning](https://www.trionictuning.com/forum/viewtopic.php?f=34&t=14297)
 
-Built on top of [goCAN](https://github.com/roffe/gocan)
-
-“Gone but never forgotten”
+Built with [goCAN](https://github.com/roffe/gocan)
 
 ## Run
     .\build_cangateway.ps1
@@ -40,10 +39,3 @@ CombiAdapter support which depends on libusb requires you to install [vc_redist.
 
 ![](txlogger.jpg)
 ![](txlogger2.jpg)
-
-# Using CANUSB with txlogger
-
-You must enable VCP mode to use CANUSB with txlogger
-
-![](canusb_vcp1.jpg)
-![](canusb_vcp2.jpg)
