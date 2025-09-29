@@ -3,9 +3,7 @@ package meshgrid
 import (
 	"fmt"
 	"image"
-	"image/color"
 	"log"
-	"math"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -164,9 +162,8 @@ func (m *Meshgrid) rotateMeshgrid(pitchDelta, yawDelta, rollDelta float64) {
 	m.updateVertexPositions()
 }
 
-// New method to compute vertex positions based on camera state
 func (m *Meshgrid) updateVertexPositions() {
-	// Calculate the true center of the mesh using original coordinates
+	// Calculate mesh center from original coordinates
 	var sumX, sumY, sumZ float64
 	var count int
 	for i := range m.vertices {
@@ -181,36 +178,27 @@ func (m *Meshgrid) updateVertexPositions() {
 	centerY := sumY / float64(count)
 	centerZ := sumZ / float64(count)
 
-	// Compute the view matrix (inverse of camera transform)
-	// For simplicity, we're just using the transpose of the rotation
-	// since we're assuming orthographic projection
 	viewMatrix := m.cameraRotation
 
-	// Apply transformations to all vertices
 	for i := range m.vertices {
 		for j := range m.vertices[i] {
-			// Scale the original coordinates
-			vx := m.vertices[i][j].Ox * m.scale
-			vy := m.vertices[i][j].Oy * m.scale
-			vz := m.vertices[i][j].Oz * m.scale
+			// Scale and translate so mesh is centered at origin
+			vx := (m.vertices[i][j].Ox - centerX) * m.scale
+			vy := (m.vertices[i][j].Oy - centerY) * m.scale
+			vz := (m.vertices[i][j].Oz - centerZ) * m.scale
 
-			// Translate to mesh center
-			vx -= centerX * m.scale
-			vy -= centerY * m.scale
-			vz -= centerZ * m.scale
-
-			// Apply view matrix (camera rotation)
+			// Rotate
 			viewVec := viewMatrix.MultiplyVector([3]float64{vx, vy, vz})
 
-			// Apply camera position offset
+			// Apply camera offset
 			viewVec[0] -= m.cameraPosition[0]
 			viewVec[1] -= m.cameraPosition[1]
 			viewVec[2] -= m.cameraPosition[2]
 
-			// Store final transformed coordinates
-			m.vertices[i][j].X = viewVec[0] + centerX*m.scale
-			m.vertices[i][j].Y = viewVec[1] + centerY*m.scale
-			m.vertices[i][j].Z = viewVec[2] + centerZ*m.scale
+			// Store in mesh-local coordinates (already centered)
+			m.vertices[i][j].X = viewVec[0]
+			m.vertices[i][j].Y = viewVec[1]
+			m.vertices[i][j].Z = viewVec[2]
 		}
 	}
 }
@@ -266,12 +254,15 @@ func findMinMaxRange(values []float64) (float64, float64, float64) {
 }
 
 func (m *Meshgrid) project(v Vertex) (int, int) {
-	// Project vertex to screen coordinates with fixed camera at center
-	centerX := float64(m.size.Width * .5)
-	centerY := float64(m.size.Height * .5)
+	centerX := float64(m.size.Width) * 0.5
+	centerY := float64(m.size.Height) * 0.5
 	screenX := centerX + v.X
 	screenY := centerY + v.Y
 	return int(screenX), int(screenY)
+}
+
+func (m *Meshgrid) Refresh() {
+	m.refresh()
 }
 
 func (m *Meshgrid) refresh() {
@@ -285,8 +276,6 @@ func (m *Meshgrid) throttledRefresh() {
 		return
 	}
 	m.refreshPending = true
-
-	// Use time.AfterFunc for throttling
 	time.AfterFunc(10*time.Millisecond, func() { // ~100fps
 		m.refresh()
 		m.refreshPending = false
@@ -305,7 +294,7 @@ func (m *meshgridRenderer) Layout(size fyne.Size) {
 		return
 	}
 	m.size = size
-	m.refresh()
+	m.throttledRefresh()
 }
 
 func (m *meshgridRenderer) MinSize() fyne.Size {
@@ -322,83 +311,3 @@ func (m *meshgridRenderer) Destroy() {
 func (m *meshgridRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{m.image}
 }
-
-func (m *Meshgrid) drawLine(img *image.RGBA, p1, p2 image.Point, startThickness, endThickness int, startColor, endColor color.RGBA) {
-	dx := float64(p2.X - p1.X)
-	dy := float64(p2.Y - p1.Y)
-	length := math.Sqrt(dx*dx + dy*dy)
-
-	for i := 0.0; i < length; i++ {
-		t := i / length
-		x := p1.X + int(t*dx)
-		y := p1.Y + int(t*dy)
-
-		// Interpolating thickness
-		currentThickness := int(float64(startThickness)*(1-t) + float64(endThickness)*t)
-
-		// Interpolating color
-		currentColor := color.RGBA{
-			R: uint8(float64(startColor.R)*(1-t) + float64(endColor.R)*t),
-			G: uint8(float64(startColor.G)*(1-t) + float64(endColor.G)*t),
-			B: uint8(float64(startColor.B)*(1-t) + float64(endColor.B)*t),
-			A: uint8(float64(startColor.A)*(1-t) + float64(endColor.A)*t),
-		}
-
-		// Draw the current segment of the line
-		drawCircle(img, image.Point{X: x, Y: y}, currentThickness, currentColor)
-	}
-}
-
-// drawCircle draws a circle on img at point p with the given radius and color.
-func drawCircle(img *image.RGBA, p image.Point, radius int, c color.RGBA) {
-	for dy := -radius; dy <= radius; dy++ {
-		for dx := -radius; dx <= radius; dx++ {
-			if dx*dx+dy*dy <= radius*radius {
-				img.SetRGBA(p.X+dx, p.Y+dy, c)
-			}
-		}
-	}
-}
-
-/*
-func lerp(a, b, t float64) float64 {
-	return a + (b-a)*t
-}
-
-func (m *Meshgrid) getColorInterpolation(value float64) color.RGBA {
-	t := (value - m.zmin) / (m.zmax - m.zmin)
-
-	var r, g, b float64
-
-	// Three-part interpolation: green -> yellow -> red
-	if t < 0.4 { // Green to Yellow transition (0-40%)
-		r = lerp(0, 1, t/0.4) // Red increases
-		g = 1.0               // Green stays max
-		b = 0                 // Blue stays zero
-	} else if t < 0.6 { // Hold Yellow (40-60%)
-		r = 1.0
-		g = 1.0
-		b = 0
-	} else { // Yellow to Red transition (60-100%)
-		r = 1.0                     // Red stays max
-		g = lerp(1, 0, (t-0.6)/0.4) // Green decreases
-		b = 0                       // Blue stays zero
-	}
-
-	// Enhance saturation for yellow region
-	if t > 0.35 && t < 0.65 {
-		// Boost both red and green components slightly in yellow region
-		boost := 1.2 // Increase brightness of yellow
-		r = math.Min(1.0, r*boost)
-		g = math.Min(1.0, g*boost)
-	}
-
-	// Convert from 0-1 range to 0-255 for color.RGBA
-	return color.RGBA{
-		R: uint8(r * 255),
-		G: uint8(g * 255),
-		B: uint8(b * 255),
-		A: 255,
-	}
-}
-*/

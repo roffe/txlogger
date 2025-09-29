@@ -35,7 +35,7 @@ func (m *Meshgrid) drawAxisIndicator(img *image.RGBA) {
 	// Create the indicator at corner position
 	origin := Vertex{
 		X: cornerOffset,
-		Y: float64(m.size.Height) - cornerOffset,
+		Y: float64(m.size.Height) - float64(m.size.Height/4),
 	}
 
 	// Instead of using just the rotation matrix, we should use the same
@@ -68,12 +68,7 @@ func (m *Meshgrid) drawAxisIndicator(img *image.RGBA) {
 
 	// X axis (red)
 	ex, ey := int(xEnd.X), int(xEnd.Y)
-	m.drawLine(img,
-		image.Point{ox, oy},
-		image.Point{ex, ey},
-		0, 0,
-		color.RGBA{R: 255, G: 0, B: 0, A: 255},
-		color.RGBA{R: 255, G: 0, B: 0, A: 255})
+	drawBresenhamLine(img, ox, oy, ex, ey, color.RGBA{R: 255, G: 0, B: 0, A: 255}, color.RGBA{R: 255, G: 0, B: 0, A: 255})
 
 	m.drawText(img, m.xlabel,
 		int(ex+5), int(ey),
@@ -82,12 +77,7 @@ func (m *Meshgrid) drawAxisIndicator(img *image.RGBA) {
 	// Y axis (green)
 	ey = int(yEnd.Y)
 	ex = int(yEnd.X)
-	m.drawLine(img,
-		image.Point{ox, oy},
-		image.Point{ex, ey},
-		0, 0,
-		color.RGBA{R: 0, G: 255, B: 0, A: 255},
-		color.RGBA{R: 0, G: 255, B: 0, A: 255})
+	drawBresenhamLine(img, ox, oy, ex, ey, color.RGBA{R: 0, G: 255, B: 0, A: 255}, color.RGBA{R: 0, G: 255, B: 0, A: 255})
 
 	m.drawText(img, m.ylabel,
 		int(ex+5), int(ey),
@@ -96,13 +86,7 @@ func (m *Meshgrid) drawAxisIndicator(img *image.RGBA) {
 	// Z axis (blue)
 	ex = int(zEnd.X)
 	ey = int(zEnd.Y)
-	m.drawLine(img,
-		image.Point{ox, oy},
-		image.Point{ex, ey},
-		0, 0,
-		color.RGBA{R: 0, G: 0, B: 255, A: 255},
-		color.RGBA{R: 0, G: 0, B: 255, A: 255})
-
+	drawBresenhamLine(img, ox, oy, ex, ey, color.RGBA{R: 0, G: 0, B: 255, A: 255}, color.RGBA{R: 0, G: 0, B: 255, A: 255})
 	m.drawText(img, m.zlabel,
 		int(ex+5), int(ey),
 		color.RGBA{R: 0, G: 0, B: 255, A: 255})

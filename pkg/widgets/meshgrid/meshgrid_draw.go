@@ -192,17 +192,19 @@ func partitionLineSegments(segments []VertexPair, low, high int) int {
 	return i + 1
 }
 
-// Fast Bresenham line algorithm for drawing lines
-func drawBresenhamLine(img *image.RGBA, x0, y0, x1, y1 int, color1, color2 color.RGBA) {
-	width := img.Bounds().Dx()
-	height := img.Bounds().Dy()
-
-	// Check if line is completely out of bounds
-	if (x0 < 0 && x1 < 0) || (x0 >= width && x1 >= width) ||
-		(y0 < 0 && y1 < 0) || (y0 >= height && y1 >= height) {
-		return
+// Fast Bresenham with clipping + direct Pix writes + fixed-point color interpolation.
+func drawBresenhamLine(img *image.RGBA, x0, y0, x1, y1 int, c1, c2 color.RGBA) {
+	r := img.Rect
+	if !clipCohenSutherland(&x0, &y0, &x1, &y1, r.Min.X, r.Min.Y, r.Max.X-1, r.Max.Y-1) {
+		return // fully outside
 	}
 
+	// Translate to image origin for indexing
+	ox, oy := r.Min.X, r.Min.Y
+	stride := img.Stride
+	pix := img.Pix
+
+	// Bresenham setup
 	dx := abs(x1 - x0)
 	dy := -abs(y1 - y0)
 	sx := 1
@@ -215,45 +217,136 @@ func drawBresenhamLine(img *image.RGBA, x0, y0, x1, y1 int, color1, color2 color
 	}
 	err := dx + dy
 
-	// Calculate total steps for color interpolation
-	totalSteps := max(dx, -dy)
-	step := 0
+	// Steps for color interpolation
+	total := dx
+	if -dy > total {
+		total = -dy
+	}
+	if total == 0 {
+		setPix(pix, stride, x0-ox, y0-oy, c1)
+		return
+	}
 
-	for {
-		// Only draw if point is within bounds
-		if x0 >= 0 && x0 < width && y0 >= 0 && y0 < height {
-			// Interpolate color based on position along the line
-			t := 0.0
-			if totalSteps > 0 {
-				t = float64(step) / float64(totalSteps)
-			}
+	// 16.16 fixed-point accumulators for R,G,B,A
+	// acc starts at c1, step = (c2-c1)/total
+	accR := int(c1.R) << 16
+	accG := int(c1.G) << 16
+	accB := int(c1.B) << 16
+	accA := int(c1.A) << 16
+	stepR := ((int(c2.R) - int(c1.R)) << 16) / total
+	stepG := ((int(c2.G) - int(c1.G)) << 16) / total
+	stepB := ((int(c2.B) - int(c1.B)) << 16) / total
+	stepA := ((int(c2.A) - int(c1.A)) << 16) / total
 
-			currentColor := interpolateColor(color1, color2, t)
-			img.SetRGBA(x0, y0, currentColor)
-		}
+	// Draw
+	for i := 0; ; i++ {
+		setPixRGBAFixed(pix, stride, x0-ox, y0-oy, accR, accG, accB, accA)
 
 		if x0 == x1 && y0 == y1 {
 			break
 		}
-
-		e2 := 2 * err
+		e2 := err << 1
 		if e2 >= dy {
-			if x0 == x1 {
-				break
-			}
 			err += dy
 			x0 += sx
 		}
 		if e2 <= dx {
-			if y0 == y1 {
-				break
-			}
 			err += dx
 			y0 += sy
 		}
 
-		step++
+		// increment color
+		accR += stepR
+		accG += stepG
+		accB += stepB
+		accA += stepA
 	}
+}
+
+func setPix(pix []uint8, stride, x, y int, c color.RGBA) {
+	i := y*stride + x*4
+	pix[i+0] = c.R
+	pix[i+1] = c.G
+	pix[i+2] = c.B
+	pix[i+3] = c.A
+}
+
+func setPixRGBAFixed(pix []uint8, stride, x, y int, r, g, b, a int) {
+	i := y*stride + x*4
+	pix[i+0] = byte(r >> 16)
+	pix[i+1] = byte(g >> 16)
+	pix[i+2] = byte(b >> 16)
+	pix[i+3] = byte(a >> 16)
+}
+
+// Cohen–Sutherland line clipping (inclusive bounds).
+const (
+	codeInside = 0
+	codeLeft   = 1
+	codeRight  = 2
+	codeBottom = 4
+	codeTop    = 8
+)
+
+func outCode(x, y, xmin, ymin, xmax, ymax int) int {
+	code := codeInside
+	if x < xmin {
+		code |= codeLeft
+	} else if x > xmax {
+		code |= codeRight
+	}
+	if y < ymin {
+		code |= codeBottom
+	} else if y > ymax {
+		code |= codeTop
+	}
+	return code
+}
+
+func clipCohenSutherland(x0, y0, x1, y1 *int, xmin, ymin, xmax, ymax int) bool {
+	x0i, y0i, x1i, y1i := *x0, *y0, *x1, *y1
+	for {
+		c0 := outCode(x0i, y0i, xmin, ymin, xmax, ymax)
+		c1 := outCode(x1i, y1i, xmin, ymin, xmax, ymax)
+		if (c0 | c1) == 0 {
+			// both inside
+			break
+		}
+		if (c0 & c1) != 0 {
+			// fully outside
+			return false
+		}
+		// pick an endpoint outside
+		var cx int
+		if c0 != 0 {
+			cx = c0
+		} else {
+			cx = c1
+		}
+
+		var x, y int
+		if (cx & codeTop) != 0 {
+			x = x0i + (x1i-x0i)*(ymax-y0i)/(y1i-y0i)
+			y = ymax
+		} else if (cx & codeBottom) != 0 {
+			x = x0i + (x1i-x0i)*(ymin-y0i)/(y1i-y0i)
+			y = ymin
+		} else if (cx & codeRight) != 0 {
+			y = y0i + (y1i-y0i)*(xmax-x0i)/(x1i-x0i)
+			x = xmax
+		} else { // left
+			y = y0i + (y1i-y0i)*(xmin-x0i)/(x1i-x0i)
+			x = xmin
+		}
+
+		if cx == c0 {
+			x0i, y0i = x, y
+		} else {
+			x1i, y1i = x, y
+		}
+	}
+	*x0, *y0, *x1, *y1 = x0i, y0i, x1i, y1i
+	return true
 }
 
 // Color interpolation
@@ -266,12 +359,11 @@ func interpolateColor(c1, c2 color.RGBA, t float64) color.RGBA {
 	}
 }
 
-// Helper functions
-func abs(x int) int {
-	if x < 0 {
-		return -x
+func abs(v int) int {
+	if v < 0 {
+		return -v
 	}
-	return x
+	return v
 }
 
 func min(a, b int) int {
