@@ -43,8 +43,8 @@ func BresenhamThick(p IPlotter, x1, y1, x2, y2 int, thickness int, col color.RGB
 	perpY := dx / length
 
 	// Draw filled circles at endpoints for rounded caps
-	fillCircle(p, x1, y1, halfThick, col)
-	fillCircle(p, x2, y2, halfThick, col)
+	//fillCircle(p, x1, y1, halfThick, col)
+	//fillCircle(p, x2, y2, halfThick, col)
 
 	// Draw the main line body using parallel lines
 	for i := -halfThick; i <= halfThick; i++ {
