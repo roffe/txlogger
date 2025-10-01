@@ -1,9 +1,11 @@
 # 2.1.0
+
 - Added support for txbridge discovery via mDNS.
 - txbridge firmware now supports AP, STA or AP+STA modes. Configurable via the configurator widget under settings.
 - Tweaked the symbollist to have bigger preview bars
 - Bug fixes and optimizations
-- Added color themes for different color blindness. Changeable under settings.
+- Added color themes for different color blindness. Changeable under settings
+- Improved camera controls in the 3D Mesh viewer
 
 # 2.0.9
 

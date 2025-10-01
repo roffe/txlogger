@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"math"
+	"slices"
 
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/logfile"
@@ -9,23 +10,40 @@ import (
 
 // 75      125     150     180     240     300     360     420     480     540     600     660     720     800     900     1100    1300    1500
 var tolerancces []int = []int{
-	5,  //75
+	5, //75
+	5,
 	10, //125
+	10,
 	10, //150
+	10,
 	10, //180
+	10,
 	10, //240
+	10,
 	15, //300
+	15,
 	15, //360
+	15,
 	15, //420
+	15,
 	15, //480
+	15,
 	15, //540
+	15,
 	15, //600
+	15,
 	20, //660
+	20,
 	20, //720
+	20,
 	20, //800
+	30,
 	30, //900
+	40,
 	40, //1100
+	40,
 	50, //1300
+	50,
 	50, //1500
 }
 
@@ -36,6 +54,21 @@ func AnalyzeLambda(fw symbol.SymbolCollection, xFrom, yFrom string, logfile logf
 
 	xsp := x.Ints()
 	ysp := y.Ints()
+
+	// double the y-axis resolution by averaging each pair of rows
+	var newYsp []int
+	for i := 0; i < len(ysp)-1; i++ {
+		newYsp = append(newYsp, (ysp[i]+ysp[i+1])/2)
+	}
+	ysp = append(ysp, newYsp...)
+	slices.Sort(ysp)
+
+	var newXsp []int
+	for i := 0; i < len(xsp)-1; i++ {
+		newXsp = append(newXsp, (xsp[i]+xsp[i+1])/2)
+	}
+	xsp = append(xsp, newXsp...)
+	slices.Sort(xsp)
 
 	zData := make([][]float64, len(xsp)*len(ysp))
 	for i := range zData {
@@ -49,29 +82,24 @@ func AnalyzeLambda(fw symbol.SymbolCollection, xFrom, yFrom string, logfile logf
 		air := rec.Values["MAF.m_AirInlet"]
 		lambda := rec.Values["Lambda.External"]
 
-		xIdx, _ := findIndexAndFrac(xsp, air)
-		yIdx, _ := findIndexAndFrac(ysp, rpm)
+		xIdx, xfrac := findIndexAndFrac(xsp, air)
+		yIdx, yfrac := findIndexAndFrac(ysp, rpm)
 
-		//airfoo := xsp[xIdx]
-		//rpmfoo := ysp[yIdx]
-
-		if int(air) < xsp[xIdx]-tolerancces[xIdx] || int(air) > xsp[xIdx]+tolerancces[xIdx] {
-			continue // Skip if air is out of tolerance
+		if xfrac > 0.2 {
+			continue
 		}
 
-		if int(rpm) < ysp[yIdx]-50 || int(rpm) > ysp[yIdx]+50 {
-			continue // Skip if RPM is out of tolerance
+		if yfrac > 0.2 {
+			continue
 		}
 
-		/*
-			const fracThreshold = 0.50
-			if xFrac > fracThreshold {
-				continue
-			}
-			if yFrac > fracThreshold {
-				continue
-			}
-		*/
+		//if int(air) < xsp[xIdx]-tolerancces[xIdx] || int(air) > xsp[xIdx]+tolerancces[xIdx] {
+		//	continue // Skip if air is out of tolerance
+		//}
+		//
+		//if int(rpm) < ysp[yIdx]-50 || int(rpm) > ysp[yIdx]+50 {
+		//	continue // Skip if RPM is out of tolerance
+		//}
 
 		// Apply any index corrections if needed for boundary cases
 		if xIdx >= len(xsp) {
