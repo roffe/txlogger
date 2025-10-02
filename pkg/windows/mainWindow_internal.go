@@ -49,15 +49,17 @@ func newOtoContext() *oto.Context {
 
 func (mw *MainWindow) closeIntercept() {
 	if mw.dlc != nil {
+		log.Println("Closing datalogger client")
 		mw.dlc.Close()
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(250 * time.Millisecond)
 	}
-	if mw.gclient != nil {
-		mw.gclient.SendCommand(context.Background(), &proto.Command{Data: []byte("quit")})
+	if mw.gwclient != nil {
+		log.Println("Sending quit to CAN gateway")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		mw.gwclient.SendCommand(ctx, &proto.Command{Data: []byte("quit")})
 	}
 	debug.Close()
-
-	mw.Close()
 }
 
 func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
@@ -72,7 +74,6 @@ func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
 			// log.Println(mw.buttons.openLogBtn.Position(), mw.buttons.openLogBtn.Size())
 			if p.X >= mw.buttons.openLogBtn.Position().X && p.X <= mw.buttons.openLogBtn.Position().X+mw.buttons.openLogBtn.Size().Width &&
 				p.Y >= mw.buttons.openLogBtn.Position().Y+30 && p.Y <= mw.buttons.openLogBtn.Position().Y+30+mw.buttons.openLogBtn.Size().Height {
-
 				f, err := os.Open(filename)
 				if err != nil {
 					mw.Error(err)
