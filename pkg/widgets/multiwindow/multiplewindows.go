@@ -83,7 +83,7 @@ func (m *MultipleWindows) Add(w *InnerWindow, startPosition ...fyne.Position) bo
 			startPosition[0].Y = clamp32(startPosition[0].Y, 0, bounds.Height-size.Height)
 			bounds.Subtract(size).Max(startPosition[0])
 		}
-		w.Move(startPosition[0])
+		w.Move(startPosition[0].SubtractXY(w.MinSize().Width*0.5, 80))
 	}
 
 	m.content.Add(w)
@@ -218,7 +218,7 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 		// log.Println(m.content.Size())
 		if w.maximized {
 			w.maximized = false
-			w.Move(ev.Position.SubtractXY(w.preMaximizedSize.Width*0.5, 5))
+			w.Move(ev.Position.SubtractXY(w.preMaximizedSize.Width*0.5, 13))
 			w.Resize(w.preMaximizedSize)
 			return
 		}
