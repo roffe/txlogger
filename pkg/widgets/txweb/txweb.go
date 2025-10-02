@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	Endpoint = "http://192.168.2.136:8080"
+	Endpoint = "https://txweb.roffe.nu"
 )
 
 type Widget struct {
