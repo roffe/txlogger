@@ -124,8 +124,8 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 		},
 		funcs: &funcs{
 			loadECUFunc:   func() {},
-			saveECUFunc:   func(data []float64) {},
-			updateECUFunc: func(idx int, value []float64) {},
+			saveECUFunc:   func([]float64) {},
+			updateECUFunc: func(int, []float64) {},
 		},
 	}
 	mv.ExtendBaseWidget(mv)
@@ -148,33 +148,12 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 	mv.crosshair = NewCrosshair(color.RGBA{165, 55, 253, 180}, 3)
 	mv.selectionRect = NewRectangle(color.RGBA{0x30, 0x70, 0xFF, 0xFF}, 3)
 
-	log.Printf("mapViewer c:%d r:%d len:%d x:%s y:%s z:%s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom, mv.symbol.Name)
+	// log.Printf("mapViewer c:%d r:%d len:%d x:%s y:%s z:%s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom, mv.symbol.Name)
 
 	mv.createYAxis()
 	mv.createXAxis()
 	mv.createZdata()
 	mv.createTextValues()
-
-	/*
-		fmt.Println()
-		fmt.Print("[]float64{")
-		for _, num := range mv.xData {
-			fmt.Print(num, ",")
-		}
-		fmt.Println("}")
-
-		fmt.Print("[]float64{")
-		for _, num := range mv.yData {
-			fmt.Print(num, ",")
-		}
-		fmt.Println("}")
-
-		fmt.Print("[]float64{")
-		for _, num := range mv.zData {
-			fmt.Print(num, ",")
-		}
-		fmt.Println("}")
-	*/
 
 	return mv, nil
 }
@@ -338,43 +317,9 @@ func (mv *MapViewer) Info() MapViewerInfo {
 	}
 }
 
-/*
-func (mv *MapViewer) SetValue(name string, value float64) {
-	var hit bool
-	if name == mv.xFrom {
-		mv.xValue = value
-		//hit = true
-	}
-	if name == mv.yFrom {
-		mv.yValue = value
-		hit = true
-	}
-	if hit {
-		//log.Printf("MapViewer SetValue x(%s): %d y(%s): %d", mv.xFrom, mv.xValue, mv.yFrom, mv.yValue)
-		if mv.crosshair.Hidden {
-			mv.crosshair.Show()
-			mv.crosshair.Resize(fyne.Size{Width: mv.widthFactor, Height: mv.heightFactor})
-		}
-		mv.setXY()
-	} else {
-		log.Printf("MapViewer SetValue unknown: %s", name)
-	}
-}
-*/
-
 func (mv *MapViewer) SetX(xValue float64) {
 	mv.xValue = xValue
 }
-
-/*
-func (mv *MapViewer) SetY2(yValue float64) {
-	select {
-	case mv.updateChan <- yValue:
-	default:
-		log.Println("MapViewer updateChan full")
-	}
-}
-*/
 
 func (mv *MapViewer) SetY(yValue float64) {
 	mv.yValue = yValue
@@ -404,9 +349,7 @@ func (mv *MapViewer) SetZData(zData []float64) error {
 	}
 	mv.zData = zData
 	mv.numData = len(zData)
-	//fyne.Do(func() {
 	mv.Refresh()
-	//})
 	return nil
 }
 
