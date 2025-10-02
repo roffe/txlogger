@@ -1,6 +1,9 @@
 package widgets
 
-import "image/color"
+import (
+	"image/color"
+	"math"
+)
 
 type ColorBlindMode int
 
@@ -40,6 +43,11 @@ func GetColorInterpolation(min, max, value float64, mode ColorBlindMode) color.R
 		t = 1
 	}
 
+	if math.IsNaN(t) {
+		// fallback to gray if value is NaN
+		return color.RGBA{128, 128, 128, 255}
+	}
+
 	// pick color stops depending on mode
 	var low, mid, high color.RGBA
 	switch mode {
@@ -48,7 +56,6 @@ func GetColorInterpolation(min, max, value float64, mode ColorBlindMode) color.R
 		low = color.RGBA{0, 255, 0, 255}
 		mid = color.RGBA{255, 255, 0, 255}
 		high = color.RGBA{255, 0, 0, 255}
-
 	case ModeUniversal:
 		// Blue → Gray → Orange
 		low = color.RGBA{33, 102, 172, 255}  // #2166AC
