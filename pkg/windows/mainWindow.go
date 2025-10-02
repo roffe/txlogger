@@ -115,7 +115,7 @@ type MainWindow struct {
 	symbolList      *symbollist.Widget
 	fw              symbol.SymbolCollection
 	dlc             datalogger.IClient
-	gclient         proto.GocanClient
+	gwclient        proto.GocanClient
 	buttonsDisabled bool
 	settings        *settings.Widget
 	statusText      *SecretText
@@ -213,7 +213,7 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	mw.render()
 
 	mw.Window.SetOnDropped(mw.onDropped)
-	mw.SetCloseIntercept(mw.closeIntercept)
+	mw.SetOnClosed(mw.closeIntercept)
 	mw.SetPadded(true)
 	mw.SetContent(mw.content)
 	mw.Resize(fyne.NewSize(1000, 700))
@@ -271,7 +271,7 @@ func (mw *MainWindow) gocanGatewayClient() {
 	}
 	mw.settings.CANSettings.AddAdapters(res.Adapters)
 
-	mw.gclient = client
+	mw.gwclient = client
 }
 
 func (mw *MainWindow) setupShortcuts() {
@@ -573,7 +573,7 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 	mw.Log("loaded log file " + filename + " in combined logplayer")
 }
 
-func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, p fyne.Position) {
+func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Position) {
 	// Just filename, used for Window title
 	fp := filepath.Base(filename)
 
@@ -627,7 +627,7 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, p fyne.Position)
 	iw.OnClose = func() {
 		lp.Close()
 	}
-	mw.wm.Add(iw, p)
+	mw.wm.Add(iw, pos)
 
 }
 
