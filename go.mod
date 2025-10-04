@@ -10,7 +10,7 @@ go 1.25.0
 
 // replace github.com/roffe/gocanusb => ..\gocanusb
 
-//replace github.com/roffe/ecusymbol => ..\ecusymbol
+// replace github.com/roffe/ecusymbol => ..\ecusymbol
 
 // replace github.com/roffe/gocanlib => ..\gocanlib
 
@@ -25,7 +25,7 @@ require (
 	github.com/lusingander/colorpicker v0.7.4
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.0.7
-	github.com/roffe/ecusymbol v1.0.1
+	github.com/roffe/ecusymbol v1.0.2
 	github.com/roffe/gocan v1.1.7
 	github.com/roffe/gocanflasher v1.0.3
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
