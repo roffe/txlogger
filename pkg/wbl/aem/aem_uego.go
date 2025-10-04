@@ -29,13 +29,20 @@ type AEMuego struct {
 
 	dataBuff []byte
 	dataPos  int
+
+	//debugLog *os.File
 }
 
 func NewAEMuegoClient(port string, logFunc func(string)) (*AEMuego, error) {
+	//f, err := os.Create("aem.log")
+	//if err != nil {
+	//	return nil, err
+	//}
 	return &AEMuego{
 		port:     port,
 		log:      logFunc,
 		dataBuff: make([]byte, 8),
+		//debugLog: f,
 	}, nil
 }
 
@@ -125,6 +132,10 @@ func (a *AEMuego) Stop() {
 				a.log(err.Error())
 			}
 		}
+		//if a.debugLog != nil {
+		//	a.debugLog.Sync()
+		//	a.debugLog.Close()
+		//}
 	})
 }
 
@@ -156,6 +167,8 @@ func (a *AEMuego) Stop() {
 func (a *AEMuego) SetData(data []byte) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+
+	// fmt.Fprintf(a.debugLog, "% 02X\n", data)
 
 	r := bytes.NewReader(data)
 	var wbl uint16
