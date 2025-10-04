@@ -123,8 +123,8 @@ func (c *T5Client) Start() error {
 				}
 				c.cps = 0
 				c.errPerSecond = 0
-			case symbols := <-c.symbolChan:
-				_ = symbols
+			//case symbols := <-c.symbolChan:
+			//	_ = symbols
 			case read := <-c.readChan:
 				if c.txbridge {
 					// log.Println(read.Length)
@@ -170,7 +170,14 @@ func (c *T5Client) Start() error {
 				read.Data = data
 				read.Complete(nil)
 			case upd := <-c.writeChan:
-				upd.Complete(fmt.Errorf("not implemented"))
+				for i, b := range upd.Data {
+					if err := t5.WriteRam(ctx, upd.Address+uint32(i), b); err != nil {
+						upd.Complete(err)
+						break
+					}
+
+				}
+				upd.Complete(nil)
 			case <-t.C:
 				ts := time.Now()
 				for _, sym := range c.Symbols {

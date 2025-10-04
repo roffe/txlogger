@@ -320,6 +320,8 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		buff := bytes.NewBuffer(symZ.EncodeFloat64s(data))
 		var startPos uint32
 		switch mw.selects.ecuSelect.Selected {
+		case "T5":
+			startPos = symZ.SramOffset
 		case "T7":
 			startPos = symZ.Address
 		case "T8":
