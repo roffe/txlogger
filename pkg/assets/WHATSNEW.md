@@ -1,3 +1,8 @@
+# 2.1.1
+
+- Fixed a bug where the background color of single cell maps (bool values) would be black until selected
+- Added support for writing to SRAM on Trionic 5 ( you can now livetune T5 with txlogger )
+
 # 2.1.0
 
 - Added support for txbridge discovery via mDNS.
