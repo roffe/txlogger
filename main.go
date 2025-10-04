@@ -223,7 +223,9 @@ func handleArgs(mw *windows.MainWindow, tx fyne.App) {
 			}
 			defer f.Close()
 
-			mw.LoadLogfile(filename, f, fyne.Position{})
+			sz := mw.Canvas().Size()
+
+			mw.LoadLogfile(filename, f, fyne.Position{X: sz.Width / 2, Y: sz.Height / 2})
 		}
 	}
 
@@ -255,8 +257,9 @@ func createIPCRouter(mw *windows.MainWindow) ipc.Router {
 					mw.Error(err)
 				}
 				defer f.Close()
+				sz := mw.Canvas().Size()
 
-				mw.LoadLogfile(filename, f, fyne.Position{})
+				mw.LoadLogfile(filename, f, fyne.Position{X: sz.Width / 2, Y: sz.Height / 2})
 			}
 			return nil
 		},
