@@ -145,7 +145,7 @@ func (r *ReadRequest) Wait() error {
 	case err := <-r.respChan:
 		return err
 	case <-time.After(10 * time.Second):
-		return fmt.Errorf("timeout")
+		return fmt.Errorf("RAM read timeout")
 	}
 }
 
@@ -189,8 +189,8 @@ func (r *WriteRequest) Wait() error {
 	select {
 	case err := <-r.respChan:
 		return err
-	case <-time.After(5 * time.Second):
-		return fmt.Errorf("timeout")
+	case <-time.After(10 * time.Second):
+		return fmt.Errorf("RAM write timeout")
 	}
 }
 
