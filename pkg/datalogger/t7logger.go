@@ -230,30 +230,32 @@ func (c *T7Client) Start() error {
 				}
 				c.cps = 0
 				c.errPerSecond = 0
-			case symbols := <-c.symbolChan:
-				c.Symbols = symbols
-				c.OnMessage("Reconfiguring symbols..")
-				if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
-					return err
-				}
-				c.OnMessage("Cleared dynamic register")
-				if len(c.Symbols) > 0 {
-					expectedPayloadSize = 0
-					dpos := 0
-					for _, sym := range c.Symbols {
-						if c.sysvars.Exists(sym.Name) {
-							sym.Number = -1
-							continue
-						}
-						if err := kwp.DynamicallyDefineLocalIdRequest(ctx, dpos, sym); err != nil {
-							return err
-						}
-						dpos++
-						expectedPayloadSize += sym.Length
-						time.Sleep(5 * time.Millisecond)
+			/*
+				case symbols := <-c.symbolChan:
+					c.Symbols = symbols
+					c.OnMessage("Reconfiguring symbols..")
+					if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
+						return err
 					}
-					c.OnMessage("Configured dynamic register")
-				}
+					c.OnMessage("Cleared dynamic register")
+					if len(c.Symbols) > 0 {
+						expectedPayloadSize = 0
+						dpos := 0
+						for _, sym := range c.Symbols {
+							if c.sysvars.Exists(sym.Name) {
+								sym.Number = -1
+								continue
+							}
+							if err := kwp.DynamicallyDefineLocalIdRequest(ctx, dpos, sym); err != nil {
+								return err
+							}
+							dpos++
+							expectedPayloadSize += sym.Length
+							time.Sleep(5 * time.Millisecond)
+						}
+						c.OnMessage("Configured dynamic register")
+					}
+			*/
 			case read := <-c.readChan:
 				if c.txbridge {
 					toRead := min(235, read.Length)

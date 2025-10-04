@@ -168,25 +168,27 @@ func (c *T8Client) Start() error {
 						return errors.New("too many errors, reconnecting")
 					}
 					c.errPerSecond = 0
-				case symbols := <-c.symbolChan:
-					c.Symbols = symbols
-					expectedPayloadSize = 0
-					for _, sym := range c.Symbols {
-						expectedPayloadSize += sym.Length
-					}
-					c.OnMessage("Reconfiguring symbols..")
-					if err := clearDynamicallyDefinedRegister(ctx, gm); err != nil {
-						return err
-					}
-					c.OnMessage("Cleared dynamic register")
-					if len(c.Symbols) > 0 {
+				/*
+					case symbols := <-c.symbolChan:
+						c.Symbols = symbols
+						expectedPayloadSize = 0
 						for _, sym := range c.Symbols {
-							if err := setUpDynamicallyDefinedRegisterBySymbol(ctx, gm, uint16(sym.Number)); err != nil {
-								return err
-							}
+							expectedPayloadSize += sym.Length
 						}
-						c.OnMessage("Configured dynamic register")
-					}
+						c.OnMessage("Reconfiguring symbols..")
+						if err := clearDynamicallyDefinedRegister(ctx, gm); err != nil {
+							return err
+						}
+						c.OnMessage("Cleared dynamic register")
+						if len(c.Symbols) > 0 {
+							for _, sym := range c.Symbols {
+								if err := setUpDynamicallyDefinedRegisterBySymbol(ctx, gm, uint16(sym.Number)); err != nil {
+									return err
+								}
+							}
+							c.OnMessage("Configured dynamic register")
+						}
+				*/
 				case read := <-c.readChan:
 					if c.txbridge {
 						if err := c.handleReadTxbridge(ctx, cl, read); err != nil {
