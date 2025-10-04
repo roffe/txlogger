@@ -49,10 +49,10 @@ const (
 +--------------------------+-------------------+
 */
 
-type SensorType int
+type sensorType int
 
 const (
-	WidebandAirFuel SensorType = iota
+	WidebandAirFuel sensorType = iota
 	ExhaustGasTemperature
 	FluidTemperature
 	Vacuum
@@ -81,7 +81,7 @@ const (
 	WidebandAFRReaction
 )
 
-func (s SensorType) String() string {
+func (s sensorType) String() string {
 	switch s {
 	case WidebandAirFuel:
 		return "Wideband Air/Fuel (0)"
@@ -325,7 +325,7 @@ func (s *IMFDClient) Stop() {
 	})
 }
 
-func (s *IMFDClient) GetSensor(sensorType SensorType, instance uint8) float64 {
+func (s *IMFDClient) GetSensor(sensorType sensorType, instance uint8) float64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if v, ok := s.values[createMapkey(sensorType, instance)]; ok {
@@ -378,7 +378,7 @@ func (s *IMFDClient) parsePackets(data []byte) error {
 	return nil
 }
 
-func createMapkey(typ SensorType, instance uint8) string {
+func createMapkey(typ sensorType, instance uint8) string {
 	return fmt.Sprintf("%s #%d", typ.String(), instance)
 
 }
@@ -391,14 +391,14 @@ func (s *IMFDClient) parsePacket(packet []byte) error {
 	dataLSB := packet[4] & DataMask
 	address := uint16(addrMSB)<<6 | uint16(addrLSB)
 	data := uint16(dataMSB)<<6 | uint16(dataLSB)
-	st := SensorType(address)
-	value, _ := ConvertData(st, 0, data)
+	st := sensorType(address)
+	value, _ := convertData(st, 0, data)
 	key := createMapkey(st, instance)
 	s.values[key] = value
 	return nil
 }
 
-func ConvertData(sensor SensorType, unit, raw uint16) (float64, string) {
+func convertData(sensor sensorType, unit, raw uint16) (float64, string) {
 	var retUnit string
 	var value float64
 	switch sensor {
