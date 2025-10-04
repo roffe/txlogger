@@ -46,14 +46,6 @@ func (c *Client) ReadRam(ctx context.Context, address, length uint32) ([]byte, e
 	return buff, nil
 }
 
-func (c *Client) WriteRam(ctx context.Context, address uint32, data byte) error {
-	command := fmt.Sprintf("W%04X%02X\r", uint16(address), data)
-	if err := sendCommand(ctx, c.c, []byte(command)); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (c *Client) sendReadCommand(ctx context.Context, address uint32) ([]byte, error) {
 	frame := gocan.NewFrame(0x05, []byte{0xC7, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address)}, gocan.ResponseRequired)
 	resp, err := c.c.SendAndWait(ctx, frame, 200*time.Millisecond, 0xC)
@@ -68,6 +60,14 @@ func (c *Client) sendReadCommand(ctx context.Context, address uint32) ([]byte, e
 		respData[j], respData[5-j] = respData[5-j], respData[j]
 	}
 	return respData, nil
+}
+
+func (c *Client) WriteRam(ctx context.Context, address uint32, data byte) error {
+	command := fmt.Sprintf("W%04X%02X\r", uint16(address), data)
+	if err := sendCommand(ctx, c.c, []byte(command)); err != nil {
+		return err
+	}
+	return nil
 }
 
 func sendCommand(ctx context.Context, c *gocan.Client, cmd []byte) error {
