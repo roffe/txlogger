@@ -7,20 +7,20 @@ import (
 	"sync"
 	"time"
 
-	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
+	"github.com/roffe/txlogger/pkg/wbl"
 )
 
 type BaseLogger struct {
-	lamb LambdaProvider
+	lamb wbl.LambdaProvider
 	lw   LogWriter
 
 	sysvars *ThreadSafeMap
 
-	symbolChan chan []*symbol.Symbol
-	readChan   chan *ReadRequest
-	writeChan  chan *WriteRequest
-	quitChan   chan struct{}
+	//symbolChan chan []*symbol.Symbol
+	readChan  chan *ReadRequest
+	writeChan chan *WriteRequest
+	quitChan  chan struct{}
 
 	cps          int
 	captureCount int
@@ -42,10 +42,10 @@ type BaseLogger struct {
 
 func NewBaseLogger(cfg Config, lw LogWriter) BaseLogger {
 	return BaseLogger{
-		lw:           lw,
-		Config:       cfg,
-		sysvars:      NewThreadSafeMap(),
-		symbolChan:   make(chan []*symbol.Symbol, 1),
+		lw:      lw,
+		Config:  cfg,
+		sysvars: NewThreadSafeMap(),
+		//symbolChan:   make(chan []*symbol.Symbol, 1),
 		writeChan:    make(chan *WriteRequest, 1),
 		readChan:     make(chan *ReadRequest, 1),
 		quitChan:     make(chan struct{}),
@@ -73,6 +73,7 @@ func (bl *BaseLogger) GetRAM(address uint32, length uint32) ([]byte, error) {
 	return req.Data, req.Wait()
 }
 
+/*
 func (bl *BaseLogger) SetSymbols(symbols []*symbol.Symbol) error {
 	select {
 	case bl.symbolChan <- symbols:
@@ -81,6 +82,7 @@ func (bl *BaseLogger) SetSymbols(symbols []*symbol.Symbol) error {
 	}
 	return nil
 }
+*/
 
 func (bl *BaseLogger) onError() {
 	bl.errCount++
@@ -93,15 +95,14 @@ func (bl *BaseLogger) calculateCompensatedTimestamp() time.Time {
 }
 
 func (bl *BaseLogger) setupWBL(ctx context.Context, cl *gocan.Client) error {
-	// Wideband lambda
-	cfg := &WBLConfig{
+	cfg := &wbl.WBLConfig{
 		WBLType:  bl.Config.WidebandConfig.Type,
 		Port:     bl.Config.WidebandConfig.Port,
 		Log:      bl.OnMessage,
 		Txbridge: bl.txbridge,
 	}
 	var err error
-	bl.lamb, err = NewWBL(ctx, cl, cfg)
+	bl.lamb, err = wbl.New(ctx, cl, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create wideband lambda: %w", err)
 	}

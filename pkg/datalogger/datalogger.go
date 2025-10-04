@@ -1,7 +1,6 @@
 package datalogger
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"time"
@@ -23,19 +22,12 @@ type IClient interface {
 	Start() error
 	SetRAM(address uint32, data []byte) error
 	GetRAM(address uint32, length uint32) ([]byte, error)
-	SetSymbols(symbols []*symbol.Symbol) error
+	//SetSymbols(symbols []*symbol.Symbol) error
 	Close()
 }
 
 type Consumer interface {
 	SetValue(string, float64)
-}
-
-type LambdaProvider interface {
-	GetLambda() float64
-	Start(context.Context) error
-	Stop()
-	String() string
 }
 
 type Config struct {
