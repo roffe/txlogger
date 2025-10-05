@@ -19,6 +19,7 @@ import (
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
 	"github.com/roffe/txlogger/pkg/wbl/plx"
+	"github.com/roffe/txlogger/pkg/wbl/zeitronix"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/settings/cansettings"
 	"github.com/roffe/txlogger/pkg/widgets/txconfigurator"
@@ -102,6 +103,7 @@ type Widget struct {
 		t7          *canvas.Image
 		plx         *canvas.Image
 		combi       *canvas.Image
+		zeitronix   *canvas.Image
 	}
 
 	widget.BaseWidget
@@ -127,7 +129,12 @@ func (sw *Widget) GetWidebandSymbolName() string {
 		default:
 			return "None"
 		}
-	case ecumaster.ProductString, innovate.ProductString, aem.ProductString, plx.ProductString, "CombiAdapter":
+	case ecumaster.ProductString,
+		innovate.ProductString,
+		aem.ProductString,
+		plx.ProductString,
+		"CombiAdapter",
+		zeitronix.ProductString:
 		return datalogger.EXTERNALWBLSYM // Lambda.External
 	default:
 		return "None"
@@ -400,6 +407,7 @@ func New(cfg *Config) *Widget {
 	sw.images.t7 = newImageFromResource("t7")
 	sw.images.plx = newImageFromResource("plx")
 	sw.images.combi = newImageFromResource("combi")
+	sw.images.zeitronix = newImageFromResource("zeitronix")
 
 	wblSel := sw.newWBLSelector()
 	sw.wblADscanner = sw.newADscannerCheck()
@@ -416,7 +424,7 @@ func New(cfg *Config) *Widget {
 			sw.images.t7,
 			sw.images.plx,
 			sw.images.combi,
-			//sw.wblImage,
+			sw.images.zeitronix,
 			layout.NewSpacer(),
 		),
 		wblSel,
@@ -514,6 +522,9 @@ func newImageFromResource(name string) *canvas.Image {
 	case "combi":
 		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.CombiV2))
 		img.SetMinSize(fyne.NewSize(360, 245))
+	case "zeitronix":
+		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.ZeitronixZT2))
+		img.SetMinSize(fyne.NewSize(252, 252))
 	}
 	img.FillMode = canvas.ImageFillContain
 	img.ScaleMode = canvas.ImageScaleFastest
@@ -536,6 +547,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 		aem.ProductString,
 		plx.ProductString,
 		"CombiAdapter",
+		zeitronix.ProductString,
 	}, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsLambdaSource, s)
 		fyne.CurrentApp().Preferences().SetString(prefsWidebandSymbolName, sw.GetWidebandSymbolName())
@@ -550,6 +562,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.images.t7.Show()
 			sw.images.plx.Hide()
 			sw.images.combi.Hide()
+			sw.images.zeitronix.Hide()
 			ecuSet = true
 			portSelect = false
 		case ecumaster.ProductString:
@@ -560,6 +573,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.images.t7.Hide()
 			sw.images.plx.Hide()
 			sw.images.combi.Hide()
+			sw.images.zeitronix.Hide()
 			portSelect = false
 		case innovate.ProductString:
 			sw.images.mtxl.Show()
@@ -569,6 +583,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.images.t7.Hide()
 			sw.images.plx.Hide()
 			sw.images.combi.Hide()
+			sw.images.zeitronix.Hide()
 			portSelect = true
 		case aem.ProductString:
 			sw.images.mtxl.Hide()
@@ -578,6 +593,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.images.t7.Hide()
 			sw.images.plx.Hide()
 			sw.images.combi.Hide()
+			sw.images.zeitronix.Hide()
 			portSelect = true
 		case plx.ProductString:
 			sw.images.mtxl.Hide()
@@ -587,6 +603,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.images.t7.Hide()
 			sw.images.plx.Show()
 			sw.images.combi.Hide()
+			sw.images.zeitronix.Hide()
 			portSelect = true
 		case "CombiAdapter":
 			sw.images.mtxl.Hide()
@@ -596,7 +613,18 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.images.t7.Hide()
 			sw.images.plx.Hide()
 			sw.images.combi.Show()
+			sw.images.zeitronix.Hide()
 			portSelect = false
+		case zeitronix.ProductString:
+			sw.images.mtxl.Hide()
+			sw.images.lc2.Hide()
+			sw.images.uego.Hide()
+			sw.images.lambdatocan.Hide()
+			sw.images.t7.Hide()
+			sw.images.plx.Hide()
+			sw.images.combi.Hide()
+			sw.images.zeitronix.Show()
+			portSelect = true
 		default:
 			sw.images.mtxl.Hide()
 			sw.images.lc2.Hide()
@@ -605,6 +633,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.images.t7.Hide()
 			sw.images.plx.Hide()
 			sw.images.combi.Hide()
+			sw.images.zeitronix.Hide()
 			portSelect = false
 		}
 

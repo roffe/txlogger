@@ -11,6 +11,7 @@ import (
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
 	"github.com/roffe/txlogger/pkg/wbl/plx"
+	"github.com/roffe/txlogger/pkg/wbl/zeitronix"
 )
 
 type LambdaProvider interface {
@@ -52,6 +53,8 @@ func New(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvider,
 		return newAEM(ctx, cl, cfg)
 	case plx.ProductString:
 		return newPLX(ctx, cl, cfg)
+	case zeitronix.ProductString:
+		return newZeitronix(ctx, cl, cfg)
 	default:
 		return nil, fmt.Errorf("unknown WBL type: %s", cfg.WBLType)
 	}
@@ -158,7 +161,34 @@ func newPLX(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 			for msg := range ch {
 				if err := wblClient.Parse(msg.Data); err != nil {
 					cfg.Log(err.Error())
-					log.Println(err)
+				}
+			}
+		}()
+	} else {
+		if err := wblClient.Start(ctx); err != nil {
+			return nil, err
+		}
+	}
+	return wblClient, nil
+}
+
+func newZeitronix(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvider, error) {
+	wblClient, err := zeitronix.NewZeitronixClient(cfg.Port, cfg.Log)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Txbridge && cfg.Port == "txbridge" {
+		if err := cl.Send(gocan.SystemMsg, []byte{'w', 1, 'z', 'z'}, gocan.Outgoing); err != nil {
+			return nil, err
+		}
+		wblSub := cl.Subscribe(ctx, gocan.SystemMsgWBLReading)
+
+		go func() {
+			ch := wblSub.Chan()
+			defer cfg.Log("wbl channel closed")
+			for msg := range ch {
+				if err := wblClient.SetData(msg.Data); err != nil {
+					cfg.Log(err.Error())
 				}
 			}
 		}()

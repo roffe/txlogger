@@ -49,6 +49,9 @@ var LambdaToCan []byte
 //go:embed plx.jpg
 var PLX []byte
 
+//go:embed zeitronix-zt2.jpg
+var ZeitronixZT2 []byte
+
 //go:embed t7.jpg
 var T7 []byte
 
