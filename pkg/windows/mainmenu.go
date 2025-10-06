@@ -194,15 +194,15 @@ var T8SymbolsTuning = map[string][]string{
 type MainMenu struct {
 	w                 fyne.Window
 	leading, trailing []*fyne.Menu
-	oneFunc           func(symbol.ECUType, string)
-	multiFunc         func(symbol.ECUType, ...string)
-	funcMap           map[string]func(string)
+	openFunc          func(symbol.ECUType, string)
+	//multiFunc         func(symbol.ECUType, ...string)
+	funcMap map[string]func(string)
 }
 
-func NewMenu(w fyne.Window, leading, trailing []*fyne.Menu, oneFunc func(symbol.ECUType, string), funcMap map[string]func(string)) *MainMenu {
+func NewMenu(w fyne.Window, leading, trailing []*fyne.Menu, openFunc func(symbol.ECUType, string), funcMap map[string]func(string)) *MainMenu {
 	return &MainMenu{
 		w:        w,
-		oneFunc:  oneFunc,
+		openFunc: openFunc,
 		leading:  leading,
 		trailing: trailing,
 		funcMap:  funcMap,
@@ -242,35 +242,25 @@ func (mw *MainMenu) GetMenu(name string) *fyne.MainMenu {
 				continue
 			}
 
-			/*
-				if mapName == "Register EU0D" {
-					itm := fyne.NewMenuItem(mapName, func() {
-						mw.otherFunc(mapName)
-					})
-					items = append(items, itm)
-					continue
-				}
-			*/
-
 			if strings.Contains(mapName, "|") {
 				parts := strings.Split(mapName, "|")
 				names := parts[1:]
 				if len(parts) == 2 {
 					itm := fyne.NewMenuItem(parts[0], func() {
-						mw.oneFunc(typ, names[0])
+						mw.openFunc(typ, names[0])
 					})
 					items = append(items, itm)
 					continue
 				}
-				itm := fyne.NewMenuItem(parts[0], func() {
-					mw.multiFunc(typ, names...)
-				})
-				items = append(items, itm)
+				//itm := fyne.NewMenuItem(parts[0], func() {
+				//	mw.multiFunc(typ, names...)
+				//})
+				//items = append(items, itm)
 				continue
 			}
 
 			itm := fyne.NewMenuItem(mapName, func() {
-				mw.oneFunc(typ, mapName)
+				mw.openFunc(typ, mapName)
 			})
 			items = append(items, itm)
 		}
