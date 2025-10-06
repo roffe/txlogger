@@ -183,10 +183,40 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	symX := mw.fw.GetByName(axis.X)
 	if symX == nil && axis.X == "BstKnkCal.fi_offsetXSP" {
 		symX = mw.fw.GetByName("BstKnkCal.OffsetXSP")
+		axis.X = "BstKnkCal.OffsetXSP"
 	}
 
 	symY := mw.fw.GetByName(axis.Y)
 	symZ := mw.fw.GetByName(axis.Z)
+
+	// Special cases
+	switch mapName {
+	case "Pgm_mod!":
+		pgm := pgmmod.New()
+		pgm.LoadFunc = func() ([]byte, error) {
+			return symZ.Bytes(), nil
+		}
+		pgm.Set(symZ.Bytes())
+		mapWindow := multiwindow.NewInnerWindow("Pgm_mod!", pgm)
+		mapWindow.Icon = theme.GridIcon()
+		mw.wm.Add(mapWindow)
+		return
+	case "Pgm_status":
+		if w := mw.wm.HasWindow("Pgm_status"); w != nil {
+			return
+		}
+		pgs := pgmstatus.New()
+		cancel := ebus.SubscribeFunc("Pgm_status", pgs.Set)
+		iw := multiwindow.NewInnerWindow("Pgm_status", pgs)
+		iw.Icon = theme.InfoIcon()
+		iw.OnClose = func() {
+			if cancel != nil {
+				cancel()
+			}
+		}
+		mw.wm.Add(iw)
+		return
+	}
 
 	if symZ == nil {
 		mw.Error(fmt.Errorf("failed to find symbol %s", axis.Z))
@@ -220,35 +250,6 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 	if axis.X == "Pwm_ind_trot!" {
 		xData = xData[:8]
-	}
-
-	// Special cases
-	switch mapName {
-	case "Pgm_mod!":
-		pgm := pgmmod.New()
-		pgm.LoadFunc = func() ([]byte, error) {
-			return symZ.Bytes(), nil
-		}
-		pgm.Set(symZ.Bytes())
-		mapWindow := multiwindow.NewInnerWindow("Pgm_mod!", pgm)
-		mapWindow.Icon = theme.GridIcon()
-		mw.wm.Add(mapWindow)
-		return
-	case "Pgm_status":
-		if w := mw.wm.HasWindow("Pgm_status"); w != nil {
-			return
-		}
-		pgs := pgmstatus.New()
-		cancel := ebus.SubscribeFunc("Pgm_status", pgs.Set)
-		iw := multiwindow.NewInnerWindow("Pgm_status", pgs)
-		iw.Icon = theme.InfoIcon()
-		iw.OnClose = func() {
-			if cancel != nil {
-				cancel()
-			}
-		}
-		mw.wm.Add(iw)
-		return
 	}
 
 	var mv *mapviewer.MapViewer
