@@ -29,11 +29,15 @@ var T5SymbolsTuning = map[string][]string{
 		"Insp_mat!",
 	},
 	"Ignition": {
-		"Ign_map_0!",
+		"Ignition normal|Ign_map_0!",
+		"Ignition knock|Ign_map_2!",
+		"Ignition warmup|Ign_map_4!",
 	},
 	"Boost": {
 		"Tryck_mat!",
-		//"Reg_kon_mat!",
+		"Tryck_mat_a!",
+		"Reg_kon_mat!",
+		"Reg_kon_mat_a!",
 		//"P_fors!",
 		//"I_fors!",
 		//"D_fors!",
