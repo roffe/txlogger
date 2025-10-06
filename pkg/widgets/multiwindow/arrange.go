@@ -22,11 +22,11 @@ type Arranger interface {
 type baseArrangement struct{}
 
 func (b *baseArrangement) setWindowState(w *InnerWindow, pos fyne.Position, size fyne.Size, maximized bool) {
-	w.preMaximizedPos = pos
-	w.preMaximizedSize = w.MinSize()
+	w.preMaximizedPos = w.Position()
+	w.preMaximizedSize = w.Size()
+	w.maximized = maximized
 	w.Move(pos)
 	w.Resize(size)
-	w.maximized = maximized
 }
 
 // GridArranger arranges windows in a grid pattern
