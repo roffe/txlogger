@@ -349,29 +349,7 @@ func (mw *MainWindow) render() {
 		)
 	*/
 
-	toolbar := container.NewHBox(
-		container.NewBorder(
-			nil,
-			nil,
-			widget.NewLabel("ECU"),
-			nil,
-			mw.selects.ecuSelect,
-		),
-		widget.NewSeparator(),
-		mw.buttons.symbolListBtn,
-		mw.buttons.logBtn,
-
-		//mw.buttons.logplayerBtn,
-		mw.buttons.openLogBtn,
-		mw.buttons.dashboardBtn,
-		widget.NewButtonWithIcon("", theme.GridIcon(), func() {
-			mw.wm.Arrange(&multiwindow.GridArranger{})
-		}),
-		mw.buttons.addGaugeBtn,
-		widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
-			mw.wm.CloseAll()
-		}),
-	)
+	toolbar := mw.newToolbar()
 
 	if mw.previewFeatures {
 		toolbar.Add(widget.NewButtonWithIcon("", theme.UploadIcon(), func() {
