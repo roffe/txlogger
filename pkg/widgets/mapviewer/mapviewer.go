@@ -136,6 +136,8 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 		}
 	}
 
+	log.Printf("mapViewer c:%d r:%d len:%d x:%s y:%s z:%s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom, mv.symbol.Name)
+
 	if len(mv.zData) == 0 {
 		return nil, fmt.Errorf("mapViewer zData is empty")
 	}
@@ -147,8 +149,6 @@ func New(options ...MapViewerOption) (*MapViewer, error) {
 
 	mv.crosshair = NewCrosshair(color.RGBA{165, 55, 253, 180}, 3)
 	mv.selectionRect = NewRectangle(color.RGBA{0x30, 0x70, 0xFF, 0xFF}, 3)
-
-	// log.Printf("mapViewer c:%d r:%d len:%d x:%s y:%s z:%s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom, mv.symbol.Name)
 
 	mv.createYAxis()
 	mv.createXAxis()
