@@ -175,7 +175,6 @@ func (c *T5Client) Start() error {
 						upd.Complete(err)
 						break
 					}
-
 				}
 				upd.Complete(nil)
 			case <-t.C:
