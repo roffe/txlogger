@@ -367,10 +367,10 @@ func (mw *MainWindow) startLogging() {
 	go func() {
 
 		mw.Log("Connecting to " + device.Name())
-		defer mw.Log(device.Name() + " disconnected")
 		if err := mw.dlc.Start(); err != nil {
 			mw.Error(err)
 		}
+		mw.Log(device.Name() + " disconnected")
 		mw.loggingRunning = false
 		mw.dlc = nil
 		fyne.Do(func() {
