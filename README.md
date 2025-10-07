@@ -1,8 +1,13 @@
 # txlogger
 ![Windows Build](https://github.com/roffe/txlogger/actions/workflows/windows.yml/badge.svg)
 
-Blazing fast data logging for Trionic 5, 7 & 8 ECU's found in Saab 900, 9000, 9-3 & 9-5 1993-2010
-Saab Automobile, Gone but never forgotten
+Blazing fast data logging for SAAB Trionic ECU's
+
+Trionic 5 - 9000, NG900 & OG9-3
+Trionic 7 - OG9-3 & OG9-5
+Trionic 8 - NG9-3
+
+SAAB Automobile, Gone but never forgotten
 
 Created after discussions on [TrionicTuning](https://www.trionictuning.com/forum/viewtopic.php?f=34&t=14297)
 
