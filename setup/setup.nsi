@@ -10,7 +10,7 @@
 
   ;Name and file
   Name "${NAME}"
-  OutFile "txlogger_setup.exe"
+  OutFile ..\txlogger_setup.exe
   Unicode True
   RequestExecutionLevel Admin ; Request admin rights on WinVista+ (when UAC is turned on)
   
@@ -71,7 +71,7 @@ Function un.onInit
 FunctionEnd
 
 
-Section "core" SecCore
+Section "txlogger" SecCore
   SetOutPath "$InstDir"
   
   ;ADD YOUR OWN FILES HERE...

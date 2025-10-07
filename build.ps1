@@ -10,6 +10,20 @@ if (-not ($cangateway -or $txlogger -or $setup -or $release)) {
     exit
 }
 
+# Check if WinRAR is installed in common locations
+$winrarPaths = @(
+    "C:\Program Files\WinRAR\WinRAR.exe",
+    "C:\Program Files (x86)\WinRAR\WinRAR.exe"
+)
+
+$winrarExe = $null
+foreach ($path in $winrarPaths) {
+    if (Test-Path $path) {
+        $winrarExe = $path
+        break
+    }
+}
+
 if ($release) {
     $cangateway = $true
     $txlogger = $true
@@ -67,7 +81,7 @@ if ($txlogger) {
 }
 
 if ($setup) {
-    Write-Host "Building setup.exe"
+    Write-Host "Building txlogger_setup.exe"
 
     $ifpPath = (Get-Location).Path + "\setup\setup.nsi"
     Start-Process -FilePath "C:\Program Files (x86)\NSIS\makensis.exe" -ArgumentList $ifpPath -WorkingDirectory (Get-Location).Path -NoNewWindow -Wait
@@ -77,11 +91,10 @@ if ($setup) {
         exit
     }
 
-    $winRarPath = "C:\Program Files\WinRAR\WinRAR.exe"
     $filesToAdd = "txlogger_setup.exe"
     $outputZip = "setup.zip"
     $winRarArgs = "a -m5 -afzip $outputZip $filesToAdd"
 
     Write-Output "Creating setup.zip"
-    Start-Process -FilePath $winRarPath -ArgumentList $winRarArgs -NoNewWindow -Wait
+    Start-Process -FilePath $winRarExe -ArgumentList $winRarArgs -NoNewWindow -Wait
 }

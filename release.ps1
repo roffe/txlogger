@@ -27,9 +27,9 @@ if ($beta) {
 else {
     Remove-Item "txlogger.exe" -ErrorAction Continue
     Remove-Item "txlogger.zip" -ErrorAction SilentlyContinue
-    Remove-Item "setup.exe" -ErrorAction SilentlyContinue
+    Remove-Item "txlogger_setup.exe" -ErrorAction SilentlyContinue
     Remove-Item "setup.zip" -ErrorAction SilentlyContinue
-    .\build.ps1 -cangateway -txlogger -setup
+    .\build.ps1 -release
 }
 
 $files = @(
