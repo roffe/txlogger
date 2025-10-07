@@ -542,11 +542,11 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 	sw.wblSource = widget.NewSelect([]string{
 		"None",
 		"ECU",
+		aem.ProductString,
+		"CombiAdapter",
 		ecumaster.ProductString,
 		innovate.ProductString,
-		aem.ProductString,
 		plx.ProductString,
-		"CombiAdapter",
 		zeitronix.ProductString,
 	}, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsLambdaSource, s)
