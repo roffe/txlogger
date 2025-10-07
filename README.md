@@ -22,28 +22,27 @@ Install Golang & C-compiler - [DEVELOPMENT.md](DEVELOPMENT.md)
     go get .
 
 ## Run
-    .\build_cangateway.ps1 # only needs to be done once
     .\run.ps1
 
 ## Build
-    .\build.ps1
+    .\build.ps1 -cangateway -txlogger
 
 ## Build requirements
 
-### libusb *
+### libusb*
 
 libusb from vcpkg for combiadapter support
 
     vcpkg install 'libusb:x64-windows'
     vcpkg install 'libusb:x86-windows'
 
-### CANlib *
+### CANlib*
 
 https://kvaser.com/single-download/?download_id=47112
 
 Install in the default location `C:\Program Files (x86)\Kvaser\Canlib`
 
-### CANUSB *
+### CANUSB*
 
 https://www.canusb.com/files/canusb_dll_driver.zip
 unzip the content of the file into a folder called "canusb" in the root of the project
