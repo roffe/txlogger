@@ -16,7 +16,9 @@ Built with [goCAN](https://github.com/roffe/gocan)
 
 ## Bootstrap the project
 
-Install Golang & C-compiler - [DEVELOPMENT.md](DEVELOPMENT.md)
+Install Golang & C-compiler - [DEVELOPMENT.md](DEVELOPMENT.md) has more details.
+
+Run the setup script to get external dependencies then "go get" to download dependencies
 
     .\setup_build_env.ps1
     go get .
