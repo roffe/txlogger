@@ -2,7 +2,6 @@ package multiwindow
 
 import (
 	"encoding/json"
-	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -33,8 +32,7 @@ type MultipleWindows struct {
 
 	windows []*InnerWindow
 
-	content      *fyne.Container
-	propertyLock sync.RWMutex
+	content *fyne.Container
 
 	openOffset fyne.Position
 
@@ -62,9 +60,6 @@ func (m *MultipleWindows) Add(w *InnerWindow, startPosition ...fyne.Position) bo
 		m.Raise(w)
 		return false
 	}
-
-	m.propertyLock.Lock()
-	defer m.propertyLock.Unlock()
 
 	m.windows = append(m.windows, w)
 	m.setupChild(w)
@@ -97,16 +92,12 @@ func (m *MultipleWindows) Add(w *InnerWindow, startPosition ...fyne.Position) bo
 }
 
 func (m *MultipleWindows) Windows() []*InnerWindow {
-	m.propertyLock.RLock()
-	defer m.propertyLock.RUnlock()
 	out := make([]*InnerWindow, len(m.windows))
 	copy(out, m.windows)
 	return out
 }
 
 func (m *MultipleWindows) HasWindow(title string) *InnerWindow {
-	//m.propertyLock.RLock()
-	//defer m.propertyLock.RUnlock()
 	for _, w := range m.windows {
 		if w.Title() == title {
 			return w
@@ -145,8 +136,6 @@ func (m *MultipleWindows) Remove(w *InnerWindow) {
 */
 
 func (m *MultipleWindows) remove(w *InnerWindow) {
-	m.propertyLock.Lock()
-	defer m.propertyLock.Unlock()
 	for i, ww := range m.windows {
 		if ww == w {
 			m.windows = append(m.windows[:i], m.windows[i+1:]...)
@@ -166,8 +155,6 @@ func (m *MultipleWindows) Refresh() {
 }
 
 func (m *MultipleWindows) Raise(w *InnerWindow) {
-	m.propertyLock.Lock()
-	defer m.propertyLock.Unlock()
 	m.raise(w)
 	if obj, ok := w.content.Objects[0].(fyne.Focusable); ok {
 		if c := fyne.CurrentApp().Driver().CanvasForObject(w); c != nil {
@@ -214,11 +201,9 @@ func (m *MultipleWindows) refreshChildren() {
 
 func (m *MultipleWindows) setupChild(w *InnerWindow) {
 	w.OnDragged = func(ev *fyne.DragEvent) {
-		//S		log.Println("Dragged", ev.Dragged)
-		// log.Println(m.content.Size())
 		if w.maximized {
 			w.maximized = false
-			w.Move(ev.Position.SubtractXY(w.preMaximizedSize.Width*0.5, 13))
+			w.Move(ev.AbsolutePosition.SubtractXY(w.preMaximizedSize.Width*0.5, 78))
 			w.Resize(w.preMaximizedSize)
 			return
 		}
@@ -229,7 +214,6 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 			bounds := m.content.Size()
 			newPos.X = clamp32(newPos.X, 0, bounds.Width-size.Width)
 			newPos.Y = clamp32(newPos.Y, 0, bounds.Height-size.Height)
-			//bounds.Subtract(size).Max(newPos)
 		}
 		w.Move(newPos)
 	}
@@ -238,7 +222,6 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 		var newSize fyne.Size
 		minSize := w.MinSize()
 		currentSize := w.Size()
-
 		if w.leftDrag {
 			actualDX := ev.Dragged.DX
 			if actualDX > 0 {
