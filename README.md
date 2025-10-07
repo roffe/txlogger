@@ -1,6 +1,8 @@
 # txlogger
 ![Windows Build](https://github.com/roffe/txlogger/actions/workflows/windows.yml/badge.svg)
 
+![](txlogger.jpg)
+
 Blazing fast data logging for SAAB Trionic ECU's
 
 Trionic 5 - 9000, NG900 & OG9-3
@@ -65,8 +67,3 @@ CombiAdapter support which depends on libusb requires you to install [vc_redist.
     Mongoose Pro GM II 101 - 106 fps
     STN2120 97 - 103 fps
     Just4Trionic 19 - 24 fps
-
-## Screenshots
-
-![](txlogger.jpg)
-![](txlogger2.jpg)
