@@ -91,9 +91,11 @@ var T7SymbolsTuning = map[string][]string{
 		"InjCorrCal.InjectorConst",
 	},
 	"Limiters": {
-		"BstKnkCal.MaxAirmass",
-		"BstKnkCal.MaxAirmassAu",
-		"TorqueCal.M_ManGearLim",
+		"Airmass (M)|BstKnkCal.MaxAirmass",
+		"Airmass (A)|BstKnkCal.MaxAirmassAu",
+		"Gear Torque (M)|TorqueCal.M_ManGearLim",
+		"RPM limiter|MaxSpdCal.n_EngLimAir",
+		"Speed limiter|MaxVehicCal.v_MaxSpeed",
 	},
 	"Fuel": {
 		"BFuelCal.Map",
@@ -110,10 +112,11 @@ var T7SymbolsTuning = map[string][]string{
 		"BoostCal.DMap",
 	},
 	"Ignition": {
-		"IgnE85Cal.fi_AbsMap",
-		"IgnIdleCal.fi_IdleMap",
-		"IgnNormCal.Map",
-		"IgnStartCal.fi_StartMap",
+		"Ignition|IgnNormCal.Map",
+		"Ignition E85|IgnE85Cal.fi_AbsMap",
+		"Ignition LPG|IgnNormCal.GasMap",
+		"Ignition Idle|IgnIdleCal.fi_IdleMap",
+		"Ignition Start|IgnStartCal.fi_StartMap",
 	},
 	"Adaption": {
 		"AdpFuelCal.T_AdaptLim",
