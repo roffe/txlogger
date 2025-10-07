@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"os/exec"
 	"sync"
 	"time"
@@ -209,9 +210,16 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	}
 
 	symX := mw.fw.GetByName(axis.X)
-	if symX == nil && axis.X == "BstKnkCal.fi_offsetXSP" {
-		symX = mw.fw.GetByName("BstKnkCal.OffsetXSP")
-		axis.X = "BstKnkCal.OffsetXSP"
+	if symX == nil {
+		switch axis.X {
+		case "BstKnkCal.fi_offsetXSP":
+			symX = mw.fw.GetByName("BstKnkCal.OffsetXSP")
+			axis.X = "BstKnkCal.OffsetXSP"
+		case "IgnStartCal.X_EthActSP":
+			symX = mw.fw.GetByName("IgnStartCal.n_EngXSP")
+			axis.X = "IgnStartCal.n_EngXSP"
+			axis.XDescription = "Engine speed (rpm)"
+		}
 	}
 
 	symY := mw.fw.GetByName(axis.Y)
@@ -227,6 +235,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 	if symX != nil {
 		xData = symX.Float64s()
+		log.Println("xdata", symX.Name, symX.Correctionfactor)
 	} else {
 		xData = []float64{0}
 	}
