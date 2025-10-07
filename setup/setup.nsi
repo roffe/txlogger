@@ -10,7 +10,7 @@
 
   ;Name and file
   Name "${NAME}"
-  OutFile "setup.exe"
+  OutFile "txlogger_setup.exe"
   Unicode True
   RequestExecutionLevel Admin ; Request admin rights on WinVista+ (when UAC is turned on)
   
@@ -75,12 +75,12 @@ Section "core" SecCore
   SetOutPath "$InstDir"
   
   ;ADD YOUR OWN FILES HERE...
-  FILE cangateway.exe
-  FILE txlogger.exe
-  FILE canusbdrv64.dll
-  FILE libusb-1.0.dll
+  FILE ..\cangateway.exe
+  FILE ..\txlogger.exe
+  FILE ..\canusb\dll64\canusbdrv64.dll
+  FILE ..\vcpkg\packages\libusb_x64-windows\bin\libusb-1.0.dll
   ;FILE canlib32.dll
-  FILE debug.bat
+  FILE ..\debug.bat
   
   ;Store installation folder
   WriteRegStr HKLM "${REGPATH_UNINSTSUBKEY}" "DisplayName" "${NAME}"
