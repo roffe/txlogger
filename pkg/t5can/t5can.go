@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/roffe/gocan"
@@ -25,41 +26,40 @@ func NewClient(c *gocan.Client) *Client {
 }
 
 func (c *Client) ReadRam(ctx context.Context, address, length uint32) ([]byte, error) {
+	const chunk = 6
+	const addrBias = 5
+
 	buff := make([]byte, length)
-	realAddress := address + 5
-	num := length / 6
-	if length%6 > 0 {
-		num++
-	}
-	for i := 0; i < int(num); i++ {
-		resp, err := c.sendReadCommand(ctx, realAddress)
+	for off := uint32(0); off < length; off += chunk {
+		// Read up to 6 bytes at a time
+		resp, err := c.sendReadCommand(ctx, address+addrBias+off)
 		if err != nil {
 			return nil, err
 		}
-		for j := 0; j < 6; j++ {
-			if (i*6)+j < int(length) {
-				buff[(i*6)+j] = resp[j]
-			}
-		}
-		realAddress += 6
+		n := min(int(length-off), chunk)
+		copy(buff[int(off):int(off)+n], resp[:n])
 	}
 	return buff, nil
 }
 
 func (c *Client) sendReadCommand(ctx context.Context, address uint32) ([]byte, error) {
-	frame := gocan.NewFrame(0x05, []byte{0xC7, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address)}, gocan.ResponseRequired)
-	resp, err := c.c.SendAndWait(ctx, frame, 200*time.Millisecond, 0xC)
+	const cmdByte = 0xC7
+	frame := gocan.NewFrame(0x05, []byte{cmdByte, 0x00, 0x00, byte(address >> 8), byte(address)}, gocan.ResponseRequired)
+	resp, err := c.c.SendAndWait(ctx, frame, 200*time.Millisecond, 0x0C)
 	if err != nil {
 		return nil, err
 	}
-	if resp.Data[0] != 0xC7 {
-		return nil, fmt.Errorf("invalid response")
+
+	if len(resp.Data) < 8 { // need at least cmd + ? + 6 data bytes
+		return nil, fmt.Errorf("short response: got %d bytes", len(resp.Data))
 	}
-	respData := resp.Data[2:]
-	for j := 0; j < 3; j++ {
-		respData[j], respData[5-j] = respData[5-j], respData[j]
+	if resp.Data[0] != cmdByte {
+		return nil, fmt.Errorf("invalid response: expected 0x%X, got 0x%X", cmdByte, resp.Data[0])
 	}
-	return respData, nil
+
+	data := append([]byte(nil), resp.Data[2:8]...) // copy slice
+	slices.Reverse(data)
+	return data, nil
 }
 
 func (c *Client) WriteRam(ctx context.Context, address uint32, data byte) error {
