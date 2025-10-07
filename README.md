@@ -41,7 +41,6 @@ libusb from vcpkg for combiadapter support
 ### CANlib*
 
 https://kvaser.com/single-download/?download_id=47112
-
 Install in the default location `C:\Program Files (x86)\Kvaser\Canlib`
 
 ### CANUSB*
@@ -55,15 +54,3 @@ Is installed by the setup script
 ## Runtime requirements
 
 CombiAdapter support which depends on libusb requires you to install [vc_redist.x86.exe](https://www.microsoft.com/en-gb/download/confirmation.aspx?id=48145)
-
-### Benchmarks
-
-#### EU0D T7 @ 25mhz on bench, 14 symbols
-
-    CANUSB 96 - 102 fps ( com port speed 3000000 and port latency set to 1ms)
-    SM2 PRO 109 - 119 fps
-    OBDLink SX 87-93 fps (with 1ms latency set)
-    CombiAdapter 100 - 106 fps
-    Mongoose Pro GM II 101 - 106 fps
-    STN2120 97 - 103 fps
-    Just4Trionic 19 - 24 fps
