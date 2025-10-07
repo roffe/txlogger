@@ -10,7 +10,7 @@
 
   ;Name and file
   Name "${NAME}"
-  OutFile "install.exe"
+  OutFile "setup.exe"
   Unicode True
   RequestExecutionLevel Admin ; Request admin rights on WinVista+ (when UAC is turned on)
   
