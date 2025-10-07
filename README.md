@@ -4,9 +4,9 @@
 
 Blazing fast data logging for SAAB Trionic ECU's
 
-Trionic 5 - 9000, NG900 & OG9-3
-Trionic 7 - OG9-3 & OG9-5
-Trionic 8 - NG9-3
+- Trionic 5 (9000, NG900 & OG9-3)
+- Trionic 7 (OG9-3 & OG9-5)
+- Trionic 8 (NG9-3)
 
 SAAB Automobile, Gone but never forgotten
 
