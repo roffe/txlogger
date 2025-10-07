@@ -7,6 +7,7 @@ tmp2
 *.t8l
 *.csv
 *.dif
+*.dll
 /*.json
 *.dat
 *.exe
@@ -17,3 +18,7 @@ symbols.txt
 lzhuf/lzhuf.dll
 logs
 layouts/*
+canusb
+llvm-mingw
+vcpkg
+go
