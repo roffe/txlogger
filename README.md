@@ -1,7 +1,6 @@
 # txlogger
-![Windows Build](https://github.com/roffe/txlogger/actions/workflows/windows.yml/badge.svg)
-
 ![](txlogger.jpg)
+![Windows Build](https://github.com/roffe/txlogger/actions/workflows/windows.yml/badge.svg)
 
 Blazing fast data logging for SAAB Trionic ECU's
 
