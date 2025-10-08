@@ -29,11 +29,10 @@ func NewT8(cfg Config, lw LogWriter) (IClient, error) {
 }
 
 func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
-	//c.OnMessage(fmt.Sprintf("GetRAM %X %d", address, length))
 	if address+length <= 0x100000 {
 		return nil, fmt.Errorf("GetRAM: address not in SRAM: $%X", address)
 	}
-	req := NewReadRequest(address, length)
+	req := NewReadDataRequest(address, length)
 	c.readChan <- req
 	return req.Data, req.Wait()
 }
@@ -356,7 +355,7 @@ func (c *T8Client) Start() error {
 	return err
 }
 
-func (c *T8Client) handleWriteTxbridge(ctx context.Context, cl *gocan.Client, write *WriteRequest) error {
+func (c *T8Client) handleWriteTxbridge(ctx context.Context, cl *gocan.Client, write *DataRequest) error {
 	toWrite := min(write.Length, T8ChunkSize)
 	// log.Printf("Writing RAM $%X:%d", write.Address, toWrite)
 	cmd := serialcommand.SerialCommand{
@@ -396,7 +395,7 @@ func (c *T8Client) handleWriteTxbridge(ctx context.Context, cl *gocan.Client, wr
 	return nil
 }
 
-func (c *T8Client) handleReadTxbridge(ctx context.Context, cl *gocan.Client, read *ReadRequest) error {
+func (c *T8Client) handleReadTxbridge(ctx context.Context, cl *gocan.Client, read *DataRequest) error {
 	toRead := min(T8ChunkSize, read.Length)
 	// log.Printf("Reading RAM $%X:%d", read.Address, toRead)
 	cmd := serialcommand.SerialCommand{

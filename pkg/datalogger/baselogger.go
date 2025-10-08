@@ -18,8 +18,8 @@ type BaseLogger struct {
 	sysvars *ThreadSafeMap
 
 	//symbolChan chan []*symbol.Symbol
-	readChan  chan *ReadRequest
-	writeChan chan *WriteRequest
+	readChan  chan *DataRequest
+	writeChan chan *DataRequest
 	quitChan  chan struct{}
 
 	cps          int
@@ -46,8 +46,8 @@ func NewBaseLogger(cfg Config, lw LogWriter) BaseLogger {
 		Config:  cfg,
 		sysvars: NewThreadSafeMap(),
 		//symbolChan:   make(chan []*symbol.Symbol, 1),
-		writeChan:    make(chan *WriteRequest, 1),
-		readChan:     make(chan *ReadRequest, 1),
+		writeChan:    make(chan *DataRequest, 1),
+		readChan:     make(chan *DataRequest, 1),
 		quitChan:     make(chan struct{}),
 		txbridge:     strings.HasPrefix(cfg.Device.Name(), "txbridge"),
 		secondTicker: time.NewTicker(time.Second),
@@ -62,14 +62,22 @@ func (bl *BaseLogger) Close() {
 }
 
 func (bl *BaseLogger) SetRAM(address uint32, data []byte) error {
-	upd := NewRamUpdate(address, data)
-	bl.writeChan <- upd
-	return upd.Wait()
+	req := NewWriteDataRequest(address, data)
+	select {
+	case bl.writeChan <- req:
+	default:
+		return fmt.Errorf("busy")
+	}
+	return req.Wait()
 }
 
 func (bl *BaseLogger) GetRAM(address uint32, length uint32) ([]byte, error) {
-	req := NewReadRequest(address, length)
-	bl.readChan <- req
+	req := NewReadDataRequest(address, length)
+	select {
+	case bl.readChan <- req:
+	default:
+		return nil, fmt.Errorf("busy")
+	}
 	return req.Data, req.Wait()
 }
 
