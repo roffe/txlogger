@@ -63,6 +63,8 @@ func NewCSVWriter(f *os.File) *CSVWriter {
 	}
 }
 
+// CSV Writer
+
 type CSVWriter struct {
 	file          *os.File
 	headerWritten bool
@@ -119,6 +121,8 @@ func (c *CSVWriter) Close() error {
 	}
 	return c.file.Close()
 }
+
+// TX Writer
 
 type TXWriter struct {
 	file       *os.File
