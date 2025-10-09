@@ -207,7 +207,7 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	symbolListConfig.ColorBlindMode = mw.settings.GetColorBlindMode()
 
 	mw.wm = multiwindow.NewMultipleWindows()
-	mw.wm.LockViewport = false
+	mw.wm.LockViewport = true
 	mw.wm.OnError = mw.Error
 
 	mw.render()
