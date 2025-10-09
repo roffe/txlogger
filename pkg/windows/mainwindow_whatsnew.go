@@ -17,8 +17,8 @@ func (mw *MainWindow) whatsNew() {
 	lastVersion := mw.app.Preferences().String(lastVersionKey)
 	if lastVersion != mw.app.Metadata().Version {
 		mw.showWhatsNew()
+		mw.app.Preferences().SetString(lastVersionKey, mw.app.Metadata().Version)
 	}
-	mw.app.Preferences().SetString(lastVersionKey, mw.app.Metadata().Version)
 }
 
 func (mw *MainWindow) showWhatsNew() {
