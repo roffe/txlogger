@@ -45,10 +45,10 @@ $winRarArgs = "a -ep -m5 -afzip $outputZip $($files -join ' ')"
 Start-Process -FilePath $winrarExe -ArgumentList $winRarArgs -NoNewWindow -Wait
 
 if ($beta) {
-    scp txlogger_beta.zip roffe@roffe.nu:/webroot/roffe/public_html/txlogger
+    scp txlogger_beta.zip roffe@192.168.2.177:/var/www/html/txlogger
 }
 else {
-    scp txlogger.zip setup.zip roffe@roffe.nu:/webroot/roffe/public_html/txlogger
+    scp txlogger.zip setup.zip roffe@192.168.2.177:/var/www/html/txlogger
 }
 
 
