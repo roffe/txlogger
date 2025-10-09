@@ -42,10 +42,9 @@ type BaseLogger struct {
 
 func NewBaseLogger(cfg Config, lw LogWriter) BaseLogger {
 	return BaseLogger{
-		lw:      lw,
-		Config:  cfg,
-		sysvars: NewThreadSafeMap(),
-		//symbolChan:   make(chan []*symbol.Symbol, 1),
+		lw:           lw,
+		Config:       cfg,
+		sysvars:      NewThreadSafeMap(),
 		writeChan:    make(chan *DataRequest, 1),
 		readChan:     make(chan *DataRequest, 1),
 		quitChan:     make(chan struct{}),
@@ -81,17 +80,6 @@ func (bl *BaseLogger) GetRAM(address uint32, length uint32) ([]byte, error) {
 	return req.Data, req.Wait()
 }
 
-/*
-func (bl *BaseLogger) SetSymbols(symbols []*symbol.Symbol) error {
-	select {
-	case bl.symbolChan <- symbols:
-	default:
-		return fmt.Errorf("pending")
-	}
-	return nil
-}
-*/
-
 func (bl *BaseLogger) onError() {
 	bl.errCount++
 	bl.errPerSecond++
@@ -110,9 +98,10 @@ func (bl *BaseLogger) setupWBL(ctx context.Context, cl *gocan.Client) error {
 		Txbridge: bl.txbridge,
 	}
 	var err error
-	bl.lamb, err = wbl.New(ctx, cl, cfg)
+	lamb, err := wbl.New(ctx, cl, cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create wideband lambda: %w", err)
 	}
+	bl.lamb = lamb
 	return nil
 }
