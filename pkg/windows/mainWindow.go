@@ -228,7 +228,6 @@ func (mw *MainWindow) gocanGatewayClient() {
 		return
 	}
 	mw.settings.CANSettings.AddAdapters(res.Adapters)
-
 	mw.gwclient = client
 }
 

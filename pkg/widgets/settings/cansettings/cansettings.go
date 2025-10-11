@@ -94,16 +94,16 @@ func (c *Widget) AddAdapters(adapters []*proto.AdapterInfo) {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	for _, a := range adapters {
+	for _, adapter := range adapters {
 		adapter := &gocan.AdapterInfo{
-			Name:        a.GetName(),
-			Description: a.GetDescription(),
+			Name:        adapter.GetName(),
+			Description: adapter.GetDescription(),
 			Capabilities: gocan.AdapterCapabilities{
-				HSCAN: a.GetCapabilities().GetHSCAN(),
-				SWCAN: a.GetCapabilities().GetSWCAN(),
-				KLine: a.GetCapabilities().GetKLine(),
+				HSCAN: adapter.GetCapabilities().GetHSCAN(),
+				SWCAN: adapter.GetCapabilities().GetSWCAN(),
+				KLine: adapter.GetCapabilities().GetKLine(),
 			},
-			RequiresSerialPort: a.GetRequireSerialPort(),
+			RequiresSerialPort: adapter.GetRequireSerialPort(),
 		}
 
 		if _, found := c.adapters[adapter.Name]; found {
@@ -230,54 +230,40 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 		}
 		canRate = 500
 	}
+
 	var minimumVersion string
 	if strings.HasPrefix(cs.adapterSelector.Selected, "txbridge") {
 		minimumVersion = MinimumtxbridgeVersion
 	}
 
-	gocan.ListAdapters()
+	cfg := &gocan.AdapterConfig{
+		Port:                   cs.portSelector.Selected,
+		PortBaudrate:           baudrate,
+		CANRate:                canRate,
+		CANFilter:              canFilter,
+		OnMessage:              logger,
+		Debug:                  cs.debugCheckbox.Checked,
+		MinimumFirmwareVersion: minimumVersion,
+		PrintVersion:           true,
+	}
 
-	if strings.HasPrefix(cs.adapterSelector.Selected, "J2534") || strings.HasPrefix(cs.adapterSelector.Selected, "CANlib") { // || (strings.HasPrefix(cs.adapterSelector.Selected, "CANUSB ") && cs.adapterSelector.Selected != "CANUSB VCP") {
-		return gocan.NewGWClient(
-			cs.adapterSelector.Selected,
-			&gocan.AdapterConfig{
-				Port:                   cs.portSelector.Selected,
-				PortBaudrate:           baudrate,
-				CANRate:                canRate,
-				CANFilter:              canFilter,
-				OnMessage:              logger,
-				Debug:                  cs.debugCheckbox.Checked,
-				MinimumFirmwareVersion: minimumVersion,
-				PrintVersion:           true,
-			},
-		)
-	} else {
-		cfg := &gocan.AdapterConfig{
-			Port:                   cs.portSelector.Selected,
-			PortBaudrate:           baudrate,
-			CANRate:                canRate,
-			CANFilter:              canFilter,
-			OnMessage:              logger,
-			Debug:                  cs.debugCheckbox.Checked,
-			MinimumFirmwareVersion: minimumVersion,
-			PrintVersion:           true,
-		}
+	if strings.HasPrefix(cs.adapterSelector.Selected, "J2534") || strings.HasPrefix(cs.adapterSelector.Selected, "CANlib") {
+		return gocan.NewGWClient(cs.adapterSelector.Selected, cfg)
+	}
 
+	if cs.adapterSelector.Selected == "txbridge wifi" {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if cs.adapterSelector.Selected == "txbridge wifi" {
-			addr, err := mdns.Query(ctx, "txbridge.local")
-			if err != nil {
-				logger(fmt.Sprintf("Failed to resolve txbridge address via mDNS: %v", err))
-			} else {
-				cfg.AdditionalConfig = map[string]string{
-					"address": fmt.Sprintf("%s:%d", addr.String(), 1337),
-				}
+		addr, err := mdns.Query(ctx, "txbridge.local")
+		if err != nil {
+			logger(fmt.Sprintf("Failed to resolve txbridge address via mDNS: %v", err))
+		} else {
+			cfg.AdditionalConfig = map[string]string{
+				"address": fmt.Sprintf("%s:%d", addr.String(), 1337),
 			}
 		}
-
-		return gocan.NewAdapter(cs.adapterSelector.Selected, cfg)
 	}
+	return gocan.NewAdapter(cs.adapterSelector.Selected, cfg)
 }
 
 func (cs *Widget) CreateRenderer() fyne.WidgetRenderer {

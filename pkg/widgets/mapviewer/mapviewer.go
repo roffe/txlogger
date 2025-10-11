@@ -26,14 +26,9 @@ const (
 	maxTextSize = 28
 )
 
-type MapViewerInfo struct {
-	XName, YName, ZName string
-	XLen, YLen, ZLen    int
-}
-
 var (
 	//  _ fyne.Tappable = (*MapViewer)(nil)
-	// _ fyne.Focusable    = (*MapViewer)(nil)
+	_ fyne.Focusable    = (*MapViewer)(nil)
 	_ desktop.Mouseable = (*MapViewer)(nil)
 	_ desktop.Hoverable = (*MapViewer)(nil)
 	_ fyne.Draggable    = (*MapViewer)(nil)
@@ -246,14 +241,6 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		nil,
 		mapview,
 	)
-}
-
-func (mv *MapViewer) Info() MapViewerInfo {
-	return MapViewerInfo{
-		XLen: mv.numColumns,
-		YLen: mv.numRows,
-		ZLen: mv.numData,
-	}
 }
 
 func (mv *MapViewer) SetX(xValue float64) {
@@ -481,24 +468,25 @@ func (mv *MapViewer) resizeSelectionRect() {
 	//mv.selectionRect.MoveAndResize(pos, size)
 }
 
+/*
 var _ fyne.WidgetRenderer = (*mapViewerRenderer)(nil)
 
-type mapViewerRenderer struct {
-	mv      *MapViewer
-	oldSize fyne.Size
-}
-
-func (r *mapViewerRenderer) Layout(size fyne.Size) {
-	if size == r.oldSize {
-		return
+	type mapViewerRenderer struct {
+		mv      *MapViewer
+		oldSize fyne.Size
 	}
-	r.oldSize = size
-	r.mv.content.Resize(size)
-}
 
-func (r *mapViewerRenderer) MinSize() fyne.Size {
-	return r.mv.content.MinSize()
-}
+	func (r *mapViewerRenderer) Layout(size fyne.Size) {
+		if size == r.oldSize {
+			return
+		}
+		r.oldSize = size
+		r.mv.content.Resize(size)
+	}
+
+	func (r *mapViewerRenderer) MinSize() fyne.Size {
+		return r.mv.content.MinSize()
+	}
 
 func (r *mapViewerRenderer) Refresh() {
 }
@@ -506,9 +494,10 @@ func (r *mapViewerRenderer) Refresh() {
 func (r *mapViewerRenderer) Destroy() {
 }
 
-func (r *mapViewerRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.mv.content}
-}
+	func (r *mapViewerRenderer) Objects() []fyne.CanvasObject {
+		return []fyne.CanvasObject{r.mv.content}
+	}
+*/
 
 func calculateTextSize(widthFactor, heightFactor float32) float32 {
 	cellSize := fyne.Min(widthFactor, heightFactor)

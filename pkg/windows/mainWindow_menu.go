@@ -149,38 +149,10 @@ func (mw *MainWindow) setupMenu() {
 			fyne.NewMenuItem("Settings", func() {
 				mw.openSettings()
 			}),
-			/*
-				fyne.NewMenuItem("Update txbridge", func() {
-					port := mw.settings.CANSettings.GetSerialPort()
-					if mw.settings.CANSettings.GetAdapterName() == "txbridge wifi" {
-						ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-						defer cancel()
-						addr, err := mdns.Query(ctx, "txbridge.local")
-						if err != nil {
-							mw.Error(fmt.Errorf("mDNS lookup for txbridge.local failed: %w", err))
-							port = "tcp://192.168.4.1:1337"
-						} else {
-							port = "tcp://" + addr.String() + ":1337"
-						}
-					}
-					updater := multiwindow.NewInnerWindow("txbridge firmware updater", txupdater.New(port))
-					updater.Icon = theme.DownloadIcon()
-					updater.Resize(fyne.NewSize(400, 300))
-					mw.wm.Add(updater)
-				}),
-			*/
 			fyne.NewMenuItem("What's new", func() {
 				mw.showWhatsNew()
 			}),
 		),
-		//fyne.NewMenu("Preset",
-		//	fyne.NewMenuItem("Save", mw.savePreset),
-		//	fyne.NewMenuItem("New", mw.newPreset),
-		//	fyne.NewMenuItem("Import", mw.importPreset),
-		//	fyne.NewMenuItem("Export", mw.exportPreset),
-		//	fyne.NewMenuItem("Delete", mw.deletePreset),
-		//),
-
 	}
 
 	trailing := []*fyne.Menu{
