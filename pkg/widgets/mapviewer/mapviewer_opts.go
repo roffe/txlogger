@@ -1,40 +1,41 @@
 package mapviewer
 
 import (
-	symbol "github.com/roffe/ecusymbol"
+	"fyne.io/fyne/v2"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
-type LoadFunc func()
-type SaveFunc func([]float64)
-type UpdateFunc func(idx int, value []float64)
-
 type Config struct {
-	Symbol *symbol.Symbol
-
-	XFrom string
-	YFrom string
-
 	XData []float64
 	YData []float64
 	ZData []float64
-
-	XAxisLabel string
-	YAxisLabel string
-	ZAxisLabel string
 
 	XPrecision int
 	YPrecision int
 	ZPrecision int
 
-	SaveFileFunc  SaveFunc
-	LoadECUFunc   LoadFunc
-	SaveECUFunc   SaveFunc
-	UpdateECUFunc UpdateFunc
+	XLabel string
+	YLabel string
+	ZLabel string
+
+	LoadFileFunc func()
+	SaveFileFunc func([]float64)
+	LoadECUFunc  func()
+	SaveECUFunc  func([]float64)
+	OnUpdateCell func(idx int, value []float64)
+	OnMouseDown  func()
 
 	MeshView              bool
-	Buttons               bool
 	Editable              bool
 	CursorFollowCrosshair bool
-	ColorblindMode        widgets.ColorBlindMode
+
+	ColorblindMode widgets.ColorBlindMode
+
+	Buttons []*MapViewerButton
+}
+
+type MapViewerButton struct {
+	Label    string
+	Icon     fyne.Resource
+	OnTapped func()
 }

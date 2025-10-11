@@ -21,7 +21,6 @@ func (mv *MapViewer) restoreSelectedValues() {
 }
 
 func (mv *MapViewer) TypedShortcut(shortcut fyne.Shortcut) {
-	log.Println(shortcut.ShortcutName())
 	switch shortcut.ShortcutName() {
 	case "Copy":
 		mv.copy()
@@ -51,7 +50,6 @@ func (mv *MapViewer) copy() {
 		copyString.WriteString(fmt.Sprintf("%d:%d:%g:"+copyPasteSeparator, x, y, mv.cfg.ZData[cell]))
 	}
 	fyne.CurrentApp().Clipboard().SetContent(copyString.String())
-	//fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(copyString.String())
 }
 
 func (mv *MapViewer) paste() {
@@ -59,7 +57,6 @@ func (mv *MapViewer) paste() {
 		return
 	}
 	cb := fyne.CurrentApp().Clipboard().Content()
-	//cb := fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().Content()
 	split := strings.Split(cb, copyPasteSeparator)
 	for i, part := range split {
 		if len(part) < 3 {
@@ -101,18 +98,17 @@ func (mv *MapViewer) paste() {
 			continue
 		}
 		mv.cfg.ZData[index] = float64(value)
-		if len(split) < 30 {
-			mv.cfg.UpdateECUFunc(index, []float64{mv.cfg.ZData[index]})
-		}
+		//if len(split) < 30 {
+		//	mv.cfg.UpdateECUFunc(index, []float64{mv.cfg.ZData[index]})
+		//}
 	}
-	if len(split) >= 30 {
-		mv.cfg.SaveECUFunc(mv.cfg.ZData)
-	}
+	//if len(split) >= 30 {
+	//	mv.cfg.SaveECUFunc(mv.cfg.ZData)
+	//}
 	mv.Refresh()
 }
 
 func (mv *MapViewer) smooth() {
-	// Not enough elements to interpolate
 	if len(mv.selectedCells) < 3 {
 		return
 	}
@@ -205,6 +201,6 @@ func (mv *MapViewer) fullSync() {
 
 func (mv *MapViewer) partialSync(updates []*updateBlock) {
 	for _, update := range updates {
-		mv.cfg.UpdateECUFunc(update.idx, update.data)
+		mv.cfg.OnUpdateCell(update.idx, update.data)
 	}
 }

@@ -14,13 +14,11 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/meshgrid"
-	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
 )
 
 const (
@@ -31,7 +29,6 @@ const (
 type MapViewerInfo struct {
 	XName, YName, ZName string
 	XLen, YLen, ZLen    int
-	XFrom, YFrom        string
 }
 
 var (
@@ -87,8 +84,6 @@ type MapViewer struct {
 	widthFactor  float32
 	heightFactor float32
 
-	OnMouseDown func()
-
 	colorMode widgets.ColorBlindMode
 }
 
@@ -102,24 +97,14 @@ func New(config *Config) (*MapViewer, error) {
 		numData:       len(config.ZData),
 	}
 	mv.ExtendBaseWidget(mv)
-
-	log.Printf("mapViewer c:%d r:%d len:%d x:%s y:%s z:%s", mv.numColumns, mv.numRows, mv.numData, mv.cfg.XFrom, mv.cfg.YFrom, mv.cfg.Symbol.Name)
-
+	log.Printf("mapViewer c:%d r:%d len:%d", mv.numColumns, mv.numRows, mv.numData)
 	if len(mv.cfg.ZData) == 0 {
 		return nil, fmt.Errorf("mapViewer zData is empty")
 	}
-
 	mv.zMin, mv.zMax = widgets.FindMinMax(mv.cfg.ZData)
-
 	if mv.numColumns*mv.numRows != mv.numData && mv.numColumns > 1 && mv.numRows > 1 {
 		return nil, fmt.Errorf("mapViewer columns * rows != data length")
 	}
-
-	mv.createYAxis()
-	mv.createXAxis()
-	mv.createZdata()
-	mv.createTextValues()
-
 	return mv, nil
 }
 
@@ -131,20 +116,11 @@ func (mv *MapViewer) SetColorBlindMode(mode widgets.ColorBlindMode) {
 	}
 }
 
-// Dragged is called when the user drags the window.
-func (mv *MapViewer) Dragged(ev *fyne.DragEvent) {
-	moveEvent := &desktop.MouseEvent{}
-	moveEvent.Position = ev.Position
-	if mv.selecting {
-		moveEvent.Button = desktop.MouseButtonPrimary
-	}
-	mv.MouseMoved(moveEvent)
-}
-
-// DragEnd is called when the user stops dragging the window.
-func (mv *MapViewer) DragEnd() {}
-
 func (mv *MapViewer) CreateRenderer() fyne.WidgetRenderer {
+	mv.createYAxis()
+	mv.createXAxis()
+	mv.createZdata()
+	mv.createTextValues()
 	mv.content = mv.render()
 	return widget.NewSimpleRenderer(mv.content)
 	//return &mapViewerRenderer{mv: mv}
@@ -210,7 +186,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 
 	buttons := mv.createButtons()
 
-	if mv.cfg.Symbol == nil || (mv.numColumns == 1 || mv.numRows == 1) {
+	if mv.numColumns == 1 || mv.numRows == 1 {
 		return container.NewBorder(
 			nil,
 			buttons,
@@ -237,9 +213,9 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 	if mv.cfg.MeshView {
 		var err error
 		mv.mesh, err = meshgrid.NewMeshgrid(
-			mv.cfg.XAxisLabel,
-			mv.cfg.YAxisLabel,
-			mv.cfg.ZAxisLabel,
+			mv.cfg.XLabel,
+			mv.cfg.YLabel,
+			mv.cfg.ZLabel,
 			mv.cfg.ZData,
 			mv.numColumns,
 			mv.numRows,
@@ -274,11 +250,9 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 
 func (mv *MapViewer) Info() MapViewerInfo {
 	return MapViewerInfo{
-		XLen:  mv.numColumns,
-		YLen:  mv.numRows,
-		ZLen:  mv.numData,
-		XFrom: mv.cfg.XFrom,
-		YFrom: mv.cfg.YFrom,
+		XLen: mv.numColumns,
+		YLen: mv.numRows,
+		ZLen: mv.numData,
 	}
 }
 
@@ -430,40 +404,15 @@ func (mv *MapViewer) setXY() error {
 }
 
 func (mv *MapViewer) createButtons() *fyne.Container {
-	if mv.cfg.Buttons {
-		return container.NewGridWithColumns(4,
-			widget.NewButtonWithIcon("Load File", theme.DocumentIcon(), func() {
-				if mv.cfg.Symbol != nil {
-					log.Println("load", mv.cfg.Symbol.Name)
-					mv.cfg.ZData = mv.cfg.Symbol.Float64s()
-					mv.Refresh()
-				}
-			}),
-			widget.NewButtonWithIcon("Save File", theme.DocumentSaveIcon(), func() {
-				mv.cfg.SaveFileFunc(mv.cfg.ZData)
-			}),
-			widget.NewButtonWithIcon("Load ECU", theme.DownloadIcon(), func() {
-				p := progressmodal.New(fyne.CurrentApp().Driver().AllWindows()[0].Canvas(), "Loading map from ECU")
-				p.Show()
-				go func() {
-					mv.cfg.LoadECUFunc()
-					fyne.Do(func() {
-						p.Hide()
-					})
-				}()
-			}),
-			widget.NewButtonWithIcon("Save ECU", theme.UploadIcon(), func() {
-				p := progressmodal.New(fyne.CurrentApp().Driver().AllWindows()[0].Canvas(), "Saving map to ECU")
-				p.Show()
-				go func() {
-					mv.cfg.SaveECUFunc(mv.cfg.ZData)
-					fyne.Do(func() {
-						p.Hide()
-					})
-
-				}()
-			}),
-		)
+	noButtons := len(mv.cfg.Buttons)
+	if noButtons > 0 {
+		buttonContainer := container.NewGridWithColumns(noButtons)
+		for _, btn := range mv.cfg.Buttons {
+			buttonContainer.Add(
+				widget.NewButtonWithIcon(btn.Label, btn.Icon, btn.OnTapped),
+			)
+		}
+		return buttonContainer
 	} else {
 		return container.NewWithoutLayout()
 	}

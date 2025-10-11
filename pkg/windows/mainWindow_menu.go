@@ -318,7 +318,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		}
 	}
 
-	loadFunc := func() {
+	loadRamFunc := func() {
 		if mw.dlc != nil {
 			start := time.Now()
 			var addr uint32
@@ -346,7 +346,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 		}
 	}
 
-	saveFunc := func(data []float64) {
+	saveRamFunc := func(data []float64) {
 		if mw.dlc == nil {
 			return
 		}
@@ -370,6 +370,14 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 		//mw.Log(fmt.Sprintf("save %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 		mw.Log(fmt.Sprintf("save %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
+	}
+
+	loadFileFunc := func() {
+		if symZ != nil {
+			log.Println("load", symZ.Name)
+			mv.SetZData(symZ.Float64s())
+			mv.Refresh()
+		}
 	}
 
 	saveFileFunc := func(data []float64) {
@@ -401,27 +409,73 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	zPrecision = symbol.GetPrecision(symZ.Correctionfactor)
 
 	cfg := &mapviewer.Config{
-		Symbol:                symZ,
-		XFrom:                 axis.XFrom,
-		YFrom:                 axis.YFrom,
-		XData:                 xData,
-		YData:                 yData,
-		ZData:                 zData,
-		XAxisLabel:            axis.XDescription,
-		YAxisLabel:            axis.YDescription,
-		ZAxisLabel:            axis.ZDescription,
-		XPrecision:            xPrecision,
-		YPrecision:            yPrecision,
-		ZPrecision:            zPrecision,
-		SaveFileFunc:          saveFileFunc,
-		LoadECUFunc:           loadFunc,
-		SaveECUFunc:           saveFunc,
-		UpdateECUFunc:         updateFunc,
+		XData: xData,
+		YData: yData,
+		ZData: zData,
+
+		XPrecision: xPrecision,
+		YPrecision: yPrecision,
+		ZPrecision: zPrecision,
+
+		XLabel: axis.XDescription,
+		YLabel: axis.YDescription,
+		ZLabel: axis.ZDescription,
+
+		LoadFileFunc: loadFileFunc,
+		SaveFileFunc: saveFileFunc,
+		LoadECUFunc:  loadRamFunc,
+		SaveECUFunc:  saveRamFunc,
+		OnUpdateCell: updateFunc,
+
 		MeshView:              mw.settings.GetMeshView(),
-		Buttons:               true,
 		Editable:              true,
 		CursorFollowCrosshair: mw.settings.GetCursorFollowCrosshair(),
 		ColorblindMode:        mw.settings.GetColorBlindMode(),
+	}
+
+	cfg.Buttons = []*mapviewer.MapViewerButton{
+		{
+			Label: "Load File",
+			Icon:  theme.DocumentIcon(),
+			OnTapped: func() {
+				loadFileFunc()
+			},
+		},
+		{
+			Label: "Save File",
+			Icon:  theme.DocumentSaveIcon(),
+			OnTapped: func() {
+				saveFileFunc(cfg.ZData)
+			},
+		},
+		{
+			Label: "Load ECU",
+			Icon:  theme.DownloadIcon(),
+			OnTapped: func() {
+				p := progressmodal.New(fyne.CurrentApp().Driver().AllWindows()[0].Canvas(), "Loading map from ECU")
+				p.Show()
+				go func() {
+					loadRamFunc()
+					fyne.Do(func() {
+						p.Hide()
+					})
+				}()
+			},
+		},
+		{
+			Label: "Save ECU",
+			Icon:  theme.UploadIcon(),
+			OnTapped: func() {
+				p := progressmodal.New(fyne.CurrentApp().Driver().AllWindows()[0].Canvas(), "Saving map to ECU")
+				p.Show()
+				go func() {
+					saveRamFunc(cfg.ZData)
+					fyne.Do(func() {
+						p.Hide()
+					})
+				}()
+			},
+		},
 	}
 
 	mv, err := mapviewer.New(cfg)
@@ -436,7 +490,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 			defer openMapLock.Unlock()
 			p := progressmodal.New(mw.Window.Canvas(), "Loading "+axis.Z)
 			fyne.DoAndWait(p.Show)
-			loadFunc()
+			loadRamFunc()
 			fyne.Do(p.Hide)
 		}()
 	}
@@ -444,7 +498,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	mapWindow := multiwindow.NewInnerWindow(axis.Z+" - "+axis.ZDescription, mv)
 	mapWindow.Icon = theme.GridIcon()
 
-	mv.OnMouseDown = func() {
+	cfg.OnMouseDown = func() {
 		mw.wm.Raise(mapWindow)
 	}
 

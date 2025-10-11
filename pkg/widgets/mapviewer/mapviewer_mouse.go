@@ -10,11 +10,21 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func (mv *MapViewer) MouseIn(_ *desktop.MouseEvent) {
+// Dragged is called when the user drags the window.
+func (mv *MapViewer) Dragged(ev *fyne.DragEvent) {
+	moveEvent := &desktop.MouseEvent{}
+	moveEvent.Position = ev.Position
+	if mv.selecting {
+		moveEvent.Button = desktop.MouseButtonPrimary
+	}
+	mv.MouseMoved(moveEvent)
 }
 
-func (mv *MapViewer) MouseOut() {
-}
+// DragEnd is called when the user stops dragging the window.
+func (mv *MapViewer) DragEnd() {}
+
+func (mv *MapViewer) MouseIn(_ *desktop.MouseEvent) {}
+func (mv *MapViewer) MouseOut()                     {}
 
 // MouseMoved is called when the mouse is moved over the map viewer.
 func (mv *MapViewer) MouseMoved(event *desktop.MouseEvent) {
@@ -36,8 +46,8 @@ func (mv *MapViewer) MouseMoved(event *desktop.MouseEvent) {
 func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
 	//log.Println("MouseDown")
 	mv.lastModifier = event.Modifier
-	if mv.OnMouseDown != nil {
-		mv.OnMouseDown()
+	if mv.cfg.OnMouseDown != nil {
+		mv.cfg.OnMouseDown()
 	}
 
 	if event.Position.Y > mv.xAxisLabelContainer.Size().Height+mv.innerView.Size().Height {
@@ -234,7 +244,6 @@ func (mv *MapViewer) showPopupMenu(pos fyne.Position) {
 				mv.copy()
 			}),
 		)
-
 		if mv.cfg.Editable {
 			menu.Items = append(menu.Items,
 				fyne.NewMenuItem("Paste", func() {
