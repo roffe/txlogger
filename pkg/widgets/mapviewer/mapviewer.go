@@ -16,7 +16,6 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/widgets"
@@ -37,7 +36,7 @@ type MapViewerInfo struct {
 
 var (
 	//  _ fyne.Tappable = (*MapViewer)(nil)
-	_ fyne.Focusable    = (*MapViewer)(nil)
+	// _ fyne.Focusable    = (*MapViewer)(nil)
 	_ desktop.Mouseable = (*MapViewer)(nil)
 	_ desktop.Hoverable = (*MapViewer)(nil)
 	_ fyne.Draggable    = (*MapViewer)(nil)
@@ -45,25 +44,15 @@ var (
 
 type MapViewer struct {
 	widget.BaseWidget
-
-	focused bool
-
-	funcs *funcs
-	opts  *opts
-
-	symbol *symbol.Symbol
-
-	zMin, zMax                         float64
-	xData, yData, zData                []float64
-	xPrecision, yPrecision, zPrecision int
+	focused    bool
+	cfg        *Config
+	zMin, zMax float64
 
 	xValue, yValue float64
 	xIndex, yIndex float64
 
-	xFrom, yFrom                 string
 	numColumns, numRows, numData int
 
-	xAxisLabel, yAxisLabel, zAxisLabel       string
 	xAxisLabelContainer, yAxisLabelContainer *fyne.Container
 	xAxisTexts, yAxisTexts                   []*canvas.Text
 	textValues                               []*canvas.Text
@@ -103,45 +92,22 @@ type MapViewer struct {
 	colorMode widgets.ColorBlindMode
 }
 
-type opts struct {
-	editable              bool
-	buttonsEnabled        bool
-	cursorFollowCrosshair bool
-	meshView              bool
-}
-
-type funcs struct {
-	saveFileFunc  SaveFunc
-	updateECUFunc UpdateFunc
-	loadECUFunc   LoadFunc
-	saveECUFunc   SaveFunc
-}
-
-func New(options ...MapViewerOption) (*MapViewer, error) {
+func New(config *Config) (*MapViewer, error) {
 	mv := &MapViewer{
-		opts: &opts{
-			editable: true,
-		},
-		funcs: &funcs{
-			loadECUFunc:   func() {},
-			saveECUFunc:   func([]float64) {},
-			updateECUFunc: func(int, []float64) {},
-		},
+		cfg: config,
 	}
 	mv.ExtendBaseWidget(mv)
 
-	for _, option := range options {
-		if err := option(mv); err != nil {
-			return nil, err
-		}
-	}
+	mv.numColumns = len(mv.cfg.XData)
+	mv.numRows = len(mv.cfg.YData)
+	mv.numData = len(mv.cfg.ZData)
 
-	log.Printf("mapViewer c:%d r:%d len:%d x:%s y:%s z:%s", mv.numColumns, mv.numRows, mv.numData, mv.xFrom, mv.yFrom, mv.symbol.Name)
+	log.Printf("mapViewer c:%d r:%d len:%d x:%s y:%s z:%s", mv.numColumns, mv.numRows, mv.numData, mv.cfg.XFrom, mv.cfg.YFrom, mv.cfg.Symbol.Name)
 
-	if len(mv.zData) == 0 {
+	if len(mv.cfg.ZData) == 0 {
 		return nil, fmt.Errorf("mapViewer zData is empty")
 	}
-	mv.zMin, mv.zMax = widgets.FindMinMax(mv.zData)
+	mv.zMin, mv.zMax = widgets.FindMinMax(mv.cfg.ZData)
 
 	if mv.numColumns*mv.numRows != mv.numData && mv.numColumns > 1 && mv.numRows > 1 {
 		return nil, fmt.Errorf("mapViewer columns * rows != data length")
@@ -245,7 +211,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 
 	buttons := mv.createButtons()
 
-	if mv.symbol == nil || (mv.numColumns == 1 || mv.numRows == 1) {
+	if mv.cfg.Symbol == nil || (mv.numColumns == 1 || mv.numRows == 1) {
 		return container.NewBorder(
 			nil,
 			buttons,
@@ -269,13 +235,13 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		mv.innerView,
 	)
 
-	if mv.opts.meshView {
+	if mv.cfg.MeshView {
 		var err error
 		mv.mesh, err = meshgrid.NewMeshgrid(
-			mv.xAxisLabel,
-			mv.yAxisLabel,
-			mv.zAxisLabel,
-			mv.zData,
+			mv.cfg.XAxisLabel,
+			mv.cfg.YAxisLabel,
+			mv.cfg.ZAxisLabel,
+			mv.cfg.ZData,
 			mv.numColumns,
 			mv.numRows,
 			mv.colorMode,
@@ -312,8 +278,8 @@ func (mv *MapViewer) Info() MapViewerInfo {
 		XLen:  mv.numColumns,
 		YLen:  mv.numRows,
 		ZLen:  mv.numData,
-		XFrom: mv.xFrom,
-		YFrom: mv.yFrom,
+		XFrom: mv.cfg.XFrom,
+		YFrom: mv.cfg.YFrom,
 	}
 }
 
@@ -336,7 +302,7 @@ func (mv *MapViewer) SetY(yValue float64) {
 }
 
 func (mv *MapViewer) setCellText(idx int, value float64) {
-	textValue := strconv.FormatFloat(value, 'f', mv.zPrecision, 64)
+	textValue := strconv.FormatFloat(value, 'f', mv.cfg.ZPrecision, 64)
 	if mv.textValues[idx].Text != textValue {
 		mv.textValues[idx].Text = textValue
 		mv.textValues[idx].Refresh()
@@ -347,15 +313,15 @@ func (mv *MapViewer) SetZData(zData []float64) error {
 	if len(zData) != mv.numData {
 		return fmt.Errorf("MapViewer SetZ len mismatch %d != %d", len(zData), mv.numData)
 	}
-	mv.zData = zData
+	mv.cfg.ZData = zData
 	mv.numData = len(zData)
 	mv.Refresh()
 	return nil
 }
 
 func (mv *MapViewer) Refresh() {
-	mv.zMin, mv.zMax = widgets.FindMinMax(mv.zData)
-	for idx, value := range mv.zData {
+	mv.zMin, mv.zMax = widgets.FindMinMax(mv.cfg.ZData)
+	for idx, value := range mv.cfg.ZData {
 		mv.setCellText(idx, value)
 		col := widgets.GetColorInterpolation(
 			mv.zMin,
@@ -371,7 +337,7 @@ func (mv *MapViewer) Refresh() {
 		}
 	}
 	if mv.mesh != nil {
-		mv.mesh.LoadFloat64s(mv.zMin, mv.zMax, mv.zData)
+		mv.mesh.LoadFloat64s(mv.zMin, mv.zMax, mv.cfg.ZData)
 	}
 }
 
@@ -381,7 +347,7 @@ func (mv *MapViewer) createYAxis() {
 		for i := mv.numRows - 1; i >= 0; i-- {
 			text := &canvas.Text{
 				Alignment: fyne.TextAlignCenter,
-				Text:      strconv.FormatFloat(mv.yData[i], 'f', mv.yPrecision, 64),
+				Text:      strconv.FormatFloat(mv.cfg.YData[i], 'f', mv.cfg.YPrecision, 64),
 				TextSize:  minTextSize + 2,
 			}
 			mv.yAxisTexts = append(mv.yAxisTexts, text)
@@ -397,7 +363,7 @@ func (mv *MapViewer) createXAxis() {
 		for i := 0; i < mv.numColumns; i++ {
 			text := &canvas.Text{
 				Alignment: fyne.TextAlignCenter,
-				Text:      strconv.FormatFloat(mv.xData[i], 'f', mv.xPrecision, 64),
+				Text:      strconv.FormatFloat(mv.cfg.XData[i], 'f', mv.cfg.XPrecision, 64),
 				TextSize:  minTextSize + 2,
 			}
 			mv.xAxisTexts = append(mv.xAxisTexts, text)
@@ -409,9 +375,9 @@ func (mv *MapViewer) createXAxis() {
 
 func (mv *MapViewer) createTextValues() {
 	mv.valueTexts = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.32))
-	for _, v := range mv.zData {
+	for _, v := range mv.cfg.ZData {
 		text := &canvas.Text{
-			Text:      strconv.FormatFloat(v, 'f', mv.zPrecision, 64),
+			Text:      strconv.FormatFloat(v, 'f', mv.cfg.ZPrecision, 64),
 			TextSize:  minTextSize,
 			Color:     color.Black,
 			Alignment: fyne.TextAlignCenter,
@@ -423,7 +389,7 @@ func (mv *MapViewer) createTextValues() {
 
 func (mv *MapViewer) createZdata() {
 	mv.valueRects = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.32))
-	for _, value := range mv.zData {
+	for _, value := range mv.cfg.ZData {
 		color := widgets.GetColorInterpolation(mv.zMin, mv.zMax, value, mv.colorMode)
 		rect := &canvas.Rectangle{FillColor: color, StrokeColor: color, StrokeWidth: 0}
 		rect.SetMinSize(fyne.NewSize(34, 14))
@@ -433,7 +399,7 @@ func (mv *MapViewer) createZdata() {
 }
 
 func (mv *MapViewer) setXY() error {
-	xIdx, yIdx, err := interpolate.Interpolate64S(mv.xData, mv.yData, mv.zData, mv.xValue, mv.yValue)
+	xIdx, yIdx, err := interpolate.Interpolate64S(mv.cfg.XData, mv.cfg.YData, mv.cfg.ZData, mv.xValue, mv.yValue)
 	if err != nil {
 		return err
 	}
@@ -456,7 +422,7 @@ func (mv *MapViewer) setXY() error {
 	}
 
 	mv.crosshair.Move(crosshairPos)
-	if mv.opts.cursorFollowCrosshair {
+	if mv.cfg.CursorFollowCrosshair {
 		mv.selectedX = int(math.Round(xIdx))
 		mv.SelectedY = int(math.Round(yIdx))
 		mv.updateCursor(true)
@@ -465,23 +431,23 @@ func (mv *MapViewer) setXY() error {
 }
 
 func (mv *MapViewer) createButtons() *fyne.Container {
-	if mv.opts.buttonsEnabled {
+	if mv.cfg.Buttons {
 		return container.NewGridWithColumns(4,
 			widget.NewButtonWithIcon("Load File", theme.DocumentIcon(), func() {
-				if mv.symbol != nil {
-					log.Println("load", mv.symbol.Name)
-					mv.zData = mv.symbol.Float64s()
+				if mv.cfg.Symbol != nil {
+					log.Println("load", mv.cfg.Symbol.Name)
+					mv.cfg.ZData = mv.cfg.Symbol.Float64s()
 					mv.Refresh()
 				}
 			}),
 			widget.NewButtonWithIcon("Save File", theme.DocumentSaveIcon(), func() {
-				mv.funcs.saveFileFunc(mv.zData)
+				mv.cfg.SaveFileFunc(mv.cfg.ZData)
 			}),
 			widget.NewButtonWithIcon("Load ECU", theme.DownloadIcon(), func() {
 				p := progressmodal.New(fyne.CurrentApp().Driver().AllWindows()[0].Canvas(), "Loading map from ECU")
 				p.Show()
 				go func() {
-					mv.funcs.loadECUFunc()
+					mv.cfg.LoadECUFunc()
 					fyne.Do(func() {
 						p.Hide()
 					})
@@ -491,7 +457,7 @@ func (mv *MapViewer) createButtons() *fyne.Container {
 				p := progressmodal.New(fyne.CurrentApp().Driver().AllWindows()[0].Canvas(), "Saving map to ECU")
 				p.Show()
 				go func() {
-					mv.funcs.saveECUFunc(mv.zData)
+					mv.cfg.SaveECUFunc(mv.cfg.ZData)
 					fyne.Do(func() {
 						p.Hide()
 					})

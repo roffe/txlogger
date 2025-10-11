@@ -23,10 +23,12 @@ func (mw *MapViewer) FocusGained() {
 	//log.Println("FocusGained")
 	mw.focused = true
 }
+
 func (mw *MapViewer) FocusLost() {
 	//log.Println("FocusLost")
 	mw.focused = false
 }
+
 func (mw *MapViewer) Focused() bool {
 	return mw.focused
 }
@@ -37,7 +39,7 @@ func (mv *MapViewer) TypedRune(r rune) {
 }
 
 func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
-	if !mv.opts.editable {
+	if !mv.cfg.Editable {
 		return
 	}
 	//	log.Println("TypedKey", key.Name, shifted, key.Physical.ScanCode)
@@ -80,12 +82,12 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 					fyne.LogError("Error parsing float", err)
 					return
 				}
-				mv.zData[cell] = num
+				mv.cfg.ZData[cell] = num
 				log.Println("Set", cell, num)
 			} else {
 				num, err := strconv.Atoi(mv.inputBuffer.String())
 				if err == nil {
-					mv.zData[cell] = float64(num)
+					mv.cfg.ZData[cell] = float64(num)
 				}
 			}
 		}
@@ -101,9 +103,9 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 			}
 		}
 
-		increment := base * math.Pow(10, -float64(mv.zPrecision))
+		increment := base * math.Pow(10, -float64(mv.cfg.ZPrecision))
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] += increment
+			mv.cfg.ZData[cell] += increment
 		}
 		mv.updateCells()
 		refresh = true
@@ -114,23 +116,23 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 				base = 100
 			}
 		}
-		increment := base * math.Pow(10, -float64(mv.zPrecision))
+		increment := base * math.Pow(10, -float64(mv.cfg.ZPrecision))
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] -= increment
+			mv.cfg.ZData[cell] -= increment
 		}
 		mv.updateCells()
 		refresh = true
 	case "+", "A":
-		increment := math.Pow(10, -float64(mv.zPrecision))
+		increment := math.Pow(10, -float64(mv.cfg.ZPrecision))
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] += increment
+			mv.cfg.ZData[cell] += increment
 		}
 		mv.updateCells()
 		refresh = true
 	case "-", "Z":
-		increment := math.Pow(10, -float64(mv.zPrecision))
+		increment := math.Pow(10, -float64(mv.cfg.ZPrecision))
 		for _, cell := range mv.selectedCells {
-			mv.zData[cell] -= increment
+			mv.cfg.ZData[cell] -= increment
 		}
 		mv.updateCells()
 		refresh = true

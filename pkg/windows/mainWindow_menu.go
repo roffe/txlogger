@@ -70,8 +70,33 @@ func (mw *MainWindow) setupMenu() {
 			symZ := mw.fw.GetByName("Pgm_mod!")
 			pgm := pgmmod.New()
 			pgm.LoadFunc = func() ([]byte, error) {
+				if mw.dlc != nil {
+					log.Printf("Loading Pgm_mod! from ECU $%X", symZ.SramOffset)
+					data, err := mw.dlc.GetRAM(symZ.SramOffset, uint32(symZ.Length))
+					if err != nil {
+						return nil, err
+					}
+					return data, nil
+				}
+				log.Printf("Loading Pgm_mod! from Binary $%X", symZ.Address)
 				return symZ.Bytes(), nil
 			}
+
+			pgm.SaveFunc = func(data []byte) error {
+				if len(data) != int(symZ.Length) {
+					return fmt.Errorf("data length mismatch: got %d, want %d", len(data), symZ.Length)
+				}
+				if mw.dlc != nil {
+					log.Printf("Saving Pgm_mod! to ECU $%X", symZ.SramOffset)
+					if err := mw.dlc.SetRAM(symZ.SramOffset, data); err != nil {
+						return err
+					}
+					return nil
+				}
+				log.Printf("Saving Pgm_mod! to Binary $%X", symZ.Address)
+				return symZ.SetData(data)
+			}
+
 			pgm.Set(symZ.Bytes())
 			mapWindow := multiwindow.NewInnerWindow("Pgm_mod!", pgm)
 			mapWindow.Icon = theme.GridIcon()
@@ -375,27 +400,31 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 	zPrecision = symbol.GetPrecision(symZ.Correctionfactor)
 
-	mv, err := mapviewer.New(
-		mapviewer.WithSymbol(symZ),
-		mapviewer.WithXData(xData),
-		mapviewer.WithYData(yData),
-		mapviewer.WithZData(zData),
-		mapviewer.WithXPrecision(xPrecision),
-		mapviewer.WithYPrecision(yPrecision),
-		mapviewer.WithZPrecision(zPrecision),
-		mapviewer.WithXFrom(axis.XFrom),
-		mapviewer.WithYFrom(axis.YFrom),
-		mapviewer.WithUpdateECUFunc(updateFunc),
-		mapviewer.WithLoadECUFunc(loadFunc),
-		mapviewer.WithSaveECUFunc(saveFunc),
-		mapviewer.WithSaveFileFunc(saveFileFunc),
-		mapviewer.WithMeshView(mw.settings.GetMeshView()),
-		mapviewer.WithEditable(true),
-		mapviewer.WithButtons(true),
-		mapviewer.WithFollowCrosshair(mw.settings.GetCursorFollowCrosshair()),
-		mapviewer.WithAxisLabels(axis.XDescription, axis.YDescription, axis.ZDescription),
-		mapviewer.WithColorBlindMode(mw.settings.GetColorBlindMode()),
-	)
+	cfg := &mapviewer.Config{
+		Symbol:                symZ,
+		XFrom:                 axis.XFrom,
+		YFrom:                 axis.YFrom,
+		XData:                 xData,
+		YData:                 yData,
+		ZData:                 zData,
+		XAxisLabel:            axis.XDescription,
+		YAxisLabel:            axis.YDescription,
+		ZAxisLabel:            axis.ZDescription,
+		XPrecision:            xPrecision,
+		YPrecision:            yPrecision,
+		ZPrecision:            zPrecision,
+		SaveFileFunc:          saveFileFunc,
+		LoadECUFunc:           loadFunc,
+		SaveECUFunc:           saveFunc,
+		UpdateECUFunc:         updateFunc,
+		MeshView:              mw.settings.GetMeshView(),
+		Buttons:               true,
+		Editable:              true,
+		CursorFollowCrosshair: mw.settings.GetCursorFollowCrosshair(),
+		ColorblindMode:        mw.settings.GetColorBlindMode(),
+	}
+
+	mv, err := mapviewer.New(cfg)
 	if err != nil {
 		mw.Error(err)
 		return

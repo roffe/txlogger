@@ -235,7 +235,7 @@ func (mv *MapViewer) showPopupMenu(pos fyne.Position) {
 			}),
 		)
 
-		if mv.opts.editable {
+		if mv.cfg.Editable {
 			menu.Items = append(menu.Items,
 				fyne.NewMenuItem("Paste", func() {
 					mv.paste()

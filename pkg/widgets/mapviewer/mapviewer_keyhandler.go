@@ -14,7 +14,7 @@ func (mv *MapViewer) restoreSelectedValues() {
 	if mv.restoreValues {
 		mv.inputBuffer.Reset()
 		for _, cell := range mv.selectedCells {
-			mv.setCellText(cell, mv.zData[cell])
+			mv.setCellText(cell, mv.cfg.ZData[cell])
 		}
 		mv.restoreValues = false
 	}
@@ -48,14 +48,14 @@ func (mv *MapViewer) copy() {
 				x += 200
 			}
 		}
-		copyString.WriteString(fmt.Sprintf("%d:%d:%g:"+copyPasteSeparator, x, y, mv.zData[cell]))
+		copyString.WriteString(fmt.Sprintf("%d:%d:%g:"+copyPasteSeparator, x, y, mv.cfg.ZData[cell]))
 	}
 	fyne.CurrentApp().Clipboard().SetContent(copyString.String())
 	//fyne.CurrentApp().Driver().AllWindows()[0].Clipboard().SetContent(copyString.String())
 }
 
 func (mv *MapViewer) paste() {
-	if !mv.opts.editable {
+	if !mv.cfg.Editable {
 		return
 	}
 	cb := fyne.CurrentApp().Clipboard().Content()
@@ -96,17 +96,17 @@ func (mv *MapViewer) paste() {
 		y = mv.numRows - 1 - y
 
 		index := y*mv.numColumns + x
-		if index < 0 || index >= len(mv.zData) {
+		if index < 0 || index >= len(mv.cfg.ZData) {
 			log.Printf("Index out of range: %d", index)
 			continue
 		}
-		mv.zData[index] = float64(value)
+		mv.cfg.ZData[index] = float64(value)
 		if len(split) < 30 {
-			mv.funcs.updateECUFunc(index, []float64{mv.zData[index]})
+			mv.cfg.UpdateECUFunc(index, []float64{mv.cfg.ZData[index]})
 		}
 	}
 	if len(split) >= 30 {
-		mv.funcs.saveECUFunc(mv.zData)
+		mv.cfg.SaveECUFunc(mv.cfg.ZData)
 	}
 	mv.Refresh()
 }
@@ -120,7 +120,7 @@ func (mv *MapViewer) smooth() {
 	values := make([]float64, len(mv.selectedCells))
 
 	for i, idx := range mv.selectedCells {
-		values[i] = mv.zData[idx]
+		values[i] = mv.cfg.ZData[idx]
 	}
 
 	start := values[0]
@@ -134,7 +134,7 @@ func (mv *MapViewer) smooth() {
 		values[i] = start + float64(i)*step
 	}
 	for i, idx := range mv.selectedCells {
-		mv.zData[idx] = values[i]
+		mv.cfg.ZData[idx] = values[i]
 	}
 	mv.updateCells()
 	mv.Refresh()
@@ -170,10 +170,10 @@ func (mv *MapViewer) updateCells() {
 
 	slices.Sort(mv.selectedCells)
 	updates := []*updateBlock{
-		{mv.selectedCells[0], mv.selectedCells[0], []float64{mv.zData[mv.selectedCells[0]]}},
+		{mv.selectedCells[0], mv.selectedCells[0], []float64{mv.cfg.ZData[mv.selectedCells[0]]}},
 	}
 	for _, cell := range mv.selectedCells[1:] {
-		data := mv.zData[cell]
+		data := mv.cfg.ZData[cell]
 		last := updates[len(updates)-1]
 		if cell-1 == last.end {
 			last.end = cell
@@ -200,11 +200,11 @@ func (mv *MapViewer) shouldFullSync(updates []*updateBlock) bool {
 }
 
 func (mv *MapViewer) fullSync() {
-	mv.funcs.saveECUFunc(mv.zData)
+	mv.cfg.SaveECUFunc(mv.cfg.ZData)
 }
 
 func (mv *MapViewer) partialSync(updates []*updateBlock) {
 	for _, update := range updates {
-		mv.funcs.updateECUFunc(update.idx, update.data)
+		mv.cfg.UpdateECUFunc(update.idx, update.data)
 	}
 }
