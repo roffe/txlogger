@@ -94,27 +94,26 @@ type MapViewer struct {
 
 func New(config *Config) (*MapViewer, error) {
 	mv := &MapViewer{
-		cfg: config,
+		cfg:           config,
+		crosshair:     NewCrosshair(color.RGBA{165, 55, 253, 180}, 3),
+		selectionRect: NewRectangle(color.RGBA{0x30, 0x70, 0xFF, 0xFF}, 3),
+		numColumns:    len(config.XData),
+		numRows:       len(config.YData),
+		numData:       len(config.ZData),
 	}
 	mv.ExtendBaseWidget(mv)
-
-	mv.numColumns = len(mv.cfg.XData)
-	mv.numRows = len(mv.cfg.YData)
-	mv.numData = len(mv.cfg.ZData)
 
 	log.Printf("mapViewer c:%d r:%d len:%d x:%s y:%s z:%s", mv.numColumns, mv.numRows, mv.numData, mv.cfg.XFrom, mv.cfg.YFrom, mv.cfg.Symbol.Name)
 
 	if len(mv.cfg.ZData) == 0 {
 		return nil, fmt.Errorf("mapViewer zData is empty")
 	}
+
 	mv.zMin, mv.zMax = widgets.FindMinMax(mv.cfg.ZData)
 
 	if mv.numColumns*mv.numRows != mv.numData && mv.numColumns > 1 && mv.numRows > 1 {
 		return nil, fmt.Errorf("mapViewer columns * rows != data length")
 	}
-
-	mv.crosshair = NewCrosshair(color.RGBA{165, 55, 253, 180}, 3)
-	mv.selectionRect = NewRectangle(color.RGBA{0x30, 0x70, 0xFF, 0xFF}, 3)
 
 	mv.createYAxis()
 	mv.createXAxis()
