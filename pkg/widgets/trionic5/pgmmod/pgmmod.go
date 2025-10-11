@@ -149,6 +149,10 @@ func (w *Widget) CreateRenderer() fyne.WidgetRenderer {
 			}),
 			widget.NewButton("Save", func() {
 				log.Printf("Save: %X", w.Get())
+				err := w.SaveFunc(w.Get())
+				if err != nil {
+					dialog.ShowError(err, fyne.CurrentApp().Driver().AllWindows()[0])
+				}
 			}),
 		),
 		nil,
