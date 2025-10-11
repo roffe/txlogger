@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
@@ -21,7 +20,6 @@ import (
 	xwidget "fyne.io/x/fyne/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan/proto"
-	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ebus"
@@ -35,6 +33,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/logplayer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
+	"github.com/roffe/txlogger/pkg/widgets/secrettext"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
 	"github.com/roffe/txlogger/pkg/widgets/txweb"
@@ -53,44 +52,7 @@ const (
 	prefsSelectedPreset = "selectedPreset"
 )
 
-var _ fyne.Tappable = (*SecretText)(nil)
-
 // var _ desktop.Mouseable = (*SecretText)(nil)
-
-type SecretText struct {
-	*widget.Label
-	tappedTimes int
-	SecretFunc  func()
-}
-
-func NewSecretText(text string) *SecretText {
-	label := widget.NewLabel(text)
-	return &SecretText{
-		Label: label,
-	}
-}
-
-func (s *SecretText) Tapped(*fyne.PointEvent) {
-	s.tappedTimes++
-	//	log.Println("tapped", s.tappedTimes)
-	if s.tappedTimes >= 10 {
-		t := fyne.NewStaticResource("taz.png", assets.Taz)
-		cv := canvas.NewImageFromResource(t)
-		cv.ScaleMode = canvas.ImageScaleFastest
-		cv.SetMinSize(fyne.NewSize(0, 0))
-		cont := container.NewStack(cv)
-		s.tappedTimes = 0
-		if f := s.SecretFunc; f != nil {
-			f()
-		}
-		dialog.ShowCustom("You found the secret", "Leif", cont, fyne.CurrentApp().Driver().AllWindows()[0])
-		an := canvas.NewSizeAnimation(fyne.NewSize(0, 0), fyne.NewSize(370, 386), time.Second, func(size fyne.Size) {
-			cv.Resize(size)
-		})
-
-		an.Start()
-	}
-}
 
 /*
 func (s *SecretText) MouseDown(e *desktop.MouseEvent) {
@@ -118,7 +80,7 @@ type MainWindow struct {
 	gwclient        proto.GocanClient
 	buttonsDisabled bool
 	settings        *settings.Widget
-	statusText      *SecretText
+	statusText      *secrettext.SecretText
 	wm              *multiwindow.MultipleWindows
 	content         *fyne.Container
 	startup         bool
@@ -150,12 +112,9 @@ type mainWindowButtons struct {
 }
 
 type mainWindowCounters struct {
-	//captureCounter       binding.Int
 	capturedCounterLabel *widget.Label
-	//errorCounter         binding.Int
-	errorCounterLabel *widget.Label
-	//fpsCounter           binding.Int
-	fpsCounterLabel *widget.Label
+	errorCounterLabel    *widget.Label
+	fpsCounterLabel      *widget.Label
 }
 
 func NewMainWindow(app fyne.App) *MainWindow {
@@ -175,7 +134,7 @@ func NewMainWindow(app fyne.App) *MainWindow {
 
 		gocanGatewayLED: ledicon.New("Gateway"),
 		canLED:          ledicon.New("CAN"),
-		statusText:      NewSecretText("Harder, Better, Faster, Stronger"),
+		statusText:      secrettext.New("Harder, Better, Faster, Stronger"),
 		previewFeatures: app.Preferences().BoolWithFallback("enable_preview_features", false),
 	}
 
@@ -184,8 +143,7 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	}
 
 	ebus.SubscribeFunc(ebus.TOPIC_COLORBLINDMODE, func(v float64) {
-		idx := int(v)
-		mw.symbolList.SetColorBlindMode(widgets.ColorBlindMode(idx))
+		mw.symbolList.SetColorBlindMode(widgets.ColorBlindMode(int(v)))
 		mw.symbolList.Refresh()
 	})
 
