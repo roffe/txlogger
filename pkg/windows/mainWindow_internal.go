@@ -14,7 +14,6 @@ import (
 	"fyne.io/fyne/v2/theme"
 	xwidget "fyne.io/x/fyne/widget"
 	"github.com/roffe/gocan/proto"
-	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/widgets/ebusmonitor"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
@@ -47,7 +46,7 @@ func newOtoContext() *oto.Context {
 }
 */
 
-func (mw *MainWindow) closeIntercept() {
+func (mw *MainWindow) Close() {
 	if mw.dlc != nil {
 		log.Println("Closing datalogger client")
 		mw.dlc.Close()
@@ -59,7 +58,7 @@ func (mw *MainWindow) closeIntercept() {
 		defer cancel()
 		mw.gwclient.SendCommand(ctx, &proto.Command{Data: []byte("quit")})
 	}
-	debug.Close()
+	mw.Window.Close()
 }
 
 func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
