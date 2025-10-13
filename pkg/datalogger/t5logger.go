@@ -26,7 +26,6 @@ func NewT5(cfg Config, lw LogWriter) (IClient, error) {
 }
 
 func (c *T5Client) Start() error {
-	c.ErrorCounter(0)
 	defer c.secondTicker.Stop()
 	defer c.lw.Close()
 
@@ -70,7 +69,6 @@ func (c *T5Client) Start() error {
 			symbollist = binary.LittleEndian.AppendUint32(symbollist, sym.SramOffset)
 			symbollist = binary.LittleEndian.AppendUint16(symbollist, sym.Length)
 			expectedPayloadSize += sym.Length
-
 			// deletelog.Printf("Symbol: %s, offset: %X, length: %d\n", sym.Name, sym.SramOffset, sym.Length)
 		}
 		cmd := &serialcommand.SerialCommand{
@@ -170,11 +168,9 @@ func (c *T5Client) Start() error {
 				read.Data = data
 				read.Complete(nil)
 			case upd := <-c.writeChan:
-				for i, b := range upd.Data {
-					if err := t5.WriteRam(ctx, upd.Address+uint32(i), b); err != nil {
-						upd.Complete(err)
-						break
-					}
+				if err := t5.WriteRam(ctx, upd.Address, upd.Data); err != nil {
+					upd.Complete(err)
+					break
 				}
 				upd.Complete(nil)
 			case <-t.C:
@@ -442,4 +438,82 @@ func ConvertByteStringToDoubleStatus2(ecudata []byte) float64 {
 	}
 
 	return retval
+}
+
+func converto(name string, data []byte) float64 {
+	switch name {
+	case "P_medel", "P_Manifold10", "P_Manifold", "Max_tryck", "Regl_tryck":
+		// inlet manifold pressure
+		return ConvertByteStringToDouble(data)*correctionForMapsensor*0.01 - 1
+	case "Lambdaint":
+		return ConvertByteStringToDouble(data)
+	case "Lufttemp", "Kyl_temp":
+		retval := ConvertByteStringToDouble(data)
+		if retval > 128 {
+			retval = -(256 - retval)
+		}
+		return retval
+	case "Rpm":
+		return ConvertByteStringToDouble(data) * 10
+	case "AD_sond":
+		// should average, no the realtime panel does that
+		return ConvertByteStringToDouble(data)
+		// fix
+		// retval = ConvertToAFR(retval)
+	//case "AD_EGR":
+	//	value := ConvertByteStringToDouble(data)
+	//	voltage := (value / 255) * (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
+	//	voltage = clamp(voltage, c.WidebandConfig.MinimumVoltageWideband, c.WidebandConfig.MaximumVoltageWideband)
+	//	steepness := (c.WidebandConfig.High - c.WidebandConfig.Low) / (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
+	//	return c.WidebandConfig.Low + (steepness * (voltage - c.WidebandConfig.MinimumVoltageWideband))
+	case "Pgm_status":
+		// now what, just pass it on in a seperate structure
+		// fix
+		return ConvertByteStringToDoubleStatus(data)
+	case "Insptid_ms10":
+		// return value using multiplication instead of division
+		return ConvertByteStringToDouble(data) * 0.1
+		//return ConvertByteStringToDouble(data) / 10
+
+	case "Lacc_mangd", "Acc_mangd", "Lret_mangd", "Ret_mangd":
+		// 4 values in one variable, one for each cylinder
+		return ConvertByteStringToDouble(data)
+	case "Ign_angle":
+		retval := ConvertByteStringToDouble(data)
+		if retval > 32000 {
+			retval = -(65536 - retval)
+		}
+		return retval / 10
+	case "Knock_offset1", "Knock_offset2", "Knock_offset3", "Knock_offset4", "Knock_offset1234":
+		retval := ConvertByteStringToDouble(data)
+		if retval > 32000 {
+			retval = -(65536 - retval)
+		}
+		return retval / 10
+	case "Medeltrot":
+		//TODO: should substract trot_min from this value?
+		return ConvertByteStringToDouble(data) - 34
+	case "Apc_decrese":
+		return ConvertByteStringToDouble(data) * correctionForMapsensor * 0.01
+	case "P_fak", "I_fak", "D_fak":
+		retval := ConvertByteStringToDouble(data)
+		if retval > 32000 {
+			retval = -(65535 - retval)
+		}
+		return retval
+	case "PWM_ut10":
+		return ConvertByteStringToDouble(data)
+	case "Knock_count_cyl1", "Knock_count_cyl2", "Knock_count_cyl3", "Knock_count_cyl4":
+		return ConvertByteStringToDouble(data)
+	case "Knock_average":
+		return ConvertByteStringToDouble(data)
+	case "Bil_hast":
+		return ConvertByteStringToDouble(data)
+	case "TQ":
+		return ConvertByteStringToDouble(data) * correctionForMapsensor
+	case "Batt_volt":
+		return ConvertByteStringToDouble(data) * 0.1
+	default:
+		return ConvertByteStringToDouble(data)
+	}
 }

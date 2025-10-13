@@ -69,7 +69,6 @@ func (c *T7Client) broadcastListener(ctx context.Context, cl *gocan.Client) {
 }
 
 func (c *T7Client) Start() error {
-	c.ErrorCounter(0)
 	defer c.secondTicker.Stop()
 	defer c.lw.Close()
 

@@ -41,7 +41,6 @@ const T8ChunkSize = 235
 const lastPresentInterval = 2800 * time.Millisecond
 
 func (c *T8Client) Start() error {
-	c.ErrorCounter(0)
 	defer c.secondTicker.Stop()
 	defer c.lw.Close()
 
