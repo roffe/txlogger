@@ -171,7 +171,7 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	mw.render()
 
 	mw.Window.SetOnDropped(mw.onDropped)
-	mw.SetOnClosed(mw.closeIntercept)
+	mw.SetCloseIntercept(mw.Close)
 	mw.SetPadded(true)
 	mw.SetContent(mw.content)
 	mw.Resize(fyne.NewSize(1000, 700))
@@ -394,9 +394,9 @@ func (mw *MainWindow) render() {
 				mw.counters.capturedCounterLabel,
 				mw.counters.errorCounterLabel,
 				mw.counters.fpsCounterLabel,
-				mw.buttons.debugBtn,
 			),
 			widget.NewButtonWithIcon("", theme.ComputerIcon(), mw.openEBUSMonitor),
+			mw.buttons.debugBtn,
 		),
 		mw.statusText,
 	)
