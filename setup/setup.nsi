@@ -79,7 +79,7 @@ Section "txlogger" SecCore
   FILE ..\txlogger.exe
   FILE ..\canusb\dll64\canusbdrv64.dll
   FILE ..\vcpkg\packages\libusb_x64-windows\bin\libusb-1.0.dll
-  ;FILE canlib32.dll
+  FILE C:\Progra~2\Kvaser\Canlib\Bin\canlib32.dll
   FILE ..\debug.bat
   
   ;Store installation folder
@@ -143,7 +143,7 @@ Section "Uninstall"
   Delete "$InstDir\cangateway.exe"
   Delete "$InstDir\canusbdrv64.dll"
   Delete "$InstDir\libusb-1.0.dll"
-  ;Delete "$InstDir\canlib32.dll"
+  Delete "$InstDir\canlib32.dll"
   Delete "$InstDir\debug.bat"
   Delete "$InstDir\Uninstall.exe"
   RMDir "$InstDir"

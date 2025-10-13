@@ -36,6 +36,7 @@ $files = @(
     "debug.bat",
     "vcpkg\packages\libusb_x64-windows\bin\libusb-1.0.dll"
     "canusb\dll64\canusbdrv64.dll"
+    "C:\Progra~2\Kvaser\Canlib\Bin\canlib32.dll"
     "cangateway.exe"
     "txlogger.exe"
 )
