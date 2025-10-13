@@ -12,6 +12,15 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
+// VBar is a lightweight, allocation‑aware vertical bar gauge.
+// Key optimizations:
+//  - Prebuilt renderer object slice (no per-call allocations in Objects()).
+//  - LUT-based color picking (no per-frame branching/float math beyond an index).
+//  - Skip work when the pixel height AND color index have not changed.
+//  - Cheap int formatting for display (strconv.Itoa on rounded int).
+//  - Cached layout factors; avoid repeated MinSize/Size calls.
+//  - Reuse canvas primitives; no per-update allocations.
+
 type VBar struct {
 	widget.BaseWidget
 	face        *canvas.Rectangle
@@ -30,8 +39,6 @@ type VBar struct {
 		heightFactor  float32
 		diameterEight float32
 		twoEight      float32
-		titleX        float32
-		displayTextX  float32
 	}
 
 	// performance caches
@@ -76,8 +83,6 @@ func (s *VBar) render() {
 	s.displayText.Alignment = fyne.TextAlignCenter
 
 	// Pre-calculate text positions (approx) using MinSize
-	s.layoutValues.titleX = -s.titleText.Size().Width * 0.5
-	s.layoutValues.displayTextX = -s.displayText.Size().Width * 0.5
 
 	maxSteps := s.cfg.Steps + 1
 	s.bars = make([]*canvas.Line, maxSteps)
@@ -157,6 +162,9 @@ func (s *VBar) SetValue(value float64) {
 	if changedText {
 		// Cheaper than FormatFloat for integer-ish values
 		s.displayText.Text = strconv.Itoa(intDisp)
+		// Re-center the dynamic text based on its new width
+		minDisp := s.displayText.MinSize()
+		s.displayText.Move(fyne.Position{X: s.layoutValues.middle - minDisp.Width/2, Y: s.size.Height - minDisp.Height})
 		s.displayText.Refresh()
 	}
 
@@ -224,11 +232,11 @@ func (r *VBarRenderer) Layout(space fyne.Size) {
 	r.s.face.Resize(space.AddWidthHeight(0, 3))
 
 	// Text layout (use MinSize; avoids calling Size which can be 0 before first draw)
-	r.s.titleText.Move(fyne.Position{X: r.s.layoutValues.middle + r.s.layoutValues.titleX, Y: space.Height + 1})
-	//minDisp := r.s.displayText.Size()
-	r.s.displayText.Move(fyne.Position{X: r.s.layoutValues.middle + r.s.layoutValues.displayTextX,
-		Y: space.Height - r.s.displayText.MinSize().Height,
-	})
+	titleMin := r.s.titleText.MinSize()
+	r.s.titleText.Move(fyne.Position{X: r.s.layoutValues.middle - titleMin.Width/2, Y: space.Height + 2})
+	minDisp := r.s.displayText.MinSize()
+	r.s.displayText.Move(fyne.Position{X: r.s.layoutValues.middle - minDisp.Width/2, Y: space.Height - minDisp.Height})
+
 	// Bar lines layout
 	oneThird := space.Width * common.OneThird
 	oneSeventh := space.Width * common.OneSeventh
