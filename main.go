@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	_ "embed"
-	"errors"
 	"flag"
 	"fmt"
 	"image/color"
@@ -47,16 +46,23 @@ func init() {
 		}()
 	}
 
-	func signalHandler(tx fyne.App) {
-		sig := make(chan os.Signal, 2)
-		signal.Notify(sig, syscall.SIGINT)
-		go func() {
-			<-sig
-			//rdebug.PrintStack()
-		}()
-	}
 */
-func startCanGateway(errFunc func(error), readyChan chan<- struct{}) *os.Process {
+
+// Unfortunately Fyne installs its own signal handler that needs to be overridden
+// to allow graceful shutdown on SIGINT/SIGTERM.
+func signalHandler(mw *windows.MainWindow) {
+	time.Sleep(1 * time.Second)
+	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
+	log.Println("installed signal handler")
+	sig := make(chan os.Signal, 2)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	s := <-sig
+	log.Println("Caught:", s)
+	fyne.DoAndWait(mw.Close)
+	//fyne.CurrentApp().Driver().Quit()
+}
+
+func startCanGateway(readyChan chan<- struct{}) *os.Process {
 	if wd, err := os.Getwd(); err == nil {
 		command := filepath.Join(wd, "cangateway.exe")
 		cmd := exec.Command(command)
@@ -72,10 +78,10 @@ func startCanGateway(errFunc func(error), readyChan chan<- struct{}) *os.Process
 				str, err := r.ReadString('\n')
 				if err != nil {
 					if err == io.EOF {
-						errFunc(errors.New("GoCAN Gateway exited"))
+						log.Println("GoCAN Gateway exited")
 						return
 					}
-					errFunc(fmt.Errorf("GoCAN Gateway error: %s", err))
+					log.Printf("GoCAN Gateway error: %s", err)
 					return
 				}
 				fmt.Print(str)
@@ -122,9 +128,8 @@ func RtlGetVersion() RTL_OSVERSIONINFOEXW {
 */
 
 func main() {
-	sig := make(chan os.Signal, 2)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	defer log.Println("txlogger exit")
+	defer debug.Close()
 	//ver := RtlGetVersion()
 	//if ver.MajorVersion < 10 {
 	//	sdialog.Message("txlogger requires Windows 10 or later").Title("Unsupported Windows version").Error()
@@ -146,12 +151,7 @@ func main() {
 	}
 
 	readyChan := make(chan struct{})
-
-	var errFunc = func(err error) {
-		log.Print(err.Error())
-	}
-
-	if p := startCanGateway(errFunc, readyChan); p != nil {
+	if p := startCanGateway(readyChan); p != nil {
 		defer func(p *os.Process) {
 			if p != nil {
 				p.Kill()
@@ -168,9 +168,6 @@ func main() {
 	}
 
 	tx := app.NewWithID("com.roffe.txlogger")
-
-	//signalHandler(tx)
-
 	tx.Settings().SetTheme(&txTheme{})
 
 	if err := presets.Load(tx); err != nil {
@@ -182,10 +179,6 @@ func main() {
 	//log.Printf("starting txlogger v%s build %d tempDir: %s", meta.Version, meta.Build, os.TempDir())
 
 	mw := windows.NewMainWindow(tx)
-	go func() {
-		<-sig
-		fyne.DoAndWait(mw.Close)
-	}()
 
 	sockServ, err := ipc.NewServer(
 		createIPCRouter(mw),
@@ -201,6 +194,7 @@ func main() {
 
 	//go updateCheck(a, mw)
 
+	go signalHandler(mw)
 	mw.ShowAndRun()
 }
 
