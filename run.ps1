@@ -1,5 +1,6 @@
 param(
-    [switch]$cangateway
+    [switch]$cangateway,
+    [switch]$nobuildcangateway
 )
 
 $current_path = Get-Location
@@ -25,7 +26,10 @@ if ($cangateway) {
     exit
 }
 
-.\build.ps1 -cangateway
+if (-not $nobuildcangateway) {
+    Write-Output "Build cangateway"
+    & "$current_path\build.ps1" -cangateway
+}
 
 $includes = @(
     "$current_path\vcpkg\packages\libusb_x64-windows\include\libusb-1.0",
