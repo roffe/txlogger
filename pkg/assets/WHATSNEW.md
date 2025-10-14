@@ -3,6 +3,7 @@
 - Fixed a bug where the background color of single cell maps (bool values) would be black until selected
 - Added support for writing to SRAM on Trionic 5 ( you can now livetune T5 with txlogger )
 - Now possible to change Pgm_mod! in SRAM on T5
+- Fixed timing bug where writing to ram on T8 would fail some times
 
 # 2.1.0
 
