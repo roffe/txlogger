@@ -17,7 +17,6 @@ type BaseLogger struct {
 
 	sysvars *ThreadSafeMap
 
-	//symbolChan chan []*symbol.Symbol
 	readChan  chan *DataRequest
 	writeChan chan *DataRequest
 	quitChan  chan struct{}
@@ -28,8 +27,6 @@ type BaseLogger struct {
 	errPerSecond int
 
 	closeOnce sync.Once
-
-	txbridge bool
 
 	secondTicker *time.Ticker
 
@@ -48,7 +45,6 @@ func NewBaseLogger(cfg Config, lw LogWriter) BaseLogger {
 		writeChan:    make(chan *DataRequest, 1),
 		readChan:     make(chan *DataRequest, 1),
 		quitChan:     make(chan struct{}),
-		txbridge:     strings.HasPrefix(cfg.Device.Name(), "txbridge"),
 		secondTicker: time.NewTicker(time.Second),
 	}
 }
@@ -95,7 +91,7 @@ func (bl *BaseLogger) setupWBL(ctx context.Context, cl *gocan.Client) error {
 		WBLType:  bl.Config.WidebandConfig.Type,
 		Port:     bl.Config.WidebandConfig.Port,
 		Log:      bl.OnMessage,
-		Txbridge: bl.txbridge,
+		Txbridge: strings.HasPrefix(cl.Adapter().Name(), "txbridge"),
 	}
 	var err error
 	lamb, err := wbl.New(ctx, cl, cfg)

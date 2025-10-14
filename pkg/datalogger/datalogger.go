@@ -21,7 +21,6 @@ type IClient interface {
 	Start() error
 	SetRAM(address uint32, data []byte) error
 	GetRAM(address uint32, length uint32) ([]byte, error)
-	//SetSymbols(symbols []*symbol.Symbol) error
 	Close()
 }
 
@@ -62,11 +61,21 @@ func New(cfg Config) (IClient, string, error) {
 	datalogger := &Client{
 		cfg: cfg,
 	}
-	var err error
 
 	filename, lw, err := NewWriter(cfg)
 	if err != nil {
 		return nil, "", err
+	}
+
+	cfg.OnMessage(fmt.Sprintf("Logging to %s", filename))
+
+	if cfg.Device.Name() == "txbridge wifi" || cfg.Device.Name() == "txbridge bluetooth" {
+		cfg.OnMessage("using experimental txbridge client")
+		dc, err := NewTxbridge(cfg, lw)
+		if err != nil {
+			return nil, "", err
+		}
+		return dc, filename, nil
 	}
 
 	switch cfg.ECU {
@@ -88,8 +97,6 @@ func New(cfg Config) (IClient, string, error) {
 	default:
 		return nil, "", fmt.Errorf("%s not supported yet", cfg.ECU)
 	}
-
-	cfg.OnMessage(fmt.Sprintf("Logging to %s", filename))
 
 	return datalogger, filename, nil
 }

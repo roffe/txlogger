@@ -3,8 +3,6 @@ package datalogger
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
-	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -12,7 +10,6 @@ import (
 	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/pkg/serialcommand"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/t5can"
 )
@@ -57,45 +54,12 @@ func (c *T5Client) Start() error {
 		order = append(order, EXTERNALWBLSYM)
 	}
 
-	var expectedPayloadSize uint16
-	if c.txbridge {
-		if err := cl.Send(gocan.SystemMsg, []byte("5"), gocan.Outgoing); err != nil {
-			return err
-		}
-		var symbollist []byte
-		for _, sym := range c.Symbols {
-			symbollist = binary.LittleEndian.AppendUint32(symbollist, sym.SramOffset)
-			symbollist = binary.LittleEndian.AppendUint16(symbollist, sym.Length)
-			expectedPayloadSize += sym.Length
-			// deletelog.Printf("Symbol: %s, offset: %X, length: %d\n", sym.Name, sym.SramOffset, sym.Length)
-		}
-		cmd := &serialcommand.SerialCommand{
-			Command: 'd',
-			Data:    symbollist,
-		}
-		payload, err := cmd.MarshalBinary()
-		if err != nil {
-			return err
-		}
-		if err := cl.Send(gocan.SystemMsg, payload, gocan.Outgoing); err != nil {
-			return err
-		}
-		c.OnMessage("Symbol list configured")
-	}
-
 	err = retry.Do(func() error {
 		tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
 		defer tx.Close()
 
 		messages := cl.Subscribe(ctx, gocan.SystemMsg)
 		defer messages.Close()
-
-		if c.txbridge {
-			t.Stop()
-			if err := cl.Send(gocan.SystemMsg, []byte("r"), gocan.Outgoing); err != nil {
-				return err
-			}
-		}
 
 		converto := newT5Converter(c.WidebandConfig)
 
@@ -121,44 +85,7 @@ func (c *T5Client) Start() error {
 				}
 				c.cps = 0
 				c.errPerSecond = 0
-			//case symbols := <-c.symbolChan:
-			//	_ = symbols
 			case read := <-c.readChan:
-				if c.txbridge {
-					// log.Println(read.Length)
-					toRead := min(234, read.Length)
-					read.Length -= toRead
-					cmd := serialcommand.SerialCommand{
-						Command: 'R',
-						Data: []byte{
-							byte(read.Address),
-							byte(read.Address >> 8),
-							byte(read.Address >> 16),
-							byte(read.Address >> 24),
-							byte(toRead),
-						},
-					}
-					read.Address += uint32(toRead)
-					payload, err := cmd.MarshalBinary()
-					if err != nil {
-						c.onError()
-						c.OnMessage(err.Error())
-						continue
-					}
-					frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
-					resp, err := cl.SendAndWait(ctx, frame, 300*time.Millisecond, gocan.SystemMsgDataRequest)
-					if err != nil {
-						read.Complete(err)
-						continue
-					}
-					read.Data = append(read.Data, resp.Data...)
-					if read.Length > 0 {
-						c.readChan <- read
-					} else {
-						read.Complete(nil)
-					}
-					continue
-				}
 				data, err := t5.ReadRam(ctx, read.Address, read.Length)
 				if err != nil {
 					c.onError()
@@ -203,57 +130,6 @@ func (c *T5Client) Start() error {
 				if err := c.lw.Write(c.sysvars, []*symbol.Symbol{}, ts, order); err != nil {
 					return err
 				}
-				c.captureCount++
-				c.cps++
-				if c.captureCount%15 == 0 {
-					c.CaptureCounter(c.captureCount)
-				}
-			case msg, ok := <-tx.Chan():
-				if !ok {
-					return retry.Unrecoverable(errors.New("txbridge sub closed"))
-				}
-
-				if msg.Length() != int(expectedPayloadSize+4) {
-					c.onError()
-					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, msg.Length()))
-					continue
-				}
-
-				r := bytes.NewReader(msg.Data)
-				binary.Read(r, binary.LittleEndian, &c.currtimestamp)
-
-				if c.firstTime.IsZero() {
-					c.firstTime = time.Now()
-					c.firstTimestamp = c.currtimestamp
-				}
-
-				timeStamp := c.calculateCompensatedTimestamp()
-
-				for _, sym := range c.Symbols {
-					if err := sym.Read(r); err != nil {
-						return err
-					}
-					val := converto(sym.Name, sym.Bytes())
-					c.sysvars.Set(sym.Name, val)
-					if err := ebus.Publish(sym.Name, val); err != nil {
-						c.onError()
-						c.OnMessage(err.Error())
-					}
-				}
-
-				if c.lamb != nil {
-					lambda := c.lamb.GetLambda()
-					c.sysvars.Set(EXTERNALWBLSYM, lambda)
-					if err := ebus.Publish(EXTERNALWBLSYM, lambda); err != nil {
-						c.onError()
-						c.OnMessage(err.Error())
-					}
-				}
-
-				if err := c.lw.Write(c.sysvars, []*symbol.Symbol{}, timeStamp, order); err != nil {
-					return err
-				}
-
 				c.captureCount++
 				c.cps++
 				if c.captureCount%15 == 0 {
