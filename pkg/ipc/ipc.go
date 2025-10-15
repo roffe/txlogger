@@ -17,7 +17,7 @@ func IsRunning(socketFile string) bool {
 		if !ping(socketFile) {
 			log.Println("txlogger is not running, removing stale socket file")
 			if err := os.Remove(socketFile); err != nil {
-				log.Println(err)
+				log.Printf("failed to remove stale socket file: %v", err)
 			}
 		} else {
 			log.Println("txlogger is running, sending show request over socket")
@@ -38,7 +38,7 @@ func sendShow(socketFile string) {
 				return
 			}
 		}
-		log.Println(err)
+		log.Println("failed to send show request:", err)
 		return
 	}
 	defer c.Close()
