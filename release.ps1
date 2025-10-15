@@ -16,10 +16,12 @@ foreach ($path in $winrarPaths) {
     }
 }
 
-$outputZip = "txlogger.zip"
+New-Item -ItemType Directory -Path "dist" -Force | Out-Null
+
+$outputZip = "dist\txlogger.zip"
 
 if ($beta) {
-    $outputZip = "txlogger_beta.zip"
+    $outputZip = "dist\txlogger_beta.zip"
     Remove-Item "txlogger.exe" -ErrorAction Continue
     Remove-Item "txlogger_beta.zip" -ErrorAction SilentlyContinue
     .\build.ps1 -cangateway -txlogger
@@ -46,10 +48,10 @@ $winRarArgs = "a -ep -m5 -afzip $outputZip $($files -join ' ')"
 Start-Process -FilePath $winrarExe -ArgumentList $winRarArgs -NoNewWindow -Wait
 
 if ($beta) {
-    scp txlogger_beta.zip roffe@192.168.2.177:/var/www/html/txlogger
+    scp dist\txlogger_beta.zip roffe@192.168.2.177:/var/www/html/txlogger
 }
 else {
-    scp txlogger.zip setup.zip roffe@192.168.2.177:/var/www/html/txlogger
+    scp dist\txlogger.zip dist\setup.zip roffe@192.168.2.177:/var/www/html/txlogger
 }
 
 

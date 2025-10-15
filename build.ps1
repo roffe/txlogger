@@ -24,6 +24,8 @@ foreach ($path in $winrarPaths) {
     }
 }
 
+New-Item -ItemType Directory -Path "dist" -Force | Out-Null
+
 if ($release) {
     $cangateway = $true
     $txlogger = $true
@@ -92,7 +94,7 @@ if ($setup) {
     }
 
     $filesToAdd = "txlogger_setup.exe"
-    $outputZip = "setup.zip"
+    $outputZip = "dist\setup.zip"
     $winRarArgs = "a -m5 -afzip $outputZip $filesToAdd"
 
     Write-Output "Creating setup.zip"
