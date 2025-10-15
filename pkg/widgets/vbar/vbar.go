@@ -35,7 +35,7 @@ type VBar struct {
 	}
 
 	// performance caches
-	colorLUT       [256]color.RGBA // precomputed fill colors (stroke derived from same idx if needed)
+	colorLUT       [256]color.RGBA
 	strokeLUT      [256]color.RGBA
 	lastPxHeight   int32
 	lastColorIdx   int
@@ -91,7 +91,7 @@ func (s *VBar) render() {
 
 // buildColorLUT precomputes 256 interpolated entries across the configured scale.
 func (s *VBar) buildColorLUT() {
-	for i := 0; i < 256; i++ {
+	for i := range 255 {
 		fill, stroke := s.getColorForRatio(float64(i) / 255.0)
 		s.colorLUT[i] = fill
 		s.strokeLUT[i] = stroke
