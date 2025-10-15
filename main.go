@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"flag"
 	"fmt"
-	"image/color"
 	"io"
 	"log"
 	"os"
@@ -19,14 +18,12 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/theme"
-	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ipc"
 	"github.com/roffe/txlogger/pkg/presets"
+	"github.com/roffe/txlogger/pkg/theme"
 	"github.com/roffe/txlogger/pkg/windows"
-
-	_ "net/http/pprof"
+	// _ "net/http/pprof"
 )
 
 var (
@@ -62,8 +59,9 @@ func signalHandler(mw *windows.MainWindow) {
 	//fyne.CurrentApp().Driver().Quit()
 }
 
-func startCanGateway(readyChan chan<- struct{}) *os.Process {
+func startCanGateway() (*os.Process, error) {
 	if wd, err := os.Getwd(); err == nil {
+		readyChan := make(chan struct{})
 		command := filepath.Join(wd, "cangateway.exe")
 		cmd := exec.Command(command)
 		//cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
@@ -78,10 +76,10 @@ func startCanGateway(readyChan chan<- struct{}) *os.Process {
 				str, err := r.ReadString('\n')
 				if err != nil {
 					if err == io.EOF {
-						log.Println("GoCAN Gateway exited")
+						log.Println("goCAN Gateway exited")
 						return
 					}
-					log.Printf("GoCAN Gateway error: %s", err)
+					log.Printf("goCAN Gateway error: %s", err)
 					return
 				}
 				fmt.Print(str)
@@ -92,14 +90,20 @@ func startCanGateway(readyChan chan<- struct{}) *os.Process {
 			}
 		}()
 		if err := cmd.Start(); err != nil {
-			log.Fatal("Failed to start GoCAN Gateway")
-		} else {
-			// defer cmd.Process.Kill()
-			log.Printf("Starting GoCAN Gateway pid: %d", cmd.Process.Pid)
+			log.Fatal("Failed to start goCAN Gateway")
 		}
-		return cmd.Process
+
+		log.Printf("Started goCAN Gateway pid: %d", cmd.Process.Pid)
+
+		select {
+		case <-readyChan:
+			debug.Log("goCAN Gateway is ready")
+			return cmd.Process, nil
+		case <-time.After(5 * time.Second):
+			return nil, fmt.Errorf("goCAN Gateway was not ready after 5 seconds")
+		}
 	}
-	return nil
+	return nil, fmt.Errorf("failed to get working directory")
 }
 
 /*
@@ -128,15 +132,16 @@ func RtlGetVersion() RTL_OSVERSIONINFOEXW {
 */
 
 func main() {
-	defer log.Println("txlogger exit")
+	//startpprof()
 	defer debug.Close()
+	defer debug.Log("txlogger exit")
+
 	//ver := RtlGetVersion()
 	//if ver.MajorVersion < 10 {
 	//	sdialog.Message("txlogger requires Windows 10 or later").Title("Unsupported Windows version").Error()
 	//	return
 	//}
 
-	//startpprof()
 	socketFile := filepath.Join(os.TempDir(), "txlogger.sock")
 
 	if ipc.IsRunning(socketFile) {
@@ -150,8 +155,8 @@ func main() {
 		}
 	}
 
-	readyChan := make(chan struct{})
-	if p := startCanGateway(readyChan); p != nil {
+	p, err := startCanGateway()
+	if p != nil {
 		defer func(p *os.Process) {
 			if p != nil {
 				p.Kill()
@@ -159,19 +164,15 @@ func main() {
 			}
 		}(p)
 	}
-
-	select {
-	case <-readyChan:
-		debug.Log("GoCAN Gateway is ready")
-	case <-time.After(5 * time.Second):
+	if err != nil {
 		debug.Log("GoCAN Gateway was not ready after 5 seconds")
 	}
 
 	tx := app.NewWithID("com.roffe.txlogger")
-	tx.Settings().SetTheme(&txTheme{})
+	tx.Settings().SetTheme(&theme.TxTheme{})
 
 	if err := presets.Load(tx); err != nil {
-		log.Println(err)
+		debug.Log("failed to load presets: " + err.Error())
 	}
 
 	meta := tx.Metadata()
@@ -209,16 +210,13 @@ func handleArgs(mw *windows.MainWindow, tx fyne.App) {
 			} else {
 				loadedSymbols = true
 			}
-
 		case ".t5l", ".t7l", ".t8l", ".csv":
 			f, err := os.Open(filename)
 			if err != nil {
 				mw.Error(err)
 			}
 			defer f.Close()
-
 			sz := mw.Canvas().Size()
-
 			mw.LoadLogfile(filename, f, fyne.Position{X: sz.Width / 2, Y: sz.Height / 2})
 		}
 	}
@@ -230,34 +228,45 @@ func handleArgs(mw *windows.MainWindow, tx fyne.App) {
 	}
 }
 
-func fileExists(name string) bool {
-	_, err := os.Stat(name)
-	return !os.IsNotExist(err)
-}
-
 func createIPCRouter(mw *windows.MainWindow) ipc.Router {
 	return ipc.Router{
 		"ping": func(data string) *ipc.Message {
 			return &ipc.Message{Type: "pong", Data: ""}
 		},
 		"open": func(filename string) *ipc.Message {
-			fyne.Do(mw.Window.RequestFocus) // show window
+			fyne.DoAndWait(mw.Window.RequestFocus)
 			if strings.HasSuffix(filename, ".bin") {
 				mw.LoadSymbolsFromFile(filename)
 			}
-			if strings.HasSuffix(filename, ".t5l") || strings.HasSuffix(filename, ".t7l") || strings.HasSuffix(filename, ".t8l") || strings.HasSuffix(filename, ".csv") {
+			if isLogfile(filename) {
 				f, err := os.Open(filename)
 				if err != nil {
 					mw.Error(err)
 				}
 				defer f.Close()
 				sz := mw.Canvas().Size()
-
 				mw.LoadLogfile(filename, f, fyne.Position{X: sz.Width / 2, Y: sz.Height / 2})
 			}
 			return nil
 		},
 	}
+}
+
+var logfileExtensions = [...]string{".t5l", ".t7l", ".t8l", ".csv"}
+
+func fileExists(name string) bool {
+	_, err := os.Stat(name)
+	return !os.IsNotExist(err)
+}
+
+func isLogfile(name string) bool {
+	filename := strings.ToLower(name)
+	for _, ext := range logfileExtensions {
+		if strings.HasSuffix(filename, ext) {
+			return true
+		}
+	}
+	return false
 }
 
 /*
@@ -305,76 +314,3 @@ func updateCheck(a fyne.App, mw fyne.Window) {
 	}
 }
 */
-
-type txTheme struct{}
-
-func (m txTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
-	switch name {
-	case theme.ColorNameBackground:
-		return color.RGBA{R: 23, G: 23, B: 24, A: 255}
-	case fyne.ThemeColorName("primary-hover"):
-		return color.RGBA{R: 0x21, G: 0x99, B: 0xF3, A: 255}
-	}
-	return theme.DefaultTheme().Color(name, theme.VariantDark)
-}
-
-var dragcornerindicatorleftIconRes = &fyne.StaticResource{
-	StaticName:    "drag-corner-indicator-left.svg",
-	StaticContent: assets.LeftCornerBytes,
-}
-
-func (m txTheme) Icon(name fyne.ThemeIconName) fyne.Resource {
-	switch name {
-	case fyne.ThemeIconName("drag-corner-indicator-left"):
-		return theme.NewThemedResource(dragcornerindicatorleftIconRes)
-	default:
-		return theme.DefaultTheme().Icon(name)
-	}
-}
-
-func (m txTheme) Font(style fyne.TextStyle) fyne.Resource {
-	return theme.DefaultTheme().Font(style)
-}
-
-func (m txTheme) Size(name fyne.ThemeSizeName) float32 {
-	switch name {
-	case theme.SizeNameSeparatorThickness: // denna 0
-		return 0
-	case theme.SizeNameInlineIcon:
-		return 20
-	case theme.SizeNameInnerPadding:
-		return 8
-	case theme.SizeNameLineSpacing:
-		return 4
-	case theme.SizeNamePadding: // 2
-		return 2
-	case theme.SizeNameScrollBar: // 8
-		return 16
-	case theme.SizeNameScrollBarSmall:
-		return 4
-	case theme.SizeNameText:
-		return 14
-	case theme.SizeNameHeadingText:
-		return 24
-	case theme.SizeNameSubHeadingText:
-		return 18
-	case theme.SizeNameCaptionText:
-		return 11
-	case theme.SizeNameInputBorder:
-		return 1
-	case theme.SizeNameInputRadius:
-		return 5
-	case theme.SizeNameSelectionRadius:
-		return 3
-	case theme.SizeNameWindowTitleBarHeight:
-		return 26
-	case theme.SizeNameWindowButtonHeight:
-		return 20
-	case theme.SizeNameWindowButtonIcon:
-		return 20
-	case theme.SizeNameWindowButtonRadius:
-		return 0
-	default:
-		return 0
-	}
-}
