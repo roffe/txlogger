@@ -16,7 +16,7 @@ go 1.25.2
 
 // replace github.com/roffe/goftdi => ..\goftdi
 
-replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
+// replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 
 require (
 	fyne.io/fyne/v2 v2.7.0-rc1.0.20251014092848-6d316e29599f
