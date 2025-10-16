@@ -1,6 +1,6 @@
 module github.com/roffe/txlogger
 
-go 1.25.0
+go 1.25.2
 
 // replace github.com/roffe/gocan => ..\gocan
 
@@ -16,7 +16,7 @@ go 1.25.0
 
 // replace github.com/roffe/goftdi => ..\goftdi
 
-// replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
+replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 
 require (
 	fyne.io/fyne/v2 v2.7.0-rc1.0.20251014092848-6d316e29599f
@@ -26,17 +26,19 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.0.7
 	github.com/roffe/ecusymbol v1.0.3
-	github.com/roffe/gocan v1.1.8
+	github.com/roffe/gocan v1.1.9
 	github.com/roffe/gocanflasher v1.0.3
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.4
 	golang.org/x/image v0.24.0
-	golang.org/x/mod v0.23.0
-	golang.org/x/net v0.35.0
-	golang.org/x/sync v0.11.0
-	google.golang.org/grpc v1.70.0
-	google.golang.org/protobuf v1.36.5
+	golang.org/x/mod v0.25.0
+	golang.org/x/net v0.42.0
+	golang.org/x/sync v0.17.0
+	google.golang.org/grpc v1.76.0 // indirect
+	google.golang.org/protobuf v1.36.10
 )
+
+require github.com/Microsoft/go-winio v0.6.2
 
 require (
 	fyne.io/systray v1.11.1-0.20250603113521-ca66a66d8b58 // indirect
@@ -59,7 +61,7 @@ require (
 	github.com/go-text/typesetting v0.2.1 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/mock v1.6.0 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gousb v1.1.3 // indirect
 	github.com/hack-pad/go-indexeddb v0.3.2 // indirect
 	github.com/hack-pad/safejs v0.1.0 // indirect
@@ -83,10 +85,10 @@ require (
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9 // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
 	go.einride.tech/can v0.12.1 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
-	golang.org/x/tools v0.30.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250212204824-5a70512c5d8b // indirect
+	golang.org/x/crypto v0.40.0 // indirect
+	golang.org/x/sys v0.34.0 // indirect
+	golang.org/x/text v0.27.0 // indirect
+	golang.org/x/tools v0.34.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250804133106-a7a43d27e69b // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
