@@ -1,3 +1,6 @@
+# 2.1.2
+ - rewrote cangateway to use named pipes on windows instead of unix sockets. This should ensure that cangateway is working even on early Windows 10 versions
+
 # 2.1.1
 
 - Fixed a bug where the background color of single cell maps (bool values) would be black until selected
