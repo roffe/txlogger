@@ -27,7 +27,6 @@ if ($cangateway) {
 }
 
 if (-not $nobuildcangateway) {
-    Write-Output "Build cangateway"
     & "$current_path\build.ps1" -cangateway
 }
 
