@@ -8,28 +8,52 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
+
+	"fyne.io/fyne/v2"
+	"github.com/roffe/txlogger/pkg/windows"
 )
 
-func IsRunning(socketFile string) bool {
-	if fileExists(socketFile) {
-		if !ping(socketFile) {
-			log.Println("txlogger is not running, removing stale socket file")
-			if err := os.Remove(socketFile); err != nil {
-				log.Printf("failed to remove stale socket file: %v", err)
+func CreateIPCRouter(mw *windows.MainWindow) Router {
+	return Router{
+		"ping": func(data string) *Message {
+			return &Message{Type: "pong", Data: ""}
+		},
+		"open": func(filename string) *Message {
+			fyne.DoAndWait(mw.Window.RequestFocus)
+			if strings.HasSuffix(filename, ".bin") {
+				mw.LoadSymbolsFromFile(filename)
 			}
-		} else {
-			log.Println("txlogger is running, sending show request over socket")
-			sendShow(socketFile)
+			if isLogfile(filename) {
+				f, err := os.Open(filename)
+				if err != nil {
+					mw.Error(err)
+				}
+				defer f.Close()
+				sz := mw.Canvas().Size()
+				mw.LoadLogfile(filename, f, fyne.Position{X: sz.Width / 2, Y: sz.Height / 2})
+			}
+			return nil
+		},
+	}
+}
+
+var logfileExtensions = [...]string{".t5l", ".t7l", ".t8l", ".csv"}
+
+func isLogfile(name string) bool {
+	filename := strings.ToLower(name)
+	for _, ext := range logfileExtensions {
+		if strings.HasSuffix(filename, ext) {
 			return true
 		}
 	}
 	return false
 }
 
-func sendShow(socketFile string) {
-	c, err := net.Dial("unix", socketFile)
+func sendShow() {
+	c, err := dial()
 	if err != nil {
 		var nErr *net.OpError
 		if errors.As(err, &nErr) {
@@ -72,14 +96,14 @@ type Server struct {
 	closeOnce sync.Once
 }
 
-func NewServer(router Router, socketFile string) (*Server, error) {
+func NewServer(router Router) (*Server, error) {
 	srv := &Server{
 		quit: make(chan struct{}),
 		r:    router,
 	}
 
 	var err error
-	srv.l, err = net.Listen("unix", socketFile)
+	srv.l, err = listen()
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +163,8 @@ func handleConn(conn net.Conn, r Router) {
 	}
 }
 
-func ping(socketFile string) bool {
-	c, err := net.Dial("unix", socketFile)
+func ping() bool {
+	c, err := dial()
 	if err != nil {
 		var nErr *net.OpError
 		if errors.As(err, &nErr) {
