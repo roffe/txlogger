@@ -347,7 +347,10 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	loadFileFunc := func() {
 		if symZ != nil {
 			log.Println("load", symZ.Name)
-			mv.SetZData(symZ.Float64s())
+			if err := mv.SetZData(symZ.Float64s()); err != nil {
+				mw.Error(err)
+				return
+			}
 			mv.Refresh()
 		}
 	}
