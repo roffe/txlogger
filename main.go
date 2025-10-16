@@ -22,31 +22,23 @@ import (
 	// _ "net/http/pprof"
 )
 
-var (
-	workDirectory string
-)
-
 func init() {
+	var workDirectory string
+
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
 	flag.StringVar(&workDirectory, "d", "", "working directory")
 	flag.Parse()
 
+	// change working directory if requested
 	if workDirectory != "" {
-		debug.Log("changing working directory to" + workDirectory)
+		debug.Log("changing working directory to " + workDirectory)
 		if err := os.Chdir(workDirectory); err != nil {
 			debug.Log(fmt.Sprintf("failed to change working directory to %s: %v", workDirectory, err))
 		}
 	}
 }
 
-// func startpprof() {
-// 	go func() {
-// 		log.Println(http.ListenAndServe("localhost:6060", nil))
-// 	}()
-// }
-
-// Unfortunately Fyne installs its own signal handler that needs to be overridden
-// to allow graceful shutdown on SIGINT/SIGTERM.
+// Unfortunately Fyne installs its own signal handler that needs to be overridden to allow graceful shutdown on SIGINT/SIGTERM.
 func signalHandler(mw *windows.MainWindow) {
 	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
 	log.Println("installed signal handler")
@@ -63,10 +55,12 @@ func main() {
 	defer debug.Close()
 	defer debug.Log("txlogger exit")
 
+	// if another instance is running, just show its window and exit
 	if ipc.IsRunning() {
 		return
 	}
 
+	// start cangateway if not already running
 	p, err := cangw.Start()
 	if p != nil {
 		defer killProcess(p)
@@ -75,22 +69,28 @@ func main() {
 		debug.Log("cangateway is not ready: " + err.Error())
 	}
 
+	// create app
 	tx := app.NewWithID("com.roffe.txlogger")
 	tx.Settings().SetTheme(&theme.TxTheme{})
 
+	// load presets
 	if err := presets.Load(tx); err != nil {
 		debug.Log("failed to load presets: " + err.Error())
 	}
 
-	meta := tx.Metadata()
-	debug.Log(fmt.Sprintf("starting txlogger v%s build %d", meta.Version, meta.Build))
+	// log version info
+	metadata := tx.Metadata()
+	debug.Log(fmt.Sprintf("starting txlogger v%s build %d", metadata.Version, metadata.Build))
 
+	// create main window
 	mw := windows.NewMainWindow(tx)
 
+	// install our own signal handler
 	fyne.CurrentApp().Lifecycle().SetOnStarted(func() {
-		go signalHandler(mw) // Install our own signal handler
+		go signalHandler(mw)
 	})
 
+	// start IPC server
 	sockServ, err := ipc.NewServer(ipc.CreateIPCRouter(mw))
 	if err != nil {
 		debug.Log("error: " + err.Error())
@@ -98,12 +98,22 @@ func main() {
 		defer sockServ.Close()
 	}
 
+	// handle command line arguments
 	handleArgs(mw, tx)
 
 	//go updateCheck(a, mw)
 
+	// show main window
 	mw.ShowAndRun()
 }
+
+/*
+func startpprof() {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+}
+*/
 
 func killProcess(p *os.Process) {
 	if p != nil {
@@ -117,7 +127,6 @@ func handleArgs(mw *windows.MainWindow, tx fyne.App) {
 	if filename := flag.Arg(0); filename != "" {
 		switch strings.ToLower(path.Ext(filename)) {
 		case ".bin":
-			//mw = windows.NewMainWindow(a, filename)
 			if err := mw.LoadSymbolsFromFile(filename); err != nil {
 				mw.Error(err)
 			} else {
@@ -136,7 +145,9 @@ func handleArgs(mw *windows.MainWindow, tx fyne.App) {
 
 	if filename := tx.Preferences().String("lastBinFile"); filename != "" && !loadedSymbols {
 		if fileExists(filename) {
-			mw.LoadSymbolsFromFile(filename)
+			if err := mw.LoadSymbolsFromFile(filename); err != nil {
+				mw.Error(err)
+			}
 		}
 	}
 }
