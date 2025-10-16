@@ -53,10 +53,14 @@ func (mw *MainWindow) Close() {
 		time.Sleep(250 * time.Millisecond)
 	}
 	if mw.gwclient != nil {
-		log.Println("Sending quit to CAN gateway")
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		log.Println("sending quit to cangateway")
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		mw.gwclient.SendCommand(ctx, &proto.Command{Data: []byte("quit")})
+		_, err := mw.gwclient.SendCommand(ctx, &proto.Command{Data: []byte("quit")})
+		if err != nil {
+			log.Println("error sending quit to cangateway:", err)
+		}
+		log.Println("quit command sent")
 	}
 	mw.Window.Close()
 }
@@ -67,7 +71,9 @@ func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
 		filename := u.Path()
 		switch strings.ToLower(path.Ext(filename)) {
 		case ".bin":
-			mw.LoadSymbolsFromFile(filename)
+			if err := mw.LoadSymbolsFromFile(filename); err != nil {
+				mw.Error(err)
+			}
 		case ".t5l", ".t7l", ".t8l", ".csv":
 			// Check if we dropped it on the open log button
 			// log.Println(mw.buttons.openLogBtn.Position(), mw.buttons.openLogBtn.Size())
