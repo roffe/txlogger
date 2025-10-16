@@ -141,10 +141,12 @@ func (c *DualDial) rotateNeedleNoRefresh(hand *canvas.Line, facePosition float64
 	c.applySinCos(hand, float32(s), float32(co), offset, length)
 }
 
+/*
 func (c *DualDial) rotateLinesNoRefresh(hand *canvas.Line, stepIndex float64, offset, length float32) {
 	s, co := math.Sincos(c.lineRotConst*stepIndex - common.Pi43)
 	c.applySinCos(hand, float32(s), float32(co), offset, length)
 }
+*/
 
 func (c *DualDial) applySinCos(hand *canvas.Line, sinRot, cosRot float32, offset, length float32) {
 	x2 := length * sinRot
