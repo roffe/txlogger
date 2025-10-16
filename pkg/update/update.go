@@ -4,8 +4,13 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/widget"
 	"golang.org/x/mod/semver"
 )
 
@@ -83,6 +88,50 @@ type Assets struct {
 	CreatedAt          time.Time   `json:"created_at"`
 	UpdatedAt          time.Time   `json:"updated_at"`
 	BrowserDownloadURL string      `json:"browser_download_url"`
+}
+
+func UpdateCheck(a fyne.App, mw fyne.Window) {
+	doUpdateCheck := false
+	nextUpdateCheck := a.Preferences().String("nextUpdateCheck")
+	ignoreVersion := a.Preferences().String("ignoreVersion")
+	if nextUpdateCheck != "" {
+		if nextCheckTime, err := time.Parse(time.RFC3339, nextUpdateCheck); err == nil {
+			if time.Now().After(nextCheckTime) {
+				doUpdateCheck = true
+			}
+		}
+	}
+	if doUpdateCheck {
+		if isLatest, latestVersion := IsLatest("v" + a.Metadata().Version); !isLatest {
+			if ignoreVersion == latestVersion {
+				return
+			}
+			u, err := url.Parse("https://txlogger.com")
+			if err != nil {
+				panic(err)
+			}
+			link := widget.NewHyperlink("txlogger.com", u)
+			link.Alignment = fyne.TextAlignCenter
+			link.TextStyle = fyne.TextStyle{Bold: true}
+			dialog.ShowCustomConfirm(
+				"Update available!",
+				"Remind me", "Don't remind me",
+				container.NewVBox(
+					widget.NewLabel("There is a new version available"),
+					link,
+				),
+				func(choice bool) {
+					if !choice {
+						a.Preferences().SetString("ignoreVersion", "v"+a.Metadata().Version)
+					}
+				},
+				mw,
+			)
+		}
+		if tt, err := time.Now().Add(96 * time.Hour).MarshalText(); err == nil {
+			a.Preferences().SetString("nextUpdateCheck", string(tt))
+		}
+	}
 }
 
 func GetLatest() (*Release, error) {
