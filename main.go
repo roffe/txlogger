@@ -72,7 +72,7 @@ func main() {
 		defer killProcess(p)
 	}
 	if err != nil {
-		debug.Log("cangatewayis not ready: " + err.Error())
+		debug.Log("cangateway is not ready: " + err.Error())
 	}
 
 	tx := app.NewWithID("com.roffe.txlogger")
