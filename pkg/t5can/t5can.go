@@ -1,11 +1,8 @@
 package t5can
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"log"
-	"os"
 	"slices"
 	"time"
 
@@ -250,6 +247,8 @@ func sendCommand(ctx context.Context, c *gocan.Client, cmd []byte) error {
 	return nil
 }
 
+/*
+
 func ack(c *gocan.Client) error {
 	return c.Send(0x05, []byte{0xC6, 0x00}, gocan.Outgoing)
 }
@@ -264,10 +263,12 @@ func recvDataEND(ctx context.Context, c *gocan.Client) ([]byte, error) {
 			fmt.Print(".")
 			dd = 0
 		}
-		ack(c)
+		if err := ack(c); err != nil {
+			return nil, err
+		}
 		resp, err := c.Wait(ctx, 40*time.Millisecond, 0xC)
 		if err != nil {
-			os.WriteFile("dump", buff.Bytes(), 0644)
+			//os.WriteFile("dump", buff.Bytes(), 0644)
 			return nil, err
 		}
 		if resp.Data[0] != 0xC6 && resp.Data[1] != 0x00 {
@@ -285,7 +286,9 @@ func recvData(ctx context.Context, c *gocan.Client) ([]byte, error) {
 	var lastByte byte
 	buff := bytes.NewBuffer(nil)
 	for {
-		ack(c)
+		if err := ack(c); err != nil {
+			return nil, err
+		}
 		resp, err := c.Wait(ctx, 75*time.Millisecond, 0xC)
 		if err != nil {
 			log.Printf("%s", buff.Bytes())
@@ -301,3 +304,5 @@ func recvData(ctx context.Context, c *gocan.Client) ([]byte, error) {
 		lastByte = resp.Data[2]
 	}
 }
+
+*/
