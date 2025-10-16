@@ -19,6 +19,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	xwidget "fyne.io/x/fyne/widget"
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
@@ -38,9 +39,6 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
 	"github.com/roffe/txlogger/pkg/widgets/txweb"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/keepalive"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -193,34 +191,13 @@ func NewMainWindow(app fyne.App) *MainWindow {
 }
 
 func (mw *MainWindow) gocanGatewayClient() {
-	var socketFile string
-	if cacheDir, err := os.UserCacheDir(); err == nil {
-		socketFile = filepath.Join(cacheDir, "gocan.sock")
-	} else {
-		mw.Error(fmt.Errorf("failed to get user cache dir: %w", err))
-		mw.gocanGatewayLED.Off()
-		return
-	}
-
-	kacp := keepalive.ClientParameters{
-		Time:                10 * time.Second, // send pings every 10 seconds if there is no activity
-		Timeout:             time.Second,      // wait 1 second for ping ack before considering the connection dead
-		PermitWithoutStream: true,             // send pings even without active streams
-	}
-
-	conn, err := grpc.NewClient(
-		"unix:"+socketFile,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithKeepaliveParams(kacp),
-	)
+	_, client, err := gocan.NewGRPCClient()
 	if err != nil {
 		mw.Error(fmt.Errorf("failed to connect to gocan gateway: %w", err))
 		mw.gocanGatewayLED.Off()
 		return
 	}
-	//defer conn.Close()
 
-	client := proto.NewGocanClient(conn)
 	mw.gocanGatewayLED.On()
 	res, err := client.GetAdapters(context.Background(), &emptypb.Empty{})
 	if err != nil {
