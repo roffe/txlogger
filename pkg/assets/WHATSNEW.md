@@ -1,5 +1,6 @@
 # 2.1.2
  - rewrote cangateway to use named pipes on windows instead of unix sockets. This should ensure that cangateway is working even on early Windows 10 versions
+ - fixed a race condition in goCAN that could cause missed canbus frames.
 
 # 2.1.1
 
