@@ -37,13 +37,12 @@ jobs:
         go install fyne.io/tools/cmd/fyne@latest
         .\setup_build_env.ps1
     
-    - name: Install LLVM-Mingw to PATH
-      run: |
-        set PATH=D:\a\txlogger\txlogger\llvm-mingw\bin;%PATH%
 
     - name: Build
       env:
         FOO: "BAR"
       run: |
+        $env:PATH += ";D:\a\txlogger\txlogger\llvm-mingw\bin"
+        $env:PATH
         .\build.ps1 -cangateway -txlogger
 
