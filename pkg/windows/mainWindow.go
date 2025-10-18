@@ -225,21 +225,21 @@ func (mw *MainWindow) setupShortcuts() {
 	})
 
 	mw.Window.Canvas().AddShortcut(ctrl1, func(shortcut fyne.Shortcut) {
-		log.Println("ctrl1")
+		log.Println("open settings with Ctrl-1")
 		mw.openSettings()
 	})
 
 	mw.Window.Canvas().AddShortcut(ctrl2, func(shortcut fyne.Shortcut) {
-		log.Println("ctrl2")
+		log.Println("open symbol list with Ctrl-2")
 		mw.buttons.symbolListBtn.OnTapped()
 	})
 
 	mw.Window.Canvas().AddShortcut(ctrl3, func(shortcut fyne.Shortcut) {
-		log.Println("ctrl3")
+		log.Println("Ctrl-3")
 	})
 
 	mw.Window.Canvas().AddShortcut(ctrl4, func(shortcut fyne.Shortcut) {
-		log.Println("ctrl4")
+		log.Println("Ctrl-4")
 	})
 }
 
