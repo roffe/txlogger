@@ -20,7 +20,7 @@ import (
 func (c *TxBridge) t7(ctx context.Context, cl *gocan.Client) error {
 	bctx, bcancel := context.WithCancel(ctx)
 	defer bcancel()
-	go t7broadcastListener(bctx, cl, c.sysvars, c.quitChan)
+	go t7broadcastListener(bctx, cl, c.sysvars)
 
 	c.OnMessage("Watching for broadcast messages")
 	<-time.After(550 * time.Millisecond)
@@ -53,7 +53,7 @@ func (c *TxBridge) t7(ctx context.Context, cl *gocan.Client) error {
 			return fmt.Errorf("failed to init t7 logging: %w", err)
 		}
 		defer func() {
-			kwp.StopSession(ctx)
+			_ = kwp.StopSession(ctx)
 			time.Sleep(50 * time.Millisecond)
 		}()
 

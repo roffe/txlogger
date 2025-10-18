@@ -25,46 +25,49 @@ func NewT7(cfg Config, lw LogWriter) (IClient, error) {
 	return &T7Client{BaseLogger: NewBaseLogger(cfg, lw)}, nil
 }
 
-func t7broadcastListener(ctx context.Context, cl *gocan.Client, sysvars *ThreadSafeMap, quitChan chan struct{}) {
+func t7broadcastListener(ctx context.Context, cl *gocan.Client, sysvars *ThreadSafeMap) {
 	sub := cl.Subscribe(ctx, 0x1A0, 0x280, 0x3A0)
 	var speed uint16
 	var rpm uint16
 	var throttle float64
 	var realSpeed float64
-	go func() {
-		<-quitChan
-		sub.Close()
-	}()
-	for msg := range sub.Chan() {
-		switch msg.Identifier {
-		case 0x1A0:
-			rpm = binary.BigEndian.Uint16(msg.Data[1:3])
-			throttle = float64(msg.Data[5])
-			sysvars.Set("ActualIn.n_Engine", float64(rpm))
-			sysvars.Set("Out.X_AccPedal", throttle)
-		case 0x280:
-			if msg.Data[3]&0x01 == 1 {
-				ebus.Publish("LIMP", 1)
-			} else {
-				ebus.Publish("LIMP", 0)
+	defer sub.Close()
+	log.Println("Started T7 broadcast listener")
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("Stopping T7 broadcast listener")
+			return
+		case msg := <-sub.Chan():
+			switch msg.Identifier {
+			case 0x1A0:
+				rpm = binary.BigEndian.Uint16(msg.Data[1:3])
+				throttle = float64(msg.Data[5])
+				sysvars.Set("ActualIn.n_Engine", float64(rpm))
+				sysvars.Set("Out.X_AccPedal", throttle)
+			case 0x280:
+				if msg.Data[3]&0x01 == 1 {
+					ebus.Publish("LIMP", 1)
+				} else {
+					ebus.Publish("LIMP", 0)
+				}
+				if msg.Data[4]&0x20 == 0x20 {
+					ebus.Publish("CRUISE", 1)
+				} else {
+					ebus.Publish("CRUISE", 0)
+				}
+				if msg.Data[4]&0x80 == 0x80 {
+					ebus.Publish("CEL", 1)
+				} else {
+					ebus.Publish("CEL", 0)
+				}
+			case 0x3A0:
+				speed = uint16(msg.Data[4]) | uint16(msg.Data[3])<<8
+				realSpeed = float64(speed) / 10
+				sysvars.Set("In.v_Vehicle", realSpeed)
 			}
-			if msg.Data[4]&0x20 == 0x20 {
-				ebus.Publish("CRUISE", 1)
-			} else {
-				ebus.Publish("CRUISE", 0)
-			}
-			if msg.Data[4]&0x80 == 0x80 {
-				ebus.Publish("CEL", 1)
-			} else {
-				ebus.Publish("CEL", 0)
-			}
-		case 0x3A0:
-			speed = uint16(msg.Data[4]) | uint16(msg.Data[3])<<8
-			realSpeed = float64(speed) / 10
-			sysvars.Set("In.v_Vehicle", realSpeed)
 		}
 	}
-	log.Println("Stopped T7 broadcast listener")
 }
 
 func (c *T7Client) Start() error {
@@ -88,7 +91,7 @@ func (c *T7Client) Start() error {
 	//}
 	bctx, bcancel := context.WithCancel(ctx)
 	defer bcancel()
-	go t7broadcastListener(bctx, cl, c.sysvars, c.quitChan)
+	go t7broadcastListener(bctx, cl, c.sysvars)
 
 	c.OnMessage("Watching for broadcast messages")
 	<-time.After(550 * time.Millisecond)
@@ -261,11 +264,6 @@ func (c *T7Client) Start() error {
 						break
 					}
 					if va.Name == "DisplProt.AD_Scanner" {
-						//value := va.Float64()
-						//voltage := (value / 1023) * (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
-						//voltage = clamp(voltage, c.WidebandConfig.MinimumVoltageWideband, c.WidebandConfig.MaximumVoltageWideband)
-						//steepness := (c.WidebandConfig.High - c.WidebandConfig.Low) / (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
-						//result := c.WidebandConfig.Low + (steepness * (voltage - c.WidebandConfig.MinimumVoltageWideband))
 						ebus.Publish(va.Name, adConverter(va.Float64()))
 						continue
 					}
