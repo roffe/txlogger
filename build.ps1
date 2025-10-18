@@ -35,9 +35,11 @@ if ($release) {
 $env:CGO_ENABLED = "1" 
 $env:GOGC = "100"
 $env:CC = "clang.exe"
-$env:CXX = "clang.exe"
+$env:CXX = "clang++.exe"
 
 $current_path = Get-Location
+
+$env:PATH += ';$current_path\llvm-mingw\bin'
 
 if ($cangateway) {
     Write-Output "Building cangateway.exe"

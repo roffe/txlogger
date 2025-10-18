@@ -25,17 +25,6 @@ jobs:
     - uses: actions/checkout@v4.2.2
       with:
         submodules: recursive
-    
-    #- run: choco uninstall mingw -y --force
-    #- run: choco install mingw -y --x86 --force
-
-    #- name: Install libusb using Vcpkg
-    #  run: |
-    #    cd vcpkg
-    #    bootstrap-vcpkg.bat
-    #    vcpkg install libusb:x86-windows
-    #    cd..
-    #    copy D:\\a\\txlogger\\txlogger\\vcpkg\\installed\\x86-windows\\bin\libusb-1.0.dll .\
 
     - name: Set up Go
       uses: actions/setup-go@v6
@@ -45,20 +34,14 @@ jobs:
     - name: Install dependencies
       run: |
         go get .
-        go install fyne.io/fyne/v2/cmd/fyne@develop
+        go install fyne.io/tools/cmd/fyne@latest
         .\setup_build_env.ps1
     
     - name: Build
       env:
-        #PKG_CONFIG_PATH: "D:\\a\\txlogger\\txlogger\\vcpkg\\packages\\libusb_x86-windows\\lib\\pkgconfig"
-        #CGO_CFLAGS: "-ID:\\a\\txlogger\\txlogger\\vcpkg\\packages\\libusb_x86-windows\\include\\libusb-1.0"
-        GOARCH: amd64 #386
-        GOOS: windows
-        CGO_ENABLED: 1
-        #CC: i686-w64-mingw32-gcc
-        #CXX: i686-w64-mingw32-g++
+        FOO: "BAR"
       run: |
-        fyne package --release
+        .\build.ps1 -txlogger 
       #run: |
       #  Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1  
       #  $Env:PATH += ";C:\ProgramData\mingw64\mingw32\bin"
