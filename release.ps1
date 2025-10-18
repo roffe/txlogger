@@ -47,6 +47,20 @@ Write-Output "Creating $outputZip"
 $winRarArgs = "a -ep -m5 -afzip $outputZip $($files -join ' ')"
 Start-Process -FilePath $winrarExe -ArgumentList $winRarArgs -NoNewWindow -Wait
 
+
+if (-not (Test-Path "txlogger_setup.exe")) {
+    Write-Host "txlogger_setup.exe not found. Exiting."
+    exit
+}
+if (-not ($beta)) {
+    $filesToAdd = "txlogger_setup.exe"
+    $outputZip = "dist\setup.zip"
+    $winRarArgs = "a -m5 -afzip $outputZip $filesToAdd"
+
+    Write-Output "Creating setup.zip"
+    Start-Process -FilePath $winRarExe -ArgumentList $winRarArgs -NoNewWindow -Wait
+}
+
 if ($beta) {
     scp dist\txlogger_beta.zip roffe@192.168.2.177:/var/www/html/txlogger
 }

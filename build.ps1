@@ -86,19 +86,6 @@ if ($txlogger) {
 
 if ($setup) {
     Write-Host "Building txlogger_setup.exe"
-
     $ifpPath = (Get-Location).Path + "\setup\setup.nsi"
     Start-Process -FilePath "C:\Program Files (x86)\NSIS\makensis.exe" -ArgumentList $ifpPath -WorkingDirectory (Get-Location).Path -NoNewWindow -Wait
-
-    if (-not (Test-Path "txlogger_setup.exe")) {
-        Write-Host "txlogger_setup.exe not found. Exiting."
-        exit
-    }
-
-    $filesToAdd = "txlogger_setup.exe"
-    $outputZip = "dist\setup.zip"
-    $winRarArgs = "a -m5 -afzip $outputZip $filesToAdd"
-
-    Write-Output "Creating setup.zip"
-    Start-Process -FilePath $winRarExe -ArgumentList $winRarArgs -NoNewWindow -Wait
 }
