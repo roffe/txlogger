@@ -91,7 +91,7 @@ func (bl *BaseLogger) setupWBL(ctx context.Context, cl *gocan.Client) error {
 		WBLType:  bl.Config.WidebandConfig.Type,
 		Port:     bl.Config.WidebandConfig.Port,
 		Log:      bl.OnMessage,
-		Txbridge: strings.HasPrefix(cl.Adapter().Name(), "txbridge"),
+		Txbridge: strings.HasPrefix(cl.AdapterName(), "txbridge"),
 	}
 	var err error
 	lamb, err := wbl.New(ctx, cl, cfg)
