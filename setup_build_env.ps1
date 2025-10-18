@@ -28,15 +28,15 @@ Write-Output "Extracting CANUSB"
 Expand-Archive -Path "$temp_dir\canusb_dll_driver.zip" -DestinationPath ".\canusb" -Force
 
 # download llvm-mingw
-# Write-Output "Downloading llvm-MinGW"
-# Invoke-WebRequest -Uri $llvm -OutFile "$temp_dir\llvm-mingw.zip"
+Write-Output "Downloading llvm-MinGW"
+Invoke-WebRequest -Uri $llvm -OutFile "$temp_dir\llvm-mingw.zip"
 
 # Write-Output "Extracting llvm-MinGW"
-# Expand-Archive -Path "$temp_dir\llvm-mingw.zip" -DestinationPath ".\" -Force
+Expand-Archive -Path "$temp_dir\llvm-mingw.zip" -DestinationPath ".\" -Force
 
 # rename folder llvm-mingw-20251007-ucrt-x86_64 to llvm-mingw
-# Write-Output "Renaming llvm-MinGW folder"
-# Rename-Item -Path ".\llvm-mingw-20251007-ucrt-x86_64" -NewName "llvm-mingw"
+Write-Output "Renaming llvm-MinGW folder"
+Rename-Item -Path ".\llvm-mingw-20251007-ucrt-x86_64" -NewName "llvm-mingw"
 
 Write-Output "Installing CANLIB"
 Start-Process -FilePath "$temp_dir\canlib.exe" -ArgumentList "/S" -Wait
