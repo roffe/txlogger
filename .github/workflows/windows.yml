@@ -19,10 +19,10 @@ jobs:
         os: [windows-latest]
         include:
           - os: windows-latest
-            vcpkgCommitId: '9edb1b8e590cc086563301d735cae4b6e732d2d2'
+            vcpkgCommitId: '74e6536215718009aae747d86d84b78376bf9e09'
     steps:
    
-    - uses: actions/checkout@v4.2.2
+    - uses: actions/checkout@v5
       with:
         submodules: recursive
 
@@ -37,13 +37,13 @@ jobs:
         go install fyne.io/tools/cmd/fyne@latest
         .\setup_build_env.ps1
     
+    - name: Install LLVM-Mingw to PATH
+      run: |
+        echo "D:\\a\\txlogger\\txlogger\\llvm-mingw\\bin" >> "$GITHUB_PATH"
+
     - name: Build
       env:
         FOO: "BAR"
       run: |
-        .\build.ps1 -txlogger 
-      #run: |
-      #  Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1  
-      #  $Env:PATH += ";C:\ProgramData\mingw64\mingw32\bin"
-      #  fyne package --release
+        .\build.ps1 -cangateway -txlogger
 

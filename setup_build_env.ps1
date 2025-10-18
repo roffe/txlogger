@@ -35,6 +35,7 @@ Write-Output "Extracting LLVM-Mingw"
 Expand-Archive -Path "$temp_dir\llvm-mingw.zip" -DestinationPath ".\" -Force
 
 # rename folder llvm-mingw-20251007-ucrt-x86_64 to llvm-mingw
+Write-Output "Renaming LLVM-Mingw folder"
 Rename-Item -Path ".\llvm-mingw-20251007-ucrt-x86_64" -NewName "llvm-mingw"
 
 Write-Output "Installing CANLIB"
