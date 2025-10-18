@@ -143,13 +143,17 @@ func (t *TXWriter) Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time.
 		} else {
 			t.precission = 2
 		}
-		t.file.Write([]byte(k + "=" + replaceDot(strconv.FormatFloat(val, 'f', t.precission, 64)) + "|"))
+		if _, err := t.file.Write([]byte(k + "=" + replaceDot(strconv.FormatFloat(val, 'f', t.precission, 64)) + "|")); err != nil {
+			return err
+		}
 	}
 	for _, va := range vars {
 		if va.Number < 0 {
 			continue
 		}
-		t.file.Write([]byte(va.Name + "=" + replaceDot(va.StringValue()) + "|"))
+		if _, err := t.file.Write([]byte(va.Name + "=" + replaceDot(va.StringValue()) + "|")); err != nil {
+			return err
+		}
 	}
 	_, err = t.file.Write([]byte("IMPORTANTLINE=0|\n"))
 	return err
