@@ -10,20 +10,6 @@ if (-not ($cangateway -or $txlogger -or $setup -or $release)) {
     exit
 }
 
-# Check if WinRAR is installed in common locations
-$winrarPaths = @(
-    "C:\Program Files\WinRAR\WinRAR.exe",
-    "C:\Program Files (x86)\WinRAR\WinRAR.exe"
-)
-
-$winrarExe = $null
-foreach ($path in $winrarPaths) {
-    if (Test-Path $path) {
-        $winrarExe = $path
-        break
-    }
-}
-
 New-Item -ItemType Directory -Path "dist" -Force | Out-Null
 
 if ($release) {
@@ -38,8 +24,6 @@ $env:CC = "x86_64-w64-mingw32-clang.exe"
 $env:CXX = "x86_64-w64-mingw32-clang++.exe"
 
 $current_path = Get-Location
-
-$env:PATH += ';$current_path\llvm-mingw\bin'
 
 if ($cangateway) {
     Write-Output "Building cangateway.exe"

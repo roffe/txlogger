@@ -52,7 +52,6 @@ jobs:
         FOO: "BAR"
       run: |
         $env:PATH += ";D:\a\txlogger\txlogger\llvm-mingw\bin"
-        $env:PATH
         .\build.ps1 -cangateway -txlogger -setup
 
     - name: Creating Zip
@@ -70,6 +69,7 @@ jobs:
         GITHUB_REPOSITORY: roffe/txlogger
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
+        make_latest: "true"
         files: |
           txlogger.zip
           txlogger_setup.zip
