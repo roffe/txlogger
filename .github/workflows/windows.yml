@@ -39,7 +39,7 @@ jobs:
     
     - name: Install LLVM-Mingw to PATH
       run: |
-        echo "D:\\a\\txlogger\\txlogger\\llvm-mingw\\bin" >> "$GITHUB_PATH"
+        set PATH=D:\a\txlogger\txlogger\llvm-mingw\bin;%PATH%
 
     - name: Build
       env:
