@@ -31,12 +31,12 @@ jobs:
       with:
         go-version: '1.25.3'
         cache: false
+
     - name: Install dependencies
       run: |
         go get .
         go install fyne.io/tools/cmd/fyne@latest
         .\setup_build_env.ps1
-    
 
     - name: Build
       env:
