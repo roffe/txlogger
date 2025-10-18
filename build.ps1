@@ -34,8 +34,8 @@ if ($release) {
 
 $env:CGO_ENABLED = "1" 
 $env:GOGC = "100"
-$env:CC = "clang.exe"
-$env:CXX = "clang++.exe"
+$env:CC = "x86_64-w64-mingw32-clang.exe"
+$env:CXX = "x86_64-w64-mingw32-clang++.exe"
 
 $current_path = Get-Location
 
