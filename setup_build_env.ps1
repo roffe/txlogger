@@ -1,6 +1,7 @@
 $temp_dir = ".\setup_temp"
 $canusb = "https://www.canusb.com/files/canusb_dll_driver.zip"
 $canlib = "https://pim.kvaser.com/var/assets/Product_Resources/canlib.exe"
+$llvm = "https://github.com/mstorsjo/llvm-mingw/releases/download/20251007/llvm-mingw-20251007-ucrt-x86_64.zip"
 
 # create directory temp if not existing
 if (-not (Test-Path -Path "$temp_dir")) {
@@ -26,6 +27,15 @@ Invoke-WebRequest -Uri $canlib -OutFile "$temp_dir\canlib.exe"
 Write-Output "Extracting CANUSB"
 Expand-Archive -Path "$temp_dir\canusb_dll_driver.zip" -DestinationPath ".\canusb" -Force
 
+# download llvm-mingw
+Write-Output "Downloading LLVM-Mingw"
+Invoke-WebRequest -Uri $llvm -OutFile "$temp_dir\llvm-mingw.zip"
+
+Write-Output "Extracting LLVM-Mingw"
+Expand-Archive -Path "$temp_dir\llvm-mingw.zip" -DestinationPath ".\" -Force
+
+# rename folder llvm-mingw-20251007-ucrt-x86_64 to llvm-mingw
+Rename-Item -Path ".\llvm-mingw-20251007-ucrt-x86_64" -NewName "llvm-mingw"
 
 Write-Output "Installing CANLIB"
 Start-Process -FilePath "$temp_dir\canlib.exe" -ArgumentList "/S" -Wait
@@ -40,7 +50,7 @@ Write-Output "Bootstrapping vcpkg"
 
 Write-Output "Installing libusb"
 .\vcpkg\vcpkg.exe install 'libusb:x64-windows'
-.\vcpkg\vcpkg.exe install 'libusb:x86-windows'
+# .\vcpkg\vcpkg.exe install 'libusb:x86-windows'
 
 Write-Output "Cleaning up"
 Remove-Item -Recurse -Force -Path $temp_dir
