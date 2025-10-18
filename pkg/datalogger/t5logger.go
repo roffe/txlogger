@@ -3,6 +3,7 @@ package datalogger
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"time"
@@ -184,57 +185,22 @@ func ConvertByteToI16(ecudata []byte) int16 {
 }
 
 func ConvertByteStringToDoubleStatus(ecudata []byte) float64 {
-	var retval float64
-	// Iterate over the bytes in ecudata and accumulate the result
-	for i := range len(ecudata) {
-		// Multiply the current byte by the appropriate power of 256 and add it to the result
-		retval += float64(ecudata[i]) * math.Pow(256, float64(i))
-	}
-	return retval
-}
-
-func ConvertByteStringToDoubleStatus2(ecudata []byte) float64 {
-	var retval float64 = 0
-
 	switch len(ecudata) {
+	case 0:
+		return 0
 	case 4:
-		retval = float64(ecudata[3]) * 256 * 256 * 256
-		retval += float64(ecudata[2]) * 256 * 256
-		retval += float64(ecudata[1]) * 256
-		retval += float64(ecudata[0])
-	case 5:
-		retval = float64(ecudata[4]) * 256 * 256 * 256 * 256
-		retval += float64(ecudata[3]) * 256 * 256 * 256
-		retval += float64(ecudata[2]) * 256 * 256
-		retval += float64(ecudata[1]) * 256
-		retval += float64(ecudata[0])
-	case 6:
-		retval = float64(ecudata[5]) * 256 * 256 * 256 * 256 * 256
-		retval += float64(ecudata[4]) * 256 * 256 * 256 * 256
-		retval += float64(ecudata[3]) * 256 * 256 * 256
-		retval += float64(ecudata[2]) * 256 * 256
-		retval += float64(ecudata[1]) * 256
-		retval += float64(ecudata[0])
-	case 7:
-		retval = float64(ecudata[6]) * 256 * 256 * 256 * 256 * 256 * 256
-		retval += float64(ecudata[5]) * 256 * 256 * 256 * 256 * 256
-		retval += float64(ecudata[4]) * 256 * 256 * 256 * 256
-		retval += float64(ecudata[3]) * 256 * 256 * 256
-		retval += float64(ecudata[2]) * 256 * 256
-		retval += float64(ecudata[1]) * 256
-		retval += float64(ecudata[0])
+		return float64(binary.LittleEndian.Uint32(ecudata))
 	case 8:
-		retval = float64(ecudata[7]) * 256 * 256 * 256 * 256 * 256 * 256 * 256
-		retval += float64(ecudata[6]) * 256 * 256 * 256 * 256 * 256 * 256
-		retval += float64(ecudata[5]) * 256 * 256 * 256 * 256 * 256
-		retval += float64(ecudata[4]) * 256 * 256 * 256 * 256
-		retval += float64(ecudata[3]) * 256 * 256 * 256
-		retval += float64(ecudata[2]) * 256 * 256
-		retval += float64(ecudata[1]) * 256
-		retval += float64(ecudata[0])
+		return float64(binary.LittleEndian.Uint64(ecudata))
 	}
 
-	return retval
+	n := min(len(ecudata), 8)
+
+	var u uint64
+	for i := 0; i < n; i++ {
+		u |= uint64(ecudata[i]) << (8 * uint(i))
+	}
+	return float64(u)
 }
 
 func newT5Converter(wb WidebandConfig) func(string, []byte) float64 {
