@@ -236,7 +236,7 @@ func (c *Client) writeRamMulti(ctx context.Context, address uint32, data []byte)
 func sendCommand(ctx context.Context, c *gocan.Client, cmd []byte) error {
 	for _, b := range cmd {
 		frame := gocan.NewFrame(0x05, []byte{0xC4, b}, gocan.ResponseRequired)
-		resp, err := c.SendAndWait(ctx, frame, 1*time.Second, 0xC)
+		resp, err := c.SendAndWait(ctx, frame, 200*time.Millisecond, 0xC)
 		if err != nil {
 			return err
 		}
