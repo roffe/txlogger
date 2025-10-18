@@ -42,7 +42,9 @@ func (r *DataRequest) Len() int {
 }
 
 func (r *DataRequest) Complete(err error) {
-	defer func() { recover() }()
+	//if r := recover(); r != nil {
+	//	fmt.Println("Recovered. Error:\n", r)
+	//}
 	select {
 	case r.respChan <- err:
 	default:
