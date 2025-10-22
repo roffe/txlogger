@@ -101,8 +101,6 @@ func main() {
 	// handle command line arguments
 	handleArgs(mw, tx)
 
-	//go updateCheck(a, mw)
-
 	// show main window
 	mw.ShowAndRun()
 }
