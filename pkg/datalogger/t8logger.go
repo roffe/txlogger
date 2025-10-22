@@ -171,7 +171,7 @@ func (c *T8Client) Start() error {
 					databuff, err := gm.ReadDataByIdentifier(ctx, 0x18)
 					if err != nil {
 						c.onError()
-						c.OnMessage("failed to read data: " + err.Error())
+						c.OnMessage(err.Error())
 						continue
 					}
 					if len(databuff) != int(expectedPayloadSize) {
