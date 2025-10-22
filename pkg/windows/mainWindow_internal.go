@@ -63,6 +63,7 @@ func (mw *MainWindow) Close() {
 		log.Println("quit command sent")
 	}
 	mw.Window.Close()
+	log.Println("mainwindow Closed")
 }
 
 func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
