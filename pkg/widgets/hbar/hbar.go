@@ -42,7 +42,6 @@ type HBar struct {
 	widthFactor float32
 
 	max75, max90 float64
-	eightHeight  float32
 	height       float32
 
 	// perf caches
@@ -66,29 +65,11 @@ func New(cfg *widgets.GaugeConfig) *HBar {
 	s.max75 = s.cfg.Max * .75
 	s.max90 = s.cfg.Max * .90
 
-	s.render()
 	return s
 }
 
 func (s *HBar) GetConfig() *widgets.GaugeConfig {
 	return s.cfg
-}
-
-func (s *HBar) render() {
-	s.face = &canvas.Rectangle{StrokeColor: theme.Color(theme.ColorNameDisabled), StrokeWidth: 2}
-
-	s.barRect = &canvas.Rectangle{FillColor: colNormal}
-
-	s.titleText = &canvas.Text{Text: s.cfg.Title, Color: colTitle, TextSize: 25}
-	s.titleText.TextStyle.Monospace = true
-	s.titleText.Alignment = fyne.TextAlignCenter
-
-	// create tick lines once; their positions get set on size change only
-	s.bars = s.bars[:0]
-	for i := 0; i < int(s.cfg.Steps+1); i++ {
-		line := &canvas.Line{StrokeColor: colTicks, StrokeWidth: 2}
-		s.bars = append(s.bars, line)
-	}
 }
 
 func (s *HBar) bandFor(v float64) band {
@@ -134,8 +115,8 @@ func (s *HBar) SetValue(value float64) {
 
 	// if layout changed, we must move Y even if width is same
 	if s.layoutDirty {
-		s.barRect.Move(fyne.NewPos(0, s.eightHeight))
-		s.lastBarY = s.eightHeight
+		s.barRect.Move(fyne.NewPos(0, s.height))
+		s.lastBarY = s.height
 		s.layoutDirty = false
 	}
 
@@ -158,6 +139,20 @@ func (s *HBar) Value() float64 {
 }
 
 func (s *HBar) CreateRenderer() fyne.WidgetRenderer {
+	s.face = &canvas.Rectangle{StrokeColor: theme.Color(theme.ColorNameDisabled), StrokeWidth: 2}
+
+	s.barRect = &canvas.Rectangle{FillColor: colNormal}
+
+	s.titleText = &canvas.Text{Text: s.cfg.Title, Color: colTitle, TextSize: 25}
+	s.titleText.TextStyle.Monospace = true
+	s.titleText.Alignment = fyne.TextAlignCenter
+
+	// create tick lines once; their positions get set on size change only
+	s.bars = s.bars[:0]
+	for i := 0; i < int(s.cfg.Steps+1); i++ {
+		line := &canvas.Line{StrokeColor: colTicks, StrokeWidth: 2}
+		s.bars = append(s.bars, line)
+	}
 	return &HBarRenderer{s}
 }
 
@@ -178,8 +173,7 @@ func (s *HBarRenderer) Layout(space fyne.Size) {
 	// Precompute geometry once per size change
 	s.widthFactor = float32(diameter) / float32(s.cfg.Max)
 	stepsFactor := float32(diameter) / float32(s.cfg.Steps)
-	s.eightHeight = space.Height * common.OneEight
-	s.height = space.Height - (s.eightHeight * 2)
+	s.height = space.Height
 
 	// mark layout dirty so SetValue repositions Y
 	s.layoutDirty = true
@@ -216,10 +210,10 @@ func (s *HBarRenderer) Refresh() {
 func (s *HBarRenderer) Destroy() {}
 
 func (s *HBarRenderer) Objects() []fyne.CanvasObject {
-	objs := []fyne.CanvasObject{s.face}
+	objs := []fyne.CanvasObject{}
 	for _, line := range s.bars {
 		objs = append(objs, line)
 	}
-	objs = append(objs, s.barRect, s.titleText)
+	objs = append(objs, s.barRect, s.face, s.titleText)
 	return objs
 }
