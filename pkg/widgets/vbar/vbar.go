@@ -2,7 +2,6 @@ package vbar
 
 import (
 	"image/color"
-	"math"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -18,7 +17,7 @@ type VBar struct {
 	bar         *canvas.Rectangle
 	titleText   *canvas.Text
 	displayText *canvas.Text
-	bars        []*canvas.Line
+	lines       []*canvas.Line
 
 	cfg *widgets.GaugeConfig
 
@@ -26,215 +25,174 @@ type VBar struct {
 
 	size         fyne.Size
 	layoutValues struct {
-		middle        float32
-		heightFactor  float32
-		diameterEight float32
-		twoEight      float32
-		titleX        float32
-		displayTextX  float32
+		middle       float32
+		heightFactor float32
+		titleX       float32
+		displayTextX float32
 	}
 
-	// performance caches
-	colorLUT       [256]color.RGBA
-	strokeLUT      [256]color.RGBA
-	lastPxHeight   int32
-	lastColorIdx   int
-	lastIntDisplay int // last integer shown in display
+	fillCache   []color.RGBA
+	strokeCache []color.RGBA
 }
 
 func New(cfg *widgets.GaugeConfig) *VBar {
-	s := &VBar{cfg: cfg}
+	s := &VBar{
+		cfg:         cfg,
+		fillCache:   make([]color.RGBA, 0, int64(cfg.Max)),
+		strokeCache: make([]color.RGBA, 0, int64(cfg.Max)),
+	}
 	if s.cfg.Steps == 0 {
 		s.cfg.Steps = 10
 	}
+
+	for value := range int(cfg.Max + 1) {
+		fill, stroke := s.getColorForValue2(float64(value))
+		s.fillCache = append(s.fillCache, fill)
+		s.strokeCache = append(s.strokeCache, stroke)
+	}
+
 	s.ExtendBaseWidget(s)
-	s.render()
 	return s
+
 }
 
-func (s *VBar) GetConfig() *widgets.GaugeConfig { return s.cfg }
+func (s *VBar) GetConfig() *widgets.GaugeConfig {
+	return s.cfg
+}
 
-func (s *VBar) render() {
+func (s *VBar) SetValue(value float64) {
+	if value == s.value {
+		return
+	}
+	s.value = value
+
+	s.bar.FillColor = s.fillCache[int(value)]
+
+	valueHeightFactor := float32(value) * s.layoutValues.heightFactor
+
+	s.bar.Resize(fyne.Size{Width: s.size.Width, Height: valueHeightFactor})
+	s.bar.Move(fyne.Position{X: 0, Y: s.size.Height - valueHeightFactor})
+
+	s.displayText.Text = strconv.Itoa(int(value))
+	s.displayText.Refresh()
+
+}
+
+func (s *VBar) SetValue2(value float64) {
+	s.SetValue(value)
+}
+
+func (s *VBar) Value() float64 {
+	return s.value
+}
+
+func (s *VBar) CreateRenderer() fyne.WidgetRenderer {
 	s.face = &canvas.Rectangle{
 		StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0xFF},
 		FillColor:   color.RGBA{0x00, 0x00, 0x00, 0x00},
 		StrokeWidth: 3,
 	}
-
-	// Precompute LUTs (256 steps) for the full 0..Max range.
-	s.buildColorLUT()
-
-	fillColor, strokeColor := s.colorFromIdx(0)
-	s.bar = &canvas.Rectangle{StrokeColor: strokeColor, FillColor: fillColor}
-
-	s.titleText = &canvas.Text{Text: s.cfg.Title, Color: color.RGBA{0xF0, 0xF0, 0xF0, 0xFF}, TextSize: 25}
+	s.bar = &canvas.Rectangle{
+		FillColor:   s.fillCache[0],
+		StrokeColor: s.strokeCache[0],
+	}
+	s.titleText = &canvas.Text{
+		Text:     s.cfg.Title,
+		Color:    color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF},
+		TextSize: 25,
+	}
 	s.titleText.TextStyle.Monospace = true
 	s.titleText.Alignment = fyne.TextAlignCenter
-
-	s.displayText = &canvas.Text{Text: "0", Color: color.RGBA{0xF0, 0xF0, 0xF0, 0xFF}, TextSize: 25}
+	s.displayText = &canvas.Text{
+		Text:     "0",
+		Color:    color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF},
+		TextSize: 25,
+	}
 	s.displayText.TextStyle.Monospace = true
 	s.displayText.Alignment = fyne.TextAlignCenter
-
-	// Pre-calculate text positions (approx) using MinSize
+	// Pre-calculate text positions
 	s.layoutValues.titleX = -s.titleText.Size().Width * 0.5
 	s.layoutValues.displayTextX = -s.displayText.Size().Width * 0.5
 
 	maxSteps := s.cfg.Steps + 1
-	s.bars = make([]*canvas.Line, maxSteps)
+	s.lines = make([]*canvas.Line, maxSteps)
 	for i := maxSteps; i > 0; i-- {
-		idx := s.idxForValue(float64(i) / float64(maxSteps) * s.cfg.Max)
-		_, stroke := s.colorFromIdx(idx)
-		line := &canvas.Line{StrokeColor: stroke, StrokeWidth: 2}
-		s.bars[maxSteps-i] = line
+		strokeColor := s.strokeCache[int(float64(i)/float64(maxSteps)*s.cfg.Max)]
+		line := &canvas.Line{StrokeColor: strokeColor, StrokeWidth: 2}
+		s.lines[maxSteps-i] = line
 	}
+
+	return &VBarRenderer{s}
 }
 
-// buildColorLUT precomputes 256 interpolated entries across the configured scale.
-func (s *VBar) buildColorLUT() {
-	for i := range 255 {
-		fill, stroke := s.getColorForRatio(float64(i) / 255.0)
-		s.colorLUT[i] = fill
-		s.strokeLUT[i] = stroke
-	}
-}
-
-// idxForValue clamps and maps a value to the 0..255 color index.
-func (s *VBar) idxForValue(v float64) int {
-	if s.cfg.Max <= 0 {
-		return 0
-	}
-	r := v / s.cfg.Max
-	if r <= 0 {
-		return 0
-	}
-	if r >= 1 {
-		return 255
-	}
-	return int(r*255.0 + 0.5)
-}
-
-func (s *VBar) colorFromIdx(idx int) (fillColor, strokeColor color.RGBA) {
-	if idx < 0 {
-		idx = 0
-	} else if idx > 255 {
-		idx = 255
-	}
-	return s.colorLUT[idx], s.strokeLUT[idx]
-}
-
-func (s *VBar) SetValue(value float64) {
-	// Fast path: translate to pixel height and color index, bail if unchanged.
-	pxHeight := int32(0)
-	if s.layoutValues.heightFactor > 0 {
-		pxHeight = int32(math.Round(float64(s.layoutValues.heightFactor) * value))
-	}
-	idx := s.idxForValue(value)
-	intDisp := int(math.Round(value))
-
-	changedHeight := pxHeight != s.lastPxHeight
-	changedColor := idx != s.lastColorIdx
-	changedText := intDisp != s.lastIntDisplay
-
-	if !(changedHeight || changedColor || changedText) {
-		return
-	}
-
-	s.value = value
-
-	if changedColor {
-		fill, _ := s.colorFromIdx(idx)
-		s.bar.FillColor = fill
-	}
-	if changedHeight {
-		// Avoid negative sizes
-		h := float32(0)
-		if pxHeight > 0 {
-			h = float32(pxHeight)
-		}
-		s.bar.Resize(fyne.Size{Width: s.size.Width - s.layoutValues.twoEight, Height: h})
-		s.bar.Move(fyne.Position{X: s.layoutValues.diameterEight, Y: s.size.Height - h})
-	}
-	if changedText {
-		// Cheaper than FormatFloat for integer-ish values
-		s.displayText.Text = strconv.Itoa(intDisp)
-		s.displayText.Refresh()
-	}
-
-	s.lastPxHeight = pxHeight
-	s.lastColorIdx = idx
-	s.lastIntDisplay = intDisp
-}
-
-func (s *VBar) SetValue2(value float64)             { s.SetValue(value) }
-func (s *VBar) Value() float64                      { return s.value }
-func (s *VBar) CreateRenderer() fyne.WidgetRenderer { return &VBarRenderer{s: s} }
-
-// getColorForRatio is the original scale logic expressed on 0..1 ratio.
-func (s *VBar) getColorForRatio(ratio float64) (fillColor, strokeColor color.RGBA) {
+func (s *VBar) getColorForValue2(value float64) (fillColor, strokeColor color.RGBA) {
+	ratio := value / s.cfg.Max
 	if s.cfg.ColorScale == widgets.BlueYellowScale {
 		if ratio < 0.5 {
 			blueRatio := 1 - (ratio * 2)
 			r := uint8(0xDD * ratio * 2)
 			g := uint8(0x77 + (0x33 * ratio * 2))
 			b := uint8(0xBB * blueRatio)
-			return color.RGBA{R: r, G: g, B: b, A: 0x80}, color.RGBA{R: r, G: g, B: b, A: 0xFF}
+			return color.RGBA{R: r, G: g, B: b, A: 0x80},
+				color.RGBA{R: r, G: g, B: b, A: 0xFF}
 		}
 		redRatio := (ratio - 0.5) * 2
 		r := uint8(0xDD - (0x11 * redRatio))
 		g := uint8(0xAA - (0x77 * redRatio))
-		return color.RGBA{R: r, G: g, B: 0x33, A: 0x80}, color.RGBA{R: r, G: g, B: 0x33, A: 0xFF}
+		return color.RGBA{R: r, G: g, B: 0x33, A: 0x80},
+			color.RGBA{R: r, G: g, B: 0x33, A: 0xFF}
 	}
 	// Traditional scale
 	r := uint8(0xA5 * ratio)
 	g := uint8(0xA5 * (1 - ratio))
-	return color.RGBA{R: r, G: g, B: 0, A: 0x80}, color.RGBA{R: r, G: g, B: 0, A: 0xFF}
+	return color.RGBA{R: r, G: g, B: 0, A: 0x80},
+		color.RGBA{R: r, G: g, B: 0, A: 0xFF}
 }
-
-// VBarRenderer implements a no-allocation Objects() and caches layout math.
 
 type VBarRenderer struct {
-	s       *VBar
-	objects []fyne.CanvasObject
+	*VBar
 }
 
-func (r *VBarRenderer) MinSize() fyne.Size { return r.s.cfg.MinSize }
-func (r *VBarRenderer) Refresh()           {}
-func (r *VBarRenderer) Destroy()           {}
+func (r *VBarRenderer) MinSize() fyne.Size {
+	return r.cfg.MinSize
+}
+
+func (r *VBarRenderer) Refresh() {
+}
+
+func (r *VBarRenderer) Destroy() {
+}
 
 func (r *VBarRenderer) Layout(space fyne.Size) {
-	if r.s.size == space {
+	if r.size == space {
 		return
 	}
-	r.s.size = space
+	r.size = space
 
 	// Cache layout calculations
-	r.s.layoutValues.middle = space.Width * 0.5
-	r.s.layoutValues.diameterEight = space.Width * common.OneEight
-	r.s.layoutValues.twoEight = r.s.layoutValues.diameterEight * 2
-	if r.s.cfg.Max > 0 {
-		r.s.layoutValues.heightFactor = float32(space.Height) / float32(r.s.cfg.Max)
-	} else {
-		r.s.layoutValues.heightFactor = 0
-	}
+	r.layoutValues.middle = space.Width * 0.5
+	r.layoutValues.heightFactor = float32(space.Height) / float32(r.cfg.Max)
 
-	stepFactor := float32(space.Height) / float32(r.s.cfg.Steps)
+	stepFactor := float32(space.Height) / float32(r.cfg.Steps)
 
 	// Face layout
-	r.s.face.Move(fyne.Position{X: 0, Y: -2})
-	r.s.face.Resize(space.AddWidthHeight(0, 3))
+	r.face.Move(fyne.Position{X: 0, Y: -2})
+	r.face.Resize(space.AddWidthHeight(0, 3))
 
-	// Text layout (use MinSize; avoids calling Size which can be 0 before first draw)
-	r.s.titleText.Move(fyne.Position{X: r.s.layoutValues.middle + r.s.layoutValues.titleX, Y: space.Height + 1})
-	//minDisp := r.s.displayText.Size()
-	r.s.displayText.Move(fyne.Position{X: r.s.layoutValues.middle + r.s.layoutValues.displayTextX,
-		Y: space.Height - r.s.displayText.MinSize().Height,
+	// Text layout
+	r.titleText.Move(fyne.Position{X: r.layoutValues.middle + r.layoutValues.titleX,
+		Y: space.Height + 2,
 	})
+	r.displayText.Move(fyne.Position{X: r.layoutValues.middle + r.layoutValues.displayTextX,
+		Y: space.Height - r.displayText.MinSize().Height,
+	})
+
 	// Bar lines layout
 	oneThird := space.Width * common.OneThird
 	oneSeventh := space.Width * common.OneSeventh
-	middle := r.s.layoutValues.middle
+	middle := r.layoutValues.middle
 
-	for i, line := range r.s.bars {
+	for i, line := range r.lines {
 		y := float32(i) * stepFactor
 		if i%2 == 0 {
 			line.Position1 = fyne.Position{X: middle - oneThird, Y: y}
@@ -245,25 +203,18 @@ func (r *VBarRenderer) Layout(space fyne.Size) {
 		}
 	}
 
-	// Update bar position/size (quantized to pixel height inside SetValue too)
-	h := float32(0)
-	if r.s.value > 0 && r.s.layoutValues.heightFactor > 0 {
-		h = float32(math.Round(float64(r.s.value) * float64(r.s.layoutValues.heightFactor)))
-	}
-	r.s.bar.Resize(fyne.Size{Width: r.s.size.Width - r.s.layoutValues.twoEight, Height: h})
-	r.s.bar.Move(fyne.Position{X: r.s.layoutValues.diameterEight, Y: r.s.size.Height - h})
+	// Update bar position
+	valueHeightFactor := float32(r.value) * r.layoutValues.heightFactor
+	r.bar.Resize(fyne.Size{Width: r.size.Width, Height: valueHeightFactor})
+	r.bar.Move(fyne.Position{X: 0, Y: r.size.Height - valueHeightFactor})
+
 }
 
 func (r *VBarRenderer) Objects() []fyne.CanvasObject {
-	if r.objects != nil {
-		return r.objects
-	}
-	// Build once; reuse to avoid per-call allocations
-	objs := make([]fyne.CanvasObject, 0, len(r.s.bars)+4)
-	for _, line := range r.s.bars {
+	objs := []fyne.CanvasObject{}
+	for _, line := range r.lines {
 		objs = append(objs, line)
 	}
-	objs = append(objs, r.s.bar, r.s.face, r.s.titleText, r.s.displayText)
-	r.objects = objs
-	return r.objects
+	objs = append(objs, r.bar, r.face, r.titleText, r.displayText)
+	return objs
 }
