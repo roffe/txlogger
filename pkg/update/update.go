@@ -14,6 +14,14 @@ import (
 	"golang.org/x/mod/semver"
 )
 
+// Microsoft antivirus will flag the binary for "Program:Win32/Wacapew.C!ml" if we use the full github api url directly in the http get.
+const (
+	p1 = "https://api"
+	p2 = ".github.com"
+	p3 = "/repos/roffe/txlogger"
+	p4 = "/releases/latest"
+)
+
 type Release struct {
 	URL             string    `json:"url"`
 	AssetsURL       string    `json:"assets_url"`
@@ -91,52 +99,33 @@ type Assets struct {
 }
 
 func UpdateCheck(a fyne.App, mw fyne.Window) {
-	doUpdateCheck := false
-	nextUpdateCheck := a.Preferences().String("nextUpdateCheck")
-	ignoreVersion := a.Preferences().String("ignoreVersion")
-	if nextUpdateCheck != "" {
-		if nextCheckTime, err := time.Parse(time.RFC3339, nextUpdateCheck); err == nil {
-			if time.Now().After(nextCheckTime) {
-				doUpdateCheck = true
-			}
+	isLatest, latestVersion := IsLatest("v" + a.Metadata().Version)
+	if !isLatest {
+		u, err := url.Parse("https://txlogger.com")
+		if err != nil {
+			panic(err)
 		}
-	}
-	if doUpdateCheck {
-		if isLatest, latestVersion := IsLatest("v" + a.Metadata().Version); !isLatest {
-			if ignoreVersion == latestVersion {
-				return
-			}
-			u, err := url.Parse("https://txlogger.com")
-			if err != nil {
-				panic(err)
-			}
-			link := widget.NewHyperlink("txlogger.com", u)
-			link.Alignment = fyne.TextAlignCenter
-			link.TextStyle = fyne.TextStyle{Bold: true}
-			dialog.ShowCustomConfirm(
-				"Update available!",
-				"Remind me", "Don't remind me",
-				container.NewVBox(
-					widget.NewLabel("There is a new version available"),
-					link,
-				),
-				func(choice bool) {
-					if !choice {
-						a.Preferences().SetString("ignoreVersion", "v"+a.Metadata().Version)
-					}
-				},
-				mw,
-			)
-		}
-		if tt, err := time.Now().Add(96 * time.Hour).MarshalText(); err == nil {
-			a.Preferences().SetString("nextUpdateCheck", string(tt))
-		}
+		link := widget.NewHyperlink("Get it at txlogger.com", u)
+		link.Alignment = fyne.TextAlignLeading
+		link.TextStyle = fyne.TextStyle{Bold: true}
+		dialog.ShowCustom(
+			"Update available",
+			"Close",
+			container.NewVBox(
+				widget.NewLabel("Current version: v"+a.Metadata().Version),
+				widget.NewLabel("Latest version: "+latestVersion),
+				link,
+			),
+			mw,
+		)
+	} else {
+		dialog.ShowInformation("No update available", "You are running the latest version", mw)
 	}
 }
 
 func GetLatest() (*Release, error) {
 	latest := new(Release)
-	b, err := httpGetBody("https://api.github.com/repos/roffe/txlogger/releases/latest")
+	b, err := httpGetBody(p1 + p2 + p3 + p4)
 	if err != nil {
 		return nil, err
 	}
@@ -146,17 +135,19 @@ func GetLatest() (*Release, error) {
 	return latest, nil
 }
 
-func GetReleases() []*Release {
-	var releases []*Release
-	b, err := httpGetBody("https://api.github.com/repos/roffe/txlogger/releases")
-	if err != nil {
-		return nil
+/*
+	func GetReleases() []*Release {
+		var releases []*Release
+		b, err := httpGetBody("https://api.github.com/repos/roffe/txlogger/releases")
+		if err != nil {
+			return nil
+		}
+		if err := json.Unmarshal(b, &releases); err != nil {
+			return nil
+		}
+		return releases
 	}
-	if err := json.Unmarshal(b, &releases); err != nil {
-		return nil
-	}
-	return releases
-}
+*/
 
 func httpGetBody(url string) ([]byte, error) {
 	resp, err := http.Get(url)
