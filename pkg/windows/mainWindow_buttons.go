@@ -13,7 +13,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
-	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/widgets"
@@ -384,11 +383,6 @@ func (mw *MainWindow) startLogging() {
 }
 
 func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, string, error) {
-	logPath, err := common.GetLogPath()
-	if err != nil {
-		return nil, "", err
-	}
-
 	return datalogger.New(datalogger.Config{
 		FilenamePrefix: strings.TrimSuffix(filepath.Base(mw.filename), filepath.Ext(mw.filename)),
 		ECU:            mw.selects.ecuSelect.Selected,
@@ -412,7 +406,7 @@ func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, st
 			})
 		},
 		LogFormat: mw.settings.GetLogFormat(),
-		LogPath:   logPath,
+		LogPath:   mw.settings.GetLogPath(),
 		WidebandConfig: datalogger.WidebandConfig{
 			Type:                   mw.settings.GetWidebandType(),
 			Port:                   mw.settings.GetWidebandPort(),
