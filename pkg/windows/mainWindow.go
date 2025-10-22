@@ -153,7 +153,7 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	mw.setupShortcuts()
 
 	mw.settings = settings.New(&settings.Config{
-		GetEcu: func() string {
+		SelectedEcuFunc: func() string {
 			return mw.selects.ecuSelect.Selected
 		},
 	})
@@ -187,7 +187,31 @@ func NewMainWindow(app fyne.App) *MainWindow {
 		mw.gocanGatewayClient()
 	}
 
+	mw.updateCheck()
+
 	return mw
+}
+
+func (mw *MainWindow) updateCheck() {
+	nextUpdateCheck := mw.app.Preferences().String("nextUpdateCheck")
+	if nextUpdateCheck == "" {
+		nextUpdateCheck = time.Now().Add(336 * time.Hour).String()
+		log.Println("nextUpdateCheck:", nextUpdateCheck)
+		mw.app.Preferences().SetString("nextUpdateCheck", nextUpdateCheck)
+
+	}
+	nextCheckTime, _ := time.Parse(time.RFC3339, nextUpdateCheck)
+	if time.Now().After(nextCheckTime) {
+		dialog.ShowConfirm("It's been a while", "Do you want to check for updates to txlogger?", func(b bool) {
+			if b {
+				mw.updateCheck()
+			}
+			if tt, err := time.Now().Add(336 * time.Hour).MarshalText(); err == nil {
+				log.Println("nextUpdateCheck:", string(tt))
+				mw.app.Preferences().SetString("nextUpdateCheck", string(tt))
+			}
+		}, mw.Window)
+	}
 }
 
 func (mw *MainWindow) gocanGatewayClient() {
