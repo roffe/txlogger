@@ -1,3 +1,8 @@
+# 2.1.3
+ - Added a check for updates dialogue that will show every second week.
+ - Fixed a bug where the user defined log path would not be adhered to after changing it in settings
+ - Bunch of more memory optimizations in dataloggers to lower GC pressure
+
 # 2.1.2
  - rewrote cangateway to use named pipes on windows instead of unix sockets. This should ensure that cangateway is working even on early Windows 10 versions
  - fixed a race condition in goCAN that could cause missed canbus frames.
