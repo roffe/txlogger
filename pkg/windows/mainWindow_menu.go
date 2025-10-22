@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/ebus"
+	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
@@ -151,6 +152,9 @@ func (mw *MainWindow) setupMenu() {
 			}),
 			fyne.NewMenuItem("What's new", func() {
 				mw.showWhatsNew()
+			}),
+			fyne.NewMenuItem("Check for updates", func() {
+				update.UpdateCheck(mw.app, mw.Window)
 			}),
 		),
 	}
