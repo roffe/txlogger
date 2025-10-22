@@ -305,7 +305,7 @@ func (sw *SymbolWidgetEntry) SetCorrectionFactor(f float64) {
 	sw.symbol.Correctionfactor = f
 	switch f {
 	case 1:
-		sw.symbolCorrectionfactor.SetText(strconv.FormatFloat(f, 'f', 0, 64))
+		sw.symbolCorrectionfactor.SetText(strconv.Itoa(int(f)))
 	case 0.1:
 		sw.symbolCorrectionfactor.SetText(strconv.FormatFloat(f, 'f', 1, 64))
 	case 0.01:
