@@ -2,7 +2,8 @@ param(
     [switch]$cangateway,
     [switch]$txlogger,
     [switch]$setup,
-    [switch]$release
+    [switch]$release,
+    [switch]$usegitsrc
 )
 
 if (-not ($cangateway -or $txlogger -or $setup -or $release)) {
@@ -34,11 +35,24 @@ if ($cangateway) {
     $libs = @(
         'C:\Progra~2\Kvaser\Canlib\Lib\MS'
     )
-
     $env:CGO_CFLAGS = ($includes | ForEach-Object { '-I' + $_ }) -join ' '
     $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
     $env:GOARCH = "386"
-    go build -tags="canlib,j2534" -ldflags '-s -w -H=windowsgui' github.com/roffe/gocan/cmd/cangateway
+    if ($usegitsrc) {
+        # git clone https://github.com/roffe/gocangateway.git
+        # Set-Location -Path ".\gocangateway"
+        # go build -tags="canlib,j2534" -ldflags '-s -w -H=windowsgui' -o cangateway.exe .
+        # Move-Item -Path ".\cangateway.exe" -Destination "$current_path\cangateway.exe" -Force
+        # Set-Location -Path $current_path
+        go install -tags="canlib,j2534" -ldflags '-s -w -H=windowsgui' github.com/roffe/gocangateway@latest
+        Move-Item -Path "$Env:USERPROFILE\go\bin\windows_386\gocangateway.exe" -Destination "$current_path\cangateway.exe" -Force
+    }
+    else {
+        #Set-Location -Path "..\gocangateway"
+        go build -tags="canlib,j2534" -ldflags '-s -w -H=windowsgui' -o cangateway.exe ..\gocangateway
+        #Move-Item -Path ".\cangateway.exe" -Destination "$current_path\cangateway.exe" -Force
+        #Set-Location -Path $current_path
+    } 
 }
 
 if ($txlogger) {

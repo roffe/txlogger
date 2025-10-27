@@ -48,11 +48,12 @@ $winRarArgs = "a -ep -m5 -afzip $outputZip $($files -join ' ')"
 Start-Process -FilePath $winrarExe -ArgumentList $winRarArgs -NoNewWindow -Wait
 
 
-if (-not (Test-Path "txlogger_setup.exe")) {
-    Write-Host "txlogger_setup.exe not found. Exiting."
-    exit
-}
+
 if (-not ($beta)) {
+    if (-not (Test-Path "txlogger_setup.exe")) {
+        Write-Host "txlogger_setup.exe not found. Exiting."
+        exit
+    }
     $filesToAdd = "txlogger_setup.exe"
     $outputZip = "dist\setup.zip"
     $winRarArgs = "a -m5 -afzip $outputZip $filesToAdd"
