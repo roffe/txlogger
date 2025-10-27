@@ -2,7 +2,7 @@ module github.com/roffe/txlogger
 
 go 1.25.2
 
-replace github.com/roffe/gocan => ..\gocan
+// replace github.com/roffe/gocan => ..\gocan
 
 // replace github.com/roffe/gocanflasher => ..\gocanflasher
 
@@ -10,7 +10,7 @@ replace github.com/roffe/gocan => ..\gocan
 
 // replace github.com/roffe/gocanusb => ..\gocanusb
 
-replace github.com/roffe/ecusymbol => ..\ecusymbol
+// replace github.com/roffe/ecusymbol => ..\ecusymbol
 
 // replace github.com/roffe/gocanlib => ..\gocanlib
 
