@@ -29,6 +29,21 @@ func (m ColorBlindMode) String() string {
 	}
 }
 
+func StringToColorBlindMode(s string) ColorBlindMode {
+	switch s {
+	case "Normal":
+		return ModeNormal
+	case "Universal":
+		return ModeUniversal
+	case "Protanopia":
+		return ModeProtanopia
+	case "Tritanopia":
+		return ModeTritanopia
+	default:
+		return ModeNormal
+	}
+}
+
 // getColorInterpolation returns a color interpolated on the color spectrum green to yellow to red.
 // value should be between min and max.
 
