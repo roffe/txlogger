@@ -11,8 +11,6 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 
-	"github.com/roffe/txlogger/pkg/widgets/settings/cansettings"
-
 	// Import ecu packages
 
 	_ "github.com/roffe/gocanflasher/pkg/ecu/t5"
@@ -20,6 +18,7 @@ import (
 	_ "github.com/roffe/gocanflasher/pkg/ecu/t7"
 	_ "github.com/roffe/gocanflasher/pkg/ecu/t8"
 	_ "github.com/roffe/gocanflasher/pkg/ecu/t8mcp"
+	"github.com/roffe/txlogger/pkg/widgets/settings"
 )
 
 var _ fyne.Widget = (*CanFlasherWidget)(nil)
@@ -44,7 +43,7 @@ type CanFlasherWidget struct {
 }
 
 type Config struct {
-	CSW    *cansettings.Widget
+	CSW    *settings.Widget
 	GetECU func() string
 }
 

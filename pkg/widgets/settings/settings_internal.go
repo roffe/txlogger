@@ -8,7 +8,9 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/ebus"
@@ -71,7 +73,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 		plx.ProductString,
 		zeitronix.ProductString,
 	}, func(s string) {
-		fyne.CurrentApp().Preferences().SetString(prefsLambdaSource, s)
+		fyne.CurrentApp().Preferences().SetString(prefsWblSource, s)
 		fyne.CurrentApp().Preferences().SetString(prefsWidebandSymbolName, sw.GetWidebandSymbolName())
 		var ecuSet bool
 		var portSelect bool
@@ -193,7 +195,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.highEntry.Hide()
 		}
 
-		sw.container.Refresh()
+		//sw.container.Refresh()
 	})
 	return container.NewBorder(
 		nil,
@@ -301,6 +303,46 @@ func (sw *Widget) newColorBlindMode() *widget.Select {
 	})
 }
 
+func (sw *Widget) newAdapterSelector() *widget.Select {
+	return widget.NewSelect(gocan.List(), func(s string) {
+		if info, found := sw.adapters[s]; found {
+			fyne.CurrentApp().Preferences().SetString(prefsAdapter, s)
+			if info.RequiresSerialPort {
+				sw.portSelector.Enable()
+				sw.speedSelector.Enable()
+				return
+			}
+			sw.portSelector.Disable()
+			sw.speedSelector.Disable()
+		}
+	})
+}
+
+func (sw *Widget) newPortSelector() *widget.Select {
+	return widget.NewSelect(sw.ListPorts(), func(s string) {
+		fyne.CurrentApp().Preferences().SetString(prefsPort, s)
+	})
+}
+
+func (sw *Widget) newSpeedSelector() *widget.Select {
+	return widget.NewSelect(portSpeeds, func(s string) {
+		fyne.CurrentApp().Preferences().SetString(prefsSpeed, s)
+	})
+}
+
+func (sw *Widget) newDebugCheckbox() *widget.Check {
+	return widget.NewCheck("Debug", func(b bool) {
+		fyne.CurrentApp().Preferences().SetBool(prefsDebug, b)
+	})
+}
+
+func (sw *Widget) newPortRefreshButton() *widget.Button {
+	return widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
+		sw.portSelector.Options = sw.ListPorts()
+		sw.portSelector.Refresh()
+	})
+}
+
 func (sw *Widget) loadPreferences() {
 	freq := fyne.CurrentApp().Preferences().IntWithFallback(prefsFreq, 25)
 	sw.freqSlider.SetValue(float64(freq))
@@ -317,7 +359,7 @@ func (sw *Widget) loadPreferences() {
 	}
 	loadPrefsText(sw.logPath, prefsLogPath, logPath)
 	loadPrefsText(sw.logPath, prefsLogPath, logPath)
-	loadPrefsSelect(sw.wblSource, prefsLambdaSource, "None")
+	loadPrefsSelect(sw.wblSource, prefsWblSource, "None")
 	loadPrefsCheck(sw.wblADscanner, prefsUseADScanner, false)
 	loadPrefsCheck(sw.useMPH, prefsUseMPH, false)
 	loadPrefsCheck(sw.swapRPMandSpeed, prefsSwapRPMandSpeed, false)
@@ -347,6 +389,11 @@ func (sw *Widget) loadPreferences() {
 		sw.lowEntry.Hide()
 		sw.highEntry.Hide()
 	}
+
+	loadPrefsSelect(sw.adapterSelector, prefsAdapter, "")
+	loadPrefsSelect(sw.portSelector, prefsPort, "")
+	loadPrefsSelect(sw.speedSelector, prefsSpeed, "115200")
+	loadPrefsCheck(sw.debugCheckbox, prefsDebug, false)
 }
 
 func loadPrefsSelect(s *widget.Select, prefKey string, fallback string) {

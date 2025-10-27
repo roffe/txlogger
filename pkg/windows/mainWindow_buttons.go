@@ -343,7 +343,7 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 	})
 }
 func (mw *MainWindow) startLogging() {
-	device, err := mw.settings.CANSettings.GetAdapter(mw.selects.ecuSelect.Selected, mw.Log)
+	device, err := mw.settings.GetAdapter(mw.selects.ecuSelect.Selected, mw.Log)
 	if err != nil {
 		d := dialog.NewError(err, mw)
 		d.Show()

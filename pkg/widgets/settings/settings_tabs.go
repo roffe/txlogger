@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/common"
+	xlayout "github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
@@ -105,12 +106,12 @@ func (sw *Widget) loggingTab() *container.TabItem {
 
 func (sw *Widget) wblTab() *container.TabItem {
 	sw.wblPortLabel = widget.NewLabel("WBL Port")
-	sw.wblPortSelect = widget.NewSelect(append([]string{"txbridge", "CAN"}, sw.CANSettings.ListPorts()...), func(s string) {
+	sw.wblPortSelect = widget.NewSelect(append([]string{"txbridge", "CAN"}, sw.ListPorts()...), func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsWBLPort, s)
 	})
 
 	sw.wblPortRefreshButton = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
-		sw.wblPortSelect.Options = append([]string{"txbridge", "CAN"}, sw.CANSettings.ListPorts()...)
+		sw.wblPortSelect.Options = append([]string{"txbridge", "CAN"}, sw.ListPorts()...)
 		sw.wblPortSelect.Refresh()
 	})
 
@@ -121,8 +122,7 @@ func (sw *Widget) wblTab() *container.TabItem {
 		if err != nil {
 			return err
 		}
-		fyne.CurrentApp().Preferences().SetString(prefsminimumVoltageWideband, s)
-		sw.minimumVoltageWideband = val
+		fyne.CurrentApp().Preferences().SetFloat(prefsminimumVoltageWideband, val)
 		return nil
 	}
 
@@ -133,8 +133,7 @@ func (sw *Widget) wblTab() *container.TabItem {
 		if err != nil {
 			return err
 		}
-		fyne.CurrentApp().Preferences().SetString(prefsmaximumVoltageWideband, s)
-		sw.maximumVoltageWideband = val
+		fyne.CurrentApp().Preferences().SetFloat(prefsmaximumVoltageWideband, val)
 		return nil
 	}
 
@@ -145,8 +144,7 @@ func (sw *Widget) wblTab() *container.TabItem {
 		if err != nil {
 			return err
 		}
-		fyne.CurrentApp().Preferences().SetString(prefslowValue, s)
-		sw.low = val
+		fyne.CurrentApp().Preferences().SetFloat(prefslowValue, val)
 		return nil
 	}
 
@@ -157,8 +155,7 @@ func (sw *Widget) wblTab() *container.TabItem {
 		if err != nil {
 			return err
 		}
-		fyne.CurrentApp().Preferences().SetString(prefshighValue, s)
-		sw.high = val
+		fyne.CurrentApp().Preferences().SetFloat(prefshighValue, val)
 		return nil
 	}
 	sw.images.mtxl = newImageFromResource("mtx-l")
@@ -247,6 +244,32 @@ func (sw *Widget) dashboardTab() *container.TabItem {
 			widget.NewIcon(theme.InfoIcon()),
 			nil,
 			sw.useMPH,
+		),
+	))
+}
+
+func (sw *Widget) canTab() *container.TabItem {
+	return container.NewTabItem("CAN", container.NewVBox(
+		container.NewBorder(
+			nil,
+			nil,
+			xlayout.NewFixedWidth(70, widget.NewLabel("Adapter")),
+			sw.debugCheckbox,
+			sw.adapterSelector,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			xlayout.NewFixedWidth(70, widget.NewLabel("Port")),
+			sw.refreshBtn,
+			sw.portSelector,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			xlayout.NewFixedWidth(70, widget.NewLabel("Speed")),
+			nil,
+			sw.speedSelector,
 		),
 	))
 }
