@@ -43,7 +43,7 @@ jobs:
     - name: Build
       run: |
         $env:PATH += ";D:\a\txlogger\txlogger\llvm-mingw\bin"
-        .\build.ps1 -cangateway -txlogger -setup
+        .\build.ps1 -cangateway -usegitsrc -txlogger -setup
 
     - name: Creating Zip
       if: startsWith(github.ref, 'refs/tags/')
