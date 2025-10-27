@@ -1,0 +1,30 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../gocan"
+		},
+		{
+			"path": "../ecusymbol"
+		},
+		{
+			"path": "../gocangateway"
+		},
+		{
+			"path": "../gocanlib"
+		},
+		{
+			"path": "../gocanusb"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.vue": "vue",
+			"*.rmd": "markdown",
+			"*.tmpl": "gohtml",
+			"*.cfile": "c"
+		}
+	}
+}
