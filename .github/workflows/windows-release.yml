@@ -1,5 +1,3 @@
-# This workflow will build a golang project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
 name: Build Windows Release
 on:
   push:
@@ -35,11 +33,6 @@ jobs:
       with:
         go-version: '1.25.3'
         cache: false
-
-    - name: Install dependencies
-      run: |
-        go get .
-        go install fyne.io/fyne/v2/cmd/fyne@develop
     
     - name: Install dependencies
       run: |
@@ -48,8 +41,6 @@ jobs:
         .\setup_build_env.ps1
     
     - name: Build
-      env:
-        FOO: "BAR"
       run: |
         $env:PATH += ";D:\a\txlogger\txlogger\llvm-mingw\bin"
         .\build.ps1 -cangateway -txlogger -setup
