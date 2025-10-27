@@ -15,7 +15,6 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
 	"github.com/roffe/gocan/pkg/serialcommand"
-	"github.com/roffe/txlogger/pkg/widgets/settings/cansettings"
 	"go.bug.st/serial"
 	"golang.org/x/mod/semver"
 )
@@ -24,7 +23,8 @@ import (
 var firmware []byte
 
 const (
-	COM_SPEED = 1000000
+	COM_SPEED              = 1000000
+	MinimumtxbridgeVersion = "1.0.9"
 )
 
 type Config struct {
@@ -98,7 +98,7 @@ func UpdateOTA(cfg Config) error {
 
 	cfg.Logfunc("Device firmware: ", string(cmd.Data))
 
-	ver := semver.Compare("v"+string(cmd.Data), "v"+cansettings.MinimumtxbridgeVersion)
+	ver := semver.Compare("v"+string(cmd.Data), "v"+MinimumtxbridgeVersion)
 	if ver == 0 {
 		cc := make(chan bool)
 		fyne.Do(func() {
