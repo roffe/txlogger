@@ -200,7 +200,6 @@ func (c *T8Client) Start() error {
 						c.sysvars.Set(EXTERNALWBLSYM, c.lamb.GetLambda())
 					}
 
-					//produceTxLogLine(file, c.sysvars, c.Symbols, timeStamp, order)
 					if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
 						c.onError()
 						c.OnMessage("failed to write log: " + err.Error())
