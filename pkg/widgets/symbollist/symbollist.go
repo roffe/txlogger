@@ -200,6 +200,8 @@ func (s *Widget) MinSize() fyne.Size {
 	return fyne.Size{Width: 480, Height: 221}
 }
 
+var headerSizes = []float64{.40, .10, .12, .14, .06}
+
 func (s *Widget) CreateRenderer() fyne.WidgetRenderer {
 	name := widget.NewLabel("Name")
 	name.TextStyle = fyne.TextStyle{Bold: true}
@@ -227,8 +229,6 @@ func (s *Widget) CreateRenderer() fyne.WidgetRenderer {
 		s.scroll,
 	))
 }
-
-var headerSizes = []float64{.34, .16, .12, .14, .06}
 
 func (s *Widget) newSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry)) *SymbolWidgetEntry {
 	sw := &SymbolWidgetEntry{
@@ -330,13 +330,12 @@ func (s *symbolWidgetEntryRenderer) Destroy() {
 }
 
 func (s *symbolWidgetEntryRenderer) Layout(size fyne.Size) {
-	if s.e.oldSize == size {
-		return
+	if s.e.oldSize != size {
+		s.e.oldSize = size
+		s.e.container.Resize(size)
+		s.e.valueBar.Move(fyne.NewPos(0, 6))
+		s.e.valueBar.Resize(fyne.Size{Width: s.e.valueBarFactor * s.e.symbolName.Size().Width, Height: 26})
 	}
-	s.e.container.Resize(size)
-	s.e.valueBar.Move(fyne.NewPos(0, 6))
-	s.e.valueBar.Resize(fyne.Size{Width: s.e.valueBarFactor * s.e.symbolName.Size().Width, Height: 26})
-	s.e.oldSize = size
 }
 
 func (s *symbolWidgetEntryRenderer) MinSize() fyne.Size {
