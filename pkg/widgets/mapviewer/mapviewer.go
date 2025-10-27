@@ -90,6 +90,7 @@ func New(config *Config) (*MapViewer, error) {
 		numColumns:    len(config.XData),
 		numRows:       len(config.YData),
 		numData:       len(config.ZData),
+		colorMode:     config.ColorblindMode,
 	}
 	mv.ExtendBaseWidget(mv)
 	log.Printf("mapViewer c:%d r:%d len:%d", mv.numColumns, mv.numRows, mv.numData)
