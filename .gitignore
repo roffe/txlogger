@@ -23,3 +23,5 @@ canusb
 llvm-mingw
 vcpkg
 go
+go.work
+go.work.sum
