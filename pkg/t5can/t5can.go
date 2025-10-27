@@ -40,7 +40,7 @@ func (c *Client) ReadRam(ctx context.Context, address, length uint32) ([]byte, e
 		// Read up to 6 bytes at a time
 		resp, err := c.sendReadCommand(ctx, address+addrBias+offset)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("ReadRam[1]: %w", err)
 		}
 		n := min(int(length-offset), chunk)
 		copy(buff[int(offset):int(offset)+n], resp[:n])
@@ -86,12 +86,13 @@ func (c *Client) WriteRam(ctx context.Context, address uint32, data []byte) erro
 	left := len(data)
 	start := 0
 	for left > 0 {
-		n := maxBlock
-		if left < n {
-			n = left
-		}
+		//n := maxBlock
+		//if left < n {
+		//	n = left
+		//}
+		n := min(left, maxBlock)
 		if err := c.sendBlock(ctx, address, data[start:start+n], maxBlock); err != nil {
-			return err
+			return fmt.Errorf("WriteRam[1]: %w", err)
 		}
 		start += n
 		left -= n
