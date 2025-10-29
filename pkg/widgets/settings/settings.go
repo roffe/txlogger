@@ -303,13 +303,15 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 		return nil, errors.New("Select CANbus adapter in settings") //lint:ignore ST1005 This is ok
 	}
 
-	if cs.adapters[adapterName].RequiresSerialPort {
-		if port == "" {
-			return nil, errors.New("Select port in setings") //lint:ignore ST1005 This is ok
+	if ad, found := cs.adapters[adapterName]; found {
+		if ad.RequiresSerialPort {
+			if port == "" {
+				return nil, errors.New("Select port in setings") //lint:ignore ST1005 This is ok
 
-		}
-		if baudstring == "" {
-			return nil, errors.New("Select port speed in settings") //lint:ignore ST1005 This is ok
+			}
+			if baudstring == "" {
+				return nil, errors.New("Select port speed in settings") //lint:ignore ST1005 This is ok
+			}
 		}
 	}
 
