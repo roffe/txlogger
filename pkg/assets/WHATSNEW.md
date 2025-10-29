@@ -1,3 +1,8 @@
+# 2.1.4
+ - Symbollist now remembers the last selected preset per ECU.
+ - Fixed a bug where logs loaded from menu would be stuck in the top left corner
+ - Tweaked positioning when dragging and dropping log files in the main window
+
 # 2.1.3
  - Added a check for updates dialogue that will show every second week.
  - Fixed a bug where the user defined log path would not be adhered to after changing it in settings
