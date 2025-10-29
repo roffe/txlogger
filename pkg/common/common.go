@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+var EcuList = []string{"T5", "T7", "T8"}
+
 const (
 	Pi15            = math.Pi * 1.5
 	Pi43            = math.Pi / 4 * 3
