@@ -137,7 +137,9 @@ func (mw *MainWindow) setupMenu() {
 					defer r.Close()
 					filename := r.URI().Name()
 					mw.Log("opening logfile " + filename)
-					mw.LoadLogfile(filename, r, fyne.NewPos(10, 10))
+					sz := mw.Window.Content().Size()
+					p := fyne.NewPos(sz.Width/2, sz.Height/2)
+					mw.LoadLogfile(filename, r, p)
 				}
 				widgets.SelectFile(cb, "Log file", "csv", "t5l", "t7l", "t8l")
 			}),
