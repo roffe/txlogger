@@ -57,3 +57,6 @@ var T7 []byte
 
 //go:embed taz.png
 var Taz []byte
+
+//go:embed korvring.mp3
+var Korvring []byte
