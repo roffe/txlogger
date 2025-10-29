@@ -149,13 +149,12 @@ func (mw *MainWindow) openSettings() {
 }
 
 func (mw *MainWindow) loadPrefs() {
-	if ecu := mw.app.Preferences().StringWithFallback(prefsSelectedECU, "T7"); ecu != "" {
-		mw.selects.ecuSelect.SetSelected(ecu)
-	}
+	ecu := mw.app.Preferences().StringWithFallback(prefsSelectedECU, "T7")
+	mw.selects.ecuSelect.SetSelected(ecu)
 
-	if preset := mw.app.Preferences().String(prefsSelectedPreset); preset != "" {
-		mw.selects.presetSelect.SetSelected(preset)
-	}
+	preset := mw.app.Preferences().StringWithFallback(ecu+prefsSelectedPreset, ecu+" Dash")
+	mw.selects.presetSelect.SetSelected(preset)
+
 	/*
 		if filename == "" {
 			if filename := mw.app.Preferences().String(prefsLastBinFile); filename != "" {

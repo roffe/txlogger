@@ -146,7 +146,7 @@ func About() *fyne.Container {
 	lb2 := widget.NewLabel("Made with support from")
 	lb2.Alignment = fyne.TextAlignCenter
 
-	thnx := widget.NewLabel("Special thanks to:")
+	thnx := widget.NewLabel("Special thanks to")
 	thnx.TextStyle.Bold = true
 
 	return container.NewBorder(
