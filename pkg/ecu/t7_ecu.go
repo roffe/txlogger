@@ -15,7 +15,7 @@ import (
 )
 
 func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (symbol.SymbolCollection, error) {
-	cl, err := gocan.NewWithAdapter(context.TODO(), dev)
+	cl, err := gocan.NewWithOpts(context.TODO(), dev)
 	if err != nil {
 		return nil, err
 	}

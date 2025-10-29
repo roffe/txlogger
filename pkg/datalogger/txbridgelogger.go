@@ -28,7 +28,7 @@ func (c *TxBridge) Start() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cl, err := gocan.NewWithAdapter(ctx, c.Device)
+	cl, err := gocan.NewWithOpts(ctx, c.Device)
 	if err != nil {
 		return err
 	}

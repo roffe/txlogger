@@ -68,7 +68,7 @@ func (t *T7Extras) resetECU() error {
 		return err
 	}
 	ctx := context.Background()
-	c, err := gocan.NewWithAdapter(ctx, adapter)
+	c, err := gocan.NewWithOpts(ctx, adapter)
 	if err != nil {
 		return err
 	}
