@@ -60,9 +60,10 @@ func (m *MultipleWindows) Add(w *InnerWindow, startPosition ...fyne.Position) bo
 		m.Raise(w)
 		return false
 	}
+	m.setupChild(w)
 
 	m.windows = append(m.windows, w)
-	m.setupChild(w)
+
 	if len(startPosition) == 0 {
 		w.Move(m.openOffset)
 		m.openOffset = m.openOffset.AddXY(15, 15)
@@ -76,9 +77,10 @@ func (m *MultipleWindows) Add(w *InnerWindow, startPosition ...fyne.Position) bo
 			bounds := m.content.Size()
 			startPosition[0].X = clamp32(startPosition[0].X, 0, bounds.Width-size.Width)
 			startPosition[0].Y = clamp32(startPosition[0].Y, 0, bounds.Height-size.Height)
-			bounds.Subtract(size).Max(startPosition[0])
+			//bounds.Subtract(size).Max(startPosition[0])
 		}
-		w.Move(startPosition[0].SubtractXY(w.MinSize().Width*0.5, 80))
+		//w.Move(startPosition[0].SubtractXY(w.MinSize().Width*0.5, 80))
+		w.Move(startPosition[0])
 	}
 
 	m.content.Add(w)
