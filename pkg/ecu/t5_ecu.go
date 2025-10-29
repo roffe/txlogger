@@ -96,7 +96,7 @@ func recvDataEND(ctx context.Context, c *gocan.Client) ([]byte, error) {
 			dd = 0
 		}
 		ack(c)
-		resp, err := c.Wait(ctx, 40*time.Millisecond, 0xC)
+		resp, err := c.Recv(ctx, 40*time.Millisecond, 0xC)
 		if err != nil {
 			os.WriteFile("dump", buff.Bytes(), 0644)
 			return nil, err
