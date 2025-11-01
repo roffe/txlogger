@@ -1,8 +1,6 @@
 package windows
 
 import (
-	"log"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
@@ -36,7 +34,6 @@ func (mw *MainWindow) createSelects() {
 		ebus.Publish(ebus.TOPIC_ECU, float64(idx))
 		mw.SetMainMenu(mw.menu.GetMenu(s))
 		pres := mw.app.Preferences().StringWithFallback(s+prefsSelectedPreset, s+" Dash")
-		log.Println(pres)
 		mw.selects.presetSelect.SetSelected(pres)
 	})
 
