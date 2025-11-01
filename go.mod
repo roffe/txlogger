@@ -21,14 +21,14 @@ go 1.25.3
 // replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 
 require (
-	fyne.io/fyne/v2 v2.7.0-rc1.0.20251014092848-6d316e29599f
+	fyne.io/fyne/v2 v2.7.1-0.20251030225945-0f9773e04342
 	fyne.io/x/fyne v0.0.0-20250106132206-3228f6c50107
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/lusingander/colorpicker v0.7.4
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.0.7
 	github.com/roffe/ecusymbol v1.0.6
-	github.com/roffe/gocan v1.2.3
+	github.com/roffe/gocan v1.2.4
 	github.com/roffe/gocanflasher v1.0.4
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.4
@@ -49,6 +49,7 @@ require (
 require (
 	fyne.io/systray v1.11.1-0.20250603113521-ca66a66d8b58 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
+	github.com/FyshOS/fancyfs v0.0.0-20251025194026-1f03098ff624 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
 	github.com/bendikro/dl v0.0.0-20190410215913-e41fdb9069d4 // indirect
@@ -85,7 +86,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/roffe/gocanusb v1.1.2 // indirect
 	github.com/roffe/goftdi v0.0.0-20250330120219-31feb988cb73 // indirect
-	github.com/roffe/gopcan v0.0.1 // indirect
+	github.com/roffe/gopcan v0.0.2 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/rymdport/portal v0.4.2 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
