@@ -23,6 +23,9 @@
 		},
 		{
 			"path": "../gopcan"
+		},
+		{
+			"path": "../gocanflasher"
 		}
 	],
 	"settings": {

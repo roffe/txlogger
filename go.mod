@@ -1,6 +1,6 @@
 module github.com/roffe/txlogger
 
-go 1.25.2
+go 1.25.3
 
 // replace github.com/roffe/gocan => ..\gocan
 
@@ -9,6 +9,8 @@ go 1.25.2
 // replace github.com/roffe/goftdi => ..\goftdi
 
 // replace github.com/roffe/gocanusb => ..\gocanusb
+
+//replace github.com/roffe/gopcan => ..\gopcan
 
 // replace github.com/roffe/ecusymbol => ..\ecusymbol
 
@@ -26,8 +28,8 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.0.7
 	github.com/roffe/ecusymbol v1.0.6
-	github.com/roffe/gocan v1.2.2
-	github.com/roffe/gocanflasher v1.0.3
+	github.com/roffe/gocan v1.2.3
+	github.com/roffe/gocanflasher v1.0.4
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.4
 	golang.org/x/image v0.25.0
@@ -38,7 +40,11 @@ require (
 	google.golang.org/protobuf v1.36.10
 )
 
-require github.com/Microsoft/go-winio v0.6.2
+require (
+	github.com/Microsoft/go-winio v0.6.2
+	github.com/ebitengine/oto/v3 v3.4.0
+	github.com/hajimehoshi/go-mp3 v0.3.4
+)
 
 require (
 	fyne.io/systray v1.11.1-0.20250603113521-ca66a66d8b58 // indirect
@@ -48,6 +54,7 @@ require (
 	github.com/bendikro/dl v0.0.0-20190410215913-e41fdb9069d4 // indirect
 	github.com/creack/goselect v0.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/ebitengine/purego v0.9.0 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fredbi/uri v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
@@ -78,6 +85,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/roffe/gocanusb v1.1.2 // indirect
 	github.com/roffe/goftdi v0.0.0-20250330120219-31feb988cb73 // indirect
+	github.com/roffe/gopcan v0.0.1 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/rymdport/portal v0.4.2 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
@@ -87,7 +95,7 @@ require (
 	github.com/yuin/goldmark v1.7.8 // indirect
 	go.einride.tech/can v0.12.1 // indirect
 	golang.org/x/crypto v0.40.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.27.0 // indirect
 	golang.org/x/tools v0.34.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250804133106-a7a43d27e69b // indirect

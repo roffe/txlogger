@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/serialcommand"
@@ -16,7 +15,10 @@ import (
 	"github.com/roffe/txlogger/pkg/t5can"
 )
 
-func (c *TxBridge) t5(ctx context.Context, cl *gocan.Client) error {
+func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
+	ctx, cancel := context.WithCancel(pctx)
+	defer cancel()
+
 	order := make([]string, len(c.Symbols))
 	for n, s := range c.Symbols {
 		order[n] = s.Name
@@ -46,17 +48,19 @@ func (c *TxBridge) t5(ctx context.Context, cl *gocan.Client) error {
 
 	converto := newT5Converter(c.WidebandConfig)
 
+	go func() {
+		if err := cl.Wait(); err != nil {
+			c.OnMessage(err.Error())
+			cancel()
+		}
+	}()
+
 	for {
 		select {
+		case <-ctx.Done():
+			return nil
 		case msg := <-messages.Chan():
 			c.OnMessage(string(msg.Data))
-		case err := <-cl.Err():
-			if gocan.IsRecoverable(err) {
-				c.onError()
-				c.OnMessage(err.Error())
-				continue
-			}
-			return retry.Unrecoverable(err)
 		case <-c.quitChan:
 			c.OnMessage("Stopped logging..")
 			return nil
@@ -109,7 +113,7 @@ func (c *TxBridge) t5(ctx context.Context, cl *gocan.Client) error {
 			upd.Complete(nil)
 		case msg, ok := <-tx.Chan():
 			if !ok {
-				return retry.Unrecoverable(errors.New("txbridge sub closed"))
+				return errors.New("txbridge sub closed")
 			}
 
 			if msg.Length() != int(expectedPayloadSize+4) {
@@ -119,7 +123,11 @@ func (c *TxBridge) t5(ctx context.Context, cl *gocan.Client) error {
 			}
 
 			r := bytes.NewReader(msg.Data)
-			binary.Read(r, binary.LittleEndian, &c.currtimestamp)
+			if err := binary.Read(r, binary.LittleEndian, &c.currtimestamp); err != nil {
+				c.onError()
+				c.OnMessage("failed to read timestamp: " + err.Error())
+				continue
+			}
 
 			if c.firstTime.IsZero() {
 				c.firstTime = time.Now()

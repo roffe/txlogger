@@ -8,7 +8,6 @@ import (
 	"math"
 	"time"
 
-	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/ebus"
@@ -30,7 +29,14 @@ func (c *T5Client) Start() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cl, err := gocan.NewWithOpts(ctx, c.Device)
+	eventHandler := func(e gocan.Event) {
+		c.OnMessage(e.String())
+		if e.Type == gocan.EventTypeError {
+			c.onError()
+		}
+	}
+
+	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventHandler(eventHandler))
 	if err != nil {
 		return err
 	}
@@ -55,99 +61,92 @@ func (c *T5Client) Start() error {
 		order = append(order, EXTERNALWBLSYM)
 	}
 
-	err = retry.Do(func() error {
-		tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
-		defer tx.Close()
+	tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
+	defer tx.Close()
 
-		messages := cl.Subscribe(ctx, gocan.SystemMsg)
-		defer messages.Close()
+	converto := newT5Converter(c.WidebandConfig)
 
-		converto := newT5Converter(c.WidebandConfig)
+	go func() {
+		if err := cl.Wait(); err != nil {
+			c.OnMessage(err.Error())
+			cancel()
+		}
+	}()
 
-		for {
-			select {
-			case msg := <-messages.Chan():
-				c.OnMessage(string(msg.Data))
-			case err := <-cl.Err():
-				if gocan.IsRecoverable(err) {
-					c.onError()
-					c.OnMessage(err.Error())
-					continue
-				}
-				return retry.Unrecoverable(err)
-			case <-c.quitChan:
-				c.OnMessage("Stopped logging..")
-				return nil
-			case <-c.secondTicker.C:
-				c.FpsCounter(c.cps)
-				if c.errPerSecond > 5 {
-					c.errPerSecond = 0
-					return fmt.Errorf("too many errors per second")
-				}
-				c.cps = 0
+	eventChan := cl.Event()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case e := <-eventChan:
+			c.OnMessage(e.String())
+			if e.Type == gocan.EventTypeError {
+				c.onError()
+			}
+		case <-c.quitChan:
+			c.OnMessage("Stopped logging..")
+			return nil
+		case <-c.secondTicker.C:
+			c.FpsCounter(c.cps)
+			if c.errPerSecond > 5 {
 				c.errPerSecond = 0
-			case read := <-c.readChan:
-				data, err := t5.ReadRam(ctx, read.Address, read.Length)
+				return fmt.Errorf("too many errors per second")
+			}
+			c.cps = 0
+			c.errPerSecond = 0
+		case read := <-c.readChan:
+			data, err := t5.ReadRam(ctx, read.Address, read.Length)
+			if err != nil {
+				c.onError()
+				c.OnMessage(err.Error())
+				continue
+			}
+			read.Data = data
+			read.Complete(nil)
+		case upd := <-c.writeChan:
+			if err := t5.WriteRam(ctx, upd.Address, upd.Data); err != nil {
+				upd.Complete(err)
+				break
+			}
+			upd.Complete(nil)
+		case <-t.C:
+			ts := time.Now()
+			for _, sym := range c.Symbols {
+				resp, err := t5.ReadRam(ctx, sym.SramOffset, uint32(sym.Length))
 				if err != nil {
 					c.onError()
 					c.OnMessage(err.Error())
 					continue
 				}
-				read.Data = data
-				read.Complete(nil)
-			case upd := <-c.writeChan:
-				if err := t5.WriteRam(ctx, upd.Address, upd.Data); err != nil {
-					upd.Complete(err)
-					break
-				}
-				upd.Complete(nil)
-			case <-t.C:
-				ts := time.Now()
-				for _, sym := range c.Symbols {
-					resp, err := t5.ReadRam(ctx, sym.SramOffset, uint32(sym.Length))
-					if err != nil {
-						c.onError()
-						c.OnMessage(err.Error())
-						continue
-					}
-					r := bytes.NewReader(resp)
-					if err := sym.Read(r); err != nil {
-						return err
-					}
-					val := converto(sym.Name, sym.Bytes())
-					c.sysvars.Set(sym.Name, val)
-					if err := ebus.Publish(sym.Name, val); err != nil {
-						c.onError()
-						c.OnMessage(err.Error())
-					}
-				}
-
-				if c.lamb != nil {
-					lambda := c.lamb.GetLambda()
-					c.sysvars.Set(EXTERNALWBLSYM, lambda)
-					ebus.Publish(EXTERNALWBLSYM, lambda)
-				}
-
-				if err := c.lw.Write(c.sysvars, []*symbol.Symbol{}, ts, order); err != nil {
+				r := bytes.NewReader(resp)
+				if err := sym.Read(r); err != nil {
 					return err
 				}
-				c.captureCount++
-				c.cps++
-				if c.captureCount%15 == 0 {
-					c.CaptureCounter(c.captureCount)
+				val := converto(sym.Name, sym.Bytes())
+				c.sysvars.Set(sym.Name, val)
+				if err := ebus.Publish(sym.Name, val); err != nil {
+					c.onError()
+					c.OnMessage(err.Error())
 				}
 			}
+
+			if c.lamb != nil {
+				lambda := c.lamb.GetLambda()
+				c.sysvars.Set(EXTERNALWBLSYM, lambda)
+				ebus.Publish(EXTERNALWBLSYM, lambda)
+			}
+
+			if err := c.lw.Write(c.sysvars, []*symbol.Symbol{}, ts, order); err != nil {
+				return err
+			}
+			c.captureCount++
+			c.cps++
+			if c.captureCount%15 == 0 {
+				c.CaptureCounter(c.captureCount)
+			}
 		}
-	},
-		retry.DelayType(retry.FixedDelay),
-		retry.Delay(1500*time.Millisecond),
-		retry.Attempts(3),
-		retry.OnRetry(func(n uint, err error) {
-			c.OnMessage(fmt.Sprintf("Retry %d: %v", n, err))
-		}),
-		retry.LastErrorOnly(true),
-	)
-	return err
+	}
 }
 
 const (

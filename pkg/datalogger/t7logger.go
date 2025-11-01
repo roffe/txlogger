@@ -10,7 +10,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/avast/retry-go/v4"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/ebus"
@@ -77,7 +76,14 @@ func (c *T7Client) Start() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cl, err := gocan.NewWithOpts(ctx, c.Device)
+	eventHandler := func(e gocan.Event) {
+		c.OnMessage(e.String())
+		if e.Type == gocan.EventTypeError {
+			c.onError()
+		}
+	}
+
+	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventHandler(eventHandler))
 	if err != nil {
 		return fmt.Errorf("failed to create t7 client: %w", err)
 	}
@@ -126,187 +132,180 @@ func (c *T7Client) Start() error {
 
 	adConverter := newDisplProtADConverterT7(c.WidebandConfig)
 
-	err = retry.Do(func() error {
-		if err := initT7logging(ctx, kwp, c.Symbols, c.OnMessage); err != nil {
-			return fmt.Errorf("failed to init t7 logging: %w", err)
+	if err := initT7logging(ctx, kwp, c.Symbols, c.OnMessage); err != nil {
+		return fmt.Errorf("failed to init t7 logging: %w", err)
+	}
+	defer func() {
+		kwp.StopSession(ctx)
+		time.Sleep(50 * time.Millisecond)
+	}()
+
+	t := time.NewTicker(time.Second / time.Duration(c.Rate))
+	defer t.Stop()
+
+	var timeStamp time.Time
+	var expectedPayloadSize uint16
+	for _, sym := range c.Symbols {
+		if sym.Number < 0 {
+			continue
 		}
-		defer func() {
-			kwp.StopSession(ctx)
-			time.Sleep(50 * time.Millisecond)
-		}()
+		expectedPayloadSize += sym.Length
+	}
 
-		t := time.NewTicker(time.Second / time.Duration(c.Rate))
-		defer t.Stop()
+	lastPresent := time.Now()
+	testerPresent := func() {
+		if time.Since(lastPresent) > lastPresentInterval {
+			if err := kwp.TesterPresent(ctx); err != nil {
+				c.onError()
+				c.OnMessage(err.Error())
+				return
+			}
+			lastPresent = time.Now()
+		}
+	}
 
-		var timeStamp time.Time
-		var expectedPayloadSize uint16
-		for _, sym := range c.Symbols {
-			if sym.Number < 0 {
+	go func() {
+		if err := cl.Wait(); err != nil {
+			c.OnMessage(err.Error())
+			cancel()
+		}
+	}()
+
+	eventChan := cl.Event()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case e := <-eventChan:
+			c.OnMessage(e.String())
+			if e.Type == gocan.EventTypeError {
+				c.onError()
+			}
+		case <-c.quitChan:
+			c.OnMessage("Stop logging")
+			return nil
+		case <-c.secondTicker.C:
+			c.FpsCounter(c.cps)
+			if c.errPerSecond > 5 {
+				c.errPerSecond = 0
+				return fmt.Errorf("too many errors per second")
+			}
+			c.cps = 0
+			c.errPerSecond = 0
+		case read := <-c.readChan:
+			data, err := kwp.ReadMemoryByAddress(ctx, int(read.Address), int(read.Length))
+			if err != nil {
+				read.Complete(err)
 				continue
 			}
-			expectedPayloadSize += sym.Length
-		}
+			read.Data = data
+			read.Complete(nil)
+		case write := <-c.writeChan:
+			toWrite := min(36, write.Length)
 
-		lastPresent := time.Now()
-		testerPresent := func() {
-			if time.Since(lastPresent) > lastPresentInterval {
-				if err := kwp.TesterPresent(ctx); err != nil {
-					c.onError()
-					c.OnMessage(err.Error())
-					return
-				}
-				lastPresent = time.Now()
+			if err := kwp.WriteDataByAddress(ctx, write.Address, write.Data[:toWrite]); err != nil {
+				write.Complete(err)
+				continue
 			}
-		}
+			write.Data = write.Data[toWrite:]
+			write.Address += uint32(toWrite)
+			write.Length -= toWrite
+			if write.Length > 0 {
+				select {
+				case c.writeChan <- write:
+				default:
+					log.Println("kisskorv updateChan full")
+				}
+				continue
+			}
+			write.Complete(nil)
 
-		messages := cl.Subscribe(ctx, gocan.SystemMsg)
-		defer messages.Close()
+		case <-t.C:
+			timeStamp = time.Now()
+			if len(c.Symbols) == 0 {
+				testerPresent()
+				continue
+			}
 
-		for {
-			select {
-			case msg := <-messages.Chan():
-				c.OnMessage(string(msg.Data))
-			case err := <-cl.Err():
-				if gocan.IsRecoverable(err) {
-					c.onError()
-					c.OnMessage(err.Error())
-					continue
-				}
-				return retry.Unrecoverable(err)
-			case <-c.quitChan:
-				c.OnMessage("Stop logging")
-				return nil
-			case <-c.secondTicker.C:
-				c.FpsCounter(c.cps)
-				if c.errPerSecond > 5 {
-					c.errPerSecond = 0
-					return fmt.Errorf("too many errors per second")
-				}
-				c.cps = 0
-				c.errPerSecond = 0
-			case read := <-c.readChan:
-				data, err := kwp.ReadMemoryByAddress(ctx, int(read.Address), int(read.Length))
-				if err != nil {
-					read.Complete(err)
-					continue
-				}
-				read.Data = data
-				read.Complete(nil)
-			case write := <-c.writeChan:
-				toWrite := min(36, write.Length)
+			databuff, err := kwp.ReadDataByIdentifier(ctx, 0xF0)
+			if err != nil {
+				c.onError()
+				c.OnMessage(err.Error())
+				continue
+			}
 
-				if err := kwp.WriteDataByAddress(ctx, write.Address, write.Data[:toWrite]); err != nil {
-					write.Complete(err)
-					continue
-				}
-				write.Data = write.Data[toWrite:]
-				write.Address += uint32(toWrite)
-				write.Length -= toWrite
-				if write.Length > 0 {
-					select {
-					case c.writeChan <- write:
-					default:
-						log.Println("kisskorv updateChan full")
-					}
-					continue
-				}
-				write.Complete(nil)
+			if len(databuff) != int(expectedPayloadSize) {
+				c.onError()
+				c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
+				continue
+				//return fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff))
+			}
 
-			case <-t.C:
-				timeStamp = time.Now()
-				if len(c.Symbols) == 0 {
-					testerPresent()
-					continue
-				}
-
-				databuff, err := kwp.ReadDataByIdentifier(ctx, 0xF0)
-				if err != nil {
-					c.onError()
-					c.OnMessage(err.Error())
-					continue
-				}
-
-				if len(databuff) != int(expectedPayloadSize) {
-					c.onError()
-					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
-					continue
-					//return retry.Unrecoverable(fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
-				}
-
-				r := bytes.NewReader(databuff)
-				for _, va := range c.Symbols {
-					if va.Number < 0 {
-						if va.Number <= -1000 {
-							if ca, ok := cl.Adapter().(gocan.ADCCapable); ok {
-								adcNumber := -va.Number - 1000
-								val, err := ca.GetADCValue(ctx, adcNumber)
-								if err != nil {
-									c.onError()
-									c.OnMessage(err.Error())
-									continue
-								}
-								c.sysvars.Set(va.Name, float64(val))
-								if err := ebus.Publish(va.Name, float64(val)); err != nil {
-									c.onError()
-									c.OnMessage(err.Error())
-								}
+			r := bytes.NewReader(databuff)
+			for _, va := range c.Symbols {
+				if va.Number < 0 {
+					if va.Number <= -1000 {
+						if ca, ok := cl.Adapter().(gocan.ADCCapable); ok {
+							adcNumber := -va.Number - 1000
+							val, err := ca.GetADCValue(ctx, adcNumber)
+							if err != nil {
+								c.onError()
+								c.OnMessage(err.Error())
 								continue
 							}
-						} else {
-							ebus.Publish(va.Name, c.sysvars.Get(va.Name))
+							c.sysvars.Set(va.Name, float64(val))
+							if err := ebus.Publish(va.Name, float64(val)); err != nil {
+								c.onError()
+								c.OnMessage(err.Error())
+							}
+							continue
 						}
-						continue
+					} else {
+						ebus.Publish(va.Name, c.sysvars.Get(va.Name))
 					}
-					if err := va.Read(r); err != nil {
-						log.Printf("data ex %d %X len %d", expectedPayloadSize, databuff, len(databuff))
-						c.onError()
-						c.OnMessage(err.Error())
-						break
-					}
-					if va.Name == "DisplProt.AD_Scanner" {
-						ebus.Publish(va.Name, adConverter(va.Float64()))
-						continue
-					}
-
-					ebus.Publish(va.Name, va.Float64())
+					continue
 				}
-
-				if r.Len() > 0 {
-					c.OnMessage(fmt.Sprintf("%d leftover bytes!", r.Len()))
-				}
-
-				if c.lamb != nil {
-					lambda := c.lamb.GetLambda()
-					c.sysvars.Set(EXTERNALWBLSYM, lambda)
-					ebus.Publish(EXTERNALWBLSYM, lambda)
-				}
-
-				if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
+				if err := va.Read(r); err != nil {
+					log.Printf("data ex %d %X len %d", expectedPayloadSize, databuff, len(databuff))
 					c.onError()
-					c.OnMessage("failed to write log: " + err.Error())
+					c.OnMessage(err.Error())
+					break
 				}
-				c.captureCount++
-				c.cps++
-				if c.captureCount%15 == 0 {
-					c.CaptureCounter(c.captureCount)
+				if va.Name == "DisplProt.AD_Scanner" {
+					ebus.Publish(va.Name, adConverter(va.Float64()))
+					continue
 				}
+
+				ebus.Publish(va.Name, va.Float64())
+			}
+
+			if r.Len() > 0 {
+				c.OnMessage(fmt.Sprintf("%d leftover bytes!", r.Len()))
+			}
+
+			if c.lamb != nil {
+				lambda := c.lamb.GetLambda()
+				c.sysvars.Set(EXTERNALWBLSYM, lambda)
+				ebus.Publish(EXTERNALWBLSYM, lambda)
+			}
+
+			if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
+				c.onError()
+				c.OnMessage("failed to write log: " + err.Error())
+			}
+			c.captureCount++
+			c.cps++
+			if c.captureCount%15 == 0 {
+				c.CaptureCounter(c.captureCount)
 			}
 		}
-	},
-		retry.DelayType(retry.FixedDelay),
-		retry.Delay(1500*time.Millisecond),
-		retry.Attempts(3),
-		retry.OnRetry(func(n uint, err error) {
-			c.OnMessage(fmt.Sprintf("Retry %d: %v", n, err))
-		}),
-		retry.LastErrorOnly(true),
-	)
-	return err
+	}
 }
 
 func initT7logging(ctx context.Context, kwp *kwp2000.Client, symbols []*symbol.Symbol, onMessage func(string)) error {
 	if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
-		return retry.Unrecoverable(errors.New("failed to start session"))
+		return errors.New("failed to start session")
 	}
 	onMessage("Connected to ECU")
 
