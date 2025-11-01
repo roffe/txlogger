@@ -13,16 +13,7 @@
 			"path": "../gocangateway"
 		},
 		{
-			"path": "../gocanlib"
-		},
-		{
-			"path": "../gocanusb"
-		},
-		{
 			"path": "../txweb"
-		},
-		{
-			"path": "../gopcan"
 		},
 		{
 			"path": "../gocanflasher"

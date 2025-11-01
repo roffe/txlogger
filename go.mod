@@ -2,21 +2,10 @@ module github.com/roffe/txlogger
 
 go 1.25.3
 
-// replace github.com/roffe/gocan => ..\gocan
+replace github.com/roffe/gocan => ..\gocan
 
 // replace github.com/roffe/gocanflasher => ..\gocanflasher
-
-// replace github.com/roffe/goftdi => ..\goftdi
-
-// replace github.com/roffe/gocanusb => ..\gocanusb
-
-//replace github.com/roffe/gopcan => ..\gopcan
-
 // replace github.com/roffe/ecusymbol => ..\ecusymbol
-
-// replace github.com/roffe/gocanlib => ..\gocanlib
-
-// replace github.com/roffe/goftdi => ..\goftdi
 
 // replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 
@@ -28,7 +17,7 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.0.7
 	github.com/roffe/ecusymbol v1.0.6
-	github.com/roffe/gocan v1.2.4
+	github.com/roffe/gocan v1.2.6
 	github.com/roffe/gocanflasher v1.0.4
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.4
@@ -84,9 +73,6 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.5.1 // indirect
 	github.com/pion/logging v0.2.2 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/roffe/gocanusb v1.1.2 // indirect
-	github.com/roffe/goftdi v0.0.0-20250330120219-31feb988cb73 // indirect
-	github.com/roffe/gopcan v0.0.2 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/rymdport/portal v0.4.2 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect

@@ -119,16 +119,8 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/roffe/ecusymbol v1.0.6 h1:0+YjKVuWTESiAdFWF/JYYlfCooRePtjBgSBB6MWnVHk=
 github.com/roffe/ecusymbol v1.0.6/go.mod h1:0nrbfx99ecWTXVjNbaqA9iZYlLlLdXWLE//Hb5hCajQ=
-github.com/roffe/gocan v1.2.4 h1:ta8jwsCAj4A08fup3jaywasuptPYwLTOpnq9NPc2wm8=
-github.com/roffe/gocan v1.2.4/go.mod h1:o0/GPZw3w2B/q9U0rzefnUwlNAlLtaEhCQQKTypSxC0=
 github.com/roffe/gocanflasher v1.0.4 h1:LCs5cb/L2c0Gqe5lte6vs41pDkcpXCVF8vHdu7E2GFc=
 github.com/roffe/gocanflasher v1.0.4/go.mod h1:IYk2Xm1KmSJAszhKtQxmdq6hmauuzKzB3u5r/q6NGoM=
-github.com/roffe/gocanusb v1.1.2 h1:qnPhGLIeTXkBKQiGNV/vZfcXMwRmL1XsEeorGmPHD+A=
-github.com/roffe/gocanusb v1.1.2/go.mod h1:zRgZyTCvOyLIMeW+d9aUPmoJC3PId0PUJF0IVNQ70Z4=
-github.com/roffe/goftdi v0.0.0-20250330120219-31feb988cb73 h1:ws9di8cqLErxvao9FI5cRU7s2XcsMcqhPMrNsKNcMSY=
-github.com/roffe/goftdi v0.0.0-20250330120219-31feb988cb73/go.mod h1:oWL500yi96TiZ8QuWArPYkkbli5DyX3y+9N03yboXIw=
-github.com/roffe/gopcan v0.0.2 h1:Usvyal9lGkrbq/epn5CXWhO1zWvncilVPjcKAL75dp0=
-github.com/roffe/gopcan v0.0.2/go.mod h1:/KrMtL4o4WA3jP7HUqX5wbRIcJQgnpnJvgawuC3wVTo=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
 github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR38lUII=
 github.com/rogpeppe/go-internal v1.13.1/go.mod h1:uMEvuHeurkdAXX61udpOXGD/AzZDWNMNyH2VO9fmH0o=
