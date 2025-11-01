@@ -401,7 +401,7 @@ func (t *Client) RequestSecurityAccess(ctx context.Context, force bool) (bool, e
 		}
 	}
 
-	return false, retry.Unrecoverable(fmt.Errorf("security access was not granted"))
+	return false, fmt.Errorf("security access denied")
 }
 
 func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
@@ -563,6 +563,7 @@ func (t *Client) splitRequest43(payload []byte, responseRequired bool) []gocan.C
 }
 */
 
+/*
 func (t *Client) recvData2(ctx context.Context, length int) ([]byte, error) {
 	var receivedBytes, payloadLeft int
 	out := bytes.NewBuffer([]byte{})
@@ -618,6 +619,7 @@ outer:
 	}
 	return out.Bytes(), nil
 }
+*/
 
 func (t *Client) ReadFlash(ctx context.Context, addr, length int) ([]byte, error) {
 	var readPos = addr
@@ -627,12 +629,7 @@ func (t *Client) ReadFlash(ctx context.Context, addr, length int) ([]byte, error
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
-			var readLength int
-			if (addr+length)-readPos >= 0xF0 {
-				readLength = 0xF0
-			} else {
-				readLength = (addr + length) - readPos
-			}
+			readLength := min((addr+length)-readPos, 0xF0)
 			err := retry.Do(func() error {
 				//log.Printf("Reading memory by address, pos: 0x%X, length: 0x%X", readPos, readLength)
 				b, err := t.ReadMemoryByAddressF0(ctx, readPos, readLength)
