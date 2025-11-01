@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"github.com/avast/retry-go/v4"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocanflasher/pkg/ecu"
 	sdialog "github.com/sqweek/dialog"
@@ -90,11 +89,9 @@ func (t *CanFlasherWidget) ecuDump() {
 
 		t.app.SendNotification(fyne.NewNotification("txlogger", "ECU download completed"))
 
-		err = retry.Do(func() error {
-			return tr.ResetECU(ctx)
-		}, retry.Attempts(3), retry.Delay(1*time.Second), retry.LastErrorOnly(true))
+		time.Sleep(200 * time.Millisecond)
 
-		if err != nil {
+		if err := tr.ResetECU(ctx); err != nil {
 			t.log(err.Error())
 		}
 	}()
