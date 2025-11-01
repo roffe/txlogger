@@ -22,7 +22,7 @@ if ($cangateway) {
     $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
 
     $env:GOARCH = "386"
-    go run -tags="canlib,j2534" github.com/roffe/gocan/cmd/cangateway $args
+    go run -tags="j2534" github.com/roffe/gocan/cmd/cangateway $args
     exit
 }
 
@@ -63,4 +63,4 @@ if (Test-Path -Path $firmware) {
 }
 
 write-Output "Run txlogger"
-go run -tags="canusb,combi,ftdi,j2534" . $args
+go run -tags="canlib,canusb,combi,ftdi,j2534,pcan" . $args

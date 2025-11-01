@@ -49,7 +49,7 @@ if ($cangateway) {
     }
     else {
         #Set-Location -Path "..\gocangateway"
-        go build -tags="canlib,j2534" -ldflags '-s -w -H=windowsgui' -o cangateway.exe ..\gocangateway
+        go build -tags="j2534" -ldflags '-s -w -H=windowsgui' -o cangateway.exe ..\gocangateway
         #Move-Item -Path ".\cangateway.exe" -Destination "$current_path\cangateway.exe" -Force
         #Set-Location -Path $current_path
     } 
@@ -79,7 +79,7 @@ if ($txlogger) {
     $env:CGO_CFLAGS = ($includes | ForEach-Object { '-I' + $_ }) -join ' '
     $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
     $env:GOARCH = "amd64"
-    fyne package -tags="canusb,combi,ftdi,j2534" --release
+    fyne package -tags="canlib,canusb,combi,ftdi,j2534,pcan" --release
 }
 
 if ($setup) {
