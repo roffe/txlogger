@@ -1,19 +1,22 @@
 # 2.1.4
- - Symbollist now remembers the last selected preset per ECU.
- - Fixed a bug where logs loaded from menu would be stuck in the top left corner
- - Tweaked positioning when dragging and dropping log files in the main window
+- Symbollist now remembers the last selected preset per ECU.
+- Fixed a bug where logs loaded from menu would be stuck in the top left corner
+- Tweaked positioning when dragging and dropping log files in the main window
+– Created driver for PCAN adapters on Windows using the PEAK CANlib DLL. This enables T5 support with PCAN adapters.
+- Rewrote large parts of goCAN to have better error handling
+- Fixed a bug in the Kvaser Canlib implementation making it possible to move it out of the cangateway back into the main application
 
 # 2.1.3
- - Added a check for updates dialogue that will show every second week.
- - Fixed a bug where the user defined log path would not be adhered to after changing it in settings
- - Bunch of more memory optimizations in dataloggers to lower GC pressure
- - Fixed a bug where the color blind mode was not applied on opening new maps
- - Rewrote settings dialogue to be easier to extend and maintain
- - Added support for saving T5 files
+- Added a check for updates dialogue that will show every second week.
+- Fixed a bug where the user defined log path would not be adhered to after changing it in settings
+- Bunch of more memory optimizations in dataloggers to lower GC pressure
+- Fixed a bug where the color blind mode was not applied on opening new maps
+- Rewrote settings dialogue to be easier to extend and maintain
+- Added support for saving T5 files
 
 # 2.1.2
- - rewrote cangateway to use named pipes on windows instead of unix sockets. This should ensure that cangateway is working even on early Windows 10 versions
- - fixed a race condition in goCAN that could cause missed canbus frames.
+- rewrote cangateway to use named pipes on windows instead of unix sockets. This should ensure that cangateway is working even on early Windows 10 versions
+- fixed a race condition in goCAN that could cause missed canbus frames.
 
 # 2.1.1
 
@@ -47,14 +50,14 @@
 The new FTDI d2xx driver has been implemented to leverage zero conf for several adapters.  
 The OBDLink SX & EX and CANUSB will be autodetected on startup and all you need to do is select the driver starting with "d2xx" in CAN settings. No more selecting ports or setting latency in device manager.
 
-  - Added FTDI d2xx driver
-  - fixed mouse panning in mesh viewer so it doesn't behave strange after you rotate the mesh
+- Added FTDI d2xx driver
+- fixed mouse panning in mesh viewer so it doesn't behave strange after you rotate the mesh
 
 # 2.0.6 3d updates baby
 
-  - FINALLY fixed the cameras on the 3d mesh view. Now it behaves like any normal 3d software and is very intuitive to use. Mouse1, 2 & middle are the modifiers to use when dragging
-  - 64 bit j2534 support added in gocan, Devices are prefixed "x64 J2534" and should be used if you see both 32-bit and 64-bit drivers for your adapter in the list
-  - fixed a bug in the j2534 driver where 4 bytes would be appended to the can packages
+- FINALLY fixed the cameras on the 3d mesh view. Now it behaves like any normal 3d software and is very intuitive to use. Mouse1, 2 & middle are the modifiers to use when dragging
+- 64 bit j2534 support added in gocan, Devices are prefixed "x64 J2534" and should be used if you see both 32-bit and 64-bit drivers for your adapter in the list
+- fixed a bug in the j2534 driver where 4 bytes would be appended to the can packages
 
 # 2.0.5 CAN library rework
 
@@ -197,3 +200,94 @@ In earlier versions there existed different presets depending on your CAN adapte
 - Added additional symbols to Trionic 7 main menu
 - It's now possible to create your own presets selectable from the preset dropdown
 - Added a Log plotter in the log player so you can see line graphs of the recorded values
+
+# 1.0.12
+
+Mostly under the hood fixes
+
+- some huge rewrites in the internal data processing which resulted in about halved CPU usage,
+If one turns off real-time preview values in settings it uses less than 0.5% CPU on my dev machine when logging.
+- bugg fixes for STN adapters, they should be more stable now
+- optimized CANUSB driver so it uses less CPU
+- better memory management and reuse of graphics elements instead of recreating them each time shown
+- The T7 presets has been merged into one, no more having to have different presets depending on what cable you have. txlogger will now solve this under the hood
+
+# 1.0.6
+
+- New settings dialogue
+- Possible to copy paste map data between t7suite <-> txlogger
+- You can type in values when editing maps
+- Edit multiple cells at the same time
+- Can load symbols and maps from binary
+- Can load and save maps from ram on open T7 bins
+- Setting to autoload maps from ECU ram ( requires loaded open bin for axis information )
+- Right click menu for copy & paste and smooth operation on maps
+- A lot of code has been written for reading and writing ECU ram on open T7 bins
+- Ton of rewritten code for stability and performance
+- Better responsiveness in map viewer.
+- new 3D map viewer
+- support for editing maps in t7 binaries
+- can update and verify t7 binary checksums
+- reworked settings & real-time symbol list
+- ability to on the fly change symbols without having to restart logging
+- read and write sram maps on T7 with open bins
+- copy paste between t7/8 suite and txlogger
+
+# 1.0.5
+
+Ever wondered how the ECU interpolates values from the maps in the binary live? Now you don't have to. With our all-new map viewer function, get a real-time view of the process. It’s visual, it’s intuitive, and it’s designed to provide insights like never before.
+
+Major Under-the-Hood Improvements!
+
+Your favorite logger just got faster and more efficient. Dive into the details and you'll find a massive code refactor that paves the way for:
+Significantly Reduced CPU Usage: Whether you're logging or using the dashboard & logplayer, expect a silky-smooth performance with reduced strain on your CPU.
+
+Other Updates & Fixes:
+
+We've also made some minor bug fixes and UI enhancements for a polished user experience.
+
+We're always working to make txlogger better for our community. Thanks for being on this journey with us.
+
+# 1.0.4
+
+File Association Improvement: Now you can effortlessly associate .t7l and .t8l files with txlogger.exe. When opening these file types, txlogger will directly launch the logplayer, eliminating the need for manual steps like browsing and clicking play logs. To set up the file associations, run setup.exe or right-click the files and select "Open With," then browse for txlogger.exe.
+
+Enhanced Date & Time Parser: Our log player now boasts an improved date and time parser, catering to multiple date standards. No more worries about compatibility issues—enjoy a seamless log playback experience!
+
+Optimized Log Player Code: The log player code has been optimized to reduce CPU usage by pre-parsing logs before playback, ensuring an efficient and smooth log viewing experience.
+
+Upgrade to txlogger version 1.0.4 today and make managing and playing logs a breeze. Download now and elevate your logging efficiency!
+
+Happy Logging!
+
+# 1.0.3
+
+- Added a shiny new "logs folder" button
+- Shorter log filenames for your convenience
+- Upgraded our symbol libraries to read maps like a champ
+- Leveled up KWP library to read maps from RAM (get ready for some cool stuff!)
+- Updated our GUI framework to the latest and greatest version
+- When loading log files, start in the "logs" folder next to txlogger.exe
+
+# 1.0.2
+
+- More performance optimization
+
+# 1.0.0
+
+- Renamed to txlogger
+- Gotten T8 support :)
+- Support for old T7 binaries with the 14 bytes address table and uncompressed symbol table
+- A homepage has been created: https://txlogger.com
+- More keyboard shortcuts added, see help in software
+- A lot of performance optimization
+- Graduated to 1.0.0 release with the T8 addition
+
+# 0.0.7
+
+- Fixed crash when trying to load symbol name table from ECU running BIN without symbol names
+- Added symbols for EU0AF01O
+- Knock warning on dashboard if logging "KnkDet.KnockCyl"
+- Support for loading XML schemas on binaries with no name table
+- Keyboard shortcuts added to log layer, dashboard and main window ( press help in main screen to see all shortcuts )
+- Various UI polish (better scaling and responsiveness)
