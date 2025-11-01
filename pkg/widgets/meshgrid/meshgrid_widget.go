@@ -9,7 +9,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/colors"
 )
 
 type Vertex struct {
@@ -49,11 +49,11 @@ type Meshgrid struct {
 
 	refreshPending bool
 
-	colorMode widgets.ColorBlindMode
+	colorMode colors.ColorBlindMode
 }
 
 // NewMeshgrid creates a new Meshgrid given width, height, depth and spacing.
-func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int, colorBlindMode widgets.ColorBlindMode) (*Meshgrid, error) {
+func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int, colorBlindMode colors.ColorBlindMode) (*Meshgrid, error) {
 	// Check if the provided values slice has the correct number of elements
 	if len(values) != max(1, cols)*max(1, rows) {
 		return nil, fmt.Errorf("the number of Z values does not match the meshgrid dimensions")
@@ -106,7 +106,7 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 	return m, nil
 }
 
-func (m *Meshgrid) SetColorBlindMode(mode widgets.ColorBlindMode) {
+func (m *Meshgrid) SetColorBlindMode(mode colors.ColorBlindMode) {
 	if m.colorMode != mode {
 		m.colorMode = mode
 	}

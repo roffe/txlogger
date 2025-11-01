@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/widgets"
@@ -498,7 +499,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	}
 
 	cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(ebus.TOPIC_COLORBLINDMODE, func(value float64) {
-		mv.SetColorBlindMode(widgets.ColorBlindMode(int(value)))
+		mv.SetColorBlindMode(colors.ColorBlindMode(int(value)))
 	}))
 
 	mapWindow.OnClose = func() {

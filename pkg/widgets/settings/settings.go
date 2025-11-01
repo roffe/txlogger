@@ -17,6 +17,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/proto"
+	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/mdns"
 	"github.com/roffe/txlogger/pkg/ota"
@@ -25,7 +26,6 @@ import (
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
 	"github.com/roffe/txlogger/pkg/wbl/plx"
 	"github.com/roffe/txlogger/pkg/wbl/zeitronix"
-	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/txconfigurator"
 	"go.bug.st/serial/enumerator"
 )
@@ -355,7 +355,7 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 		PrintVersion:           true,
 	}
 
-	if strings.HasPrefix(adapterName, "J2534") || strings.HasPrefix(adapterName, "CANlib") {
+	if strings.HasPrefix(adapterName, "J2534") { // || strings.HasPrefix(adapterName, "CANlib") {
 		return gocan.NewGWClient(adapterName, cfg)
 	}
 
@@ -407,8 +407,8 @@ func (sw *Widget) GetWidebandSymbolName() string {
 	}
 }
 
-func (sw *Widget) GetColorBlindMode() widgets.ColorBlindMode {
-	return widgets.StringToColorBlindMode(fyne.CurrentApp().Preferences().StringWithFallback(prefsColorBlindMode, "Normal"))
+func (sw *Widget) GetColorBlindMode() colors.ColorBlindMode {
+	return colors.StringToColorBlindMode(fyne.CurrentApp().Preferences().StringWithFallback(prefsColorBlindMode, "Normal"))
 
 }
 

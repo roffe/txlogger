@@ -13,9 +13,9 @@ import (
 	"fyne.io/fyne/v2/widget"
 	xlayout "fyne.io/x/fyne/layout"
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
-	"github.com/roffe/txlogger/pkg/widgets"
 )
 
 const (
@@ -37,7 +37,7 @@ type Widget struct {
 type Config struct {
 	//EBus           *eventbus.Controller
 	Symbols        []*symbol.Symbol
-	ColorBlindMode widgets.ColorBlindMode
+	ColorBlindMode colors.ColorBlindMode
 }
 
 func New(cfg *Config) *Widget {
@@ -58,7 +58,7 @@ func (s *Widget) render() {
 
 }
 
-func (s *Widget) SetColorBlindMode(mode widgets.ColorBlindMode) {
+func (s *Widget) SetColorBlindMode(mode colors.ColorBlindMode) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.cfg.ColorBlindMode = mode
@@ -93,7 +93,7 @@ func (s *Widget) SetValue(name string, value float64) {
 		}
 		if s.updateBars {
 			val.valueBarFactor = float32((value - val.min) / (val.max - val.min))
-			col := widgets.GetColorInterpolation(val.min, val.max, value, s.cfg.ColorBlindMode)
+			col := colors.GetColorInterpolation(val.min, val.max, value, s.cfg.ColorBlindMode)
 			col.A = barAlpha
 			val.valueBar.FillColor = col
 			totalWidth := val.symbolName.Size().Width
@@ -347,7 +347,7 @@ func (s *symbolWidgetEntryRenderer) Refresh() {
 	s.e.symbolValue.Refresh()
 	s.e.symbolNumber.Refresh()
 	s.e.symbolCorrectionfactor.Refresh()
-	col := widgets.GetColorInterpolation(s.e.min, s.e.max, s.e.value, s.e.w.cfg.ColorBlindMode)
+	col := colors.GetColorInterpolation(s.e.min, s.e.max, s.e.value, s.e.w.cfg.ColorBlindMode)
 	col.A = barAlpha
 	s.e.valueBar.FillColor = col
 	s.e.valueBar.StrokeColor = col

@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/assets"
+	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/wbl/aem"
@@ -19,7 +20,6 @@ import (
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
 	"github.com/roffe/txlogger/pkg/wbl/plx"
 	"github.com/roffe/txlogger/pkg/wbl/zeitronix"
-	"github.com/roffe/txlogger/pkg/widgets"
 )
 
 func newImageFromResource(name string) *canvas.Image {
@@ -292,12 +292,7 @@ func (sw *Widget) newSwapRPMandSpeed() *widget.Check {
 }
 
 func (sw *Widget) newColorBlindMode() *widget.Select {
-	return widget.NewSelect([]string{
-		widgets.ModeNormal.String(),
-		widgets.ModeUniversal.String(),
-		widgets.ModeProtanopia.String(),
-		widgets.ModeTritanopia.String(),
-	}, func(s string) {
+	return widget.NewSelect(colors.SupportedColorBlindModes[:], func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsColorBlindMode, s)
 		ebus.Publish(ebus.TOPIC_COLORBLINDMODE, float64(sw.colorBlindMode.SelectedIndex()))
 	})

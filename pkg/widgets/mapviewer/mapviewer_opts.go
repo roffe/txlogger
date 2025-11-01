@@ -2,7 +2,7 @@ package mapviewer
 
 import (
 	"fyne.io/fyne/v2"
-	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/colors"
 )
 
 type Config struct {
@@ -29,7 +29,7 @@ type Config struct {
 	Editable              bool
 	CursorFollowCrosshair bool
 
-	ColorblindMode widgets.ColorBlindMode
+	ColorblindMode colors.ColorBlindMode
 
 	Buttons []*MapViewerButton
 }

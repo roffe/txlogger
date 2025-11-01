@@ -5,7 +5,7 @@ import (
 	"image/color"
 	"math"
 
-	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/colors"
 )
 
 // VertexPair represents a line segment between two vertices
@@ -127,7 +127,7 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 func (m *Meshgrid) getColorWithDepth(value, depthFactor float64) color.RGBA {
 	// Get base color from value
 	//baseColor := m.getColorInterpolation(value)
-	baseColor := widgets.GetColorInterpolation(
+	baseColor := colors.GetColorInterpolation(
 		m.zmin,
 		m.zmax,
 		value,

@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/widgets"
@@ -79,7 +80,7 @@ type MapViewer struct {
 	widthFactor  float32
 	heightFactor float32
 
-	colorMode widgets.ColorBlindMode
+	colorMode colors.ColorBlindMode
 }
 
 func New(config *Config) (*MapViewer, error) {
@@ -104,7 +105,7 @@ func New(config *Config) (*MapViewer, error) {
 	return mv, nil
 }
 
-func (mv *MapViewer) SetColorBlindMode(mode widgets.ColorBlindMode) {
+func (mv *MapViewer) SetColorBlindMode(mode colors.ColorBlindMode) {
 	if mv.colorMode != mode {
 		mv.colorMode = mode
 		mv.Refresh()
@@ -259,7 +260,9 @@ func (mv *MapViewer) SetY(yValue float64) {
 			}
 		})
 	}
-	mv.setXY()
+	if err := mv.setXY(); err != nil {
+		log.Println("MapViewer SetXY error:", err)
+	}
 }
 
 func (mv *MapViewer) setCellText(idx int, value float64) {
@@ -284,7 +287,7 @@ func (mv *MapViewer) Refresh() {
 	mv.zMin, mv.zMax = widgets.FindMinMax(mv.cfg.ZData)
 	for idx, value := range mv.cfg.ZData {
 		mv.setCellText(idx, value)
-		col := widgets.GetColorInterpolation(
+		col := colors.GetColorInterpolation(
 			mv.zMin,
 			mv.zMax,
 			value,
@@ -351,7 +354,7 @@ func (mv *MapViewer) createTextValues() {
 func (mv *MapViewer) createZdata() {
 	mv.valueRects = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.32))
 	for _, value := range mv.cfg.ZData {
-		color := widgets.GetColorInterpolation(mv.zMin, mv.zMax, value, mv.colorMode)
+		color := colors.GetColorInterpolation(mv.zMin, mv.zMax, value, mv.colorMode)
 		rect := &canvas.Rectangle{FillColor: color, StrokeColor: color, StrokeWidth: 0}
 		rect.SetMinSize(fyne.NewSize(34, 14))
 		mv.zDataRects = append(mv.zDataRects, rect)
