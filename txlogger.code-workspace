@@ -20,6 +20,9 @@
 		},
 		{
 			"path": "../txweb"
+		},
+		{
+			"path": "../gopcan"
 		}
 	],
 	"settings": {
