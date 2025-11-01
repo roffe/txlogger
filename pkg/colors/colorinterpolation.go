@@ -1,44 +1,67 @@
-package widgets
+package colors
 
 import (
 	"image/color"
 	"math"
+	"strings"
 )
 
 type ColorBlindMode int
 
+var SupportedColorBlindModes = [...]string{
+	Normal,
+	Universal,
+	Protanopia,
+	Tritanopia,
+	Deuteranomaly,
+}
+
 const (
-	ModeNormal     ColorBlindMode = iota // Green → Yellow → Red
-	ModeUniversal                        // Blue → Gray → Orange
-	ModeProtanopia                       // Blue → White → Brown
-	ModeTritanopia                       // Red → Gray → Teal
+	Normal        = "Normal"
+	Universal     = "Universal"
+	Protanopia    = "Protanopia"
+	Tritanopia    = "Tritanopia"
+	Deuteranomaly = "Deuteranomaly"
+	Unknown       = "Unknown"
+)
+
+const (
+	ModeNormal        ColorBlindMode = iota // Green → Yellow → Red
+	ModeUniversal                           // Blue → Gray → Orange
+	ModeProtanopia                          // Blue → White → Brown
+	ModeTritanopia                          // Red → Gray → Teal
+	ModeDeuteranomaly                       // Blue → Beige → Brown
 )
 
 func (m ColorBlindMode) String() string {
 	switch m {
 	case ModeNormal:
-		return "Normal"
+		return Normal
 	case ModeUniversal:
-		return "Universal"
+		return Universal
 	case ModeProtanopia:
-		return "Protanopia"
+		return Protanopia
 	case ModeTritanopia:
-		return "Tritanopia"
+		return Tritanopia
+	case ModeDeuteranomaly:
+		return Deuteranomaly
 	default:
-		return "Unknown"
+		return Unknown
 	}
 }
 
 func StringToColorBlindMode(s string) ColorBlindMode {
-	switch s {
-	case "Normal":
+	switch strings.Title(s) {
+	case Normal:
 		return ModeNormal
-	case "Universal":
+	case Universal:
 		return ModeUniversal
-	case "Protanopia":
+	case Protanopia:
 		return ModeProtanopia
-	case "Tritanopia":
+	case Tritanopia:
 		return ModeTritanopia
+	case Deuteranomaly:
+		return ModeDeuteranomaly
 	default:
 		return ModeNormal
 	}
@@ -49,7 +72,6 @@ func StringToColorBlindMode(s string) ColorBlindMode {
 
 // GetColorInterpolation returns interpolated color for a given value
 func GetColorInterpolation(min, max, value float64, mode ColorBlindMode) color.RGBA {
-	// Normalize to [0,1]
 	t := (value - min) / (max - min)
 	if t < 0 {
 		t = 0
@@ -59,11 +81,9 @@ func GetColorInterpolation(min, max, value float64, mode ColorBlindMode) color.R
 	}
 
 	if math.IsNaN(t) {
-		// fallback to gray if value is NaN
 		return color.RGBA{128, 128, 128, 255}
 	}
 
-	// pick color stops depending on mode
 	var low, mid, high color.RGBA
 	switch mode {
 	case ModeNormal:
@@ -71,33 +91,38 @@ func GetColorInterpolation(min, max, value float64, mode ColorBlindMode) color.R
 		low = color.RGBA{0, 255, 0, 255}
 		mid = color.RGBA{255, 255, 0, 255}
 		high = color.RGBA{255, 0, 0, 255}
+
 	case ModeUniversal:
 		// Blue → Gray → Orange
 		low = color.RGBA{33, 102, 172, 255}  // #2166AC
 		mid = color.RGBA{247, 247, 247, 255} // #F7F7F7
-		high = color.RGBA{255, 165, 00, 255} // #FFA500
+		high = color.RGBA{255, 165, 0, 255}  // #FFA500
 
 	case ModeProtanopia:
 		// Blue → White → Brown
-		low = color.RGBA{5, 113, 176, 255}       // #0571B0
-		mid = color.RGBA{247, 247, 247, 255}     // #F7F7F7
-		high = color.RGBA{0x96, 0x4B, 0x00, 255} // #964B00
+		low = color.RGBA{5, 113, 176, 255}   // #0571B0
+		mid = color.RGBA{247, 247, 247, 255} // #F7F7F7
+		high = color.RGBA{150, 75, 0, 255}   // #964B00
 
 	case ModeTritanopia:
 		// Teal → Gray → Red
-		low = color.RGBA{0x00, 0x80, 0x80, 255} // #008080
-		mid = color.RGBA{247, 247, 247, 255}    // #F7F7F7
-		high = color.RGBA{215, 48, 39, 255}     // #D73027
+		low = color.RGBA{0, 128, 128, 255}   // #008080
+		mid = color.RGBA{247, 247, 247, 255} // #F7F7F7
+		high = color.RGBA{215, 48, 39, 255}  // #D73027
+
+	case ModeDeuteranomaly:
+		// Blue → Beige → Brown
+		low = color.RGBA{0x4A, 0x90, 0xE2, 255}  // #4A90E2 — medium blue
+		mid = color.RGBA{0xF5, 0xE6, 0xB3, 255}  // #F5E6B3 — beige
+		high = color.RGBA{0x8B, 0x45, 0x13, 255} // #8B4513 — dark brown
 
 	default:
-		// fallback: normal
 		low = color.RGBA{0, 255, 0, 255}
 		mid = color.RGBA{255, 255, 0, 255}
 		high = color.RGBA{255, 0, 0, 255}
 	}
-	divider := .5
 
-	// split interpolation at midpoint
+	const divider = 0.5
 	if t < divider {
 		return lerpColor(low, mid, t/divider)
 	}
@@ -105,20 +130,17 @@ func GetColorInterpolation(min, max, value float64, mode ColorBlindMode) color.R
 }
 
 func GetColorInterpolationOld(min, max, value float64) color.RGBA {
-	//log.Println("getColorInterpolation", min, max, value)
-	// Normalize the value to a 0-1 range
 	t := (value - min) / (max - min)
-	divider := .6
+	const divider = 0.6
 	var r, g, b float64
-	if t < divider { // Green to Yellow interpolation
+	if t < divider {
 		r = lerp(0, 1, t/divider)
 		g = 1
-	} else { // Yellow to Red interpolation
+	} else {
 		r = 1
 		g = lerp(1, 0, (t-divider)/(1-divider))
 	}
 	b = 0
-	// Convert from 0-1 range to 0-255 for color.RGBA
 	return color.RGBA{
 		R: uint8(r * 255),
 		G: uint8(g * 255),

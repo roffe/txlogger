@@ -21,12 +21,12 @@ import (
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/proto"
+	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/logfile"
-	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/canflasher"
 	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
@@ -117,7 +117,7 @@ type mainWindowCounters struct {
 
 func NewMainWindow(app fyne.App) *MainWindow {
 	symbolListConfig := &symbollist.Config{
-		ColorBlindMode: widgets.ModeNormal,
+		ColorBlindMode: colors.ModeNormal,
 	}
 	mw := &MainWindow{
 		Window:     app.NewWindow("txlogger"),
@@ -141,7 +141,7 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	}
 
 	ebus.SubscribeFunc(ebus.TOPIC_COLORBLINDMODE, func(v float64) {
-		mw.symbolList.SetColorBlindMode(widgets.ColorBlindMode(int(v)))
+		mw.symbolList.SetColorBlindMode(colors.ColorBlindMode(int(v)))
 		mw.symbolList.Refresh()
 	})
 
