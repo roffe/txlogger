@@ -299,7 +299,7 @@ func (sw *Widget) newColorBlindMode() *widget.Select {
 }
 
 func (sw *Widget) newAdapterSelector() *widget.Select {
-	return widget.NewSelect(gocan.List(), func(s string) {
+	return widget.NewSelect(gocan.ListAdapterNames(), func(s string) {
 		if info, found := sw.adapters[s]; found {
 			fyne.CurrentApp().Preferences().SetString(prefsAdapter, s)
 			if info.RequiresSerialPort {
