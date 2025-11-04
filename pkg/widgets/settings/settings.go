@@ -386,7 +386,7 @@ func (sw *Widget) GetWidebandSymbolName() string {
 		case "T5":
 			return "AD_EGR"
 		case "T7":
-			if sw.wblADscanner.Checked {
+			if fyne.CurrentApp().Preferences().BoolWithFallback(prefsUseADScanner, false) {
 				return "DisplProt.AD_Scanner"
 			}
 			return "DisplProt.LambdaScanner"
