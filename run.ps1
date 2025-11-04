@@ -22,7 +22,7 @@ if ($cangateway) {
     $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
 
     $env:GOARCH = "386"
-    go run -tags="j2534" github.com/roffe/gocan/cmd/cangateway $args
+    go run -tags="j2534" github.com/roffe/gocangateway $args
     exit
 }
 
