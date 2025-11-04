@@ -22,13 +22,30 @@ import (
 	// _ "net/http/pprof"
 )
 
-func init() {
-	var workDirectory string
+var workDirectory string
 
-	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.StringVar(&workDirectory, "d", "", "working directory")
 	flag.Parse()
 
+}
+
+// Unfortunately Fyne installs its own signal handler that needs to be overridden to allow graceful shutdown on SIGINT/SIGTERM.
+func signalHandler(mw *windows.MainWindow) {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
+	debug.Log("installed signal handler")
+	sig := make(chan os.Signal, 2)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	s := <-sig
+	debug.Log("caught:" + s.String())
+	fyne.DoAndWait(mw.Close)
+	//fyne.CurrentApp().Driver().Quit()
+}
+
+func main() {
+	InitConsole()
 	// change working directory if requested
 	if workDirectory != "" {
 		debug.Log("changing working directory to " + workDirectory)
@@ -36,21 +53,7 @@ func init() {
 			debug.Log(fmt.Sprintf("failed to change working directory to %s: %v", workDirectory, err))
 		}
 	}
-}
 
-// Unfortunately Fyne installs its own signal handler that needs to be overridden to allow graceful shutdown on SIGINT/SIGTERM.
-func signalHandler(mw *windows.MainWindow) {
-	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
-	log.Println("installed signal handler")
-	sig := make(chan os.Signal, 2)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	s := <-sig
-	log.Println("caught:", s)
-	fyne.DoAndWait(mw.Close)
-	//fyne.CurrentApp().Driver().Quit()
-}
-
-func main() {
 	//startpprof()
 	defer debug.Close()
 	defer debug.Log("txlogger exit")
@@ -108,7 +111,7 @@ func main() {
 /*
 func startpprof() {
 	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
+		debug.Log(http.ListenAndServe("localhost:6060", nil))
 	}()
 }
 */
