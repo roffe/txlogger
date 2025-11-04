@@ -43,7 +43,7 @@ func Start() (*os.Process, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start %s: %w", exeName, err)
 	}
-	log.Printf("started cangateway pid: %d", cmd.Process.Pid)
+	debug.Log(fmt.Sprintf("started cangateway pid: %d", cmd.Process.Pid))
 
 	ctx, cancel := context.WithTimeout(context.Background(), readyWait)
 	defer cancel()
