@@ -563,9 +563,10 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Positio
 	iw.OnClose = func() {
 		lp.Close()
 	}
+	mw.wm.Add(iw)
 	m := iw.MinSize()
 	pos2 := fyne.NewPos(pos.X-m.Width*0.5, pos.Y-m.Height*0.5)
-	mw.wm.Add(iw, pos2)
+	iw.Move(pos2)
 
 }
 

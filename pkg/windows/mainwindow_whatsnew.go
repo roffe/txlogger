@@ -30,6 +30,6 @@ func (mw *MainWindow) showWhatsNew() {
 	md.Wrapping = fyne.TextWrapWord
 	iw := multiwindow.NewSystemWindow("What's new", container.NewVScroll(md))
 	iw.Icon = theme.InfoIcon()
-	iw.Resize(fyne.NewSize(700, 400))
 	mw.wm.Add(iw)
+	iw.Resize(fyne.NewSize(700, 400))
 }
