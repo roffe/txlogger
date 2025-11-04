@@ -79,7 +79,7 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 	adConverter := newDisplProtADConverterT7(c.WidebandConfig)
 
 	go func() {
-		if err := cl.Wait(); err != nil {
+		if err := cl.Wait(ctx); err != nil {
 			c.OnMessage(err.Error())
 			cancel()
 		}

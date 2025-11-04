@@ -67,7 +67,7 @@ func (c *T5Client) Start() error {
 	converto := newT5Converter(c.WidebandConfig)
 
 	go func() {
-		if err := cl.Wait(); err != nil {
+		if err := cl.Wait(ctx); err != nil {
 			c.OnMessage(err.Error())
 			cancel()
 		}

@@ -33,7 +33,10 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 	if err := initT8Logging(ctx, gm, c.Symbols, c.OnMessage); err != nil {
 		return fmt.Errorf("failed to init t8 logging: %w", err)
 	}
-	defer gm.ReturnToNormalMode(ctx)
+	defer func() {
+		_ = gm.ReturnToNormalMode(ctx)
+		time.Sleep(50 * time.Millisecond)
+	}()
 
 	t := time.NewTicker(time.Second / time.Duration(c.Rate))
 	defer t.Stop()
@@ -66,7 +69,7 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 	}
 
 	go func() {
-		if err := cl.Wait(); err != nil {
+		if err := cl.Wait(ctx); err != nil {
 			c.OnMessage(err.Error())
 			cancel()
 		}
