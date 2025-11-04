@@ -119,6 +119,8 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/roffe/ecusymbol v1.0.6 h1:0+YjKVuWTESiAdFWF/JYYlfCooRePtjBgSBB6MWnVHk=
 github.com/roffe/ecusymbol v1.0.6/go.mod h1:0nrbfx99ecWTXVjNbaqA9iZYlLlLdXWLE//Hb5hCajQ=
+github.com/roffe/gocan v1.2.7 h1:TFKBNJTldoZJDOnr2wggyPqIXsLB3KTmey8pwrKQq3s=
+github.com/roffe/gocan v1.2.7/go.mod h1:vo1MhauJFNrpugFUiZKmN72bokN5D18ULCTgU1izFlU=
 github.com/roffe/gocanflasher v1.0.4 h1:LCs5cb/L2c0Gqe5lte6vs41pDkcpXCVF8vHdu7E2GFc=
 github.com/roffe/gocanflasher v1.0.4/go.mod h1:IYk2Xm1KmSJAszhKtQxmdq6hmauuzKzB3u5r/q6NGoM=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=

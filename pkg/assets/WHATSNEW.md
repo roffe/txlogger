@@ -5,6 +5,7 @@
 – Created driver for PCAN adapters on Windows using the PEAK CANlib DLL. This enables T5 support with PCAN adapters.
 - Rewrote large parts of goCAN to have better error handling
 - Fixed a bug in the Kvaser Canlib implementation making it possible to move it out of the cangateway back into the main application
+- Fixed crash where app would not start it T7 ECU was selected and WBL was set to ECU Lambda source
 
 # 2.1.3
 - Added a check for updates dialogue that will show every second week.
