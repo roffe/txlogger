@@ -1,8 +1,11 @@
+# 2.1.5
+- 
+
 # 2.1.4
 - Symbollist now remembers the last selected preset per ECU.
 - Fixed a bug where logs loaded from menu would be stuck in the top left corner
 - Tweaked positioning when dragging and dropping log files in the main window
-– Created driver for PCAN adapters on Windows using the PEAK Basic API DLL. This enables T5 support with PCAN adapters.
+- Created driver for PCAN adapters on Windows using the PEAK Basic API DLL. This enables T5 support with PCAN adapters.
 - Rewrote large parts of goCAN to have better error handling
 - Fixed a bug in the Kvaser Canlib implementation making it possible to move it out of the cangateway back into the main application
 - Fixed crash where app would not start it T7 ECU was selected and WBL was set to ECU Lambda source
