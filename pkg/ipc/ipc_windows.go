@@ -2,20 +2,20 @@ package ipc
 
 import (
 	"context"
-	"log"
 	"net"
 	"time"
 
 	"github.com/Microsoft/go-winio"
+	"github.com/roffe/txlogger/pkg/debug"
 )
 
 const pipe = `\\.\pipe\txlogger`
 
 func IsRunning() bool {
 	if !ping() {
-		log.Println("txlogger is not running")
+		debug.Log("txlogger is not running, starting new instance")
 	} else {
-		log.Println("txlogger is running, sending show request over socket")
+		debug.Log("txlogger is running, sending show request over socket")
 		sendShow()
 		return true
 	}

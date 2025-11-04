@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -171,6 +172,9 @@ func ping() bool {
 			if nErr.Op == "dial" {
 				return false
 			}
+		}
+		if errors.Is(err, syscall.Errno(0x2)) {
+			return false
 		}
 		log.Println(err)
 		return false
