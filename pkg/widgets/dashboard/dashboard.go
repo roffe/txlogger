@@ -98,24 +98,26 @@ func NewDashboard(cfg *Config) *Dashboard {
 			airmass: dualdial.New(&widgets.GaugeConfig{
 				Title:   "mg/c",
 				Min:     0,
-				Max:     2200,
-				Steps:   22,
+				Max:     2500,
+				Steps:   20,
 				MinSize: fyne.NewSize(100, 100),
 			}),
 			speed: dial.New(&widgets.GaugeConfig{
-				Title:         speedometerText,
-				Min:           0,
-				Max:           300,
-				Steps:         30,
-				DisplayString: "%.1f",
-				MinSize:       fyne.NewSize(100, 100),
+				Title:           speedometerText,
+				Min:             0,
+				Max:             300,
+				Steps:           30,
+				DisplayString:   "%.1f",
+				GaugeTextString: "%.0f",
+				MinSize:         fyne.NewSize(100, 100),
 			}),
 			rpm: dial.New(&widgets.GaugeConfig{
-				Title:   "RPM",
-				Min:     0,
-				Max:     8000,
-				Steps:   20,
-				MinSize: fyne.NewSize(100, 100),
+				Title:       "RPM",
+				Min:         0,
+				Max:         8000,
+				Steps:       16,
+				MinSize:     fyne.NewSize(100, 100),
+				GaugeFactor: 0.001,
 			}),
 			iat: dial.New(&widgets.GaugeConfig{
 				Title:   "IAT",
@@ -125,12 +127,13 @@ func NewDashboard(cfg *Config) *Dashboard {
 				MinSize: fyne.NewSize(100, 100),
 			}),
 			pressure: dualdial.New(&widgets.GaugeConfig{
-				Title:         "MAP",
-				Min:           0,
-				Max:           3,
-				Steps:         30,
-				DisplayString: "%.2f",
-				MinSize:       fyne.NewSize(100, 100),
+				Title:           "MAP",
+				Min:             0,
+				Max:             3,
+				Steps:           30,
+				DisplayString:   "%.2f",
+				GaugeTextString: "%.1f",
+				MinSize:         fyne.NewSize(100, 100),
 			}),
 			throttle: vbar.New(&widgets.GaugeConfig{
 				Title:      "TPS",
@@ -151,7 +154,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 			engineTemp: dial.New(&widgets.GaugeConfig{
 				Title: "tEng",
 				Min:   -20,
-				Max:   130,
+				Max:   140,
 				Steps: 16,
 			}),
 			wblambda: cbar.New(&widgets.GaugeConfig{
@@ -629,9 +632,7 @@ func layoutSideDials(db *Dashboard, space fyne.Size, dims *dims) {
 }
 
 func layoutVerticalBars(db *Dashboard, space fyne.Size, dims *dims) {
-
 	vbarSize := fyne.NewSize(min(dims.sixthWidth*common.OneThird, 70), space.Height-120)
-
 	db.gauges.pwm.Resize(vbarSize)
 	db.gauges.pwm.Move(fyne.NewPos(dims.sixthWidth+8, 25))
 

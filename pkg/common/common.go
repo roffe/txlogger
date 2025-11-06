@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"time"
 )
 
@@ -81,4 +82,30 @@ func createDirIfNotExists(path string) error {
 		return fmt.Errorf("could not create log directory: %v", err)
 	}
 	return nil
+}
+
+func ParseFixedPrec(format string) int {
+	if len(format) >= 4 && format[0] == '%' && format[1] == '.' && format[len(format)-1] == 'f' {
+		n := 0
+		has := false
+		for i := 2; i < len(format)-1; i++ {
+			ch := format[i]
+			if ch < '0' || ch > '9' {
+				return -1
+			}
+			has = true
+			n = n*10 + int(ch-'0')
+		}
+		if has {
+			return n
+		}
+	}
+	return -1
+}
+
+func AppendFormatFloat(dst []byte, format string, v float64) []byte {
+	if n := ParseFixedPrec(format); n >= 0 {
+		return strconv.AppendFloat(dst, v, 'f', n, 64)
+	}
+	return strconv.AppendFloat(dst, v, 'f', 0, 64)
 }

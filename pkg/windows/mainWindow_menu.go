@@ -123,7 +123,7 @@ func (mw *MainWindow) setupMenu() {
 
 	leading := []*fyne.Menu{
 		fyne.NewMenu("File",
-			fyne.NewMenuItem("About", func() {
+			fyne.NewMenuItemWithIcon("About", theme.HelpIcon(), func() {
 				if w := mw.wm.HasWindow("About"); w != nil {
 					mw.wm.Raise(w)
 					return
@@ -132,8 +132,8 @@ func (mw *MainWindow) setupMenu() {
 				inner.Icon = theme.HelpIcon()
 				mw.wm.Add(inner)
 			}),
-			fyne.NewMenuItem("Open binary", mw.loadBinary),
-			fyne.NewMenuItem("Open log", func() {
+			fyne.NewMenuItemWithIcon("Open binary", theme.DocumentIcon(), mw.loadBinary),
+			fyne.NewMenuItemWithIcon("Open log", theme.DocumentIcon(), func() {
 				cb := func(r fyne.URIReadCloser) {
 					defer r.Close()
 					filename := r.URI().Name()
@@ -144,19 +144,19 @@ func (mw *MainWindow) setupMenu() {
 				}
 				widgets.SelectFile(cb, "Log file", "csv", "t5l", "t7l", "t8l")
 			}),
-			fyne.NewMenuItem("Open log folder", func() {
+			fyne.NewMenuItemWithIcon("Open log folder", theme.FolderIcon(), func() {
 				cmd := exec.Command("explorer.exe", mw.settings.GetLogPath())
 				if err := cmd.Start(); err != nil {
 					mw.Error(err)
 				}
 			}),
-			fyne.NewMenuItem("Settings", func() {
+			fyne.NewMenuItemWithIcon("Settings", theme.SettingsIcon(), func() {
 				mw.openSettings()
 			}),
-			fyne.NewMenuItem("What's new", func() {
+			fyne.NewMenuItemWithIcon("What's new", theme.InfoIcon(), func() {
 				mw.showWhatsNew()
 			}),
-			fyne.NewMenuItem("Check for updates", func() {
+			fyne.NewMenuItemWithIcon("Check for updates", theme.ViewRefreshIcon(), func() {
 				update.UpdateCheck(mw.app, mw.Window)
 			}),
 		),

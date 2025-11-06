@@ -259,6 +259,8 @@ func (s *Widget) newSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*Symbo
 	})
 
 	sw.valueBar = canvas.NewRectangle(color.RGBA{0, 0, 0, 0})
+	sw.valueBar.BottomRightCornerRadius = 4
+	sw.valueBar.TopRightCornerRadius = 4
 
 	layout := xlayout.NewHPortion(headerSizes)
 	sw.body = container.New(layout,

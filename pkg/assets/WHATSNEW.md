@@ -1,5 +1,5 @@
 # 2.1.5
-- 
+- Added numbers on the gauge dials for easier reading
 
 # 2.1.4
 - Symbollist now remembers the last selected preset per ECU.

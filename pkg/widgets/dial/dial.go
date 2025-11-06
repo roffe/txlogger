@@ -8,7 +8,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/widgets"
@@ -28,10 +27,11 @@ type Dial struct {
 	highestObservedMarker *canvas.Line
 	lastHighestObserved   time.Time
 
-	pips        []*canvas.Line
-	face        *canvas.Circle
+	pips      []*canvas.Line
+	pipLabels []*canvas.Text
+
+	face        *canvas.Arc
 	center      *canvas.Circle
-	cover       *canvas.Rectangle
 	displayText *canvas.Text
 	titleText   *canvas.Text
 
@@ -42,16 +42,22 @@ type Dial struct {
 	radius                     float32
 	middle                     fyne.Position
 	needleOffset, needleLength float32
-	needleRotConst             float64 // equals common.Pi15/(Max-Min)
-	lineRotConst               float64 // equals common.Pi15/steps
+	needleRotConst             float64 // = common.Pi15/(Max-Min)
+	lineRotConst               float64 // = common.Pi15/steps
 
 	// Precomputed trig for pips: angle_i = lineRotConst*float64(i) - common.Pi43
 	pipSin []float32
 	pipCos []float32
 
 	// Fast float formatting
-	fmtPrec int // precision extracted from displayString like "%.0f", "%.1f", defaults to -1 meaning use displayString via strconv fallback
-	buf     []byte
+	fmtPrec   int // precision extracted from displayString like "%.0f", "%.1f", defaults to -1
+	gaugePrec int // precision extracted from GaugeTextString like "%.0f", "%.1f", defaults to -1
+	buf       []byte
+
+	// Label sizing cache (avoids MinSize calls every layout)
+	maxLabelChars int     // longest label length at construction
+	labelBoxW     float32 // computed each layout from TextSize and maxLabelChars
+	labelBoxH     float32 // computed each layout from TextSize
 }
 
 func New(cfg *widgets.GaugeConfig) *Dial {
@@ -65,13 +71,18 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 
 	if cfg.DisplayString != "" {
 		c.displayString = cfg.DisplayString
-		// Try to parse a simple "%.Nf" so we can use AppendFloat w/o fmt
-		// Very forgiving: looks for "%.<digits>f"
-		if n := parseFixedPrec(c.displayString); n >= 0 {
+		if n := common.ParseFixedPrec(c.displayString); n >= 0 {
 			c.fmtPrec = n
 		}
 	}
-
+	if cfg.GaugeTextString != "" {
+		if n := common.ParseFixedPrec(cfg.GaugeTextString); n >= 0 {
+			c.gaugePrec = n
+		}
+	}
+	if cfg.GaugeFactor == 0 {
+		cfg.GaugeFactor = 1.0
+	}
 	if cfg.MinSize.Width > 0 && cfg.MinSize.Height > 0 {
 		c.minsize = cfg.MinSize
 	}
@@ -79,14 +90,12 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 	steps := float64(cfg.Steps)
 	totalRange := c.cfg.Max - c.cfg.Min
 	if totalRange <= 0 {
-		// fallback to avoid div by zero; still functional
 		totalRange = 1
 	}
 
 	c.factor = c.cfg.Max / steps
 
-	c.face = &canvas.Circle{StrokeColor: color.RGBA{0x80, 0x80, 0x80, 255}, StrokeWidth: 3}
-	c.cover = &canvas.Rectangle{FillColor: theme.Color(theme.ColorNameBackground)}
+	c.face = canvas.NewArc(-135.73, 135.8, 0.985, color.RGBA{0x80, 0x80, 0x80, 0xFF})
 	c.center = &canvas.Circle{FillColor: color.RGBA{R: 0x01, G: 0x0B, B: 0x13, A: 0xFF}}
 	c.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 3}
 	c.highestObservedMarker = &canvas.Line{StrokeColor: color.RGBA{R: 216, G: 250, B: 8, A: 0xFF}, StrokeWidth: 6}
@@ -96,19 +105,38 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 	c.titleText.Alignment = fyne.TextAlignCenter
 
 	c.displayText = &canvas.Text{Text: "0", Color: color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF}, TextSize: 52}
-	c.displayText.TextStyle.Monospace = true
 	c.displayText.Alignment = fyne.TextAlignCenter
 
-	// Pip color gradient stays the same
+	// Pip color gradient
 	fac := float64(0xA5) / float64(c.cfg.Steps)
+
+	// Build pips + labels once; also track the longest label length
 	for i := 0; i < c.cfg.Steps+1; i++ {
 		col := color.RGBA{byte(float64(i) * fac), 0x00, 0x00, 0xFF}
 		col.G = 0xA5 - col.R
 		pip := &canvas.Line{StrokeColor: col, StrokeWidth: 2}
 		c.pips = append(c.pips, pip)
+
+		if i%2 == 0 {
+			val := c.cfg.Min + (float64(i)/float64(c.cfg.Steps))*(c.cfg.Max-c.cfg.Min)*c.cfg.GaugeFactor
+			txt := strconv.FormatFloat(val, 'f', c.gaugePrec, 64)
+
+			lbl := &canvas.Text{
+				Text:      txt,
+				Color:     color.RGBA{0xE0, 0xE0, 0xE0, 0xFF},
+				Alignment: fyne.TextAlignCenter,
+			}
+			//lbl.TextStyle.Monospace = true
+			if n := len(txt); n > c.maxLabelChars {
+				c.maxLabelChars = n
+			}
+			c.pipLabels = append(c.pipLabels, lbl)
+		} else {
+			c.pipLabels = append(c.pipLabels, nil)
+		}
 	}
 
-	// Constants (simplified)
+	// Constants
 	c.needleRotConst = common.Pi15 / totalRange
 	c.lineRotConst = common.Pi15 / steps
 
@@ -127,8 +155,7 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 
 func (c *Dial) GetConfig() *widgets.GaugeConfig { return c.cfg }
 
-// rotate angle (in radians) without refreshing per-object;
-// caller refreshes once after batching updates.
+// rotate angle (in radians) without refreshing per-object
 func (c *Dial) rotateNoRefresh(hand *canvas.Line, rotation float64, offset, length float32) {
 	s, co := math.Sincos(rotation)
 	c.applySinCos(hand, float32(s), float32(co), offset, length)
@@ -146,7 +173,6 @@ func (c *Dial) applySinCos(hand *canvas.Line, sinRot, cosRot float32, offset, le
 }
 
 func (c *Dial) rotateNeedleNoRefresh(hand *canvas.Line, facePosition float64, offset, length float32) {
-	// Normalize to start from Min
 	normalized := facePosition - c.cfg.Min
 	if normalized < 0 {
 		normalized = 0
@@ -164,15 +190,14 @@ func (c *Dial) SetValue(value float64) {
 	c.rotateNeedleNoRefresh(c.needle, value, c.needleOffset, c.needleLength)
 
 	// Highest observed marker with lazy reset
-	now := time.Now()
-	if c.value > c.highestObserved {
-		c.highestObserved = c.value
-		c.lastHighestObserved = now
-		c.rotateNeedleNoRefresh(c.highestObservedMarker, c.value, c.radius-2, 6)
-	} else if now.Sub(c.lastHighestObserved) > 10*time.Second {
+	if value > c.highestObserved {
 		c.highestObserved = value
-		c.lastHighestObserved = now
-		c.rotateNeedleNoRefresh(c.highestObservedMarker, c.value, c.radius-2, 6)
+		c.lastHighestObserved = time.Now()
+		c.rotateNeedleNoRefresh(c.highestObservedMarker, value, c.radius-2, 6)
+	} else if time.Since(c.lastHighestObserved) > 10*time.Second {
+		c.highestObserved = value
+		c.lastHighestObserved = time.Now()
+		c.rotateNeedleNoRefresh(c.highestObservedMarker, value, c.radius-2, 6)
 	}
 
 	// Update text with minimal allocs
@@ -180,8 +205,7 @@ func (c *Dial) SetValue(value float64) {
 	if c.fmtPrec >= 0 {
 		c.buf = strconv.AppendFloat(c.buf, value, 'f', c.fmtPrec, 64)
 	} else {
-		// Fallback for exotic formats: keep behavior identical to original
-		c.buf = appendFormatFloat(c.buf, c.displayString, value)
+		c.buf = common.AppendFormatFloat(c.buf, c.displayString, value)
 	}
 	c.displayText.Text = string(c.buf)
 
@@ -220,32 +244,26 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 	size := fyne.Size{Width: c.diameter, Height: c.diameter}
 	topleft := fyne.NewPos(c.middle.X-c.radius, c.middle.Y-c.radius)
 
-	c.titleText.TextSize = c.radius * common.OneFourth
+	// Title (no rounding needed)
+	c.titleText.TextSize = float32(int(c.radius * common.OneFourth))
 	c.titleText.Move(c.middle.Add(fyne.NewPos(0, c.diameter*common.OneFourth)))
-	// no per-field Refresh; let end-of-layout refresh cover it
 
 	// Center element
 	center := c.radius * common.OneFourth
 	c.center.Move(c.middle.SubtractXY(center*common.OneHalf, center*common.OneHalf))
 	c.center.Resize(fyne.Size{Width: center, Height: center})
 
-	// Cover
-	coverY := c.middle.Y + c.radius*common.OneSeventh*5
-	c.cover.Move(fyne.Position{X: 0, Y: coverY})
-	c.cover.Resize(fyne.Size{Width: space.Width, Height: (space.Height - coverY) + 1})
-
 	// Display text
-	c.displayText.TextSize = c.radius * common.OneHalf
-	// keep current text content
-	c.displayText.Move(topleft.AddXY(0, c.diameter*common.OneSixth))
+	c.displayText.TextSize = float32(int(c.radius * common.OneThird))
+	c.displayText.Move(topleft.AddXY(0, c.diameter*common.OneFifth))
 	c.displayText.Resize(size)
 
 	// Face + needle
 	c.needle.StrokeWidth = stroke
 	c.rotateNeedleNoRefresh(c.needle, c.value, c.needleOffset, c.needleLength)
 
-	c.face.Move(topleft)
-	c.face.Resize(size)
+	c.face.Move(c.middle.SubtractXY(c.radius, c.radius))
+	c.face.Resize(fyne.Size{Width: c.diameter, Height: c.diameter})
 
 	// Pips: reuse precomputed sin/cos, scale with current radii
 	fourthRadius := c.radius * common.OneFourth
@@ -253,10 +271,38 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 	radius43 := c.radius * common.OneFourth * 3
 	radius87 := c.radius * common.OneEight * 7
 
+	// Label padding and cached box dims (avoid lbl.MinSize per label)
+	labelPad := max(float32(6.0), c.radius*0.04)
+
+	// Assume monospace, digits only: width ≈ chars * 0.62 * TextSize; height ≈ 1.15 * TextSize
+	// This keeps alignment stable and removes per-label measuring.
+	const charWidthFactor = 0.62
+	const heightFactor = 1.15
+
+	labelTextSize := c.radius * 0.10
+	c.labelBoxW = float32(c.maxLabelChars) * float32(charWidthFactor) * labelTextSize
+	c.labelBoxH = float32(heightFactor) * labelTextSize
+
 	for i, p := range c.pips {
 		if i%2 == 0 {
 			p.StrokeWidth = max(2.0, midStroke)
 			c.applySinCos(p, c.pipSin[i], c.pipCos[i], radius43, fourthRadius-1)
+
+			// Label for long pip
+			lbl := c.pipLabels[i]
+			if lbl != nil {
+				lbl.TextSize = labelTextSize
+
+				// Place label on the INSIDE of the gauge
+				labelRadius := radius43 - labelPad
+				cx := c.middle.X + c.pipSin[i]*labelRadius
+				cy := c.middle.Y - c.pipCos[i]*labelRadius
+
+				boxW := c.labelBoxW
+				boxH := c.labelBoxH
+				lbl.Resize(fyne.NewSize(boxW, boxH))
+				lbl.Move(fyne.NewPos(cx-boxW/2, cy-boxH/2))
+			}
 		} else {
 			p.StrokeWidth = max(2.0, smallStroke)
 			c.applySinCos(p, c.pipSin[i], c.pipCos[i], radius87, eightRadius-1)
@@ -266,26 +312,25 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 	c.highestObservedMarker.StrokeWidth = max(2.0, midStroke)
 	c.rotateNeedleNoRefresh(c.highestObservedMarker, c.highestObserved, c.radius-2, 6)
 
-	// Batch refresh at end of layout
-	for _, o := range c.Objects() {
-		canvas.Refresh(o)
-	}
 }
 
 func (c *DialRenderer) MinSize() fyne.Size { return c.minsize }
-
-func (c *DialRenderer) Refresh() {}
-
-func (c *DialRenderer) Destroy() {}
+func (c *DialRenderer) Refresh()           {}
+func (c *DialRenderer) Destroy()           {}
 
 func (c *DialRenderer) Objects() []fyne.CanvasObject {
-	// Build once
 	if c.objects == nil {
-		objs := make([]fyne.CanvasObject, 0, len(c.pips)+7)
+		objs := make([]fyne.CanvasObject, 0, len(c.pips)+len(c.pipLabels)+7)
 		for _, v := range c.pips {
 			objs = append(objs, v)
 		}
-		objs = append(objs, c.face, c.cover, c.titleText, c.center, c.highestObservedMarker, c.needle, c.displayText)
+		for _, t := range c.pipLabels {
+			if t != nil {
+				objs = append(objs, t)
+			}
+		}
+		objs = append(objs, c.face, c.titleText, c.center,
+			c.highestObservedMarker, c.needle, c.displayText)
 		c.objects = objs
 	}
 	return c.objects
@@ -293,34 +338,10 @@ func (c *DialRenderer) Objects() []fyne.CanvasObject {
 
 // --- helpers ---
 
-// parseFixedPrec tries to parse a format like "%.0f", "%.1f" and returns the precision, or -1 if unknown.
-func parseFixedPrec(format string) int {
-	// tiny, fast parser for the expected patterns
-	if len(format) >= 4 && format[0] == '%' && format[1] == '.' && format[len(format)-1] == 'f' {
-		// parse digits between '.' and trailing 'f'
-		n := 0
-		has := false
-		for i := 2; i < len(format)-1; i++ {
-			ch := format[i]
-			if ch < '0' || ch > '9' {
-				return -1
-			}
-			has = true
-			n = n*10 + int(ch-'0')
-		}
-		if has {
-			return n
-		}
+// max helper that matches your float32 usage
+func max(a, b float32) float32 {
+	if a > b {
+		return a
 	}
-	return -1
-}
-
-// appendFormatFloat falls back to using the format string semantics with strconv where possible.
-// Supports only simple "%.Nf" patterns; else uses default 'f' with 0 precision to mimic original "%.0f".
-func appendFormatFloat(dst []byte, format string, v float64) []byte {
-	if n := parseFixedPrec(format); n >= 0 {
-		return strconv.AppendFloat(dst, v, 'f', n, 64)
-	}
-	// fallback: keep close to original defaults
-	return strconv.AppendFloat(dst, v, 'f', 0, 64)
+	return b
 }

@@ -14,6 +14,8 @@ type GaugeConfig struct {
 	Type             string
 	Title            string
 	DisplayString    string // default "%.0f"
+	GaugeTextString  string
+	GaugeFactor      float64
 	DisplayTextSize  int
 	Min, Max, Center float64
 	Steps            int

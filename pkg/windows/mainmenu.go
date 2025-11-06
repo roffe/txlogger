@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/theme"
 	symbol "github.com/roffe/ecusymbol"
 )
 
@@ -238,7 +239,7 @@ func (mw *MainMenu) GetMenu(name string) *fyne.MainMenu {
 		var items []*fyne.MenuItem
 		for _, mapName := range ecuM[category] {
 			if f, ok := mw.funcMap[mapName]; ok {
-				itm := fyne.NewMenuItem(mapName, func() {
+				itm := fyne.NewMenuItemWithIcon(mapName, theme.ComputerIcon(), func() {
 					f(mapName)
 				})
 				items = append(items, itm)
@@ -249,7 +250,7 @@ func (mw *MainMenu) GetMenu(name string) *fyne.MainMenu {
 				parts := strings.Split(mapName, "|")
 				names := parts[1:]
 				if len(parts) == 2 {
-					itm := fyne.NewMenuItem(parts[0], func() {
+					itm := fyne.NewMenuItemWithIcon(parts[0], theme.GridIcon(), func() {
 						mw.openFunc(typ, names[0])
 					})
 					items = append(items, itm)
@@ -262,7 +263,7 @@ func (mw *MainMenu) GetMenu(name string) *fyne.MainMenu {
 				continue
 			}
 
-			itm := fyne.NewMenuItem(mapName, func() {
+			itm := fyne.NewMenuItemWithIcon(mapName, theme.GridIcon(), func() {
 				mw.openFunc(typ, mapName)
 			})
 			items = append(items, itm)
