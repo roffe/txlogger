@@ -25,10 +25,17 @@ func (c *TxBridge) Start() error {
 	defer c.secondTicker.Stop()
 	defer c.lw.Close()
 
+	eventHandler := func(e gocan.Event) {
+		c.OnMessage(e.String())
+		if e.Type == gocan.EventTypeError {
+			c.onError()
+		}
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cl, err := gocan.NewWithOpts(ctx, c.Device)
+	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventHandler(eventHandler))
 	if err != nil {
 		return err
 	}

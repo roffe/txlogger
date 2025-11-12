@@ -73,17 +73,10 @@ func (c *T5Client) Start() error {
 		}
 	}()
 
-	eventChan := cl.Event()
-
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case e := <-eventChan:
-			c.OnMessage(e.String())
-			if e.Type == gocan.EventTypeError {
-				c.onError()
-			}
 		case <-c.quitChan:
 			c.OnMessage("Stopped logging..")
 			return nil

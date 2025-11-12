@@ -84,9 +84,6 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 		case <-c.quitChan:
 			c.OnMessage("Finished logging")
 			return nil
-		case <-ctx.Done():
-			log.Println("ctx done")
-			return nil
 		case <-c.secondTicker.C:
 			c.FpsCounter(c.cps)
 			c.cps = 0

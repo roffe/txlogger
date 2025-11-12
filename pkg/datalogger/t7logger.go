@@ -171,17 +171,10 @@ func (c *T7Client) Start() error {
 		}
 	}()
 
-	eventChan := cl.Event()
-
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case e := <-eventChan:
-			c.OnMessage(e.String())
-			if e.Type == gocan.EventTypeError {
-				c.onError()
-			}
 		case <-c.quitChan:
 			c.OnMessage("Stop logging")
 			return nil
@@ -325,16 +318,16 @@ func initT7logging(ctx context.Context, kwp *kwp2000.Client, symbols []*symbol.S
 	}
 	onMessage("Cleared dynamic register")
 
-	dpos := 0
+	index := 0
 	for _, sym := range symbols {
 		if sym.Number < 0 {
 			continue
 		}
 		onMessage("Defining " + sym.Name)
-		if err := kwp.DynamicallyDefineLocalIdRequest(ctx, dpos, sym); err != nil {
+		if err := kwp.DynamicallyDefineLocalIdBySymbolNumber(ctx, index, sym.Number); err != nil {
 			return errors.New("failed to define dynamic register")
 		}
-		dpos++
+		index++
 		time.Sleep(12 * time.Millisecond)
 	}
 	onMessage("Configured dynamic register")
