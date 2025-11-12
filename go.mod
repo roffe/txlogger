@@ -8,14 +8,14 @@ go 1.25.3
 // replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 
 require (
-	fyne.io/fyne/v2 v2.7.1-0.20251030225945-0f9773e04342
+	fyne.io/fyne/v2 v2.7.1-0.20251107215207-3649d0747c33
 	fyne.io/x/fyne v0.0.0-20250106132206-3228f6c50107
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/lusingander/colorpicker v0.7.4
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.0.7
-	github.com/roffe/ecusymbol v1.0.6
-	github.com/roffe/gocan v1.2.7
+	github.com/roffe/ecusymbol v1.0.7
+	github.com/roffe/gocan v1.2.8
 	github.com/roffe/gocanflasher v1.0.4
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.4
@@ -31,6 +31,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/ebitengine/oto/v3 v3.4.0
 	github.com/hajimehoshi/go-mp3 v0.3.4
+	golang.org/x/sys v0.36.0
 )
 
 require (
@@ -80,7 +81,6 @@ require (
 	github.com/yuin/goldmark v1.7.8 // indirect
 	go.einride.tech/can v0.12.1 // indirect
 	golang.org/x/crypto v0.40.0 // indirect
-	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.27.0 // indirect
 	golang.org/x/tools v0.34.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250804133106-a7a43d27e69b // indirect
