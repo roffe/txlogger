@@ -24,7 +24,7 @@ var firmware []byte
 
 const (
 	COM_SPEED              = 1000000
-	MinimumtxbridgeVersion = "1.0.9"
+	MinimumtxbridgeVersion = "1.1.0"
 )
 
 type Config struct {
