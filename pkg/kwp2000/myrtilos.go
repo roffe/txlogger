@@ -8,14 +8,15 @@ import (
 )
 
 func (t *Client) SendEU0DRegistrationKey(ctx context.Context, key []byte) error {
-	payload := append([]byte{0x40, 0xA1, 0x05, EU0D_SET_REGISTRATION_KEY}, key...)
-	frame := gocan.NewFrame(REQ_MSG_ID, payload, gocan.ResponseRequired)
-	//	log.Println("Send>", frame.String())
-	resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.responseID)
-	if err != nil {
-		return fmt.Errorf("SetEU0DRegistrationKey: %w", err)
+	if len(key) != 4 {
+		return fmt.Errorf("SetEU0DRegistrationKey[1]: key must be 4 bytes")
 	}
-	//	log.Println("Recv>", resp.String())
+	payload := []byte{0x40, 0xA1, 0x05, EU0D_SET_REGISTRATION_KEY, key[0], key[1], key[2], key[3]}
+	frame := gocan.NewFrame(REQ_MSG_ID, payload, gocan.ResponseRequired)
+	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, t.responseID)
+	if err != nil {
+		return fmt.Errorf("SetEU0DRegistrationKey[2]: %w", err)
+	}
 	return checkErr(resp)
 }
 
