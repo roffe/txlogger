@@ -328,7 +328,6 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 		} else {
 			canFilter = []uint32{0x180, 0x1A0, 0x238, 0x258, 0x270, 0x280, 0x3A0, 0x664, 0x665}
 		}
-
 		canRate = 500
 	case "T8":
 		if strings.Contains(adapterName, "STN") || strings.Contains(adapterName, "OBDLink") {
