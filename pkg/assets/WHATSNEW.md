@@ -1,5 +1,6 @@
 # 2.1.5
 - Added numbers on the gauge dials for easier reading
+- Fixed axis information for tryck_mat_a! in ecusymbol library where it would open tryck_mat! instead
 
 # 2.1.4
 - Symbollist now remembers the last selected preset per ECU.
