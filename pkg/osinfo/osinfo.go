@@ -2,8 +2,9 @@ package osinfo
 
 import (
 	"log"
-	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 type RTL_OSVERSIONINFOEXW struct {
@@ -21,7 +22,7 @@ type RTL_OSVERSIONINFOEXW struct {
 }
 
 func RtlGetVersion() RTL_OSVERSIONINFOEXW {
-	ntdll := syscall.NewLazyDLL("ntdll.dll")
+	ntdll := windows.NewLazySystemDLL("ntdll.dll")
 	rtlGetVersion := ntdll.NewProc("RtlGetVersion")
 	var info RTL_OSVERSIONINFOEXW
 	info.OSVersionInfoSize = 5*4 + 128*2 + 3*2 + 2*1
