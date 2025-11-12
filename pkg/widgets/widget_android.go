@@ -38,7 +38,7 @@ func SelectFile(cbc func(r fyne.URIReadCloser), desc string, exts ...string) {
 	}
 
 	w := fyne.CurrentApp().Driver().AllWindows()[0]
-	//dialog.ShowFileOpen(cb, w)
+
 	d := dialog.NewFileOpen(cb, w)
 
 	log.Println("SelectFile", desc, exts)
