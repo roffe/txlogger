@@ -575,11 +575,6 @@ func (mw *MainWindow) Log(s string) {
 	mw.outputData.Append(s)
 }
 
-func (mw *MainWindow) Log3(s string) {
-	debug.LogDepth(3, s)
-	mw.outputData.Append(s)
-}
-
 func (mw *MainWindow) Error(err error) {
 	debug.LogDepth(2, err.Error())
 	mw.outputData.Append(err.Error())
