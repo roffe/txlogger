@@ -27,6 +27,7 @@ import (
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/logfile"
+	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/widgets/canflasher"
 	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
@@ -153,6 +154,7 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	mw.setupShortcuts()
 
 	mw.settings = settings.New(&settings.Config{
+		Logger: mw.Log,
 		SelectedEcuFunc: func() string {
 			return mw.selects.ecuSelect.Selected
 		},
@@ -204,7 +206,7 @@ func (mw *MainWindow) updateCheck() {
 	if time.Now().After(nextCheckTime) {
 		dialog.ShowConfirm("It's been a while", "Do you want to check for updates to txlogger?", func(b bool) {
 			if b {
-				mw.updateCheck()
+				update.UpdateCheck(mw.app, mw.Window)
 			}
 			if tt, err := time.Now().Add(336 * time.Hour).MarshalText(); err == nil {
 				log.Println("nextUpdateCheck:", string(tt))
@@ -633,7 +635,7 @@ func (mw *MainWindow) SyncSymbols() {
 }
 
 func (mw *MainWindow) LoadSymbolsFromECU() error {
-	device, err := mw.settings.GetAdapter(mw.selects.ecuSelect.Selected, mw.Log)
+	device, err := mw.settings.GetAdapter(mw.selects.ecuSelect.Selected)
 	if err != nil {
 		return err
 	}
