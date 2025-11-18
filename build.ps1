@@ -28,15 +28,16 @@ $current_path = Get-Location
 
 if ($cangateway) {
     Write-Output "Building cangateway.exe"
-    $includes = @(
-        'C:\Progra~2\Kvaser\Canlib\INC'
-    )
+    #$includes = @(
+    #    'C:\Progra~2\Kvaser\Canlib\INC'
+    #)
 
-    $libs = @(
-        'C:\Progra~2\Kvaser\Canlib\Lib\MS'
-    )
-    $env:CGO_CFLAGS = ($includes | ForEach-Object { '-I' + $_ }) -join ' '
-    $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
+    # $libs = @(
+    #     'C:\Progra~2\Kvaser\Canlib\Lib\MS'
+    # )
+    # $env:PKG_CONFIG_PATH = "$current_path\vcpkg\packages\libusb_x64-windows\lib\pkgconfig"
+    # $env:CGO_CFLAGS = ($includes | ForEach-Object { '-I' + $_ }) -join ' '
+    # $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
     $env:GOARCH = "386"
     if ($usegitsrc) {
         # git clone https://github.com/roffe/gocangateway.git
@@ -44,7 +45,7 @@ if ($cangateway) {
         # go build -tags="canlib,j2534" -ldflags '-s -w -H=windowsgui' -o cangateway.exe .
         # Move-Item -Path ".\cangateway.exe" -Destination "$current_path\cangateway.exe" -Force
         # Set-Location -Path $current_path
-        go install -tags="canlib,j2534" -ldflags '-s -w -H=windowsgui' github.com/roffe/gocangateway@latest
+        go install -tags="j2534" -ldflags '-s -w -H=windowsgui' github.com/roffe/gocangateway@latest
         Move-Item -Path "$Env:USERPROFILE\go\bin\windows_386\gocangateway.exe" -Destination "$current_path\cangateway.exe" -Force
     }
     else {
@@ -65,19 +66,20 @@ if ($txlogger) {
     }
 
     $includes = @(
-        "$current_path\vcpkg\packages\libusb_x64-windows\include\libusb-1.0",
-        'C:\Progra~2\Kvaser\Canlib\INC',
-        "$current_path\canusb\include"
+        "$current_path\vcpkg\packages\libusb_x64-windows\include\libusb-1.0"
+        #'C:\Progra~2\Kvaser\Canlib\INC',
+        #"$current_path\canusb\include"
     )
 
-    $libs = @(
-        'C:\Progra~2\Kvaser\Canlib\Lib\x64',
-        "$current_path\canusb\lib64"
-    )
+    # $libs = @(
+    #     'C:\Progra~2\Kvaser\Canlib\Lib\x64',
+    #     "$current_path\canusb\lib64"
+    # )
+    
 
     $env:PKG_CONFIG_PATH = "$current_path\vcpkg\packages\libusb_x64-windows\lib\pkgconfig"
     $env:CGO_CFLAGS = ($includes | ForEach-Object { '-I' + $_ }) -join ' '
-    $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
+    # $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
     $env:GOARCH = "amd64"
     fyne package -tags="canlib,canusb,combi,ftdi,j2534,pcan" --release
 }

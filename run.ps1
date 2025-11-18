@@ -11,15 +11,15 @@ $env:CC = "clang.exe"
 $env:CXX = "clang.exe"
 
 if ($cangateway) {
-    $includes = @(
-        'C:\Progra~2\Kvaser\Canlib\INC'
-    )
-    $env:CGO_CFLAGS = ($includes | ForEach-Object { '-I' + $_ }) -join ' '
+    # $includes = @(
+    #     'C:\Progra~2\Kvaser\Canlib\INC'
+    # )
+    # $env:CGO_CFLAGS = ($includes | ForEach-Object { '-I' + $_ }) -join ' '
 
-    $libs = @(
-        'C:\Progra~2\Kvaser\Canlib\Lib\MS'
-    )
-    $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
+    # $libs = @(
+    #     'C:\Progra~2\Kvaser\Canlib\Lib\MS'
+    # )
+    # $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
 
     $env:GOARCH = "386"
     go run -tags="j2534" github.com/roffe/gocangateway $args
@@ -31,17 +31,17 @@ if (-not $nobuildcangateway) {
 }
 
 $includes = @(
-    "$current_path\vcpkg\packages\libusb_x64-windows\include\libusb-1.0",
-    'C:\Progra~2\Kvaser\Canlib\INC',
-    "$current_path\canusb\include"
+    "$current_path\vcpkg\packages\libusb_x64-windows\include\libusb-1.0"
+    #'C:\Progra~2\Kvaser\Canlib\INC'
+    #"$current_path\canusb\include"
 )
 $env:CGO_CFLAGS = ($includes | ForEach-Object { '-I' + $_ }) -join ' '
 
-$libs = @(
-    'C:\Progra~2\Kvaser\Canlib\Lib\x64',
-    "$current_path\canusb\lib64"
-)
-$env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
+# $libs = @(
+#     'C:\Progra~2\Kvaser\Canlib\Lib\x64',
+#     "$current_path\canusb\lib64"
+# )
+# $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
 
 $env:PKG_CONFIG_PATH = "$current_path\vcpkg\packages\libusb_x64-windows\lib\pkgconfig"
 $env:GOARCH = "amd64"
