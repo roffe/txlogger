@@ -2,7 +2,7 @@
 ![](images/txlogger.jpg)
 ![Windows Build](https://github.com/roffe/txlogger/actions/workflows/windows.yml/badge.svg)
 
-Blazing fast data logging for SAAB Trionic ECU's
+Blazing fast data logging for SAAB Trionic ECU's ( It does tuning to )
 
 - Trionic 5 (9000, NG900 & OG9-3)
 - Trionic 7 (OG9-3 & OG9-5)
