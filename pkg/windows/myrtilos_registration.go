@@ -101,11 +101,7 @@ func (mr *MyrtilosRegistration) register(key []byte) error {
 		return errors.New("stop logging before registering")
 	}
 
-	logFn := func(s string) {
-		mr.outputData.Append(s)
-	}
-
-	adapter, err := mr.mw.settings.GetAdapter("T7", logFn)
+	adapter, err := mr.mw.settings.GetAdapter("T7")
 	if err != nil {
 		return err
 	}

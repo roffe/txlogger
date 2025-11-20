@@ -11,7 +11,6 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
@@ -159,43 +158,45 @@ func (mw *MainWindow) newOpenLogBtn() *widget.Button {
 
 func (mw *MainWindow) addSymbolBtnFunc() *widget.Button {
 	return widget.NewButtonWithIcon("", theme.ContentAddIcon(), func() {
-		switch mw.selects.symbolLookup.Text {
-		case "ADC1":
-			mw.symbolList.Add(&symbol.Symbol{
-				Name:             mw.selects.symbolLookup.Text,
-				Correctionfactor: 0.001,
-				Number:           -1000, // -1001 is a special number for ADC symbols
-			})
-			return
-		case "ADC2":
-			mw.symbolList.Add(&symbol.Symbol{
-				Name:             mw.selects.symbolLookup.Text,
-				Correctionfactor: 0.001,
-				Number:           -1001, // -1002 is a special number for ADC symbols
-			})
-			return
-		case "ADC3":
-			mw.symbolList.Add(&symbol.Symbol{
-				Name:             mw.selects.symbolLookup.Text,
-				Correctionfactor: 0.001,
-				Number:           -1002, // -1003 is a special number for ADC symbols
-			})
-			return
-		case "ADC4":
-			mw.symbolList.Add(&symbol.Symbol{
-				Name:             mw.selects.symbolLookup.Text,
-				Correctionfactor: 0.001,
-				Number:           -1003, // -1004 is a special number for ADC symbols
-			})
-			return
-		case "ADC5":
-			mw.symbolList.Add(&symbol.Symbol{
-				Name:             mw.selects.symbolLookup.Text,
-				Correctionfactor: 0.001,
-				Number:           -1004, // -1005 is a special number for ADC symbols
-			})
-			return
-		}
+		/*
+			switch mw.selects.symbolLookup.Text {
+			case "ADC1":
+				mw.symbolList.Add(&symbol.Symbol{
+					Name:             mw.selects.symbolLookup.Text,
+					Correctionfactor: 0.001,
+					Number:           -1000, // -1001 is a special number for ADC symbols
+				})
+				return
+			case "ADC2":
+				mw.symbolList.Add(&symbol.Symbol{
+					Name:             mw.selects.symbolLookup.Text,
+					Correctionfactor: 0.001,
+					Number:           -1001, // -1002 is a special number for ADC symbols
+				})
+				return
+			case "ADC3":
+				mw.symbolList.Add(&symbol.Symbol{
+					Name:             mw.selects.symbolLookup.Text,
+					Correctionfactor: 0.001,
+					Number:           -1002, // -1003 is a special number for ADC symbols
+				})
+				return
+			case "ADC4":
+				mw.symbolList.Add(&symbol.Symbol{
+					Name:             mw.selects.symbolLookup.Text,
+					Correctionfactor: 0.001,
+					Number:           -1003, // -1004 is a special number for ADC symbols
+				})
+				return
+			case "ADC5":
+				mw.symbolList.Add(&symbol.Symbol{
+					Name:             mw.selects.symbolLookup.Text,
+					Correctionfactor: 0.001,
+					Number:           -1004, // -1005 is a special number for ADC symbols
+				})
+				return
+			}
+		*/
 
 		sym := mw.fw.GetByName(mw.selects.symbolLookup.Text)
 		if sym == nil {
@@ -343,11 +344,21 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 	})
 }
 func (mw *MainWindow) startLogging() {
-	device, err := mw.settings.GetAdapter(mw.selects.ecuSelect.Selected, mw.Log)
-	if err != nil {
-		d := dialog.NewError(err, mw)
-		d.Show()
+	if mw.symbolList.Count() == 0 {
+		mw.Error(fmt.Errorf("no symbols selected for logging"))
 		return
+	}
+	device, err := mw.settings.GetAdapter(mw.selects.ecuSelect.Selected)
+	if err != nil {
+		mw.Error(err)
+		return
+	}
+
+	if mw.selects.ecuSelect.Selected == "T5" {
+		if strings.Contains(device.Name(), "J2534") || strings.Contains(device.Name(), "ELM327") {
+			mw.Error(fmt.Errorf("%s is not supported for T5", device.Name()))
+			return
+		}
 	}
 
 	mw.dlc, _, err = newDataLogger(mw, device)
@@ -361,10 +372,8 @@ func (mw *MainWindow) startLogging() {
 	mw.buttons.logBtn.Icon = theme.MediaStopIcon()
 	mw.buttons.logBtn.SetText("Stop")
 	mw.Disable()
-
 	mw.canLED.On()
 	go func() {
-
 		mw.Log("Connecting to " + device.Name())
 		if err := mw.dlc.Start(); err != nil {
 			mw.Error(err)

@@ -22,8 +22,8 @@ func init() {
 	})
 }
 
-func Publish(topic string, data float64) error {
-	return CONTROLLER.Publish(topic, data)
+func Publish(topic string, data float64) {
+	CONTROLLER.Publish(topic, data)
 }
 
 /*

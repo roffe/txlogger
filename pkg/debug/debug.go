@@ -28,7 +28,7 @@ func start() {
 
 func Log(msg string) {
 	initOnce.Do(start)
-	timeStr := time.Now().Format("2006-01-02 15:04:05.000")
+	timeStr := time.Now().Format("2006/01/02 15:04:05.000")
 	_, fullPath, line, ok := runtime.Caller(1)
 	filename := filepath.Base(fullPath)
 	if ok {
@@ -40,7 +40,7 @@ func Log(msg string) {
 
 func LogDepth(depth int, msg string) {
 	initOnce.Do(start)
-	timeStr := time.Now().Format("2006-01-02 15:04:05.000")
+	timeStr := time.Now().Format("2006/01/02 15:04:05.000")
 	_, fullPath, line, ok := runtime.Caller(depth)
 	filename := filepath.Base(fullPath)
 	if ok {

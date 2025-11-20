@@ -9,7 +9,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"github.com/roffe/gocan"
-	"github.com/roffe/gocanflasher/pkg/ecu"
+	"github.com/roffe/txlogger/pkg/ecu"
 	sdialog "github.com/sqweek/dialog"
 )
 
@@ -20,7 +20,7 @@ func (t *CanFlasherWidget) ecuDump() {
 		return
 	}
 
-	dev, err := t.cfg.CSW.GetAdapter(t.cfg.GetECU(), t.log)
+	dev, err := t.cfg.CSW.GetAdapter(t.cfg.GetECU())
 	if err != nil {
 		t.log(err.Error())
 		return

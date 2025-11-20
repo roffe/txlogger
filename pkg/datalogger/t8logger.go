@@ -3,7 +3,6 @@ package datalogger
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -69,23 +68,27 @@ func (c *T8Client) Start() error {
 		order = append(order, EXTERNALWBLSYM)
 	}
 
-	// implement sym.Skip from T7 logger here
-
 	// sort order
 	sort.StringSlice(order).Sort()
 
-	gm := gmlan.New(cl, 0x7e0, 0x7e8)
+	opts := []gmlan.GMLanOption{gmlan.WithCanID(0x7E0), gmlan.WithRecvID(0x7E8)}
+	if cl.AdapterName() == "ELM327" {
+		opts = append(opts, gmlan.WithDefaultTimeout(400*time.Millisecond))
+	}
+
+	gm := gmlan.NewWithOpts(cl, opts...)
 
 	if err := initT8Logging(ctx, gm, c.Symbols, c.OnMessage); err != nil {
 		return fmt.Errorf("failed to init t8 logging: %w", err)
 	}
-	defer func() {
-		_ = gm.ReturnToNormalMode(ctx)
-		time.Sleep(50 * time.Millisecond)
-	}()
 
-	t := time.NewTicker(time.Second / time.Duration(c.Rate))
-	defer t.Stop()
+	go c.run(ctx, cl, gm, order)
+
+	return cl.Wait(ctx)
+}
+
+func (c *T8Client) run(ctx context.Context, cl *gocan.Client, gm *gmlan.Client, order []string) {
+	defer cl.Close()
 
 	var timeStamp time.Time
 	var chunkSize uint32
@@ -108,30 +111,29 @@ func (c *T8Client) Start() error {
 		}
 	}
 
-	go func() {
-		if err := cl.Wait(ctx); err != nil {
-			c.OnMessage(err.Error())
-			cancel()
-		}
+	defer func() {
+		_ = gm.ReturnToNormalMode(ctx)
+		time.Sleep(50 * time.Millisecond)
 	}()
+
+	t := time.NewTicker(time.Second / time.Duration(c.Rate))
+	defer t.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
-		case <-c.quitChan:
-			c.OnMessage("Finished logging")
-			return nil
-		case <-ctx.Done():
 			log.Println("ctx done")
-			return nil
+			return
+		case <-c.quitChan:
+			c.OnMessage("Stopped logging..")
+			return
 		case <-c.secondTicker.C:
-			c.FpsCounter(c.cps)
-			c.cps = 0
-			if c.errPerSecond > 10 {
-				return errors.New("too many errors, reconnecting")
+			c.FpsCounter(c.capturePerSecond)
+			if c.errPerSecond > 5 {
+				c.OnMessage("too many errors, aborting logging")
+				return
 			}
-			c.errPerSecond = 0
+			c.resetPerSecond()
 		case read := <-c.readChan:
 			for read.left > 0 {
 				chunkSize = uint32(math.Min(float64(read.left), T8ReadChunkSize))
@@ -176,7 +178,8 @@ func (c *T8Client) Start() error {
 				continue
 			}
 			if len(databuff) != int(expectedPayloadSize) {
-				return fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff))
+				c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
+				return
 			}
 			r := bytes.NewReader(databuff)
 
@@ -186,10 +189,7 @@ func (c *T8Client) Start() error {
 					c.OnMessage("failed to set data: " + err.Error())
 					break
 				}
-				if err := ebus.Publish(va.Name, va.Float64()); err != nil {
-					c.onError()
-					c.OnMessage(err.Error())
-				}
+				ebus.Publish(va.Name, va.Float64())
 			}
 
 			if r.Len() > 0 {
@@ -205,12 +205,8 @@ func (c *T8Client) Start() error {
 				c.onError()
 				c.OnMessage("failed to write log: " + err.Error())
 			}
-			c.cps++
-			c.captureCount++
-			if c.captureCount%15 == 0 {
-				c.CaptureCounter(c.captureCount)
-			}
 			testerPresent()
+			c.onCapture()
 		}
 	}
 }
@@ -230,6 +226,7 @@ func initT8Logging(ctx context.Context, gm *gmlan.Client, symbols []*symbol.Symb
 	onMessage("Cleared dynamic register")
 
 	for _, sym := range symbols {
+		onMessage("Defining " + sym.Name)
 		if err := setUpDynamicallyDefinedRegisterBySymbol(ctx, gm, uint16(sym.Number)); err != nil {
 			return err
 		}

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"log"
 	"sort"
@@ -33,10 +32,6 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 	if err := initT8Logging(ctx, gm, c.Symbols, c.OnMessage); err != nil {
 		return fmt.Errorf("failed to init t8 logging: %w", err)
 	}
-	defer func() {
-		_ = gm.ReturnToNormalMode(ctx)
-		time.Sleep(50 * time.Millisecond)
-	}()
 
 	t := time.NewTicker(time.Second / time.Duration(c.Rate))
 	defer t.Stop()
@@ -61,109 +56,94 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 	tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
 	defer tx.Close()
 
-	messages := cl.Subscribe(ctx, gocan.SystemMsg)
-	defer messages.Close()
-
 	if err := c.startLogging(cl); err != nil {
 		return fmt.Errorf("error starting logging: %w", err)
 	}
 
 	go func() {
-		if err := cl.Wait(ctx); err != nil {
-			c.OnMessage(err.Error())
-			cancel()
+		defer cl.Close()
+
+		defer func() {
+			_ = gm.ReturnToNormalMode(ctx)
+			time.Sleep(100 * time.Millisecond)
+		}()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-c.quitChan:
+				c.OnMessage("Finished logging")
+				return
+			case <-c.secondTicker.C:
+				c.FpsCounter(c.capturePerSecond)
+				if c.errPerSecond > 5 {
+					c.OnMessage("too many errors, aborting logging")
+					return
+				}
+				c.resetPerSecond()
+			case read := <-c.readChan:
+				if err := c.handleReadTxbridge(ctx, cl, read); err != nil {
+					read.Complete(err)
+				}
+			case upd := <-c.writeChan:
+				log.Printf("Updating RAM 0x%X", upd.Address)
+				if err := c.handleWriteTxbridge(ctx, cl, upd); err != nil {
+					upd.Complete(err)
+				}
+			case msg, ok := <-tx.Chan():
+				if !ok {
+					c.OnMessage("txbridge recv channel closed")
+					return
+				}
+				if msg.DLC() != int(expectedPayloadSize+4) {
+					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, msg.DLC()))
+					return
+				}
+
+				r := bytes.NewReader(msg.Data)
+				if err := binary.Read(r, binary.LittleEndian, &c.currtimestamp); err != nil {
+					c.onError()
+					c.OnMessage("failed to read timestamp: " + err.Error())
+					continue
+				}
+
+				if c.firstTime.IsZero() {
+					c.firstTime = time.Now()
+					c.firstTimestamp = c.currtimestamp
+				}
+
+				timeStamp := c.calculateCompensatedTimestamp()
+
+				for _, va := range c.Symbols {
+					if err := va.Read(r); err != nil {
+						c.onError()
+						c.OnMessage("failed to read symbol data: " + err.Error())
+						break
+					}
+					ebus.Publish(va.Name, va.Float64())
+				}
+
+				if r.Len() > 0 {
+					c.OnMessage(fmt.Sprintf("%d leftover bytes!", r.Len()))
+				}
+
+				if c.lamb != nil {
+					lambda := c.lamb.GetLambda()
+					c.sysvars.Set(EXTERNALWBLSYM, lambda)
+					ebus.Publish(EXTERNALWBLSYM, lambda)
+				}
+
+				if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
+					c.onError()
+					c.OnMessage("failed to write log: " + err.Error())
+				}
+				c.onCapture()
+				testerPresent()
+			}
 		}
 	}()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case msg := <-messages.Chan():
-			c.OnMessage(string(msg.Data))
-		case <-c.quitChan:
-			c.OnMessage("Finished logging")
-			return nil
-		case <-c.secondTicker.C:
-			c.FpsCounter(c.cps)
-			c.cps = 0
-			if c.errPerSecond > 10 {
-				return errors.New("too many errors, reconnecting")
-			}
-			c.errPerSecond = 0
-			continue
-		case read := <-c.readChan:
-			if err := c.handleReadTxbridge(ctx, cl, read); err != nil {
-				read.Complete(err)
-			}
-			continue
-		case upd := <-c.writeChan:
-			log.Printf("Updating RAM 0x%X", upd.Address)
-			if err := c.handleWriteTxbridge(ctx, cl, upd); err != nil {
-				upd.Complete(err)
-			}
-			continue
-		case msg, ok := <-tx.Chan():
-			if !ok {
-				return errors.New("txbridge recv channel closed")
-			}
-
-			if msg.Length() != int(expectedPayloadSize+4) {
-				return fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize+4, msg.Length())
-			}
-
-			r := bytes.NewReader(msg.Data)
-			if err := binary.Read(r, binary.LittleEndian, &c.currtimestamp); err != nil {
-				c.onError()
-				c.OnMessage("failed to read timestamp: " + err.Error())
-				continue
-			}
-
-			if c.firstTime.IsZero() {
-				c.firstTime = time.Now()
-				c.firstTimestamp = c.currtimestamp
-			}
-
-			timeStamp := c.calculateCompensatedTimestamp()
-
-			for _, va := range c.Symbols {
-				if err := va.Read(r); err != nil {
-					c.onError()
-					c.OnMessage("failed to read symbol data: " + err.Error())
-					break
-				}
-				if err := ebus.Publish(va.Name, va.Float64()); err != nil {
-					c.onError()
-					c.OnMessage("failed to publish data: " + err.Error())
-				}
-			}
-
-			if r.Len() > 0 {
-				c.OnMessage(fmt.Sprintf("%d leftover bytes!", r.Len()))
-			}
-
-			if c.lamb != nil {
-				lambda := c.lamb.GetLambda()
-				c.sysvars.Set(EXTERNALWBLSYM, lambda)
-				if err := ebus.Publish(EXTERNALWBLSYM, lambda); err != nil {
-					c.onError()
-					c.OnMessage(err.Error())
-				}
-			}
-
-			if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
-				c.onError()
-				c.OnMessage("failed to write log: " + err.Error())
-			}
-			c.cps++
-			c.captureCount++
-			if c.captureCount%15 == 0 {
-				c.CaptureCounter(c.captureCount)
-			}
-			testerPresent()
-		}
-	}
-
+	return cl.Wait(ctx)
 }
 
 func (c *TxBridge) handleReadTxbridge(ctx context.Context, cl *gocan.Client, read *DataRequest) error {

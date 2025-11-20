@@ -59,7 +59,7 @@ const (
 	prefsDebug   = "debug"
 )
 
-var portSpeeds = []string{"9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600", "1mbit", "2mbit", "3mbit"}
+var portSpeeds = []string{"9600", "19200", "38400", "57600", "115200", "230400", "460800", "500000", "921600", "1mbit", "2mbit", "3mbit"}
 
 type SettingsWidgetInterface interface {
 	Get(key string) (string, error)
@@ -71,6 +71,7 @@ type SetText interface {
 }
 
 type Config struct {
+	Logger          func(string)
 	SelectedEcuFunc func() string
 }
 
@@ -275,7 +276,7 @@ func (c *Widget) Enable() {
 	}
 }
 
-func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter, error) {
+func (cs *Widget) GetAdapter(ecuType string) (gocan.Adapter, error) {
 	debug := fyne.CurrentApp().Preferences().Bool(prefsDebug)
 	port := fyne.CurrentApp().Preferences().String(prefsPort)
 
@@ -323,35 +324,28 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 		canFilter = []uint32{0xC}
 		canRate = 615.384
 	case "T7":
-		if strings.Contains(adapterName, "STN") || strings.Contains(adapterName, "OBDLink") || strings.HasSuffix(adapterName, "Wifi") {
+		if strings.Contains(adapterName, "ELM327") || strings.Contains(adapterName, "STN") || strings.Contains(adapterName, "OBDLink") || strings.HasSuffix(adapterName, "Wifi") {
 			canFilter = []uint32{0x238, 0x258, 0x270}
 		} else {
 			canFilter = []uint32{0x180, 0x1A0, 0x238, 0x258, 0x270, 0x280, 0x3A0, 0x664, 0x665}
 		}
 		canRate = 500
 	case "T8":
-		if strings.Contains(adapterName, "STN") || strings.Contains(adapterName, "OBDLink") {
-			canFilter = []uint32{0x7e8}
+		if strings.Contains(adapterName, "ELM327") || strings.Contains(adapterName, "STN") || strings.Contains(adapterName, "OBDLink") {
+			canFilter = []uint32{0x7E8}
 		} else {
-			canFilter = []uint32{0x180, 0x7e8, 0x664, 0x665}
+			canFilter = []uint32{0x180, 0x7E8, 0x664, 0x665}
 		}
 		canRate = 500
 	}
 
-	var minimumVersion string
-	if strings.HasPrefix(adapterName, "txbridge") {
-		minimumVersion = ota.MinimumtxbridgeVersion
-	}
-
 	cfg := &gocan.AdapterConfig{
-		Port:                   port,
-		PortBaudrate:           baudrate,
-		CANRate:                canRate,
-		CANFilter:              canFilter,
-		OnMessage:              logger,
-		Debug:                  debug,
-		MinimumFirmwareVersion: minimumVersion,
-		PrintVersion:           true,
+		Port:         port,
+		PortBaudrate: baudrate,
+		CANRate:      canRate,
+		CANFilter:    canFilter,
+		Debug:        debug,
+		PrintVersion: true,
 	}
 
 	if strings.HasPrefix(adapterName, "J2534") { // || strings.HasPrefix(adapterName, "CANlib") {
@@ -363,10 +357,11 @@ func (cs *Widget) GetAdapter(ecuType string, logger func(string)) (gocan.Adapter
 		defer cancel()
 		addr, err := mdns.Query(ctx, "txbridge.local")
 		if err != nil {
-			logger(fmt.Sprintf("Failed to resolve txbridge address via mDNS: %v", err))
+			cs.cfg.Logger(fmt.Sprintf("Failed to resolve txbridge address via mDNS: %v", err))
 		} else {
 			cfg.AdditionalConfig = map[string]string{
-				"address": fmt.Sprintf("%s:%d", addr.String(), 1337),
+				"address":    fmt.Sprintf("%s:%d", addr.String(), 1337),
+				"minversion": ota.MinimumtxbridgeVersion,
 			}
 		}
 	}

@@ -2,6 +2,7 @@ package windows
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"path"
@@ -48,22 +49,20 @@ func newOtoContext() *oto.Context {
 
 func (mw *MainWindow) Close() {
 	if mw.dlc != nil {
-		log.Println("Closing datalogger client")
+		mw.Log("Closing datalogger client")
 		mw.dlc.Close()
 		time.Sleep(250 * time.Millisecond)
 	}
 	if mw.gwclient != nil {
-		log.Println("sending quit to cangateway")
+		mw.Log("Sending quit command to cangateway")
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		_, err := mw.gwclient.SendCommand(ctx, &proto.Command{Data: []byte("quit")})
 		if err != nil {
-			log.Println("error sending quit to cangateway:", err)
+			mw.Error(fmt.Errorf("error sending quit to cangateway: %w", err))
 		}
-		log.Println("quit command sent")
 	}
 	mw.Window.Close()
-	log.Println("mainwindow Closed")
 }
 
 func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
@@ -189,7 +188,8 @@ func (mw *MainWindow) newSymbolnameTypeahead() {
 			return
 		}
 		// Get the list of possible completion
-		results := []string{"ADC1", "ADC2", "ADC3", "ADC4", "ADC5"}
+		//results := []string{"ADC1", "ADC2", "ADC3", "ADC4", "ADC5"}
+		var results []string
 		for _, sym := range mw.fw.Symbols() {
 			if sym.Length > 8 {
 				continue

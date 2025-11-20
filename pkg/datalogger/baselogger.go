@@ -21,10 +21,10 @@ type BaseLogger struct {
 	writeChan chan *DataRequest
 	quitChan  chan struct{}
 
-	cps          int
-	captureCount int
-	errCount     int
-	errPerSecond int
+	capturePerSecond int
+	captureCount     int
+	errPerSecond     int
+	errCount         int
 
 	closeOnce sync.Once
 
@@ -76,10 +76,24 @@ func (bl *BaseLogger) GetRAM(address uint32, length uint32) ([]byte, error) {
 	return req.Data, req.Wait()
 }
 
+// update capture counters
+func (bl *BaseLogger) onCapture() {
+	bl.captureCount++
+	bl.capturePerSecond++
+	if bl.captureCount%15 == 0 {
+		bl.CaptureCounter(bl.captureCount)
+	}
+}
+
 func (bl *BaseLogger) onError() {
 	bl.errCount++
 	bl.errPerSecond++
 	bl.ErrorCounter(bl.errCount)
+}
+
+func (bl *BaseLogger) resetPerSecond() {
+	bl.capturePerSecond = 0
+	bl.errPerSecond = 0
 }
 
 func (bl *BaseLogger) calculateCompensatedTimestamp() time.Time {

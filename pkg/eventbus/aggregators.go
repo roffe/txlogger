@@ -1,11 +1,9 @@
 package eventbus
 
-import "log"
-
 type EventAggregatorFunc func(c DiffPublisher, name string, value float64)
 
 type DiffPublisher interface {
-	Publish(name string, value float64) error
+	Publish(name string, value float64)
 }
 
 // Modified EventAggregator to track its topics
@@ -37,9 +35,7 @@ func DIFFAggregator(first, second, output string) *EventAggregator {
 			}
 			if firstUpdated && secondUpdated {
 				diff := secondValue - firstValue
-				if err := c.Publish(output, diff); err != nil {
-					log.Printf("failed to publish diff %s: %v", output, err)
-				}
+				c.Publish(output, diff)
 				firstUpdated, secondUpdated = false, false
 			}
 		},

@@ -14,9 +14,6 @@
 		},
 		{
 			"path": "../txweb"
-		},
-		{
-			"path": "../gocanflasher"
 		}
 	],
 	"settings": {

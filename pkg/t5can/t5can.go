@@ -51,7 +51,7 @@ func (c *Client) ReadRam(ctx context.Context, address, length uint32) ([]byte, e
 func (c *Client) sendReadCommand(ctx context.Context, address uint32) ([]byte, error) {
 	const cmdByte = 0xC7
 	frame := gocan.NewFrame(0x05, []byte{cmdByte, 0x00, 0x00, byte(address >> 8), byte(address)}, gocan.ResponseRequired)
-	resp, err := c.c.SendAndWait(ctx, frame, 200*time.Millisecond, 0x0C)
+	resp, err := c.c.SendAndWait(ctx, frame, c.defaultTimeout, 0x0C)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (c *Client) WriteRam(ctx context.Context, address uint32, data []byte) erro
 	// Fast/legacy path: single byte via ASCII command supports only 16-bit addresses.
 	if len(data) == 1 && address <= 0xFFFF {
 		cmd := fmt.Sprintf("W%04X%02X\r", uint16(address), data[0])
-		return sendCommand(ctx, c.c, []byte(cmd))
+		return sendCommand(ctx, c.c, []byte(cmd), c.defaultTimeout)
 	}
 
 	// Helper to send a single 0..maxBlock block starting at `addr`
@@ -117,7 +117,7 @@ func (c *Client) sendBlock(ctx context.Context, addr uint32, block []byte, maxBl
 		},
 		gocan.ResponseRequired,
 	)
-	addrResp, err := c.c.SendAndWait(ctx, addrFrame, 200*time.Millisecond, replyID)
+	addrResp, err := c.c.SendAndWait(ctx, addrFrame, c.defaultTimeout, replyID)
 	if err != nil {
 		return fmt.Errorf("set-address send failed: %w", err)
 	}
@@ -151,7 +151,7 @@ func (c *Client) sendBlock(ctx context.Context, addr uint32, block []byte, maxBl
 		copy(payload[1:], block[offset:offset+n])
 
 		dataFrame := gocan.NewFrame(canID, payload[:], gocan.ResponseRequired)
-		dataResp, err := c.c.SendAndWait(ctx, dataFrame, 200*time.Millisecond, replyID)
+		dataResp, err := c.c.SendAndWait(ctx, dataFrame, c.defaultTimeout, replyID)
 		if err != nil {
 			return fmt.Errorf("data send failed at offset %d: %w", offset, err)
 		}
@@ -187,7 +187,7 @@ func (c *Client) WriteRam2(ctx context.Context, address uint32, data []byte) err
 
 func (c *Client) writeRamSingle(ctx context.Context, address uint32, data byte) error {
 	command := fmt.Sprintf("W%04X%02X\r", uint16(address), data)
-	if err := sendCommand(ctx, c.c, []byte(command)); err != nil {
+	if err := sendCommand(ctx, c.c, []byte(command), c.defaultTimeout); err != nil {
 		return err
 	}
 	return nil
@@ -199,7 +199,7 @@ func (c *Client) writeRamMulti(ctx context.Context, address uint32, data []byte)
 		return fmt.Errorf("data too long")
 	}
 	addressFrame := gocan.NewFrame(0x05, []byte{0xA5, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address), byte(len(data)), 0x00, 0x00}, gocan.ResponseRequired)
-	addressResp, err := c.c.SendAndWait(ctx, addressFrame, 200*time.Millisecond, 0x0C)
+	addressResp, err := c.c.SendAndWait(ctx, addressFrame, c.defaultTimeout, 0x0C)
 	if err != nil {
 		return fmt.Errorf("failed to send address command: %v", err)
 	}
@@ -221,7 +221,7 @@ func (c *Client) writeRamMulti(ctx context.Context, address uint32, data []byte)
 		payload[7] = 0x00
 		copy(payload[1:], data[offset:offset+chunkSize])
 		dataFrame := gocan.NewFrame(0x05, payload, gocan.ResponseRequired)
-		dataResp, err := c.c.SendAndWait(ctx, dataFrame, 200*time.Millisecond, 0x0C)
+		dataResp, err := c.c.SendAndWait(ctx, dataFrame, c.defaultTimeout, 0x0C)
 		if err != nil {
 			return fmt.Errorf("failed to send data command: %v", err)
 		}
@@ -234,10 +234,10 @@ func (c *Client) writeRamMulti(ctx context.Context, address uint32, data []byte)
 	return nil
 }
 
-func sendCommand(ctx context.Context, c *gocan.Client, cmd []byte) error {
+func sendCommand(ctx context.Context, c *gocan.Client, cmd []byte, timeout time.Duration) error {
 	for _, b := range cmd {
 		frame := gocan.NewFrame(0x05, []byte{0xC4, b}, gocan.ResponseRequired)
-		resp, err := c.SendAndWait(ctx, frame, 200*time.Millisecond, 0xC)
+		resp, err := c.SendAndWait(ctx, frame, timeout, 0xC)
 		if err != nil {
 			return err
 		}

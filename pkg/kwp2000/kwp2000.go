@@ -44,7 +44,7 @@ func New(c *gocan.Client) *Client {
 func (t *Client) StartSession(ctx context.Context, id, responseID uint32) error {
 	frame := &gocan.CANFrame{
 		Identifier: id,
-		Data:       []byte{0x3F, START_COM_REQ, 0x00, 0x11, byte(REQ_MSG_ID >> 8), byte(REQ_MSG_ID & 0xFF), 0x00, 0x00},
+		Data:       []byte{0x3F, START_COM_REQ, 0x00, 0x11, byte(REQ_MSG_ID >> 8), byte(REQ_MSG_ID & 0xFF)},
 		FrameType:  gocan.ResponseRequired,
 	}
 	resp, err := t.c.SendAndWait(ctx, frame, 3*time.Second, responseID)
@@ -55,6 +55,7 @@ func (t *Client) StartSession(ctx context.Context, id, responseID uint32) error 
 		return fmt.Errorf("StartSession[2]: %w", TranslateErrorCode(GENERAL_REJECT))
 	}
 	t.responseID = uint32(resp.Data[6])<<8 | uint32(resp.Data[7])
+	//log.Printf("ECU ID: 0x%03X", t.responseID)
 	return nil
 }
 
@@ -346,7 +347,7 @@ func (t *Client) ClearDynamicallyDefineLocalId(ctx context.Context) error {
 		Data:       []byte{0x40, 0xA1, DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER, DM_CDDLI},
 		FrameType:  gocan.ResponseRequired,
 	}
-	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, t.responseID)
+	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout*2, t.responseID)
 	if err != nil {
 		return fmt.Errorf("ClearDynamicallyDefineLocalId: %w", err)
 	}
@@ -406,7 +407,7 @@ func (t *Client) RequestSecurityAccess(ctx context.Context, force bool) (bool, e
 
 func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 	msg := []byte{0x40, 0xA1, 0x02, SECURITY_ACCESS, DEVELOPMENT_PRIORITY}
-	ff, err := t.c.SendAndWait(ctx, gocan.NewFrame(REQ_MSG_ID, msg, gocan.ResponseRequired), DefaultTimeout, t.responseID)
+	ff, err := t.c.SendAndWait(ctx, gocan.NewFrame(REQ_MSG_ID, msg, gocan.ResponseRequired), DefaultTimeout*2, t.responseID)
 	if err != nil {
 		return false, fmt.Errorf("request seed: %v", err)
 	}

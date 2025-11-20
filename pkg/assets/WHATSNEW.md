@@ -1,6 +1,8 @@
 # 2.1.5
 - Added numbers on the gauge dials for easier reading
 - Fixed axis information for tryck_mat_a! in ecusymbol library where it would open tryck_mat! instead
+- Added a small device check and error out if trying to use J2534 or ELM327 adapters with Trionic 5
+- fixed a bug in the update checker where the update check would not be performed properly
 
 # 2.1.4
 - Symbollist now remembers the last selected preset per ECU.

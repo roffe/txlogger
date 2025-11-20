@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"fmt"
 	"math"
 	"time"
 
@@ -67,79 +66,70 @@ func (c *T5Client) Start() error {
 	converto := newT5Converter(c.WidebandConfig)
 
 	go func() {
-		if err := cl.Wait(ctx); err != nil {
-			c.OnMessage(err.Error())
-			cancel()
-		}
-	}()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-c.quitChan:
-			c.OnMessage("Stopped logging..")
-			return nil
-		case <-c.secondTicker.C:
-			c.FpsCounter(c.cps)
-			if c.errPerSecond > 5 {
-				c.errPerSecond = 0
-				return fmt.Errorf("too many errors per second")
-			}
-			c.cps = 0
-			c.errPerSecond = 0
-		case read := <-c.readChan:
-			data, err := t5.ReadRam(ctx, read.Address, read.Length)
-			if err != nil {
-				c.onError()
-				c.OnMessage(err.Error())
-				continue
-			}
-			read.Data = data
-			read.Complete(nil)
-		case upd := <-c.writeChan:
-			if err := t5.WriteRam(ctx, upd.Address, upd.Data); err != nil {
-				upd.Complete(err)
-				break
-			}
-			upd.Complete(nil)
-		case <-t.C:
-			ts := time.Now()
-			for _, sym := range c.Symbols {
-				resp, err := t5.ReadRam(ctx, sym.SramOffset, uint32(sym.Length))
+		defer cl.Close()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-c.quitChan:
+				c.OnMessage("Stopped logging..")
+				return
+			case <-c.secondTicker.C:
+				c.FpsCounter(c.capturePerSecond)
+				if c.errPerSecond > 5 {
+					c.OnMessage("too many errors, aborting logging")
+					return
+				}
+				c.resetPerSecond()
+			case read := <-c.readChan:
+				data, err := t5.ReadRam(ctx, read.Address, read.Length)
 				if err != nil {
 					c.onError()
 					c.OnMessage(err.Error())
 					continue
 				}
-				r := bytes.NewReader(resp)
-				if err := sym.Read(r); err != nil {
-					return err
+				read.Data = data
+				read.Complete(nil)
+			case upd := <-c.writeChan:
+				if err := t5.WriteRam(ctx, upd.Address, upd.Data); err != nil {
+					upd.Complete(err)
+					break
 				}
-				val := converto(sym.Name, sym.Bytes())
-				c.sysvars.Set(sym.Name, val)
-				if err := ebus.Publish(sym.Name, val); err != nil {
-					c.onError()
-					c.OnMessage(err.Error())
+				upd.Complete(nil)
+			case <-t.C:
+				ts := time.Now()
+				for _, sym := range c.Symbols {
+					resp, err := t5.ReadRam(ctx, sym.SramOffset, uint32(sym.Length))
+					if err != nil {
+						c.onError()
+						c.OnMessage(err.Error())
+						continue
+					}
+					r := bytes.NewReader(resp)
+					if err := sym.Read(r); err != nil {
+						c.OnMessage("failed to read symbol " + sym.Name + ": " + err.Error())
+						return
+					}
+					val := converto(sym.Name, sym.Bytes())
+					c.sysvars.Set(sym.Name, val)
+					ebus.Publish(sym.Name, val)
 				}
-			}
 
-			if c.lamb != nil {
-				lambda := c.lamb.GetLambda()
-				c.sysvars.Set(EXTERNALWBLSYM, lambda)
-				ebus.Publish(EXTERNALWBLSYM, lambda)
-			}
+				if c.lamb != nil {
+					lambda := c.lamb.GetLambda()
+					c.sysvars.Set(EXTERNALWBLSYM, lambda)
+					ebus.Publish(EXTERNALWBLSYM, lambda)
+				}
 
-			if err := c.lw.Write(c.sysvars, []*symbol.Symbol{}, ts, order); err != nil {
-				return err
-			}
-			c.captureCount++
-			c.cps++
-			if c.captureCount%15 == 0 {
-				c.CaptureCounter(c.captureCount)
+				if err := c.lw.Write(c.sysvars, []*symbol.Symbol{}, ts, order); err != nil {
+					c.OnMessage("failed to write log: " + err.Error())
+					return
+				}
+				c.onCapture()
 			}
 		}
-	}
+	}()
+	return cl.Wait(ctx)
 }
 
 const (

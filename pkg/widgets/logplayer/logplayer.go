@@ -1,7 +1,6 @@
 package logplayer
 
 import (
-	"log"
 	"sync"
 	"time"
 
@@ -395,9 +394,7 @@ func (l *Logplayer) playLog() {
 						timer.Reset(0)
 					} else {
 						for k, v := range rec.Values {
-							if err := l.cfg.EBus.Publish(k, v); err != nil {
-								log.Println("Error publishing to eventbus:", err)
-							}
+							l.cfg.EBus.Publish(k, v)
 						}
 						timeSetter(rec.Time)
 						timer.Stop()
@@ -417,9 +414,7 @@ func (l *Logplayer) playLog() {
 						timer.Reset(0)
 					} else {
 						for k, v := range rec.Values {
-							if err := l.cfg.EBus.Publish(k, v); err != nil {
-								log.Println("Error publishing to eventbus:", err)
-							}
+							l.cfg.EBus.Publish(k, v)
 						}
 					}
 
@@ -441,9 +436,7 @@ func (l *Logplayer) playLog() {
 						timer.Reset(0)
 					} else {
 						for k, v := range rec.Values {
-							if err := l.cfg.EBus.Publish(k, v); err != nil {
-								log.Println("Error publishing to eventbus:", err)
-							}
+							l.cfg.EBus.Publish(k, v)
 						}
 					}
 					if f := l.cfg.TimeSetter; f != nil {
@@ -475,9 +468,7 @@ func (l *Logplayer) playLog() {
 					l.objs.timeLabel.SetText(timeText)
 				})
 				for k, v := range rec.Values {
-					if err := l.cfg.EBus.Publish(k, v); err != nil {
-						log.Println("Error publishing to eventbus:", err)
-					}
+					l.cfg.EBus.Publish(k, v)
 				}
 				if f := l.cfg.TimeSetter; f != nil {
 					f(rec.Time)

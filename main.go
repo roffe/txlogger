@@ -35,7 +35,7 @@ func init() {
 func signalHandler(mw *windows.MainWindow) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
-	debug.Log("installed signal handler")
+	//debug.Log("installed signal handler")
 	sig := make(chan os.Signal, 2)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	s := <-sig

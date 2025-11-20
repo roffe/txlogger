@@ -1,0 +1,163 @@
+package native
+
+import (
+	"syscall"
+	"unicode/utf16"
+	"unsafe"
+)
+
+// --- Win types/consts ---
+
+type DWORD = uint32
+type ULONG = uint32
+type BOOL = int32
+type HANDLE = uintptr
+
+// GUID layout (same as Windows GUID)
+type GUID struct {
+	Data1 uint32
+	Data2 uint16
+	Data3 uint16
+	Data4 [8]byte
+}
+
+// WLAN constants
+const (
+	WLAN_API_VERSION_2_0 = 2
+
+	// DOT11_BSS_TYPE
+	Dot11BssTypeInfrastructure = 1
+	Dot11BssTypeIndependent    = 2
+	Dot11BssTypeAny            = 3
+
+	DOT11_SSID_MAX_LENGTH = 32
+	WLAN_MAX_NAME_LENGTH  = 256
+
+	// WlanGetAvailableNetworkList flags
+	WLAN_AVAILABLE_NETWORK_INCLUDE_ALL_ADHOC_PROFILES         = 0x00000001
+	WLAN_AVAILABLE_NETWORK_INCLUDE_ALL_MANUAL_HIDDEN_PROFILES = 0x00000002
+
+	// WLAN_AVAILABLE_NETWORK.dwFlags
+	WLAN_AVAILABLE_NETWORK_CONNECTED   = 0x00000001
+	WLAN_AVAILABLE_NETWORK_HAS_PROFILE = 0x00000002
+)
+
+// Structures mirror wlanapi.h (pay attention to field sizes/order)
+
+// WLAN_INTERFACE_INFO
+type wlanInterfaceInfo struct {
+	InterfaceGuid           GUID
+	strInterfaceDescription [WLAN_MAX_NAME_LENGTH]uint16 // UTF-16
+	isState                 DWORD
+}
+
+// WLAN_INTERFACE_INFO_LIST
+// Header followed by an array of wlanInterfaceInfo items.
+type wlanInterfaceInfoList struct {
+	dwNumberOfItems DWORD
+	dwIndex         DWORD
+	// followed by wlanInterfaceInfo[dwNumberOfItems]
+}
+
+// DOT11_SSID
+type dot11SSID struct {
+	SSIDLength ULONG
+	SSID       [DOT11_SSID_MAX_LENGTH]byte
+}
+
+// WLAN_AVAILABLE_NETWORK
+type wlanAvailableNetwork struct {
+	strProfileName              [WLAN_MAX_NAME_LENGTH]uint16 // UTF-16
+	ssid                        dot11SSID
+	dot11BssType                uint32
+	uNumberOfBssids             ULONG
+	bNetworkConnectable         BOOL
+	wlanNotConnectableReason    DWORD
+	uNumberOfPhyTypes           ULONG
+	dot11PhyTypes               [8]uint32 // DOT11_PHY_TYPE
+	bMorePhyTypes               BOOL
+	wlanSignalQuality           DWORD // 0..100
+	bSecurityEnabled            BOOL
+	dot11DefaultAuthAlgorithm   uint32
+	dot11DefaultCipherAlgorithm uint32
+	dwFlags                     DWORD
+	dwReserved                  DWORD
+}
+
+// WLAN_AVAILABLE_NETWORK_LIST
+type wlanAvailableNetworkList struct {
+	dwNumberOfItems DWORD
+	dwIndex         DWORD
+	// followed by wlanAvailableNetwork[dwNumberOfItems]
+}
+
+// --- DLL imports ---
+
+var (
+	modWlan              = syscall.NewLazyDLL("wlanapi.dll")
+	procWlanOpenHandle   = modWlan.NewProc("WlanOpenHandle")
+	procWlanCloseHandle  = modWlan.NewProc("WlanCloseHandle")
+	procWlanEnumIfaces   = modWlan.NewProc("WlanEnumInterfaces")
+	procWlanGetAvailNets = modWlan.NewProc("WlanGetAvailableNetworkList")
+	procWlanFreeMemory   = modWlan.NewProc("WlanFreeMemory")
+)
+
+func wlanOpenHandle(clientVersion DWORD) (HANDLE, DWORD, error) {
+	var negotiated DWORD
+	var h HANDLE
+	r0, _, _ := procWlanOpenHandle.Call(
+		uintptr(clientVersion),
+		uintptr(0),
+		uintptr(unsafe.Pointer(&negotiated)),
+		uintptr(unsafe.Pointer(&h)),
+	)
+	if DWORD(r0) != 0 {
+		return 0, 0, syscall.Errno(r0)
+	}
+	return h, negotiated, nil
+}
+
+func wlanCloseHandle(h HANDLE) {
+	procWlanCloseHandle.Call(h, 0)
+}
+
+func wlanEnumInterfaces(h HANDLE) (unsafe.Pointer, error) {
+	var p unsafe.Pointer
+	r0, _, _ := procWlanEnumIfaces.Call(
+		h,
+		0,
+		uintptr(unsafe.Pointer(&p)),
+	)
+	if DWORD(r0) != 0 {
+		return nil, syscall.Errno(r0)
+	}
+	return p, nil
+}
+
+func wlanGetAvailableNetworkList(h HANDLE, guid *GUID, flags DWORD) (unsafe.Pointer, error) {
+	var p unsafe.Pointer
+	r0, _, _ := procWlanGetAvailNets.Call(
+		h,
+		uintptr(unsafe.Pointer(guid)),
+		uintptr(flags),
+		0,
+		uintptr(unsafe.Pointer(&p)),
+	)
+	if DWORD(r0) != 0 {
+		return nil, syscall.Errno(r0)
+	}
+	return p, nil
+}
+
+func wlanFreeMemory(p unsafe.Pointer) { procWlanFreeMemory.Call(uintptr(p)) }
+
+// --- helpers ---
+
+func utf16ToString(buf []uint16) string {
+	// trim at first 0
+	n := 0
+	for n < len(buf) && buf[n] != 0 {
+		n++
+	}
+	return string(utf16.Decode(buf[:n]))
+}

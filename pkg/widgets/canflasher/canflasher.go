@@ -13,11 +13,11 @@ import (
 
 	// Import ecu packages
 
-	_ "github.com/roffe/gocanflasher/pkg/ecu/t5"
-	_ "github.com/roffe/gocanflasher/pkg/ecu/t5legion"
-	_ "github.com/roffe/gocanflasher/pkg/ecu/t7"
-	_ "github.com/roffe/gocanflasher/pkg/ecu/t8"
-	_ "github.com/roffe/gocanflasher/pkg/ecu/t8mcp"
+	_ "github.com/roffe/txlogger/pkg/ecu/t5"
+	_ "github.com/roffe/txlogger/pkg/ecu/t5legion"
+	_ "github.com/roffe/txlogger/pkg/ecu/t7"
+	_ "github.com/roffe/txlogger/pkg/ecu/t8"
+	_ "github.com/roffe/txlogger/pkg/ecu/t8mcp"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 )
 
@@ -81,10 +81,14 @@ func (t *CanFlasherWidget) log(s string) {
 func (t *CanFlasherWidget) progress(v float64) {
 	if v < 0 {
 		t.progressBar.Max = math.Abs(v)
-		t.progressBar.SetValue(0)
+		fyne.Do(func() {
+			t.progressBar.SetValue(0)
+		})
 		return
 	}
-	t.progressBar.SetValue(v)
+	fyne.Do(func() {
+		t.progressBar.SetValue(v)
+	})
 }
 
 func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {

@@ -1,7 +1,6 @@
 package eventbus
 
 import (
-	"errors"
 	"log"
 	"sync"
 )
@@ -180,12 +179,11 @@ func (e *Controller) RegisterAggregator(aggs ...*EventAggregator) {
 	}
 }
 
-func (e *Controller) Publish(topic string, data float64) error {
+func (e *Controller) Publish(topic string, data float64) {
 	select {
 	case e.incoming <- &EBusMessage{Topic: topic, Data: data}:
-		return nil
 	default:
-		return errors.New(topic + "publish channel full")
+		log.Println(topic + "publish channel full")
 	}
 }
 

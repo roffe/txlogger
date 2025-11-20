@@ -8,6 +8,10 @@ import (
 	"github.com/roffe/gocan"
 )
 
+var (
+	ErrToManyErrors = fmt.Errorf("too many errors, aborting logging")
+)
+
 const ISO8601 = "2006-01-02T15:04:05.999-0700"
 const ISONICO = "2006-01-02 15:04:05,999"
 const EXTERNALWBLSYM = "Lambda.External"
@@ -70,7 +74,6 @@ func New(cfg Config) (IClient, string, error) {
 	cfg.OnMessage(fmt.Sprintf("Logging to %s", filename))
 
 	if cfg.Device.Name() == "txbridge wifi" || cfg.Device.Name() == "txbridge bluetooth" {
-		cfg.OnMessage("using experimental txbridge client")
 		dc, err := NewTxbridge(cfg, lw)
 		if err != nil {
 			return nil, "", err
