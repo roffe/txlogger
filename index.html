@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,15 +13,18 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@700&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@700&family=Inter:wght@400;500;700&display=swap"
+        rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
             background-color: #212121;
         }
+
         .font-exo {
             font-family: 'Exo 2', sans-serif;
         }
+
         .media-container {
             position: relative;
             padding-bottom: 56.25%;
@@ -31,10 +35,12 @@
             transition: border-color 0.3s ease-in-out;
             cursor: pointer;
         }
+
         .media-container:hover {
             border-color: #00b34f;
             box-shadow: 0 0 15px rgba(0, 179, 79, 0.4);
         }
+
         .media-container iframe,
         .media-container img {
             position: absolute;
@@ -44,21 +50,27 @@
             height: 100%;
             object-fit: cover;
         }
+
         .saab-green {
             color: #00b34f;
         }
+
         .bg-saab-green {
             background-color: #00b34f;
         }
+
         .hover\:bg-saab-green-dark:hover {
             background-color: #009943;
         }
+
         .border-saab-green {
             border-color: #00b34f;
         }
+
         #modal {
             transition: opacity 0.3s ease;
         }
+
         #modal-content iframe,
         #modal-content img {
             max-width: 90vw;
@@ -66,14 +78,15 @@
         }
     </style>
 </head>
+
 <body class="text-gray-300 antialiased">
 
     <main class="container mx-auto px-4 py-8 md:py-12">
-        
+
         <section class="text-center mb-12 md:mb-16">
             <div class="bg-black/20 p-2 inline-block mb-8">
-                <img src="https://txlogger.com/banner.png" alt="TxLogger Banner" class="max-w-full h-auto" 
-                     onerror="this.onerror=null; this.src='https://placehold.co/1200x300/1a1a1a/ffffff?text=TxLogger+Banner';">
+                <img src="https://txlogger.com/banner.png" alt="TxLogger Banner" class="max-w-full h-auto"
+                    onerror="this.onerror=null; this.src='https://placehold.co/1200x300/1a1a1a/ffffff?text=TxLogger+Banner';">
             </div>
             <h1 class="font-exo text-4xl md:text-5xl font-bold text-white uppercase tracking-wide mb-3">txlogger</h1>
             <p class="text-lg md:text-xl text-gray-400">
@@ -85,41 +98,48 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="media-container" data-type="image" data-src="https://txlogger.com/txlogger.jpg">
                     <img src="https://txlogger.com/txlogger.jpg" alt="Main window"
-                         onerror="this.onerror=null; this.src='https://placehold.co/600x338/1f2937/ffffff?text=Main+Window';">
+                        onerror="this.onerror=null; this.src='https://placehold.co/600x338/1f2937/ffffff?text=Main+Window';">
                 </div>
                 <div class="media-container" data-type="image" data-src="https://txlogger.com/txlogger2.jpg">
                     <img src="https://txlogger.com/txlogger2.jpg" alt="Dashboard"
-                         onerror="this.onerror=null; this.src='https://placehold.co/600x338/1f2937/ffffff?text=Dashboard';">
+                        onerror="this.onerror=null; this.src='https://placehold.co/600x338/1f2937/ffffff?text=Dashboard';">
                 </div>
-                <div class="media-container" data-type="video" data-src="https://www.youtube-nocookie.com/embed/FHyt-3YUaDM?si=XfC4rX2NaPIsrbY3">
-                    <img src="https://img.youtube.com/vi/FHyt-3YUaDM/hqdefault.jpg" alt="Video Thumbnail" class="pointer-events-none">
+                <div class="media-container" data-type="video"
+                    data-src="https://www.youtube-nocookie.com/embed/FHyt-3YUaDM?si=XfC4rX2NaPIsrbY3">
+                    <img src="https://img.youtube.com/vi/FHyt-3YUaDM/hqdefault.jpg" alt="Video Thumbnail"
+                        class="pointer-events-none">
                 </div>
-                <div class="media-container" data-type="video" data-src="https://www.youtube-nocookie.com/embed/V9WUryJe4Gk?si=JMp5Bqc0wk0iH0aE">
-                    <img src="https://img.youtube.com/vi/V9WUryJe4Gk/hqdefault.jpg" alt="Video Thumbnail" class="pointer-events-none">
+                <div class="media-container" data-type="video"
+                    data-src="https://www.youtube-nocookie.com/embed/V9WUryJe4Gk?si=JMp5Bqc0wk0iH0aE">
+                    <img src="https://img.youtube.com/vi/V9WUryJe4Gk/hqdefault.jpg" alt="Video Thumbnail"
+                        class="pointer-events-none">
                 </div>
                 <div class="media-container" data-type="image" data-src="https://txlogger.com/txlogger6.jpg">
                     <img src="https://txlogger.com/txlogger6.jpg" alt="Map Viewer"
-                         onerror="this.onerror=null; this.src='https://placehold.co/600x338/1f2937/ffffff?text=Map+Viewer';">
+                        onerror="this.onerror=null; this.src='https://placehold.co/600x338/1f2937/ffffff?text=Map+Viewer';">
                 </div>
                 <div class="media-container" data-type="image" data-src="https://txlogger.com/txlogger5.jpg">
                     <img src="https://txlogger.com/txlogger5.jpg" alt="Map Viewer 2"
-                         onerror="this.onerror=null; this.src='https://placehold.co/600x338/1f2937/ffffff?text=Map+Viewer+2';">
+                        onerror="this.onerror=null; this.src='https://placehold.co/600x338/1f2937/ffffff?text=Map+Viewer+2';">
                 </div>
             </div>
         </section>
-        
+
         <section class="text-center mb-12 md:mb-16 bg-black/30 border-t border-b border-gray-700 py-10">
             <div class="flex justify-center items-center gap-4 mb-6 text-gray-400">
                 <span>Made with</span>
                 <a href="https://go.dev/" target="_blank" class="hover:opacity-80 transition-opacity">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Go_Logo_Blue.svg/322px-Go_Logo_Blue.svg.png" width="50" alt="Go Language Logo">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Go_Logo_Blue.svg/322px-Go_Logo_Blue.svg.png"
+                        width="50" alt="Go Language Logo">
                 </a>
                 <span>, Powered by</span>
-                <a href="https://github.com/roffe/gocan" target="_blank" class="font-semibold text-white hover:text-blue-400 transition-colors">goCAN</a>
+                <a href="https://github.com/roffe/gocan" target="_blank"
+                    class="font-semibold text-white hover:text-blue-400 transition-colors">goCAN</a>
             </div>
             <blockquote class="text-xl italic text-gray-200 max-w-3xl mx-auto">
                 <p>"Logging without txlogger is like walking without legs😅"</p>
-                <footer class="text-sm not-italic text-gray-500 mt-2">- <a href="https://www.trionictuning.com" class="hover:text-gray-300 transition-colors">TrionicTuning</a> forum member</footer>
+                <footer class="text-sm not-italic text-gray-500 mt-2">- <a href="https://www.trionictuning.com"
+                        class="hover:text-gray-300 transition-colors">TrionicTuning</a> forum member</footer>
             </blockquote>
         </section>
 
@@ -128,10 +148,12 @@
                 <h2 class="font-exo text-3xl font-bold text-white mb-6 uppercase">Downloads</h2>
                 <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
                     <div class="text-lg text-gray-300">Windows 64bit:</div>
-                    <a href="https://roffe.nu/txlogger/setup.zip" class="w-full sm:w-auto bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 transition-all duration-300">
+                    <a href="https://roffe.nu/txlogger/setup.zip"
+                        class="w-full sm:w-auto bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 transition-all duration-300">
                         Installer
                     </a>
-                    <a href="https://roffe.nu/txlogger/txlogger.zip" class="w-full sm:w-auto bg-saab-green hover:bg-saab-green-dark text-black font-bold py-3 px-6 transition-all duration-300">
+                    <a href="https://roffe.nu/txlogger/txlogger.zip"
+                        class="w-full sm:w-auto bg-saab-green hover:bg-saab-green-dark text-black font-bold py-3 px-6 transition-all duration-300">
                         Standalone
                     </a>
                 </div>
@@ -140,17 +162,20 @@
         </section>
 
         <section class="text-center">
-            <a href="https://github.com/roffe/txlogger" target="_blank" class="inline-block mb-6 hover:opacity-80 transition-opacity">
-                <img src="https://cdn-icons-png.flaticon.com/512/25/25231.png" width="60" alt="Source Code on GitHub" style="filter: invert(1);">
+            <a href="https://github.com/roffe/txlogger" target="_blank"
+                class="inline-block mb-6 hover:opacity-80 transition-opacity">
+                <img src="https://cdn-icons-png.flaticon.com/512/25/25231.png" width="60" alt="Source Code on GitHub"
+                    style="filter: invert(1);">
             </a>
-            <p class="text-gray-400 max-w-lg mx-auto mb-2">This software and goCAN has taken several thousands of hours to develop.</p>
+            <p class="text-gray-400 max-w-lg mx-auto mb-2">This software and goCAN has taken several thousands of hours
+                to develop.</p>
             <p class="text-gray-300 font-semibold max-w-lg mx-auto mb-6">Consider donating if you 💕 it.</p>
-            
+
             <div id="donate-button-container" class="flex justify-center">
                 <div id="donate-button"></div>
                 <script src="https://www.paypalobjects.com/donate/sdk/donate-sdk.js" charset="UTF-8"></script>
                 <script>
-                    document.addEventListener('DOMContentLoaded', function() {
+                    document.addEventListener('DOMContentLoaded', function () {
                         try {
                             PayPal.Donation.Button({
                                 env: 'production',
@@ -168,21 +193,28 @@
                 </script>
                 <noscript>
                     <a href="https://www.paypal.com/donate/?hosted_button_id=TUG5GVFCPF3CW" target="_blank">
-                        <img src="https://www.paypalobjects.com/en_US/SE/i/btn/btn_donateCC_LG.gif" alt="Donate with PayPal button" />
+                        <img src="https://www.paypalobjects.com/en_US/SE/i/btn/btn_donateCC_LG.gif"
+                            alt="Donate with PayPal button" />
                     </a>
                 </noscript>
             </div>
         </section>
+        <br /><br />
+        <section class="text-center">
+            &copy; 2024 txlogger. All rights reserved. | <a href="privacy_policy.html"
+                class="hover:text-gray-300 transition-colors">Privacy Policy</a>
+        </section>
     </main>
 
-    <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 items-center justify-center p-4" style="backdrop-filter: blur(5px);">
+    <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 items-center justify-center p-4"
+        style="backdrop-filter: blur(5px);">
         <div id="modal-content" class="relative">
         </div>
         <button id="modal-close" class="absolute top-4 right-4 text-white text-4xl font-bold">&times;</button>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const modal = document.getElementById('modal');
             const modalContent = document.getElementById('modal-content');
             const modalClose = document.getElementById('modal-close');
@@ -210,7 +242,7 @@
                     videoWrapper.appendChild(element);
                     element = videoWrapper;
                 }
-                
+
                 if (element) {
                     modalContent.appendChild(element);
                     modal.classList.remove('hidden');
@@ -241,4 +273,5 @@
         });
     </script>
 </body>
+
 </html>
