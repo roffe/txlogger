@@ -2,21 +2,16 @@ package dashboard
 
 import (
 	_ "embed"
-	"fmt"
 	"image/color"
 	"log"
-	"strconv"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/common"
-	"github.com/roffe/txlogger/pkg/datalogger"
-	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/cbar"
 	"github.com/roffe/txlogger/pkg/widgets/dial"
@@ -42,6 +37,8 @@ type Dashboard struct {
 	logplayer bool
 
 	timeBuffer []byte
+
+	size fyne.Size
 
 	widget.BaseWidget
 }
@@ -82,7 +79,7 @@ type Config struct {
 func NewDashboard(cfg *Config) *Dashboard {
 	if cfg.AirDemToString == nil {
 		cfg.AirDemToString = func(f float64) string {
-			return "Undefined"
+			return "Unknown"
 		}
 	}
 
@@ -343,165 +340,6 @@ func interpol(x0, y0, x1, y1, x float64) float64 {
 }
 
 /*
-func (db *Dashboard) activeAirDemSetter(obj *canvas.Text) func(float64) {
-	var buf []byte
-	var lastVal float64
-	return func(value float64) {
-		if value == lastVal {
-			return
-		}
-		buf = buf[:0]
-		buf = append(buf, db.cfg.AirDemToString(value)...)
-		buf = append(buf, "("...)
-		buf = strconv.AppendFloat(buf, value, 'f', 0, 64)
-		buf = append(buf, ")"...)
-		obj.Text = string(buf)
-		//obj.Text = string(buf)
-		obj.Refresh()
-		lastVal = value
-	}
-}
-*/
-
-func (db *Dashboard) activeAirSetter(value float64) {
-	var buf []byte
-	var lastVal float64
-	if value == lastVal {
-		return
-	}
-	buf = buf[:0]
-	buf = append(buf, db.cfg.AirDemToString(value)...)
-	buf = append(buf, "("...)
-	buf = strconv.AppendFloat(buf, value, 'f', 0, 64)
-	buf = append(buf, ")"...)
-	db.text.activeAirDem.Text = string(buf)
-	//obj.Text = string(buf)
-	db.text.activeAirDem.Refresh()
-	lastVal = value
-}
-
-func (db *Dashboard) createRouter() map[string]func(float64) {
-	var rpm float64
-	t5rpmSetter := func(value float64) {
-		rpm = value
-		db.gauges.rpm.SetValue(value)
-	}
-
-	idcSetterT5 := func(obj *canvas.Text, text string) func(float64) {
-		idcc := idcSetter(obj, text)
-		return func(value float64) {
-			idcc((value * rpm) * rpmIDCconstant)
-		}
-	}
-
-	ioff := ioffSetter(db.text.ioff, db.image.taz)
-
-	// activeAirDem := db.activeAirDemSetter(db.text.activeAirDem)
-
-	setVehicleSpeed := db.gauges.speed.SetValue
-	if db.cfg.UseMPH {
-		setVehicleSpeed = func(value float64) {
-			db.gauges.speed.SetValue(value * 0.621371)
-		}
-	}
-
-	t5throttle := func(value float64) {
-		// value should be 0-100% input is 0 - 192
-		valuePercent := min(192, value) / 192 * 100
-		db.gauges.throttle.SetValue(valuePercent)
-	}
-
-	t5setnbl := func(value float64) {
-		if value < 128 {
-			// Interpolate in the range 0 to 128, mapping to -25 to 0.
-			db.gauges.nblambda.SetValue(interpol(0, -25, 128, 0, value))
-			return
-		}
-		// Interpolate in the range 128 to 255, mapping to 0 to 25.
-		db.gauges.nblambda.SetValue(interpol(128, 0, 255, 25, value))
-	}
-
-	router := map[string]func(float64){
-		"In.v_Vehicle": setVehicleSpeed, // t7 & t8
-		"Bil_hast":     setVehicleSpeed, // t5
-
-		"ActualIn.n_Engine": db.gauges.rpm.SetValue,
-		"Rpm":               t5rpmSetter, // t5
-
-		"ActualIn.T_AirInlet": db.gauges.iat.SetValue,
-		"Lufttemp":            db.gauges.iat.SetValue, // t5
-
-		"ActualIn.T_Engine": db.gauges.engineTemp.SetValue,
-		"Kyl_temp":          db.gauges.engineTemp.SetValue, // t5
-
-		"P_medel":             db.gauges.pressure.SetValue, // t5
-		"In.p_AirInlet":       db.gauges.pressure.SetValue,
-		"ActualIn.p_AirInlet": db.gauges.pressure.SetValue,
-
-		"Max_tryck":                 db.gauges.pressure.SetValue2, // t5
-		"In.p_AirBefThrottle":       db.gauges.pressure.SetValue2,
-		"ActualIn.p_AirBefThrottle": db.gauges.pressure.SetValue2,
-
-		"Medeltrot":      t5throttle,                  // t5
-		"Out.X_AccPedal": db.gauges.throttle.SetValue, // t7
-		"Out.X_AccPos":   db.gauges.throttle.SetValue, // t8
-
-		"Out.PWM_BoostCntrl": db.gauges.pwm.SetValue, // t7 & t8
-		"PWM_ut10":           db.gauges.pwm.SetValue, // t5
-
-		//"AdpFuelProt.MulFuelAdapt": amulSetter(db.text.amul, "Amul"), // t7
-		"AdpFuelProt.MulFuelAdapt": textSetter(db.text.amul, "Amul", "%", 2), // t7
-
-		// Wideband lambda
-		//"AD_EGR": db.gauges.wblambda.SetValue, // t5
-		//"DisplProt.LambdaScanner": db.wblambda.SetValue, // t7 & t8
-		//"Lambda.External":     db.wblambda.SetValue,
-		db.cfg.WidebandSymbol: db.gauges.wblambda.SetValue, // Wideband lambda
-
-		// NB lambda
-		"Lambda.LambdaInt": db.gauges.nblambda.SetValue, // t7 & t8
-		"Lambdaint":        t5setnbl,                    // t5
-
-		"MAF.m_AirInlet":        db.gauges.airmass.SetValue,  // t7 & t8
-		"m_Request":             db.gauges.airmass.SetValue2, // t7
-		"AirMassMast.m_Request": db.gauges.airmass.SetValue2, // t8
-
-		"Out.fi_Ignition": textSetter(db.text.ign, "Ign", "", 1),
-		"Ign_angle":       textSetter(db.text.ign, "Ign", "", 1),
-
-		"ECMStat.ST_ActiveAirDem": db.activeAirSetter, // t7 & t8
-
-		"IgnProt.fi_Offset":     ioff, // t7
-		"IgnMastProt.fi_Offset": ioff, // t8
-
-		"CRUISE": showHider(db.text.cruise),
-		"CEL":    showHider(db.image.checkEngine),
-		"LIMP":   showHider(db.image.limpMode),
-
-		"Knock_offset1234": knkDetSetter(db.image.knockIcon),
-		"KnkDet.KnockCyl":  knkDetSetter(db.image.knockIcon),
-
-		"Myrtilos.InjectorDutyCycle": idcSetter(db.text.idc, "Idc"),   // t7
-		"Insptid_ms10":               idcSetterT5(db.text.idc, "Idc"), // t5
-
-		ebus.TOPIC_ECU: func(value float64) {
-			switch symbol.ECUType(int(value)) {
-			case symbol.ECU_T5: //T5
-				db.cfg.AirDemToString = func(f float64) string {
-					return fmt.Sprintf("%.1f", f)
-				}
-			case symbol.ECU_T7: //T7
-				db.cfg.AirDemToString = datalogger.AirDemToStringT7
-			case symbol.ECU_T8: //T8
-				db.cfg.AirDemToString = datalogger.AirDemToStringT8
-			}
-		},
-	}
-
-	return router
-}
-
-/*
 	func lambdaToString(v float64) string {
 		switch v {
 		case 0:
@@ -568,133 +406,125 @@ type dims struct {
 	smallTextSize float32
 }
 
-func layoutMainDials(db *Dashboard, space fyne.Size, dims *dims) {
+func (db *Dashboard) layoutDials(dims *dims) {
 	left := db.gauges.pwm.Position().X + db.gauges.pwm.Size().Width
 	right := db.gauges.throttle.Position().X
 	width := right - left
 
-	centerDialSize := fyne.NewSize(
-		width,
-		space.Height-125,
-	)
-	centerDialPos := fyne.NewPos(
-		dims.centerX-centerDialSize.Width*0.5,
-		dims.centerY-centerDialSize.Height*0.5,
-	)
+	centerDialSize := fyne.Size{
+		Width:  width,
+		Height: db.size.Height - 125,
+	}
+	centerDialPos := fyne.Position{
+		X: dims.centerX - centerDialSize.Width*0.5,
+		Y: dims.centerY - centerDialSize.Height*0.5,
+	}
 
 	if !db.cfg.SwapRPMandSpeed {
-		db.gauges.rpm.Resize(fyne.NewSize(dims.sixthWidth, dims.thirdHeight))
-		db.gauges.rpm.Move(fyne.NewPos(0, 5))
+		db.gauges.rpm.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
+		db.gauges.rpm.Move(fyne.Position{X: 0, Y: 5})
 		db.gauges.speed.Resize(centerDialSize)
 		db.gauges.speed.Move(centerDialPos)
 	} else {
-		db.gauges.speed.Resize(fyne.NewSize(dims.sixthWidth, dims.thirdHeight))
-		db.gauges.speed.Move(fyne.NewPos(0, 5))
+		db.gauges.speed.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
+		db.gauges.speed.Move(fyne.Position{X: 0, Y: 5})
 		db.gauges.rpm.Resize(centerDialSize)
 		db.gauges.rpm.Move(centerDialPos)
 	}
-}
 
-func layoutSideDials(db *Dashboard, space fyne.Size, dims *dims) {
 	// Calculate dial size
-	dialWidth := dims.sixthWidth
-	dialHeight := dims.thirdHeight
+	//dialWidth := dims.sixthWidth
+	//dialHeight := dims.thirdHeight
 
 	// Calculate total height needed for all dials (3 dials on left side including the main dial)
-	totalDialHeight := dialHeight * 3 // Three dials on left side (main + 2), two on right
+	totalDialHeight := dims.thirdHeight * 3 // Three dials on left side (main + 2), two on right
 
 	// Calculate vertical spacing between dials
-	spacing := (space.Height - totalDialHeight) / 4 // Divide remaining space into 4 parts for spacing
+	spacing := (db.size.Height - totalDialHeight) / 4 // Divide remaining space into 4 parts for spacing
 
 	// Left side dials positioning
 	// Note: Top dial (speed or rpm) is already positioned by layoutMainDials
 	// Second dial: airmass
-	db.gauges.airmass.Resize(fyne.NewSize(dialWidth, dialHeight))
-	db.gauges.airmass.Move(fyne.NewPos(0, spacing*2+dialHeight)) // After top dial + spacing
+	db.gauges.airmass.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
+	db.gauges.airmass.Move(fyne.Position{X: 0, Y: spacing*2 + dims.thirdHeight}) // After top dial + spacing
 
 	// Third dial: pressure
-	db.gauges.pressure.Resize(fyne.NewSize(dialWidth, dialHeight))
-	db.gauges.pressure.Move(fyne.NewPos(0, spacing*3+dialHeight*2)) // After top dial + middle dial + spacing
-
+	db.gauges.pressure.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
+	db.gauges.pressure.Move(fyne.Position{X: 0, Y: spacing*3 + dims.thirdHeight*2}) // After top dial + middle dial + spacing
 	// Right side dials (only 2 dials, different spacing)
-	rightX := space.Width - dialWidth
+	rightX := db.size.Width - dims.sixthWidth
 
 	// Calculate spacing for right side (only 2 dials)
-	rightSideSpacing := (space.Height - (dialHeight * 2)) / 3 // Three spaces for two dials
+	rightSideSpacing := (db.size.Height - (dims.thirdHeight * 2)) / 3 // Three spaces for two dials
 
 	// First dial: IAT
-	db.gauges.iat.Resize(fyne.NewSize(dialWidth, dialHeight))
-	db.gauges.iat.Move(fyne.NewPos(rightX, rightSideSpacing))
+	db.gauges.iat.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
+	db.gauges.iat.Move(fyne.Position{X: rightX, Y: rightSideSpacing})
 
 	// Second dial: engineTemp
-	db.gauges.engineTemp.Resize(fyne.NewSize(dialWidth, dialHeight))
-	db.gauges.engineTemp.Move(fyne.NewPos(rightX, rightSideSpacing*2+dialHeight))
+	db.gauges.engineTemp.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
+	db.gauges.engineTemp.Move(fyne.Position{X: rightX, Y: rightSideSpacing*2 + dims.thirdHeight})
 }
 
-func layoutVerticalBars(db *Dashboard, space fyne.Size, dims *dims) {
-	vbarSize := fyne.NewSize(min(dims.sixthWidth*common.OneThird, 70), space.Height-120)
-	db.gauges.pwm.Resize(vbarSize)
-	db.gauges.pwm.Move(fyne.NewPos(dims.sixthWidth+8, 25))
-
-	db.gauges.throttle.Resize(vbarSize)
-	db.gauges.throttle.Move(fyne.NewPos(space.Width-dims.sixthWidth-vbarSize.Width-8, 25))
-}
-
-func layoutHorizontalBars(db *Dashboard, space fyne.Size, dims *dims) {
+func (db *Dashboard) layoutBars(dims *dims) {
+	//Horizontal bars
 	cbarHeight := min(dims.tenthHeight, 50)
-	cbarSize := fyne.NewSize((dims.sixthWidth * 3), cbarHeight)
+	cbarSize := fyne.Size{Width: (dims.sixthWidth * 3), Height: cbarHeight}
 	cbarX := dims.sixthWidth * 1.5
 
 	db.gauges.nblambda.Resize(cbarSize)
-	db.gauges.nblambda.Move(fyne.NewPos(cbarX, 0))
+	db.gauges.nblambda.Move(fyne.Position{X: cbarX, Y: 0})
 
 	db.gauges.wblambda.Resize(cbarSize)
-	db.gauges.wblambda.Move(fyne.NewPos(cbarX, space.Height-cbarHeight))
+	db.gauges.wblambda.Move(fyne.Position{X: cbarX, Y: db.size.Height - cbarHeight})
+
+	// Vertical bars
+	vbarSize := fyne.Size{Width: min(dims.sixthWidth*common.OneThird, 70), Height: db.size.Height - 120}
+	db.gauges.pwm.Resize(vbarSize)
+	db.gauges.pwm.Move(fyne.Position{X: dims.sixthWidth + 8, Y: 25})
+
+	db.gauges.throttle.Resize(vbarSize)
+	db.gauges.throttle.Move(fyne.Position{X: db.size.Width - dims.sixthWidth - vbarSize.Width - 8, Y: 25})
 }
 
-func layoutIcons(db *Dashboard, space fyne.Size, dims *dims) {
+func (db *Dashboard) layoutIcons(dims *dims) {
 	// Limp mode icon
-	db.image.limpMode.Resize(fyne.NewSize(dims.sixthWidth, dims.thirdHeight))
-	db.image.limpMode.Move(fyne.NewPos(
-		dims.centerX-db.image.limpMode.Size().Width*0.5,
-		dims.centerY-db.image.limpMode.Size().Height*0.5-(dims.thirdHeight*0.5),
-	))
+	limpSize := fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight}
+	db.image.limpMode.Resize(limpSize)
+	db.image.limpMode.Move(fyne.Position{
+		X: dims.centerX - limpSize.Width*0.5,
+		Y: dims.centerY - limpSize.Height*0.5 - (dims.thirdHeight * 0.5),
+	})
 
 	// Check engine icon
-	db.image.checkEngine.Resize(fyne.NewSize(dims.sixthWidth*0.5, dims.thirdHeight*0.5))
-	db.image.checkEngine.Move(fyne.NewPos(
-		space.Width-db.gauges.engineTemp.Size().Width-db.gauges.throttle.Size().Width-db.image.checkEngine.Size().Width-15,
-		space.Height-db.image.checkEngine.Size().Height-db.gauges.wblambda.Size().Height,
-	))
+	checkEngineSize := fyne.Size{Width: dims.sixthWidth * 0.5, Height: dims.thirdHeight * 0.5}
+	db.image.checkEngine.Resize(checkEngineSize)
+	db.image.checkEngine.Move(fyne.Position{
+		X: db.size.Width - db.gauges.engineTemp.Size().Width - db.gauges.throttle.Size().Width - checkEngineSize.Width - 15,
+		Y: db.size.Height - checkEngineSize.Height - db.gauges.wblambda.Size().Height,
+	})
 
 	// Knock icon
-	db.image.knockIcon.Move(fyne.NewPos(
-		db.gauges.pwm.Position().X+db.gauges.pwm.Size().Width,
-		dims.centerY-60,
-	))
+	db.image.knockIcon.Move(fyne.Position{
+		X: db.gauges.pwm.Position().X + db.gauges.pwm.Size().Width,
+		Y: dims.centerY - 60,
+	})
 
 	// Taz icon
 
-	asd := fyne.Min(dims.sixthWidth, dims.thirdHeight)
-
-	db.image.taz.Resize(fyne.NewSize(asd, asd+16))
-	db.image.taz.Move(fyne.NewPos(
-		dims.centerX-db.image.taz.Size().Width*0.58,
-		dims.centerY-db.image.taz.Size().Height,
-	))
+	tazMin := fyne.Min(dims.sixthWidth, dims.thirdHeight)
+	tazSize := fyne.Size{Width: tazMin, Height: tazMin + 16}
+	db.image.taz.Resize(tazSize)
+	db.image.taz.Move(fyne.Position{
+		X: dims.centerX - tazSize.Width*0.58,
+		Y: dims.centerY - tazSize.Height,
+	})
 }
 
-func layoutButtons(db *Dashboard, space fyne.Size, dims *dims) {
-	//move dr.fullscreenBtn to bottom right
-
-	db.fullscreenBtn.Resize(fyne.NewSize(dims.sixthWidth, dims.tenthHeight))
-	db.fullscreenBtn.Move(fyne.NewPos(space.Width-dims.sixthWidth, space.Height-dims.tenthHeight))
-}
-
-func layoutTexts(db *Dashboard, space fyne.Size, dims *dims) {
+func (db *Dashboard) layoutTexts(dims *dims) {
 	// Calculate responsive text sizes based on window dimensions
 	// Use the smaller of width/height to ensure text stays proportional
-	baseSize := min(space.Width, space.Height)
+	baseSize := min(db.size.Width, db.size.Height)
 
 	// Large text (like IGN, IDC) - ~4.5% of smallest window dimension
 	dims.textSize = baseSize * 0.045
@@ -708,56 +538,54 @@ func layoutTexts(db *Dashboard, space fyne.Size, dims *dims) {
 
 	// AMUL text (small)
 	db.text.amul.TextSize = dims.smallTextSize
-	db.text.amul.Move(fyne.NewPos(
-		db.gauges.wblambda.Position().X,
-		space.Height-db.gauges.wblambda.Size().Height-db.text.amul.MinSize().Height,
-	))
+	db.text.amul.Move(fyne.Position{
+		X: db.gauges.wblambda.Position().X,
+		Y: db.size.Height - db.gauges.wblambda.Size().Height - db.text.amul.MinSize().Height,
+	})
 
 	// IGN text (large)
 	db.text.ign.TextSize = dims.textSize
-	db.text.ign.Move(fyne.NewPos(
-		db.gauges.nblambda.Position().X,
-		db.gauges.nblambda.Size().Height,
-	))
+	db.text.ign.Move(fyne.Position{
+		X: db.gauges.nblambda.Position().X,
+		Y: db.gauges.nblambda.Size().Height,
+	})
 
 	// IOFF text (small)
 	db.text.ioff.TextSize = dims.smallTextSize
-	db.text.ioff.Move(fyne.NewPos(
-		db.gauges.nblambda.Position().X,
-		db.text.ign.Position().Y+db.text.ign.MinSize().Height,
-	))
+	db.text.ioff.Move(fyne.Position{
+		X: db.gauges.nblambda.Position().X,
+		Y: db.text.ign.Position().Y + db.text.ign.MinSize().Height,
+	})
 
 	// IDC text (large)
 	db.text.idc.TextSize = dims.textSize
-	db.text.idc.Move(fyne.NewPos(
-		db.gauges.nblambda.Position().X+db.gauges.nblambda.Size().Width-db.text.idc.MinSize().Width,
-		db.gauges.nblambda.Size().Height,
-	))
+	db.text.idc.Move(fyne.Position{
+		X: db.gauges.nblambda.Position().X + db.gauges.nblambda.Size().Width - db.text.idc.MinSize().Width,
+		Y: db.gauges.nblambda.Size().Height,
+	})
 
 	// Active air demand text (large)
 	db.text.activeAirDem.TextSize = dims.textSize
-	db.text.activeAirDem.Move(fyne.NewPos(
-		dims.centerX,
-		dims.thirdHeight,
-	))
+	db.text.activeAirDem.Move(fyne.Position{
+		X: dims.centerX,
+		Y: dims.thirdHeight,
+	})
 
 	// Cruise text (special size - larger)
 	cruiseSize := dims.textSize * 1.1
 	db.text.cruise.TextSize = min(max(cruiseSize, 35), 45)
-	db.text.cruise.Move(fyne.NewPos(
-		dims.sixthWidth*1.45,
-		space.Height-(db.image.checkEngine.Size().Height*0.6)-db.gauges.wblambda.Size().Height,
-	))
+	db.text.cruise.Move(fyne.Position{
+		X: dims.sixthWidth * 1.45,
+		Y: db.size.Height - (db.image.checkEngine.Size().Height * 0.6) - db.gauges.wblambda.Size().Height,
+	})
 
 	// Time text for logplayer (small)
 	if db.logplayer {
 		db.text.time.TextSize = dims.smallTextSize
-		db.text.time.Move(
-			fyne.NewPos(
-				dims.centerX-(db.text.time.MinSize().Width*0.5),
-				space.Height*common.OneHalfSix,
-			),
-		)
+		db.text.time.Move(fyne.Position{
+			X: dims.centerX - (db.text.time.MinSize().Width * 0.5),
+			Y: db.size.Height * common.OneHalfSix,
+		})
 	}
 
 	//if db.logplayer {
@@ -766,15 +594,14 @@ func layoutTexts(db *Dashboard, space fyne.Size, dims *dims) {
 }
 
 type DashboardRenderer struct {
-	db   *Dashboard
-	size fyne.Size
+	db *Dashboard
 }
 
 func (dr *DashboardRenderer) Layout(space fyne.Size) {
-	if dr.size == space {
+	if dr.db.size == space {
 		return
 	}
-	dr.size = space
+	dr.db.size = space
 
 	// Calculate common dimensions
 	dims := &dims{
@@ -789,28 +616,23 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 		//textSize: max(min(space.Height, space.Width)*0.07, 20),
 	}
 	// Layout horizontal bars
-	layoutHorizontalBars(dr.db, space, dims)
+	dr.db.layoutBars(dims)
 
-	// Layout side dials
-	layoutSideDials(dr.db, space, dims)
-
-	// Layout vertical bars
-	layoutVerticalBars(dr.db, space, dims)
-
-	// Layout main dials
-	layoutMainDials(dr.db, space, dims)
+	// Layout dials
+	dr.db.layoutDials(dims)
 
 	// Layout buttons
-	layoutButtons(dr.db, space, dims)
+	dr.db.fullscreenBtn.Resize(fyne.NewSize(dims.sixthWidth, dims.tenthHeight))
+	dr.db.fullscreenBtn.Move(fyne.NewPos(space.Width-dims.sixthWidth, space.Height-dims.tenthHeight))
 
 	dims.textSize = dr.db.gauges.nblambda.Size().Height
 	dims.smallTextSize = dims.textSize * 0.5
 
 	// Layout text elements
-	layoutTexts(dr.db, space, dims)
+	dr.db.layoutTexts(dims)
 
 	// Layout icons
-	layoutIcons(dr.db, space, dims)
+	dr.db.layoutIcons(dims)
 }
 
 func (dr *DashboardRenderer) MinSize() fyne.Size {
