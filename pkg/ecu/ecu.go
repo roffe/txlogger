@@ -7,11 +7,12 @@ import (
 	"sort"
 
 	"github.com/roffe/gocan"
+	"github.com/roffe/txlogger/pkg/dtc"
 	"github.com/roffe/txlogger/pkg/model"
 )
 
 type Client interface {
-	ReadDTC(context.Context) ([]model.DTC, error)
+	ReadDTC(context.Context) ([]dtc.DTC, error)
 	PrintECUInfo(context.Context) error
 	Info(context.Context) ([]model.HeaderResult, error)
 	DumpECU(context.Context) ([]byte, error)
