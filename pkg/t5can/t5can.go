@@ -137,10 +137,8 @@ func (c *Client) sendBlock(ctx context.Context, addr uint32, block []byte, maxBl
 	var payload [8]byte
 
 	for bytesLeft > 0 {
-		n := chunkSize
-		if bytesLeft < n {
-			n = bytesLeft
-		}
+
+		n := min(bytesLeft, chunkSize)
 
 		// prepare payload
 		payload[0] = byte(offset)
@@ -164,72 +162,6 @@ func (c *Client) sendBlock(ctx context.Context, addr uint32, block []byte, maxBl
 
 		offset += n
 		bytesLeft -= n
-	}
-	return nil
-}
-
-func (c *Client) WriteRam2(ctx context.Context, address uint32, data []byte) error {
-	if len(data) == 1 {
-		return c.writeRamSingle(ctx, address, data[0])
-	}
-
-	left := len(data)
-	for left > 0 {
-		chunkSize := min(left, 133)
-		if err := c.writeRamMulti(ctx, address, data[len(data)-left:len(data)-left+chunkSize]); err != nil {
-			return err
-		}
-		left -= chunkSize
-		address += uint32(chunkSize)
-	}
-	return nil
-}
-
-func (c *Client) writeRamSingle(ctx context.Context, address uint32, data byte) error {
-	command := fmt.Sprintf("W%04X%02X\r", uint16(address), data)
-	if err := sendCommand(ctx, c.c, []byte(command), c.defaultTimeout); err != nil {
-		return err
-	}
-	return nil
-}
-
-// we can only write up to 133 bytes at a time ( 0x7E)
-func (c *Client) writeRamMulti(ctx context.Context, address uint32, data []byte) error {
-	if len(data) > 133 {
-		return fmt.Errorf("data too long")
-	}
-	addressFrame := gocan.NewFrame(0x05, []byte{0xA5, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address), byte(len(data)), 0x00, 0x00}, gocan.ResponseRequired)
-	addressResp, err := c.c.SendAndWait(ctx, addressFrame, c.defaultTimeout, 0x0C)
-	if err != nil {
-		return fmt.Errorf("failed to send address command: %v", err)
-	}
-	if addressResp.Data[1] != 0x00 {
-		return fmt.Errorf("failed to set address %02X", addressResp.Data[1])
-	}
-	bytesLeft := len(data)
-	offset := 0
-	payload := make([]byte, 8)
-	for bytesLeft > 0 {
-		chunkSize := min(bytesLeft, 7)
-		payload[0] = byte(offset)
-		payload[1] = 0x00
-		payload[2] = 0x00
-		payload[3] = 0x00
-		payload[4] = 0x00
-		payload[5] = 0x00
-		payload[6] = 0x00
-		payload[7] = 0x00
-		copy(payload[1:], data[offset:offset+chunkSize])
-		dataFrame := gocan.NewFrame(0x05, payload, gocan.ResponseRequired)
-		dataResp, err := c.c.SendAndWait(ctx, dataFrame, c.defaultTimeout, 0x0C)
-		if err != nil {
-			return fmt.Errorf("failed to send data command: %v", err)
-		}
-		if dataResp.Data[1] != 0x00 {
-			return fmt.Errorf("failed to write data")
-		}
-		bytesLeft -= chunkSize
-		offset += chunkSize
 	}
 	return nil
 }
