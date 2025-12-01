@@ -74,7 +74,7 @@ func (t *Client) bootstrapPreFlight(ctx context.Context) error {
 
 	//time.Sleep(50 * time.Millisecond)
 
-	if err := t.gm.InitiateDiagnosticOperation(ctx, 0x02); err != nil {
+	if err := t.gm.InitiateDiagnosticOperation(ctx, gmlan.LEV_DADTC); err != nil {
 		return err
 	}
 
