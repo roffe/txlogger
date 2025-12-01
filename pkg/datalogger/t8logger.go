@@ -201,7 +201,7 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Client, gm *gmlan.Client, 
 				c.sysvars.Set(EXTERNALWBLSYM, c.lamb.GetLambda())
 			}
 
-			if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
+			if err := c.lw.Write(c.sysvars, order, c.Symbols, timeStamp); err != nil {
 				c.onError()
 				c.OnMessage("failed to write log: " + err.Error())
 			}
@@ -212,7 +212,7 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Client, gm *gmlan.Client, 
 }
 
 func initT8Logging(ctx context.Context, gm *gmlan.Client, symbols []*symbol.Symbol, onMessage func(string)) error {
-	if err := gm.InitiateDiagnosticOperation(ctx, 0x03); err != nil {
+	if err := gm.InitiateDiagnosticOperation(ctx, gmlan.LEV_EDDDC); err != nil {
 		return err
 	}
 

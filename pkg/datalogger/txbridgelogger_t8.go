@@ -134,7 +134,7 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
+				if err := c.lw.Write(c.sysvars, order, c.Symbols, timeStamp); err != nil {
 					c.onError()
 					c.OnMessage("failed to write log: " + err.Error())
 				}

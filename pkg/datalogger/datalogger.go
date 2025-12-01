@@ -17,7 +17,7 @@ const ISONICO = "2006-01-02 15:04:05,999"
 const EXTERNALWBLSYM = "Lambda.External"
 
 type LogWriter interface {
-	Write(sysvars *ThreadSafeMap, vars []*symbol.Symbol, ts time.Time, sysvarOrder []string) error
+	Write(sysvars *ThreadSafeMap, sysvarOrder []string, vars []*symbol.Symbol, ts time.Time) error
 	Close() error
 }
 

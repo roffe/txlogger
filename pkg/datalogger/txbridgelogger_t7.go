@@ -24,7 +24,7 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 	go t7broadcastListener(bctx, cl, c.sysvars)
 
 	c.OnMessage("Watching for broadcast messages")
-	<-time.After(550 * time.Millisecond)
+	<-time.After(1550 * time.Millisecond)
 	order := c.sysvars.Keys()
 	sort.StringSlice(order).Sort()
 	c.OnMessage(fmt.Sprintf("Found %s", order))
@@ -40,11 +40,9 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 
 	for _, sym := range c.Symbols {
 		if c.sysvars.Exists(sym.Name) {
-			// log.Println("Skipping", sym.Name)
+			log.Println("Skipping", sym.Name, "in broadcast")
 			sym.Number = -1
-		}
-		if sym.Number < 1000 {
-			order = append(order, sym.Name)
+			continue
 		}
 	}
 
@@ -232,7 +230,7 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				if err := c.lw.Write(c.sysvars, c.Symbols, timeStamp, order); err != nil {
+				if err := c.lw.Write(c.sysvars, order, c.Symbols, timeStamp); err != nil {
 					c.onError()
 					c.OnMessage("failed to write log: " + err.Error())
 				}

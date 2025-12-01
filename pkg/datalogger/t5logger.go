@@ -121,7 +121,7 @@ func (c *T5Client) Start() error {
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				if err := c.lw.Write(c.sysvars, []*symbol.Symbol{}, ts, order); err != nil {
+				if err := c.lw.Write(c.sysvars, order, []*symbol.Symbol{}, ts); err != nil {
 					c.OnMessage("failed to write log: " + err.Error())
 					return
 				}
