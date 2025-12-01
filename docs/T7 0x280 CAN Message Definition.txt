@@ -1,0 +1,43 @@
+0x280 CAN Message Definition
+Byte 0
+Bit 5-4 FaultCANOut.v_Vehicle2 0x30
+Bit 3 	FaultCANOut.ST_BrakeLight 0x08
+
+Byte 1
+Bit 7-0 Out.X_ActualGear 0xFF
+
+Byte 2
+Bit 6	Out.ST_CruiseActive 0x40
+Bit 5	Out.ST_NoIgnitionRetard 0x20
+Bit 4	Out.CMD_KickDown 0x10
+Bit 3	In.ST_ClutchBrake1 0x08
+Bit 2	Out.CMD_Jerk	0x04
+Bit 1	Out.ST_BrakeLight	0x02
+Bit 0	Out.CMD_WarmUpSP	0x01
+
+Byte 3
+Bit 7	Out.CMD_CheckFillerCap 0x80
+Bit 6	Out.CMD_WarmUpCycle 0x40
+Bit 5	Out.ST_Automatic 0x20
+Bit 4	Out.CMD_NCInhibit 0x10
+Bit 3	Out.CMD_GearShiftInhibit 0x08
+Bit 2	Out.CMD_ACRelay 0x04
+Bit 1	Out.ST_EGasOff	0x02
+Bit 0	Out.ST_LimpHome	0x01
+
+Byte 4
+Bit 7	Out.CMD_CheckEngine 0x80
+Bit 6	Out.CMD_ShiftUp 0x40
+Bit 5	Out.CMD_ShiftDown 0x20
+Bit 5	Out.CMD_CruiseLamp 0x10
+Bit 4	Out.CMD_REP 0x08
+
+Byte 5
+Bit 7	Out.ST_EngineStarted 0x80
+Bit 6	ECMStat.ST_CruiseIncluded 0x40
+
+Byte 6
+Bit 7-0 Out.X_EngineType 0xFF
+
+Byte 7
+Bit 7	Out.CMD_CoastLUInhibit 0x80
