@@ -4,7 +4,7 @@ import "sync"
 
 type ThreadSafeMap struct {
 	values map[string]float64
-	sync.RWMutex
+	sync.Mutex
 }
 
 func NewThreadSafeMap() *ThreadSafeMap {
@@ -14,8 +14,8 @@ func NewThreadSafeMap() *ThreadSafeMap {
 }
 
 func (t *ThreadSafeMap) Keys() []string {
-	t.RLock()
-	defer t.RUnlock()
+	t.Lock()
+	defer t.Unlock()
 	keys := make([]string, 0, len(t.values))
 	for k := range t.values {
 		keys = append(keys, k)
@@ -24,8 +24,8 @@ func (t *ThreadSafeMap) Keys() []string {
 }
 
 func (t *ThreadSafeMap) Exists(name string) bool {
-	t.RLock()
-	defer t.RUnlock()
+	t.Lock()
+	defer t.Unlock()
 	_, ok := t.values[name]
 	return ok
 }
@@ -37,8 +37,8 @@ func (t *ThreadSafeMap) Set(name string, value float64) {
 }
 
 func (t *ThreadSafeMap) Get(name string) float64 {
-	t.RLock()
-	defer t.RUnlock()
+	t.Lock()
+	defer t.Unlock()
 	return t.values[name]
 }
 
