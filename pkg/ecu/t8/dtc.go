@@ -4,37 +4,35 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
-	"github.com/roffe/txlogger/pkg/model"
+	"github.com/roffe/gocan/pkg/gmlan"
+	"github.com/roffe/txlogger/pkg/dtc"
 )
 
-func (t *Client) ReadDTC(ctx context.Context) ([]model.DTC, error) {
+func (t *Client) ReadDTC(ctx context.Context) ([]dtc.DTC, error) {
 	t.gm.TesterPresentNoResponseAllowed()
 
-	if err := t.gm.InitiateDiagnosticOperation(ctx, 0x02); err != nil {
+	if err := t.gm.InitiateDiagnosticOperation(ctx, gmlan.LEV_DADTC); err != nil {
 		return nil, err
 	}
+
+	defer func() {
+		_ = t.gm.ReturnToNormalMode(ctx)
+		time.Sleep(75 * time.Millisecond)
+	}()
 
 	dtcs, err := t.gm.ReadDiagnosticInformationStatusOfDTCByStatusMask(ctx, 0x12)
 	if err != nil {
 		return nil, err
 	}
 
-	var out []model.DTC
+	var out []dtc.DTC
 	for _, f := range dtcs {
-		//log.Printf("#%d %s", i, getDTCDescription(f))
-		code, status, err := getDTCDescription(f)
-		if err != nil {
-			return out, err
-		}
-		out = append(out, model.DTC{
-			Code:   code,
-			Status: status,
+		out = append(out, dtc.DTC{
+			Code:   f.Code,
+			Status: f.Status,
 		})
-	}
-
-	if err := t.gm.ReturnToNormalMode(ctx); err != nil {
-		return out, err
 	}
 
 	return out, nil

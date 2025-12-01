@@ -3,10 +3,10 @@ package t7
 import (
 	"context"
 
-	"github.com/roffe/txlogger/pkg/model"
+	"github.com/roffe/txlogger/pkg/dtc"
 )
 
-func (t *Client) ReadDTC(ctx context.Context) ([]model.DTC, error) {
+func (t *Client) ReadDTC(ctx context.Context) ([]dtc.DTC, error) {
 	//kw := kwp2000.New(t.c, 0x220, 0x238)
 	//if err := kw.StartSession(ctx); err != nil {
 	//	return nil, err
