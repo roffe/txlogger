@@ -77,9 +77,9 @@ func NewMyrtilosRegistration(mw *MainWindow) fyne.Widget {
 			return
 		}
 		if err := mr.register(key); err != nil {
-			mr.outputData.Append(err.Error())
+			_ = mr.outputData.Append(err.Error())
 		} else {
-			mr.outputData.Append("key saved in ecu")
+			_ = mr.outputData.Append("key saved in ecu")
 		}
 	})
 	return mr

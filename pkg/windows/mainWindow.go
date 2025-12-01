@@ -574,12 +574,12 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Positio
 
 func (mw *MainWindow) Log(s string) {
 	debug.LogDepth(2, s)
-	mw.outputData.Append(s)
+	_ = mw.outputData.Append(s)
 }
 
 func (mw *MainWindow) Error(err error) {
 	debug.LogDepth(2, err.Error())
-	mw.outputData.Append(err.Error())
+	_ = mw.outputData.Append(err.Error())
 	go fyne.Do(func() {
 		dialog.ShowError(err, mw.Window)
 	})
