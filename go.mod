@@ -2,11 +2,9 @@ module github.com/roffe/txlogger
 
 go 1.25.3
 
-replace github.com/roffe/gocan => ..\gocan
-
-replace github.com/roffe/ecusymbol => ..\ecusymbol
-
-replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
+//replace github.com/roffe/gocan => ..\gocan
+//replace github.com/roffe/ecusymbol => ..\ecusymbol
+//replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 
 require (
 	fyne.io/fyne/v2 v2.7.2-0.20251119154138-3a4ac7d7e74e
