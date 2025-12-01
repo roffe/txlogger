@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"runtime"
@@ -13,14 +14,15 @@ import (
 	"github.com/avast/retry-go/v4"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/debug"
+	"github.com/roffe/txlogger/pkg/dtc"
 )
 
-const (
-	INIT_MSG_ID        = 0x220 // 220h
-	INIT_RESP_ID       = 0x238 // 238h
-	REQ_MSG_ID         = 0x240 // 240h
-	REQ_CHUNK_CONF_ID  = 0x270 // 270h
-	RESP_CHUNK_CONF_ID = 0x266 // 266h
+var (
+	INIT_MSG_ID        uint32 = 0x220 // 220h
+	INIT_RESP_ID       uint32 = 0x238 // 238h
+	REQ_MSG_ID         uint32 = 0x240 // 240h
+	REQ_CHUNK_CONF_ID  uint32 = 0x270 // 270h
+	RESP_CHUNK_CONF_ID uint32 = 0x266 // 266h
 )
 
 const (
@@ -41,13 +43,35 @@ func New(c *gocan.Client) *Client {
 	return &Client{c: c}
 }
 
+func (t *Client) SetResponseID(id uint32) {
+	t.responseID = id
+}
+
 func (t *Client) StartSession(ctx context.Context, id, responseID uint32) error {
 	frame := &gocan.CANFrame{
 		Identifier: id,
 		Data:       []byte{0x3F, START_COM_REQ, 0x00, 0x11, byte(REQ_MSG_ID >> 8), byte(REQ_MSG_ID & 0xFF)},
 		FrameType:  gocan.ResponseRequired,
 	}
-	resp, err := t.c.SendAndWait(ctx, frame, 3*time.Second, responseID)
+	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, responseID)
+	if err != nil {
+		return fmt.Errorf("StartSession[1]: %w", err)
+	}
+	if resp.Data[3] != START_COM_REQ|0x40 {
+		return fmt.Errorf("StartSession[2]: %w", TranslateErrorCode(GENERAL_REJECT))
+	}
+	t.responseID = uint32(resp.Data[6])<<8 | uint32(resp.Data[7])
+	//log.Printf("ECU ID: 0x%03X", t.responseID)
+	return nil
+}
+
+func (t *Client) StartSession2(ctx context.Context, id, responseID uint32) error {
+	frame := &gocan.CANFrame{
+		Identifier: id,
+		Data:       []byte{0x3F, START_COM_REQ, 0x00, 0x11, byte((0x740) >> 8), byte((0x740) & 0xFF)},
+		FrameType:  gocan.ResponseRequired,
+	}
+	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, responseID)
 	if err != nil {
 		return fmt.Errorf("StartSession[1]: %w", err)
 	}
@@ -344,7 +368,7 @@ func (t *Client) RequestTransferExit(ctx context.Context) error {
 func (t *Client) ClearDynamicallyDefineLocalId(ctx context.Context) error {
 	frame := &gocan.CANFrame{
 		Identifier: REQ_MSG_ID,
-		Data:       []byte{0x40, 0xA1, DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER, DM_CDDLI},
+		Data:       []byte{0x40, 0xA1, DYNAMICALLY_DEFINE_IDENTIFIER, DM_CDDLI},
 		FrameType:  gocan.ResponseRequired,
 	}
 	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout*2, t.responseID)
@@ -355,15 +379,15 @@ func (t *Client) ClearDynamicallyDefineLocalId(ctx context.Context) error {
 }
 
 func (t *Client) DynamicallyDefineLocalIdBySymbolNumber(ctx context.Context, index int, symbolNumber int) error {
-	return t.sendDDL(ctx, []byte{0x08, DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER, 0xF0, DM_DBMA, byte(index), 0x00, 0x80, byte(symbolNumber >> 8), byte(symbolNumber)})
+	return t.sendDDL(ctx, []byte{0x08, DYNAMICALLY_DEFINE_IDENTIFIER, 0xF0, DM_DBMA, byte(index), 0x00, 0x80, byte(symbolNumber >> 8), byte(symbolNumber)})
 }
 
 func (t *Client) DynamicallyDefineLocalIdByAddress(ctx context.Context, index int, address uint32, length uint16) error {
-	return t.sendDDL(ctx, []byte{0x08, DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER, 0xF0, DM_DBMA, byte(index), byte(length), byte((address >> 16) & 0xFF), byte((address >> 8) & 0xFF), byte(address & 0xFF)})
+	return t.sendDDL(ctx, []byte{0x08, DYNAMICALLY_DEFINE_IDENTIFIER, 0xF0, DM_DBMA, byte(index), byte(length), byte((address >> 16) & 0xFF), byte((address >> 8) & 0xFF), byte(address & 0xFF)})
 }
 
 func (t *Client) DynamicallyDefineLocalIdByLocID(ctx context.Context, index int, locID int) error {
-	return t.sendDDL(ctx, []byte{0x06, DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER, 0xF0, DM_DBLI, byte(index), 0x00, byte(locID), 0x00})
+	return t.sendDDL(ctx, []byte{0x06, DYNAMICALLY_DEFINE_IDENTIFIER, 0xF0, DM_DBLI, byte(index), 0x00, byte(locID), 0x00})
 }
 
 func (t *Client) sendDDL(ctx context.Context, payload []byte) error {
@@ -657,7 +681,7 @@ func (t *Client) ReadFlash(ctx context.Context, addr, length int) ([]byte, error
 
 func (t *Client) ReadMemoryByAddressF0(ctx context.Context, address, length int) ([]byte, error) {
 	// Jump to read adress
-	if err := t.c.Send(REQ_MSG_ID, []byte{0x41, 0xA1, 0x08, DYNAMICALLY_DEFINE_LOCAL_IDENTIFIER, 0xF0, 0x03, 0x00, byte(length)}, gocan.Outgoing); err != nil {
+	if err := t.c.Send(REQ_MSG_ID, []byte{0x41, 0xA1, 0x08, DYNAMICALLY_DEFINE_IDENTIFIER, 0xF0, 0x03, 0x00, byte(length)}, gocan.Outgoing); err != nil {
 		return nil, fmt.Errorf("failed to set read length: %w", err)
 	}
 	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x00, 0xA1, byte((address >> 16) & 0xFF), byte((address >> 8) & 0xFF), byte(address & 0xFF), 0x00, 0x00, 0x00}, gocan.ResponseRequired)
@@ -1181,6 +1205,195 @@ func (t *Client) RequestDownload(ctx context.Context, address uint32, length uin
 
 	return nil
 }
+
+func (t *Client) ReadDTCByStatus(ctx context.Context, status byte) ([]dtc.DTC, error) {
+	const (
+		posRespReadDTCByStatus = 0x58 // KWP2000 positive response SID for "Read DTC by status"
+		noDTCLength            = 0x02
+		bytesPerDTC            = 3
+	)
+
+	// Initial request: 0xA1 sub-function, length 0x02 (SID + status)
+	req := &gocan.CANFrame{
+		Identifier: REQ_MSG_ID,
+		Data:       []byte{0x40, 0xA1, 0x02, READ_DTC_BY_STATUS, status},
+		FrameType:  gocan.ResponseRequired,
+	}
+	resp, err := t.c.SendAndWait(ctx, req, DefaultTimeout, t.responseID)
+	if err != nil {
+		return nil, fmt.Errorf("ReadDTCByStatus[0]: %w", err)
+	}
+	if err := checkErr(resp); err != nil {
+		return nil, err
+	}
+	if len(resp.Data) < 5 {
+		return nil, fmt.Errorf("ReadDTCByStatus[1]: short first response: % X", resp.Data)
+	}
+
+	// No DTCs: 02 58 00
+	if resp.Data[2] == noDTCLength && resp.Data[3] == posRespReadDTCByStatus && resp.Data[4] == 0x00 {
+		return nil, nil
+	}
+
+	if resp.Data[3] != posRespReadDTCByStatus {
+		return nil, fmt.Errorf("ReadDTCByStatus[2]: unexpected SID 0x%02X (data % X)", resp.Data[3], resp.Data)
+	}
+
+	numDTCs := int(resp.Data[4])
+
+	// Collect raw DTC bytes (3 bytes per DTC: 2 bytes code, 1 byte status)
+	dtcData := make([]byte, 0, numDTCs*bytesPerDTC)
+
+	// First frame payload starts at byte 5
+	dtcData = append(dtcData, resp.Data[5:]...)
+
+	row := resp.Data[0]
+
+	// Saab T7 paging:
+	//   e.g. 4 DTCs → first frame row=0xC2, then 0x81, final 0x80.
+	// We send confirmations while row >= 0x81; 0x80 is the last frame.
+	for row > 0x80 {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
+		chunkReq := &gocan.CANFrame{
+			Identifier: RESP_CHUNK_CONF_ID,
+			// 0x3F = "block transfer confirmation"
+			// row &^ 0x40 clears the "first block" bit.
+			Data:      []byte{0x40, 0xA1, 0x3F, row &^ 0x40},
+			FrameType: gocan.ResponseRequired,
+		}
+
+		resp, err = t.c.SendAndWait(ctx, chunkReq, DefaultTimeout, t.responseID)
+		if err != nil {
+			return nil, fmt.Errorf("ReadDTCByStatus[3]: %w", err)
+		}
+		if err := checkErr(resp); err != nil {
+			return nil, err
+		}
+
+		if len(resp.Data) < 3 {
+			return nil, fmt.Errorf("ReadDTCByStatus[4]: short chunk response: % X", resp.Data)
+		}
+
+		// Chunk payload starts at Data[2]
+		dtcData = append(dtcData, resp.Data[2:]...)
+		row = resp.Data[0]
+	}
+
+	// At this point row should be 0x80 (final frame) and we have all bytes.
+	if len(dtcData) < numDTCs*bytesPerDTC {
+		return nil, fmt.Errorf("ReadDTCByStatus[5]: not enough DTC data: have %d bytes for %d DTCs",
+			len(dtcData), numDTCs)
+	}
+
+	dtcs := make([]dtc.DTC, 0, numDTCs)
+	r := bytes.NewReader(dtcData)
+
+	for range numDTCs {
+		var dtcBytes [bytesPerDTC]byte
+		if _, err := io.ReadFull(r, dtcBytes[:]); err != nil {
+			return nil, fmt.Errorf("ReadDTCByStatus[6]: %w", err)
+		}
+
+		// First two bytes = SAE DTC code, third = status
+		code := (uint16(dtcBytes[0]) << 8) | uint16(dtcBytes[1])
+		dtcs = append(dtcs, dtc.DTC{
+			ECU:    dtc.ECU_T7,
+			Code:   fmt.Sprintf("P%04X", code),
+			Status: dtcBytes[2],
+		})
+	}
+
+	return dtcs, nil
+}
+
+func (t *Client) ClearDTCS(ctx context.Context) error {
+	frame := &gocan.CANFrame{
+		Identifier: REQ_MSG_ID,
+		Data:       []byte{0x40, 0xA1, 0x03, CLEAR_DTC, 0xFF, 0x00},
+		FrameType:  gocan.ResponseRequired,
+	}
+	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, t.responseID)
+	if err != nil {
+		return fmt.Errorf("ClearDTCS[0]: %w", err)
+	}
+	//log.Println(resp.String())
+	if err := checkErr(resp); err != nil {
+		return err
+	}
+	// successful response: C0 BF 03 54 FF 00 00 00
+	if resp.Data[3]^0x40 != CLEAR_DTC || resp.Data[4] != 0xFF || resp.Data[5] != 0x00 {
+		return fmt.Errorf("ClearDTCS[1]: invalid response: % 02X", resp.Data)
+	}
+	return nil
+}
+
+/*
+func (t *Client) ReadDTCByStatus2(ctx context.Context, status byte) ([]string, error) {
+	frame := &gocan.CANFrame{
+		Identifier: REQ_MSG_ID,
+		Data:       []byte{0x40, 0xA1, 0x02, READ_DTC_BY_STATUS, status},
+		FrameType:  gocan.ResponseRequired,
+	}
+	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, t.responseID)
+	if err != nil {
+		return []string{}, fmt.Errorf("ReadDTCByStatus[0]: %w", err)
+	}
+
+	if err := checkErr(resp); err != nil {
+		return []string{}, err
+	}
+
+	var dtcs []string
+	if resp.Data[2] == 0x02 && resp.Data[3] == 0x58 && resp.Data[4] == 0x00 {
+		return dtcs, nil
+	}
+	var dtcData []byte
+	dtcData = append(dtcData, resp.Data[5:]...)
+
+	numDTCs := int(resp.Data[4])
+
+	log.Println("Number of DTCs:", numDTCs)
+
+	if resp.Data[3] == 0x58 && resp.Data[4] > 0x00 {
+		row := resp.Data[0]
+		for row > 0x80 {
+			req := &gocan.CANFrame{
+				Identifier: RESP_CHUNK_CONF_ID,
+				Data:       []byte{0x40, 0xA1, 0x3F, row &^ 0x40},
+				FrameType:  gocan.ResponseRequired,
+			}
+			if row == 0x80 {
+				req.FrameType = gocan.Outgoing
+			}
+			resp, err = t.c.SendAndWait(ctx, req, DefaultTimeout, t.responseID)
+			if err != nil {
+				return []string{}, fmt.Errorf("ReadDTCByStatus[1]: %w", err)
+			}
+			if err := checkErr(resp); err != nil {
+				return []string{}, err
+			}
+			log.Println(resp.String())
+			dtcData = append(dtcData, resp.Data[2:]...)
+			row = resp.Data[0]
+		}
+		r := bytes.NewReader(dtcData)
+		for range numDTCs {
+			var dtcBytes [3]byte
+			if _, err := r.Read(dtcBytes[:]); err != nil {
+				return []string{}, fmt.Errorf("ReadDTCByStatus[2]: %w", err)
+			}
+			dtc := fmt.Sprintf("P%04X", (uint16(dtcBytes[0])<<8)|uint16(dtcBytes[1]))
+			dtcs = append(dtcs, dtc)
+		}
+
+	}
+
+	return dtcs, nil
+}
+*/
 
 func getFunctionName() string {
 	return getFunctionNameN(2)
