@@ -2,19 +2,21 @@ module github.com/roffe/txlogger
 
 go 1.25.3
 
-// replace github.com/roffe/gocan => ..\gocan
-// replace github.com/roffe/ecusymbol => ..\ecusymbol
-// replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
+replace github.com/roffe/gocan => ..\gocan
+
+replace github.com/roffe/ecusymbol => ..\ecusymbol
+
+replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 
 require (
-	fyne.io/fyne/v2 v2.7.1-0.20251107215207-3649d0747c33
+	fyne.io/fyne/v2 v2.7.2-0.20251119154138-3a4ac7d7e74e
 	fyne.io/x/fyne v0.0.0-20250106132206-3228f6c50107
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/lusingander/colorpicker v0.7.4
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.0.7
-	github.com/roffe/ecusymbol v1.0.7
-	github.com/roffe/gocan v1.3.0
+	github.com/roffe/ecusymbol v1.0.8
+	github.com/roffe/gocan v1.3.1
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.4
 	golang.org/x/image v0.25.0
