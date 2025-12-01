@@ -12,10 +12,12 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/widgets/dtcreader"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
@@ -23,11 +25,38 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmstatus"
 	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7esp"
 	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7fwinfo"
-	// "github.com/skratchdot/open-golang/open"
 )
 
 func (mw *MainWindow) setupMenu() {
 	funcMap := map[string]func(string){
+		"DTC Reader": func(str string) {
+			if w := mw.wm.HasWindow("DTC Reader"); w != nil {
+				mw.wm.Raise(w)
+				return
+			}
+
+			getFW := func() symbol.SymbolCollection {
+				return mw.fw
+			}
+
+			getAdapter := func() (gocan.Adapter, error) {
+				device, err := mw.settings.GetAdapter(mw.selects.ecuSelect.Selected)
+				if err != nil {
+					mw.Error(err)
+					return nil, err
+				}
+				return device, nil
+			}
+
+			getECU := func() string {
+				return mw.selects.ecuSelect.Selected
+			}
+
+			inner := multiwindow.NewInnerWindow("DTC Reader", dtcreader.New(getFW, getECU, getAdapter, mw.Log, mw.Error))
+			inner.Icon = theme.InfoIcon()
+			mw.wm.Add(inner)
+			inner.Resize(fyne.Size{Width: 600, Height: 400})
+		},
 		"Register EU0D": func(str string) {
 			if w := mw.wm.HasWindow("Register EU0D"); w != nil {
 				mw.wm.Raise(w)
