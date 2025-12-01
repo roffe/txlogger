@@ -5,7 +5,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
-	"github.com/roffe/txlogger/pkg/assets"
 )
 
 type TxTheme struct{}
@@ -20,18 +19,21 @@ func (m TxTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) colo
 	return theme.DefaultTheme().Color(name, theme.VariantDark)
 }
 
-var dragcornerindicatorleftIconRes = &fyne.StaticResource{
-	StaticName:    "drag-corner-indicator-left.svg",
-	StaticContent: assets.LeftCornerBytes,
-}
+//var dragcornerindicatorleftIconRes = &fyne.StaticResource{
+//	StaticName:    "drag-corner-indicator-left.svg",
+//	StaticContent: assets.LeftCornerBytes,
+//}
 
 func (m TxTheme) Icon(name fyne.ThemeIconName) fyne.Resource {
-	switch name {
-	case fyne.ThemeIconName("drag-corner-indicator-left"):
-		return theme.NewThemedResource(dragcornerindicatorleftIconRes)
-	default:
-		return theme.DefaultTheme().Icon(name)
-	}
+	return theme.DefaultTheme().Icon(name)
+	/*
+		switch name {
+		//case fyne.ThemeIconName("drag-corner-indicator-left"):
+		//	return theme.NewThemedResource(dragcornerindicatorleftIconRes)
+		default:
+			return theme.DefaultTheme().Icon(name)
+		}
+	*/
 }
 
 func (m TxTheme) Font(style fyne.TextStyle) fyne.Resource {
