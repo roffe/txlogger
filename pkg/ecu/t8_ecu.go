@@ -53,7 +53,7 @@ func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) (symb
 
 	gm := gmlan.New(cl, 0x7e0, 0x7e8)
 
-	if err := gm.InitiateDiagnosticOperation(ctx, 0x02); err != nil {
+	if err := gm.InitiateDiagnosticOperation(ctx, gmlan.LEV_DADTC); err != nil {
 		return nil, err
 	}
 
