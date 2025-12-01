@@ -220,11 +220,62 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 		w.Move(newPos)
 	}
 
-	w.OnResized = func(ev *fyne.DragEvent) {
+	w.OnResized = func(direction resizeDirection, ev *fyne.DragEvent) {
 		var newSize fyne.Size
 		minSize := w.MinSize()
 		currentSize := w.Size()
-		if w.leftDrag {
+		switch direction {
+		case resizeUp:
+			actualDY := ev.Dragged.DY
+			if actualDY > 0 {
+				actualDY = fyne.Min(actualDY, currentSize.Height-minSize.Height)
+			} else if w.Position().Y+actualDY < 0 {
+				actualDY = -w.Position().Y
+			}
+			newSize = fyne.NewSize(currentSize.Width, currentSize.Height-actualDY)
+			w.Move(w.Position().Add(fyne.NewPos(0, actualDY)))
+		case resizeDown:
+			newSize = currentSize.AddWidthHeight(0, ev.Dragged.DY)
+		case resizeLeft:
+			actualDX := ev.Dragged.DX
+			if actualDX > 0 {
+				// When shrinking (dragging right), limit by remaining width
+				actualDX = fyne.Min(actualDX, currentSize.Width-minSize.Width)
+			} else if w.Position().X+actualDX < 0 {
+				// Prevent dragging past left edge
+				actualDX = -w.Position().X
+			}
+			newSize = fyne.NewSize(currentSize.Width-actualDX, currentSize.Height)
+			w.Move(w.Position().Add(fyne.NewPos(actualDX, 0)))
+		case resizeRight:
+			newSize = currentSize.AddWidthHeight(ev.Dragged.DX, 0)
+		case resizeUpLeft:
+			actualDY := ev.Dragged.DY
+			if actualDY > 0 {
+				actualDY = fyne.Min(actualDY, currentSize.Height-minSize.Height)
+			} else if w.Position().Y+actualDY < 0 {
+				actualDY = -w.Position().Y
+			}
+			actualDX := ev.Dragged.DX
+			if actualDX > 0 {
+				// When shrinking (dragging right), limit by remaining width
+				actualDX = fyne.Min(actualDX, currentSize.Width-minSize.Width)
+			} else if w.Position().X+actualDX < 0 {
+				// Prevent dragging past left edge
+				actualDX = -w.Position().X
+			}
+			newSize = fyne.NewSize(currentSize.Width-actualDX, currentSize.Height-actualDY)
+			w.Move(w.Position().Add(fyne.NewPos(actualDX, actualDY)))
+		case resizeUpRight:
+			actualDY := ev.Dragged.DY
+			if actualDY > 0 {
+				actualDY = fyne.Min(actualDY, currentSize.Height-minSize.Height)
+			} else if w.Position().Y+actualDY < 0 {
+				actualDY = -w.Position().Y
+			}
+			newSize = fyne.NewSize(currentSize.Width+ev.Dragged.DX, currentSize.Height-actualDY)
+			w.Move(w.Position().Add(fyne.NewPos(0, actualDY)))
+		case resizeDownLeft:
 			actualDX := ev.Dragged.DX
 			if actualDX > 0 {
 				// When shrinking (dragging right), limit by remaining width
@@ -236,7 +287,7 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 
 			newSize = fyne.NewSize(currentSize.Width-actualDX, currentSize.Height+ev.Dragged.DY)
 			w.Move(w.Position().Add(fyne.NewPos(actualDX, 0)))
-		} else {
+		case resizeDownRight:
 			newSize = currentSize.Add(ev.Dragged)
 		}
 
