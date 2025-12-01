@@ -9,16 +9,20 @@ import (
 )
 
 var T5SymbolsTuningOrder = []string{
+	"Diagnostics",
 	"Options",
 	"Injectors",
 	"Fuel",
 	"Ignition",
 	"Boost",
 	// "Idle",
-	"Diagnostics",
 }
 
 var T5SymbolsTuning = map[string][]string{
+	"Diagnostics": {
+		"DTC Reader",
+		"Pgm_status",
+	},
 	"Options": {
 		"Pgm_mod!",
 	},
@@ -50,9 +54,6 @@ var T5SymbolsTuning = map[string][]string{
 		"Ign_idle_angle!",
 		"Idle_fuel_korr!",
 	},
-	"Diagnostics": {
-		"Pgm_status",
-	},
 }
 
 var T7SymbolsTuningOrder = []string{
@@ -69,6 +70,7 @@ var T7SymbolsTuningOrder = []string{
 
 var T7SymbolsTuning = map[string][]string{
 	"Diagnostics": {
+		"DTC Reader",
 		// "Firmware information",
 		"F_KnkDetAdap.FKnkCntMap",
 		"F_KnkDetAdap.RKnkCntMap",
@@ -139,6 +141,7 @@ var T7SymbolsTuning = map[string][]string{
 }
 
 var T8SymbolsTuningOrder = []string{
+	"Diagnostics",
 	"Injectors",
 	"Limiters",
 	"Fuel",
@@ -148,6 +151,9 @@ var T8SymbolsTuningOrder = []string{
 }
 
 var T8SymbolsTuning = map[string][]string{
+	"Diagnostics": {
+		"DTC Reader",
+	},
 	"Injectors": {
 		"InjCorrCal.InjectorConst",
 		"InjCorrCal.BattCorrTab",
