@@ -47,5 +47,6 @@ Install in the default location `C:\Program Files (x86)\Kvaser\Canlib`
 https://www.canusb.com/files/canusb_dll_driver.zip  
 unzip the content of the file into a folder called "canusb" in the root of the project
 
-#### *
-Is installed by the setup script
+###
+
+(*) Is installed by the setup script
