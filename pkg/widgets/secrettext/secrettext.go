@@ -9,6 +9,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 	"github.com/hajimehoshi/go-mp3"
 	"github.com/roffe/txlogger/pkg/assets"
@@ -70,4 +71,8 @@ func (s *SecretText) Tapped(*fyne.PointEvent) {
 
 		an.Start()
 	}
+}
+
+func (s *SecretText) Cursor() desktop.Cursor {
+	return desktop.CrosshairCursor
 }
