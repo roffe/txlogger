@@ -50,6 +50,8 @@ type Meshgrid struct {
 	refreshPending bool
 
 	colorMode colors.ColorBlindMode
+
+	dragging bool
 }
 
 // NewMeshgrid creates a new Meshgrid given width, height, depth and spacing.
