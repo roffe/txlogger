@@ -11,6 +11,24 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/icon"
 )
 
+func (db *Dashboard) activeAirSetter(obj *canvas.Text) func(float64) {
+	var buf []byte
+	var lastVal float64
+	return func(value float64) {
+		if value == lastVal {
+			return
+		}
+		buf = buf[:0]
+		buf = append(buf, db.cfg.AirDemToString(value)...)
+		buf = append(buf, "("...)
+		buf = strconv.AppendFloat(buf, value, 'f', 0, 64)
+		buf = append(buf, ")"...)
+		obj.Text = string(buf)
+		obj.Refresh()
+		lastVal = value
+	}
+}
+
 func knkDetSetter(icon *icon.Icon) func(float64) {
 	knkStr2 := make([]byte, 4)
 	var oldValue float64
