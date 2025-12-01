@@ -1,8 +1,11 @@
 # 2.1.5
-- Added numbers on the gauge dials for easier reading
+- Added numbers on the gauges in the dashboard to look more like real gauges
 - Fixed axis information for tryck_mat_a! in ecusymbol library where it would open tryck_mat! instead
 - Added a small device check and error out if trying to use J2534 or ELM327 adapters with Trionic 5
 - fixed a bug in the update checker where the update check would not be performed properly
+- Fixed a bug where you could rotate the 3d mesh of a map view when resizing a window overlaying it
+- Added dragable borders to all windows to make resizing easier
+- Added DTC reader for Trionic 5, 7 & 8. Found under the "Diagnostics" menu
 
 # 2.1.4
 - Symbollist now remembers the last selected preset per ECU.
@@ -26,14 +29,12 @@
 - fixed a race condition in goCAN that could cause missed canbus frames.
 
 # 2.1.1
-
 - Fixed a bug where the background color of single cell maps (bool values) would be black until selected
 - Added support for writing to SRAM on Trionic 5 ( you can now livetune T5 with txlogger )
 - Now possible to change Pgm_mod! in SRAM on T5
 - Fixed timing bug where writing to ram on T8 would fail some times
 
 # 2.1.0
-
 - Added support for txbridge discovery via mDNS.
 - txbridge firmware now supports AP, STA or AP+STA modes. Configurable via the configurator widget under settings.
 - Tweaked the symbollist to have bigger preview bars
@@ -42,36 +43,30 @@
 - Improved camera controls in the 3D Mesh viewer
 
 # 2.0.9
-
 - Set min/max values for MAF.m_AirFromp_AirInlet to match other airmass values in the plotter
 - fix bug when using page up and down would not advance more than one step in logplayer
 - added setting to use AD Scanner as ECU lambda source
 
 # 2.0.8 
-
 - Added ESP calibration settings for T7. Found under "Calibration" in the menu
 - Updated to latest goCAN
 
-# 2.0.7 Zero conf drivers für alles
-
+# 2.0.7
 The new FTDI d2xx driver has been implemented to leverage zero conf for several adapters.  
 The OBDLink SX & EX and CANUSB will be autodetected on startup and all you need to do is select the driver starting with "d2xx" in CAN settings. No more selecting ports or setting latency in device manager.
 
 - Added FTDI d2xx driver
 - fixed mouse panning in mesh viewer so it doesn't behave strange after you rotate the mesh
 
-# 2.0.6 3d updates baby
-
+# 2.0.6
 - FINALLY fixed the cameras on the 3d mesh view. Now it behaves like any normal 3d software and is very intuitive to use. Mouse1, 2 & middle are the modifiers to use when dragging
 - 64 bit j2534 support added in gocan, Devices are prefixed "x64 J2534" and should be used if you see both 32-bit and 64-bit drivers for your adapter in the list
 - fixed a bug in the j2534 driver where 4 bytes would be appended to the can packages
 
-# 2.0.5 CAN library rework
-
+# 2.0.5
 - Rewrote large parts of the CAN library to pass along a pointer to a message instead of a interface with methods to lower cpu usage
 
-# 2.0.4 CANUSB optimization
-
+# 2.0.4
 - Added support for Lawicel CANUSB DLL. No more fiddling with VCP and latencies. required 64-bit DLL is included with txlogger.
 - Moved back all CAN communications except for J2534 DLL's to the main program to not incur performance pentaly of using cangateway when not necessary
 - Updated libusb to 64-bit for use with CombiAdapter
@@ -79,17 +74,14 @@ The OBDLink SX & EX and CANUSB will be autodetected on startup and all you need 
 - Added ECU dump & info on all 3 Trionic versions (no txbridge support yet) 
 
 # 2.0.3
-
 - Optimized most adapter drivers in goCAN
 
 # 2.0.2
-
 - Fixed a bugg where the knock icon would not hide after a few seconds on the dashboard
 - Huge rewrite of the goCAN canbus drivers to have better error handling and a clearer path on how to propagate messages to the UI
 - Started adding support for dumping and flashing ECU's, dumping and info should work on all 3 platforms. (no txbridge support yet)
 
 # 2.0.1
-
 - Improved kvaser CANlib drivers in goCAN
 - Fixed so Lambda.External's value is properly displayed in plotter legend
 - txbride firmware updater now supports both wifi and bluetooth.  
@@ -98,7 +90,6 @@ The OBDLink SX & EX and CANUSB will be autodetected on startup and all you need 
   Change the CAN device to "txbridge wifi" and connect to the wifi network with password **123456789**. after that you can continue logging as before.
 
 # 2.0.0
-
 This is a huge milestone release. 
 
 The user interface has been competely revamped to allow inline windows, custom gauges and plotters to be created, moved around and layouts saved & restored.
@@ -130,7 +121,6 @@ Or why not create your own gauges and make it just like you want
 - The CANbus communication has been broken out to a separate binary that is compiled as 32-bit due to the requirements for j2534 dll's.
 
 # 1.0.19
-
 - Added E85.X_EthAct_Tech2 to Trionic 7 calibration shortcuts
 - Added T5 support for TXbridge
 - Improved TXbridge T8 support
@@ -144,7 +134,6 @@ Or why not create your own gauges and make it just like you want
 - Made log player plotter resizable even on low-resolution monitors
 
 # 1.0.18
-
 - Add code to convert T5 AD_EGR value to lambda 0.5 - 1.5
 - Add settings to configure WBL when reading AD values from T7
 - Fixed bugg where IDC did not change color on threshold values
@@ -162,20 +151,17 @@ Or why not create your own gauges and make it just like you want
   start txlogger with the debug.bat file and create a issue on Github or forum post on TrionicTuning.
 
 # 1.0.17
-
 - If WBL is set to None the WBL will not be shown in logplayer
 - Changed color of crosshair in mapviewer to make it easier to see
 - Fixed a bug where pedal position was not properly translated to pedalmap in Trionic 7
 - changed scaling of AirCompCal.PressMap to bar instead of kPa
 
 # 1.0.16
-
 - Fixed bug where some t5 files would not load
 - Added support for drag and drop loading of binaries and logs
 - Fixed bugg where ioff would not be visualized properly in map viewer
 
 # 1.0.15
-
 - Presets are NOT saved autmaticly on exit. If you have made changes to the presets you need to save them manually from the settings menu as a new preset or overwrite an existing one or your changes will get lost
 - Added support for Trionic 5 (yay!)  
   Support for Trionic 5 is still in beta, please report any issues you find
@@ -184,7 +170,6 @@ Or why not create your own gauges and make it just like you want
 - Added support for registering Myrtilos binaries over CANBUS
 
 # 1.0.14
-
 - Moved CANBUS adapter settings from main screen into settings
 - OHM ( One Hand Mapping ) has been added. if you enable "Cursor follows crosshair in mapviewer" under settings the cursor for editing will now follow the crosshair in the mapviewer. This makes it possible to edit maps with one hand while driving. a & z for minor increment and s & x for major increment.
 - Fixed colors for certain symbols in plotter
@@ -194,7 +179,6 @@ Or why not create your own gauges and make it just like you want
 - fixed so AirCtrlCal.Regmap is using m_Req instead of m_Air to show crosshair in mapviewer
 
 # 1.0.13
-
 The default presets has been updated. Be sure to load it once from the settings menu to make sure ActualIn.n_Engine, Out.X_AccPedal & In.v_Vehicle is logged properly on Trionic 7
 
 In earlier versions there existed different presets depending on your CAN adapter. This has been fixed and the presets are now the same for all adapters. The default presets has been updated to reflect this change
@@ -209,7 +193,6 @@ In earlier versions there existed different presets depending on your CAN adapte
 - Added a Log plotter in the log player so you can see line graphs of the recorded values
 
 # 1.0.12
-
 Mostly under the hood fixes
 
 - some huge rewrites in the internal data processing which resulted in about halved CPU usage,
@@ -220,7 +203,6 @@ If one turns off real-time preview values in settings it uses less than 0.5% CPU
 - The T7 presets has been merged into one, no more having to have different presets depending on what cable you have. txlogger will now solve this under the hood
 
 # 1.0.6
-
 - New settings dialogue
 - Possible to copy paste map data between t7suite <-> txlogger
 - You can type in values when editing maps
@@ -241,7 +223,6 @@ If one turns off real-time preview values in settings it uses less than 0.5% CPU
 - copy paste between t7/8 suite and txlogger
 
 # 1.0.5
-
 Ever wondered how the ECU interpolates values from the maps in the binary live? Now you don't have to. With our all-new map viewer function, get a real-time view of the process. It’s visual, it’s intuitive, and it’s designed to provide insights like never before.
 
 Major Under-the-Hood Improvements!
@@ -256,7 +237,6 @@ We've also made some minor bug fixes and UI enhancements for a polished user exp
 We're always working to make txlogger better for our community. Thanks for being on this journey with us.
 
 # 1.0.4
-
 File Association Improvement: Now you can effortlessly associate .t7l and .t8l files with txlogger.exe. When opening these file types, txlogger will directly launch the logplayer, eliminating the need for manual steps like browsing and clicking play logs. To set up the file associations, run setup.exe or right-click the files and select "Open With," then browse for txlogger.exe.
 
 Enhanced Date & Time Parser: Our log player now boasts an improved date and time parser, catering to multiple date standards. No more worries about compatibility issues—enjoy a seamless log playback experience!
@@ -268,7 +248,6 @@ Upgrade to txlogger version 1.0.4 today and make managing and playing logs a bre
 Happy Logging!
 
 # 1.0.3
-
 - Added a shiny new "logs folder" button
 - Shorter log filenames for your convenience
 - Upgraded our symbol libraries to read maps like a champ
@@ -277,13 +256,11 @@ Happy Logging!
 - When loading log files, start in the "logs" folder next to txlogger.exe
 
 # 1.0.2
-
 - More performance optimization
 
 # 1.0.0
-
 - Renamed to txlogger
-- Gotten T8 support :)
+- Gotten T8 support
 - Support for old T7 binaries with the 14 bytes address table and uncompressed symbol table
 - A homepage has been created: https://txlogger.com
 - More keyboard shortcuts added, see help in software
@@ -291,7 +268,6 @@ Happy Logging!
 - Graduated to 1.0.0 release with the T8 addition
 
 # 0.0.7
-
 - Fixed crash when trying to load symbol name table from ECU running BIN without symbol names
 - Added symbols for EU0AF01O
 - Knock warning on dashboard if logging "KnkDet.KnockCyl"
