@@ -36,7 +36,6 @@ Run the setup script to get external dependencies then "go get" to download depe
 libusb from vcpkg for combiadapter support
 
     vcpkg install 'libusb:x64-windows'
-    vcpkg install 'libusb:x86-windows'
 
 ### CANlib*
 
@@ -50,7 +49,3 @@ unzip the content of the file into a folder called "canusb" in the root of the p
 
 #### *
 Is installed by the setup script
-
-## Runtime requirements
-
-CombiAdapter support which depends on libusb requires you to install [vc_redist.x86.exe](https://www.microsoft.com/en-gb/download/confirmation.aspx?id=48145)
