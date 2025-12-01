@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/roffe/gocan"
+	"github.com/roffe/txlogger/pkg/dtc"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ecu/t8legion"
 	"github.com/roffe/txlogger/pkg/ecu/t8util"
@@ -41,7 +42,7 @@ func New(c *gocan.Client, cfg *ecu.Config) ecu.Client {
 	return t
 }
 
-func (t *Client) ReadDTC(ctx context.Context) ([]model.DTC, error) {
+func (t *Client) ReadDTC(ctx context.Context) ([]dtc.DTC, error) {
 	return nil, errors.New("MCP cannot do this")
 }
 
