@@ -51,9 +51,10 @@ type Images struct {
 }
 
 type Texts struct {
-	ioff, activeAirDem, ign, cruise *canvas.Text
-	idc, amul                       *canvas.Text
-	time                            *canvas.Text
+	ign, ioff, idc       *canvas.Text
+	activeAirDem, cruise *canvas.Text
+	amul                 *canvas.Text
+	time                 *canvas.Text
 }
 
 type Gauges struct {
@@ -161,7 +162,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				Max:             1.50,
 				Steps:           20,
 				MinSize:         fyne.NewSize(50, 35),
-				DisplayString:   "λ %.3f",
+				DisplayString:   "λ %.2f",
 				DisplayTextSize: 20,
 				TextPosition:    widgets.TextAtTop,
 			}),
@@ -201,7 +202,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				Color:     color.RGBA{R: 0, G: 255, B: 0, A: 255},
 			},
 			idc: &canvas.Text{
-				Text:      "Idc: 00%",
+				Text:      "Idc:  0%",
 				Alignment: fyne.TextAlignLeading,
 				TextSize:  44,
 				Color:     color.RGBA{R: 0, G: 255, B: 0, A: 255},
@@ -417,7 +418,7 @@ func (db *Dashboard) layoutDials(dims *dims) {
 	}
 	centerDialPos := fyne.Position{
 		X: dims.centerX - centerDialSize.Width*0.5,
-		Y: dims.centerY - centerDialSize.Height*0.5,
+		Y: dims.centerY - centerDialSize.Height*0.46,
 	}
 
 	if !db.cfg.SwapRPMandSpeed {
@@ -560,7 +561,7 @@ func (db *Dashboard) layoutTexts(dims *dims) {
 	// IDC text (large)
 	db.text.idc.TextSize = dims.textSize
 	db.text.idc.Move(fyne.Position{
-		X: db.gauges.nblambda.Position().X + db.gauges.nblambda.Size().Width - db.text.idc.MinSize().Width,
+		X: db.gauges.nblambda.Position().X + db.gauges.nblambda.Size().Width - (db.text.idc.MinSize().Width - 4),
 		Y: db.gauges.nblambda.Size().Height,
 	})
 
@@ -568,7 +569,7 @@ func (db *Dashboard) layoutTexts(dims *dims) {
 	db.text.activeAirDem.TextSize = dims.textSize
 	db.text.activeAirDem.Move(fyne.Position{
 		X: dims.centerX,
-		Y: dims.thirdHeight,
+		Y: dims.thirdHeight * 1.24,
 	})
 
 	// Cruise text (special size - larger)
@@ -622,10 +623,12 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	dr.db.layoutDials(dims)
 
 	// Layout buttons
-	dr.db.fullscreenBtn.Resize(fyne.NewSize(dims.sixthWidth, dims.tenthHeight))
-	dr.db.fullscreenBtn.Move(fyne.NewPos(space.Width-dims.sixthWidth, space.Height-dims.tenthHeight))
+	btnWidth := dims.sixthWidth * 0.8
+	btnHeigh := dims.tenthHeight * 0.8
+	dr.db.fullscreenBtn.Resize(fyne.NewSize(btnWidth, btnHeigh))
+	dr.db.fullscreenBtn.Move(fyne.NewPos(space.Width-btnWidth, space.Height-btnHeigh))
 
-	dims.textSize = dr.db.gauges.nblambda.Size().Height
+	dims.textSize = dr.db.gauges.nblambda.Size().Height - 2
 	dims.smallTextSize = dims.textSize * 0.5
 
 	// Layout text elements

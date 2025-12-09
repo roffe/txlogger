@@ -1,7 +1,6 @@
 package windows
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,20 +24,16 @@ import (
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ebus"
-	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/update"
-	"github.com/roffe/txlogger/pkg/widgets/canflasher"
 	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/ledicon"
 	"github.com/roffe/txlogger/pkg/widgets/logplayer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
-	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
 	"github.com/roffe/txlogger/pkg/widgets/secrettext"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
-	"github.com/roffe/txlogger/pkg/widgets/txweb"
 	"golang.org/x/net/context"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -311,75 +306,6 @@ func (mw *MainWindow) render() {
 
 	toolbar := mw.newToolbar()
 
-	if mw.previewFeatures {
-		toolbar.Add(widget.NewButtonWithIcon("", theme.UploadIcon(), func() {
-			if w := mw.wm.HasWindow("Canflasher"); w != nil {
-				mw.wm.Raise(w)
-				return
-			}
-			inner := multiwindow.NewInnerWindow("Canflasher", canflasher.New(&canflasher.Config{
-				CSW: mw.settings,
-				GetECU: func() string {
-					return mw.selects.ecuSelect.Selected
-				},
-			}))
-			inner.Icon = theme.UploadIcon()
-			mw.wm.Add(inner)
-			inner.Resize(fyne.NewSize(450, 250))
-
-		}),
-		)
-
-		toolbar.Add(widget.NewButtonWithIcon("", theme.DocumentIcon(), func() {
-			if w := mw.wm.HasWindow("txweb"); w != nil {
-				mw.wm.Raise(w)
-				return
-			}
-			txb := txweb.New()
-			txb.LoadFileFunc = func(name string, data []byte) error {
-				switch filepath.Ext(name) {
-				case ".bin":
-					if err := mw.LoadSymbolsFromBytes(name, data); err != nil {
-						return err
-					}
-					return nil
-				case ".t5l", ".t7l", ".t8l", ".csv":
-					mw.LoadLogfile(name, bytes.NewReader(data), fyne.NewPos(100, 100))
-					return nil
-				}
-				return nil
-			}
-			inner := multiwindow.NewInnerWindow("txweb", txb)
-			inner.Icon = theme.FileApplicationIcon()
-			mw.wm.Add(inner)
-			inner.Resize(fyne.NewSize(700, 500))
-		}),
-		)
-
-		/*
-			widget.NewButtonWithIcon("", theme.NavigateNextIcon(), func() {
-				if w := mw.wm.HasWindow("Map"); w != nil {
-					mw.wm.Raise(w)
-					return
-				}
-				mapp := maps.NewMap()
-				cnt := container.NewBorder(
-					nil,
-					widget.NewButtonWithIcon("", theme.ContentClearIcon(), func() {
-						mapp.SetCenter(59.644810, 17.058252)
-					}),
-					nil,
-					nil,
-					mapp,
-				)
-
-				inner := multiwindow.NewInnerWindow("Map", cnt)
-				inner.Icon = theme.NavigateNextIcon()
-				mw.wm.Add(inner)
-			}),
-		*/
-	}
-
 	footer := container.NewBorder(
 		nil,
 		nil,
@@ -568,6 +494,9 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Positio
 	mw.wm.Add(iw)
 	m := iw.MinSize()
 	pos2 := fyne.NewPos(pos.X-m.Width*0.5, pos.Y-m.Height*0.5)
+	if pos2.X < 0 {
+		pos2.X = 0
+	}
 	iw.Move(pos2)
 
 }
@@ -634,6 +563,7 @@ func (mw *MainWindow) SyncSymbols() {
 	mw.Log(fmt.Sprintf("Synced %d / %d symbols", cnt, mw.symbolList.Count()))
 }
 
+/*
 func (mw *MainWindow) LoadSymbolsFromECU() error {
 	device, err := mw.settings.GetAdapter(mw.selects.ecuSelect.Selected)
 	if err != nil {
@@ -673,6 +603,7 @@ func (mw *MainWindow) LoadSymbolsFromECU() error {
 	mw.Log("Symbols loaded from ECU " + time.Now().Format("2006-01-02 15:04:05.000"))
 	return nil
 }
+*/
 
 func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	data, err := os.ReadFile(filename)

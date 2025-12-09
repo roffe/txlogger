@@ -19,6 +19,7 @@ if ($release) {
     $setup = $true
 }
 
+$env:GOEXPERIMENT = "greenteagc"
 $env:CGO_ENABLED = "1" 
 $env:GOGC = "100"
 $env:CC = "x86_64-w64-mingw32-clang.exe"

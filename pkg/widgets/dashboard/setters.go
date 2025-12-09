@@ -20,7 +20,7 @@ func (db *Dashboard) activeAirSetter(obj *canvas.Text) func(float64) {
 		}
 		buf = buf[:0]
 		buf = append(buf, db.cfg.AirDemToString(value)...)
-		buf = append(buf, "("...)
+		buf = append(buf, " ("...)
 		buf = strconv.AppendFloat(buf, value, 'f', 0, 64)
 		buf = append(buf, ")"...)
 		obj.Text = string(buf)

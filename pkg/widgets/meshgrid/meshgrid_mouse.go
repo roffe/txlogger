@@ -49,6 +49,9 @@ const (
 var _ desktop.Mouseable = (*Meshgrid)(nil)
 
 func (m *Meshgrid) MouseDown(event *desktop.MouseEvent) {
+	if f := m.OnMouseDown; f != nil {
+		f()
+	}
 	m.dragging = true
 }
 

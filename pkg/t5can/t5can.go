@@ -3,6 +3,7 @@ package t5can
 import (
 	"context"
 	"fmt"
+	"log"
 	"slices"
 	"time"
 
@@ -10,12 +11,12 @@ import (
 )
 
 const (
-	canID           = 0x05
-	replyID         = 0x0C
-	cmdSetAddr byte = 0xA5
-	maxBlock        = 133 // protocol cap per address window
-	chunkSize       = 7   // bytes per data frame (payload[1:] = 7 bytes)
-	respOK     byte = 0x00
+	canID   = 0x05
+	replyID = 0x0C
+	//cmdSetAddr byte = 0xA5
+	maxBlock       = 133 // protocol cap per address window
+	chunkSize      = 7   // bytes per data frame (payload[1:] = 7 bytes)
+	respOK    byte = 0x00
 )
 
 type Client struct {
@@ -86,10 +87,6 @@ func (c *Client) WriteRam(ctx context.Context, address uint32, data []byte) erro
 	left := len(data)
 	start := 0
 	for left > 0 {
-		//n := maxBlock
-		//if left < n {
-		//	n = left
-		//}
 		n := min(left, maxBlock)
 		if err := c.sendBlock(ctx, address, data[start:start+n], maxBlock); err != nil {
 			return fmt.Errorf("WriteRam[1]: %w", err)
@@ -102,22 +99,40 @@ func (c *Client) WriteRam(ctx context.Context, address uint32, data []byte) erro
 	return nil
 }
 
+func (c *Client) WriteRam2(ctx context.Context, address uint32, data []byte) error {
+	for idx, db := range data {
+		if err := c.writeRamSingle(ctx, address+uint32(idx), db); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Client) writeRamSingle(ctx context.Context, address uint32, data byte) error {
+	command := fmt.Sprintf("W%04X%02X\r", uint16(address), data)
+	log.Println(command)
+	if err := sendCommand(ctx, c.c, []byte(command), c.defaultTimeout); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (c *Client) sendBlock(ctx context.Context, addr uint32, block []byte, maxBlock int) error {
 	if len(block) == 0 || len(block) > maxBlock {
 		return fmt.Errorf("invalid block size %d (max %d)", len(block), maxBlock)
 	}
 
 	// 1) Set address
-	addrFrame := gocan.NewFrame(canID,
+	frame := gocan.NewFrame(canID,
 		[]byte{
-			cmdSetAddr,
+			0xA5,
 			byte(addr >> 24), byte(addr >> 16), byte(addr >> 8), byte(addr),
 			byte(len(block)),
 			0x00, 0x00,
 		},
 		gocan.ResponseRequired,
 	)
-	addrResp, err := c.c.SendAndWait(ctx, addrFrame, c.defaultTimeout, replyID)
+	addrResp, err := c.c.SendAndWait(ctx, frame, c.defaultTimeout, replyID)
 	if err != nil {
 		return fmt.Errorf("set-address send failed: %w", err)
 	}
@@ -167,8 +182,8 @@ func (c *Client) sendBlock(ctx context.Context, addr uint32, block []byte, maxBl
 }
 
 func sendCommand(ctx context.Context, c *gocan.Client, cmd []byte, timeout time.Duration) error {
-	for _, b := range cmd {
-		frame := gocan.NewFrame(0x05, []byte{0xC4, b}, gocan.ResponseRequired)
+	for _, cmdByte := range cmd {
+		frame := gocan.NewFrame(0x05, []byte{0xC4, cmdByte}, gocan.ResponseRequired)
 		resp, err := c.SendAndWait(ctx, frame, timeout, 0xC)
 		if err != nil {
 			return err

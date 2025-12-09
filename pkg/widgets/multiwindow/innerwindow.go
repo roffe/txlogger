@@ -252,7 +252,7 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 	}
 
 	r := &innerWindowRenderer{
-		ShadowingRenderer: NewShadowingRenderer(objects, DialogLevel),
+		ShadowingRenderer: NewShadowingRenderer(objects, SubmergedContentLevel),
 		win:               w,
 		bar:               bar,
 		buttons:           []*borderButton{min, max, close},
@@ -297,39 +297,42 @@ func (w *InnerWindow) SetTitle(title string) {
 var _ fyne.WidgetRenderer = (*innerWindowRenderer)(nil)
 
 type innerWindowRenderer struct {
-	*ShadowingRenderer
-	win           *InnerWindow
-	bar           *fyne.Container
-	buttons       []*borderButton
+	win     *InnerWindow
+	bar     *fyne.Container
+	buttons []*borderButton
+
 	bg, contentBG *canvas.Rectangle
-	topBorder     fyne.CanvasObject
-	bottomBorder  fyne.CanvasObject
-	leftBorder    fyne.CanvasObject
-	rightBorder   fyne.CanvasObject
+
+	topBorder    fyne.CanvasObject
+	bottomBorder fyne.CanvasObject
+	leftBorder   fyne.CanvasObject
+	rightBorder  fyne.CanvasObject
 
 	leftTopCorner     fyne.CanvasObject
 	rightTopCorner    fyne.CanvasObject
 	leftBottomCorner  fyne.CanvasObject
 	rightBottomCorner fyne.CanvasObject
+
+	*ShadowingRenderer
 }
 
 func (i *innerWindowRenderer) Layout(size fyne.Size) {
 	// Calculate padding and base size
 	padding := i.win.Theme().Size(theme.SizeNamePadding)
-
 	contentSize := size.Subtract(fyne.NewSquareSize(padding))
 
+	doublePadd := padding * 2
 	// Pre-calculate commonly used dimensions
-	adjustedWidth := contentSize.Width - padding*2
+	adjustedWidth := contentSize.Width - doublePadd
 
 	// Layout shadow and background
-	i.LayoutShadow(size, fyne.Position{})
+	i.LayoutShadow(size.SubtractWidthHeight(2, 2), fyne.Position{})
 	i.bg.Resize(contentSize)
 
 	// Layout title bar
 	barHeight := i.win.Theme().Size(theme.SizeNameWindowTitleBarHeight)
 	i.bar.Move(fyne.NewPos(padding, 0))
-	i.bar.Resize(fyne.NewSize(size.Width-(padding*2), barHeight))
+	i.bar.Resize(fyne.NewSize(size.Width-doublePadd, barHeight))
 
 	// Layout main content area
 	contentPos := fyne.NewPos(padding, barHeight)
@@ -353,7 +356,7 @@ func (i *innerWindowRenderer) layoutCorners(size fyne.Size) {
 	i.topBorder.Move(fyne.Position{X: 10, Y: -3})
 	i.topBorder.Resize(fyne.NewSize(size.Width-20, 6))
 
-	i.bottomBorder.Move(fyne.Position{X: 10, Y: size.Height - 6})
+	i.bottomBorder.Move(fyne.Position{X: 10, Y: size.Height - 3})
 	i.bottomBorder.Resize(fyne.NewSize(size.Width-20, 6))
 
 	i.leftBorder.Move(fyne.Position{X: -3, Y: 10})
@@ -490,16 +493,7 @@ func newDraggableCorner(w *InnerWindow, resizeDir resizeDirection) *draggableCor
 }
 
 func (c *draggableCorner) CreateRenderer() fyne.WidgetRenderer {
-	//var prop *canvas.Rectangle
-	//th := fyne.CurrentApp().Settings().Theme()
-	//if c.resizeDir == resizeDownLeft {
-	//	prop = canvas.NewImageFromResource(th.Icon(fyne.ThemeIconName("drag-corner-indicator-left")))
-	//} else {
-	//	prop = canvas.NewImageFromResource(th.Icon(theme.IconNameDragCornerIndicator))
-	//}
-	//prop.ScaleMode = canvas.ImageScaleFastest
-	//prop.SetMinSize(fyne.NewSquareSize(16))
-	prop := canvas.NewRectangle(color.Transparent)
+	prop := canvas.NewRectangle(color.RGBA{0, 0, 0, 0})
 	return widget.NewSimpleRenderer(prop)
 }
 
@@ -619,7 +613,7 @@ type draggableBorder struct {
 func newDraggableBorder(w *InnerWindow, resizeDir resizeDirection) *draggableBorder {
 	d := &draggableBorder{win: w, resizeDir: resizeDir}
 	d.ExtendBaseWidget(d)
-	d.rect = canvas.NewRectangle(color.Transparent)
+	d.rect = canvas.NewRectangle(color.RGBA{0, 0, 0, 0})
 
 	switch d.resizeDir {
 	case resizeUp, resizeDown:

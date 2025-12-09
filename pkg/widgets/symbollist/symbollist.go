@@ -107,14 +107,14 @@ func (s *Widget) SetValue(name string, value float64) {
 
 func (s *Widget) Disable() {
 	for _, e := range s.entries {
-		e.symbolCorrectionfactor.Disable()
+		//e.symbolCorrectionfactor.Disable()
 		e.deleteBTN.Disable()
 	}
 }
 
 func (s *Widget) Enable() {
 	for _, e := range s.entries {
-		e.symbolCorrectionfactor.Enable()
+		//e.symbolCorrectionfactor.Enable()
 		e.deleteBTN.Enable()
 	}
 }
@@ -197,10 +197,10 @@ func (s *Widget) Symbols() []*symbol.Symbol {
 }
 
 func (s *Widget) MinSize() fyne.Size {
-	return fyne.Size{Width: 480, Height: 221}
+	return fyne.Size{Width: 280, Height: 221}
 }
 
-var headerSizes = []float64{.40, .10, .12, .14, .06}
+var headerSizes = []float64{.70, .20, .10}
 
 func (s *Widget) CreateRenderer() fyne.WidgetRenderer {
 	name := widget.NewLabel("Name")
@@ -209,17 +209,18 @@ func (s *Widget) CreateRenderer() fyne.WidgetRenderer {
 	value := widget.NewLabel("Value")
 	value.TextStyle = fyne.TextStyle{Bold: true}
 
-	num := widget.NewLabel("#")
-	num.TextStyle = fyne.TextStyle{Bold: true}
+	// num := widget.NewLabel("#")
+	// num.TextStyle = fyne.TextStyle{Bold: true}
 
-	typ := widget.NewLabel("Type")
-	typ.TextStyle = fyne.TextStyle{Bold: true}
+	//typ := widget.NewLabel("Type")
+	//typ.TextStyle = fyne.TextStyle{Bold: true}
 
-	factor := widget.NewLabel("Factor")
-	factor.TextStyle = fyne.TextStyle{Bold: true}
+	//factor := widget.NewLabel("Factor")
+	//factor.TextStyle = fyne.TextStyle{Bold: true}
 
-	ll := xlayout.NewHPortion(headerSizes)
-	header := container.New(ll, name, value, num /* typ,*/, factor, widget.NewLabel(""))
+	customLayout := xlayout.NewHPortion(headerSizes)
+	//header := container.New(ll, name, value, num /* typ,*/, factor, widget.NewLabel(""))
+	header := container.New(customLayout, name, value, widget.NewLabel(""))
 
 	return widget.NewSimpleRenderer(container.NewBorder(
 		header,
@@ -240,17 +241,19 @@ func (s *Widget) newSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*Symbo
 	sw.symbolName = widget.NewLabel(sw.symbol.Name)
 	sw.symbolName.Selectable = true
 	sw.symbolValue = widget.NewLabel("---")
-	sw.symbolNumber = widget.NewLabel(strconv.Itoa(sw.symbol.Number))
-	sw.symbolCorrectionfactor = widget.NewEntry()
-	sw.symbolCorrectionfactor.OnChanged = func(s string) {
-		f, err := strconv.ParseFloat(s, 64)
-		if err != nil {
-			return
+	/*
+		sw.symbolNumber = widget.NewLabel(strconv.Itoa(sw.symbol.Number))
+		sw.symbolCorrectionfactor = widget.NewEntry()
+		sw.symbolCorrectionfactor.OnChanged = func(s string) {
+			f, err := strconv.ParseFloat(s, 64)
+			if err != nil {
+				return
+			}
+			sw.symbol.Correctionfactor = f
 		}
-		sw.symbol.Correctionfactor = f
-	}
+	*/
 
-	sw.SetCorrectionFactor(sym.Correctionfactor)
+	//sw.SetCorrectionFactor(sym.Correctionfactor)
 
 	sw.deleteBTN = widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
 		if sw.deleteFunc != nil {
@@ -266,8 +269,8 @@ func (s *Widget) newSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*Symbo
 	sw.body = container.New(layout,
 		sw.symbolName,
 		sw.symbolValue,
-		sw.symbolNumber,
-		sw.symbolCorrectionfactor,
+		//sw.symbolNumber,
+		//sw.symbolCorrectionfactor,
 		sw.deleteBTN,
 	)
 	sw.container = container.NewStack(
@@ -283,14 +286,14 @@ type SymbolWidgetEntry struct {
 
 	w *Widget
 
-	symbol                 *symbol.Symbol
-	symbolName             *widget.Label
-	symbolValue            *widget.Label
-	symbolNumber           *widget.Label
-	symbolCorrectionfactor *widget.Entry
-	deleteBTN              *widget.Button
-	valueBar               *canvas.Rectangle
-	valueBarFactor         float32
+	symbol      *symbol.Symbol
+	symbolName  *widget.Label
+	symbolValue *widget.Label
+	//symbolNumber           *widget.Label
+	//symbolCorrectionfactor *widget.Entry
+	deleteBTN      *widget.Button
+	valueBar       *canvas.Rectangle
+	valueBarFactor float32
 
 	deleteFunc func(*SymbolWidgetEntry)
 
@@ -303,6 +306,7 @@ type SymbolWidgetEntry struct {
 	container *fyne.Container
 }
 
+/*
 func (sw *SymbolWidgetEntry) SetCorrectionFactor(f float64) {
 	sw.symbol.Correctionfactor = f
 	switch f {
@@ -318,6 +322,7 @@ func (sw *SymbolWidgetEntry) SetCorrectionFactor(f float64) {
 		sw.symbolCorrectionfactor.SetText(strconv.FormatFloat(f, 'f', 4, 64))
 	}
 }
+*/
 
 func (sw *SymbolWidgetEntry) CreateRenderer() fyne.WidgetRenderer {
 	return &symbolWidgetEntryRenderer{sw}
@@ -341,14 +346,14 @@ func (s *symbolWidgetEntryRenderer) Layout(size fyne.Size) {
 }
 
 func (s *symbolWidgetEntryRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(400, 36)
+	return fyne.NewSize(200, 36)
 }
 
 func (s *symbolWidgetEntryRenderer) Refresh() {
 	s.e.symbolName.Refresh()
 	s.e.symbolValue.Refresh()
-	s.e.symbolNumber.Refresh()
-	s.e.symbolCorrectionfactor.Refresh()
+	//s.e.symbolNumber.Refresh()
+	//s.e.symbolCorrectionfactor.Refresh()
 	col := colors.GetColorInterpolation(s.e.min, s.e.max, s.e.value, s.e.w.cfg.ColorBlindMode)
 	col.A = barAlpha
 	s.e.valueBar.FillColor = col

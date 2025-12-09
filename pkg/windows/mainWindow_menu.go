@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -229,7 +231,7 @@ func (mw *MainWindow) loadBinary() {
 
 var openMapLock sync.Mutex
 
-func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
+func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) {
 	if mw.fw == nil {
 		mw.Error(fmt.Errorf("no binary loaded"))
 		return
@@ -237,7 +239,12 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 	axis := symbol.GetInfo(typ, mapName)
 
-	if w := mw.wm.HasWindow(axis.Z + " - " + axis.ZDescription); w != nil {
+	windowName := axis.Z
+	if title != "" {
+		windowName += " - " + title
+	}
+
+	if w := mw.wm.HasWindow(windowName); w != nil {
 		mw.wm.Raise(w)
 		return
 	}
@@ -268,13 +275,27 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 	if symX != nil {
 		xData = symX.Float64s()
-		log.Println("xdata", symX.Name, symX.Correctionfactor)
 	} else {
 		xData = []float64{0}
 	}
 
 	if symY != nil {
-		yData = symY.Float64s()
+		if strings.HasPrefix(symZ.Name, "Eftersta_fak") {
+			valz := symZ.Ints()
+			yData = make([]float64, len(valz))
+			for idx, val := range symY.Ints() {
+				kyltempSteg := mw.fw.GetByName("Kyltemp_steg!")
+				kyltempTab := mw.fw.GetByName("Kyltemp_tab!")
+				if kyltempSteg == nil || kyltempTab == nil {
+					mw.Error(fmt.Errorf("missing coolant temperature symbols"))
+					return
+				}
+				realTemp := LookupCoolantTemperature(val, kyltempSteg.Ints(), kyltempTab.Ints())
+				yData[idx] = float64(realTemp)
+			}
+		} else {
+			yData = symY.Float64s()
+		}
 	} else {
 		yData = []float64{0}
 		if symZ.Name == "Batt_korr_tab!" {
@@ -322,7 +343,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 				return
 			}
 			//mw.Log(fmt.Sprintf("set $%d %s %s", addr, axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
-			mw.Log(fmt.Sprintf("set %s $%X %dms", axis.Z, addr, time.Since(start).Truncate(10*time.Millisecond).Milliseconds()))
+			mw.Log(fmt.Sprintf("set %s $%X %dms", axis.Z, addr+uint32(idx*dataLen), time.Since(start).Truncate(10*time.Millisecond).Milliseconds()))
 		}
 	}
 
@@ -382,7 +403,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 
 	loadFileFunc := func() {
 		if symZ != nil {
-			log.Println("load", symZ.Name)
+			//log.Println("load", symZ.Name)
 			if err := mv.SetZData(symZ.Float64s()); err != nil {
 				mw.Error(err)
 				return
@@ -420,6 +441,8 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	zPrecision = symbol.GetPrecision(symZ.Correctionfactor)
 
 	cfg := &mapviewer.Config{
+		Name: symZ.Name,
+
 		XData: xData,
 		YData: yData,
 		ZData: zData,
@@ -538,5 +561,69 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, mapName string) {
 	}
 
 	mw.wm.Add(mapWindow)
+}
 
+func LookupCoolantTemperature(axisvalue int, kyltempSteg, kyltempTab []int) int {
+	index := -1
+	retval := -1
+	smallestDiff := 256
+	secondvalue := -1
+
+	// find index in kyltempSteg
+	for idx, v := range kyltempSteg {
+		diff := int(math.Abs(float64(v - axisvalue)))
+		if diff < smallestDiff {
+			// need a neighbor to interpolate with
+			if v < axisvalue {
+				if idx+1 >= len(kyltempSteg) {
+					continue
+				}
+				secondvalue = kyltempSteg[idx+1]
+			} else {
+				if idx-1 < 0 {
+					continue
+				}
+				secondvalue = kyltempSteg[idx-1]
+			}
+			index = idx
+			smallestDiff = diff
+		}
+	}
+
+	if index >= 0 && index < len(kyltempTab) && secondvalue != -1 {
+		// get value from kyltempTab
+		retval = kyltempTab[index]
+		firstvalue := kyltempSteg[index]
+
+		//sval := -1000
+		diff := int(math.Abs(float64(secondvalue - firstvalue)))
+		if diff == 0 {
+			// avoid div by zero; just return base value minus 40 like original end
+			return retval - 40
+		}
+
+		diff2 := axisvalue - firstvalue
+		percentage := float64(diff2) / float64(diff)
+
+		var sval int
+		if secondvalue > firstvalue {
+			// need the next value from kyltempTab as well
+			if index+1 >= len(kyltempTab) {
+				return retval - 40
+			}
+			sval = kyltempTab[index+1]
+		} else {
+			if index-1 < 0 {
+				return retval - 40
+			}
+			sval = kyltempTab[index-1]
+			percentage = -percentage
+		}
+
+		// interpolate
+		retval += int(percentage * float64(sval-retval))
+		retval -= 40
+	}
+
+	return retval
 }

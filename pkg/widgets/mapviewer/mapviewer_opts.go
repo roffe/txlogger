@@ -6,6 +6,8 @@ import (
 )
 
 type Config struct {
+	Name string
+
 	XData []float64
 	YData []float64
 	ZData []float64

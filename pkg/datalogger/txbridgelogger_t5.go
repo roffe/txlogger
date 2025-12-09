@@ -5,13 +5,13 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/serialcommand"
 	"github.com/roffe/txlogger/pkg/ebus"
-	"github.com/roffe/txlogger/pkg/t5can"
 )
 
 func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
@@ -29,7 +29,6 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 		order = append(order, EXTERNALWBLSYM)
 	}
 
-	t5 := t5can.NewClient(cl)
 	expectedPayloadSize, err := c.configureT5Symbols(cl)
 	if err != nil {
 		return fmt.Errorf("error configuring symbols: %w", err)
@@ -81,7 +80,7 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 					continue
 				}
 				frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
-				resp, err := cl.SendAndWait(ctx, frame, 300*time.Millisecond, gocan.SystemMsgDataRequest)
+				resp, err := cl.SendAndWait(ctx, frame, 3*time.Second, gocan.SystemMsgDataRequest)
 				if err != nil {
 					read.Complete(err)
 					continue
@@ -93,19 +92,60 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 					read.Complete(nil)
 				}
 				continue
-			case upd := <-c.writeChan:
-				if err := t5.WriteRam(ctx, upd.Address, upd.Data); err != nil {
-					upd.Complete(err)
-					break
+			case write := <-c.writeChan:
+				toWrite := min(128, write.Length)
+				cmd := serialcommand.SerialCommand{
+					Command: 'W',
+					Data: []byte{
+						byte(write.Address),
+						byte(write.Address >> 8),
+						byte(write.Address >> 16),
+						byte(write.Address >> 24),
+						byte(toWrite),
+					},
 				}
-				upd.Complete(nil)
+				cmd.Data = append(cmd.Data, write.Data[:toWrite]...)
+
+				write.Data = write.Data[toWrite:] // remove the data we just sent
+				write.Address += uint32(toWrite)
+				write.Length -= toWrite
+
+				payload, err := cmd.MarshalBinary()
+				if err != nil {
+					write.Complete(err)
+					continue
+				}
+
+				frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
+
+				resp, err := cl.SendAndWait(ctx, frame, 5*time.Second, gocan.SystemMsgWriteResponse)
+				if err != nil {
+					write.Complete(err)
+					continue
+				}
+
+				if resp.Identifier == gocan.SystemMsgError {
+					write.Complete(fmt.Errorf("error response: % 02X", resp.Data))
+					continue
+				}
+
+				if write.Length > 0 {
+					select {
+					case c.writeChan <- write:
+					default:
+						log.Println("writeChan full")
+					}
+					continue
+				}
+				write.Complete(nil)
+				continue
 			case msg, ok := <-tx.Chan():
 				if !ok {
 					c.OnMessage("txbridge sub closed")
 					return
 				}
 
-				if msg.DLC() != int(expectedPayloadSize+4) {
+				if msg.DLC() != (expectedPayloadSize + 4) {
 					c.onError()
 					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, msg.DLC()))
 					continue

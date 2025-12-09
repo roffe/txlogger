@@ -52,6 +52,8 @@ type Meshgrid struct {
 	colorMode colors.ColorBlindMode
 
 	dragging bool
+
+	OnMouseDown func()
 }
 
 // NewMeshgrid creates a new Meshgrid given width, height, depth and spacing.

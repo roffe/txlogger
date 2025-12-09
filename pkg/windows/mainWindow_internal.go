@@ -63,6 +63,8 @@ func (mw *MainWindow) Close() {
 		}
 	}
 	mw.Window.Close()
+	time.Sleep(200 * time.Millisecond)
+	fyne.CurrentApp().Quit()
 }
 
 func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
@@ -93,6 +95,9 @@ func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
 					return
 				}
 				defer f.Close()
+				if p.X < 100 {
+					p.X = 100
+				}
 				mw.LoadLogfile(filename, f, p)
 			}
 		}

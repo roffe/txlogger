@@ -90,12 +90,12 @@ func (c *T5Client) Start() error {
 				}
 				read.Data = data
 				read.Complete(nil)
-			case upd := <-c.writeChan:
-				if err := t5.WriteRam(ctx, upd.Address, upd.Data); err != nil {
-					upd.Complete(err)
+			case write := <-c.writeChan:
+				if err := t5.WriteRam2(ctx, write.Address, write.Data); err != nil {
+					write.Complete(err)
 					break
 				}
-				upd.Complete(nil)
+				write.Complete(nil)
 			case <-t.C:
 				ts := time.Now()
 				for _, sym := range c.Symbols {

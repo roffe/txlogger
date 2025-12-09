@@ -1,5 +1,7 @@
 fyne.io/fyne/v2 v2.7.2-0.20251119154138-3a4ac7d7e74e h1:f2xY1QRtJyPCKxiL1q9c5umMJ92WMb6w6yBfsgwkB8E=
 fyne.io/fyne/v2 v2.7.2-0.20251119154138-3a4ac7d7e74e/go.mod h1:xo+SRRY+GLd0bNX/g8/FdXZ5Xlltobi1BA4VSNiEzpE=
+fyne.io/fyne/v2 v2.7.2-0.20251203185017-f400fa2c568a h1:PVrwYxrOd64kDuNmGNrYH57UOgFdf/OAerAgHd9xSD0=
+fyne.io/fyne/v2 v2.7.2-0.20251203185017-f400fa2c568a/go.mod h1:xo+SRRY+GLd0bNX/g8/FdXZ5Xlltobi1BA4VSNiEzpE=
 fyne.io/systray v1.11.1-0.20250603113521-ca66a66d8b58 h1:eA5/u2XRd8OUkoMqEv3IBlFYSruNlXD8bRHDiqm0VNI=
 fyne.io/systray v1.11.1-0.20250603113521-ca66a66d8b58/go.mod h1:RVwqP9nYMo7h5zViCBHri2FgjXF7H2cub7MAq4NSoLs=
 fyne.io/x/fyne v0.0.0-20250106132206-3228f6c50107 h1:hSbnee3f6u0PRh8QnR8q4lrN6nW4WSiSHmlGIV0ola8=

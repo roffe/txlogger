@@ -116,7 +116,7 @@ func (mw *MainWindow) newSymbolListBtn() *widget.Button {
 		mw.wm.Add(symbolListWindow)
 		if mw.startup {
 			symbolListWindow.Move(fyne.NewPos(0, 0))
-			symbolListWindow.Resize(fyne.NewSize(500, 550))
+			symbolListWindow.Resize(fyne.NewSize(300, 550))
 		}
 	})
 }
@@ -158,6 +158,9 @@ func (mw *MainWindow) newOpenLogBtn() *widget.Button {
 
 func (mw *MainWindow) addSymbolBtnFunc() *widget.Button {
 	return widget.NewButtonWithIcon("", theme.ContentAddIcon(), func() {
+		if mw.selects.symbolLookup.Text == "" {
+			return
+		}
 		/*
 			switch mw.selects.symbolLookup.Text {
 			case "ADC1":

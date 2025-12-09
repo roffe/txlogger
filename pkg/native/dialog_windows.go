@@ -30,6 +30,7 @@ const (
 	OFN_FILEMUSTEXIST   = 0x00001000
 	OFN_PATHMUSTEXIST   = 0x00000800
 	OFN_OVERWRITEPROMPT = 0x00000002
+	OFN_NOCHANGEDIR     = 0x00000008
 )
 
 type openfilenameW struct {
@@ -94,7 +95,7 @@ func OpenFileDialog(title string, filters ...FileFilter) (string, error) {
 		lpstrFile:    &fileBuf[0],
 		nMaxFile:     MAX_PATH,
 		lpstrTitle:   titlePtr,
-		Flags:        OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST,
+		Flags:        OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR,
 		nFilterIndex: 1, // 1-based index into filter pairs
 	}
 
@@ -226,7 +227,7 @@ func SaveFileDialog(title string, defaultExt string, filters ...FileFilter) (str
 		nMaxFile:     MAX_PATH,
 		lpstrTitle:   titlePtr,
 		lpstrDefExt:  defExtPtr,
-		Flags:        OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST,
+		Flags:        OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR,
 		nFilterIndex: 1,
 	}
 

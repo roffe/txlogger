@@ -94,7 +94,7 @@ func New(config *Config) (*MapViewer, error) {
 		colorMode:     config.ColorblindMode,
 	}
 	mv.ExtendBaseWidget(mv)
-	log.Printf("mapViewer c:%d r:%d len:%d", mv.numColumns, mv.numRows, mv.numData)
+	log.Printf("%s c:%d r:%d len:%d", config.Name, mv.numColumns, mv.numRows, mv.numData)
 	if len(mv.cfg.ZData) == 0 {
 		return nil, fmt.Errorf("mapViewer zData is empty")
 	}
@@ -218,6 +218,10 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 			mv.numRows,
 			mv.colorMode,
 		)
+
+		if mv.cfg.OnMouseDown != nil {
+			mv.mesh.OnMouseDown = mv.cfg.OnMouseDown
+		}
 
 		if err == nil {
 			split := container.NewVSplit(

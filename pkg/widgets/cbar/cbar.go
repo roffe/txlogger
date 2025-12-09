@@ -204,6 +204,8 @@ func (r *CBarRenderer) Layout(space fyne.Size) {
 	r.bar.Move(fyne.Position{X: barPosition, Y: 0})
 	r.bar.Resize(fyne.Size{Width: r.barWidth * r.widthFactor, Height: r.barHeight})
 
+	r.displayText.TextSize = r.bar.Size().Height - 8
+
 	var y float32
 	switch r.cfg.TextPosition {
 	case widgets.TextAtTop:
@@ -211,6 +213,7 @@ func (r *CBarRenderer) Layout(space fyne.Size) {
 	case widgets.TextAtBottom:
 		y = r.lastSize.Height
 	}
+
 	titleX := r.lastSize.Width*0.5 - r.titleText.MinSize().Width*0.5
 	displayX := r.lastSize.Width*0.5 - r.displayText.MinSize().Width*0.5
 

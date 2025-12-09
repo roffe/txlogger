@@ -1,8 +1,16 @@
+# 2.1.6
+- Added all maps from "Manual tuning" in T5suite
+- Added all maps from "Tuning" in T7suite
+- Fixed small graphical discrepancy where the shadow around windows would be 2 pixels off
+- Updated txbridge firmware to 1.1.1 which includes write support for Trionic 5
+- Fixed a bug where the working directory would be changed when opening file via dialogs on Windows
+- txbridge firmware updated so it uses the slow write to ram method for Trionic 5 that should work with engine running
+
 # 2.1.5
 - Added numbers on the gauges in the dashboard to look more like real gauges
 - Fixed axis information for tryck_mat_a! in ecusymbol library where it would open tryck_mat! instead
 - Added a small device check and error out if trying to use J2534 or ELM327 adapters with Trionic 5
-- fixed a bug in the update checker where the update check would not be performed properly
+- Fixed a bug in the update checker where the update check would not be performed properly
 - Fixed a bug where you could rotate the 3d mesh of a map view when resizing a window overlaying it
 - Added dragable borders to all windows to make resizing easier
 - Added DTC reader for Trionic 5, 7 & 8. Found under the "Diagnostics" menu
@@ -25,8 +33,8 @@
 - Added support for saving T5 files
 
 # 2.1.2
-- rewrote cangateway to use named pipes on windows instead of unix sockets. This should ensure that cangateway is working even on early Windows 10 versions
-- fixed a race condition in goCAN that could cause missed canbus frames.
+- Rewrote cangateway to use named pipes on windows instead of unix sockets. This should ensure that cangateway is working even on early Windows 10 versions
+- Fixed a race condition in goCAN that could cause missed canbus frames.
 
 # 2.1.1
 - Fixed a bug where the background color of single cell maps (bool values) would be black until selected
@@ -59,9 +67,9 @@ The OBDLink SX & EX and CANUSB will be autodetected on startup and all you need 
 - fixed mouse panning in mesh viewer so it doesn't behave strange after you rotate the mesh
 
 # 2.0.6
-- FINALLY fixed the cameras on the 3d mesh view. Now it behaves like any normal 3d software and is very intuitive to use. Mouse1, 2 & middle are the modifiers to use when dragging
+- FINALLY fixed the camera on the 3d mesh view. Now it behaves like any normal 3d software and is very intuitive to use. Mouse1, 2 & middle are the modifiers to use when dragging
 - 64 bit j2534 support added in gocan, Devices are prefixed "x64 J2534" and should be used if you see both 32-bit and 64-bit drivers for your adapter in the list
-- fixed a bug in the j2534 driver where 4 bytes would be appended to the can packages
+- Fixed a bug in the j2534 driver where 4 bytes would be appended to the can packages
 
 # 2.0.5
 - Rewrote large parts of the CAN library to pass along a pointer to a message instead of a interface with methods to lower cpu usage

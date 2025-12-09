@@ -117,7 +117,7 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 			switch symbol.ECUType(int(value)) {
 			case symbol.ECU_T5: //T5
 				db.cfg.AirDemToString = func(f float64) string {
-					return fmt.Sprintf("%.1f", f)
+					return fmt.Sprintf("%.0f", f)
 				}
 			case symbol.ECU_T7: //T7
 				db.cfg.AirDemToString = datalogger.AirDemToStringT7

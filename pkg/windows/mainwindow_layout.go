@@ -189,7 +189,7 @@ func (mw *MainWindow) LoadLayout(name string) error {
 		}
 
 		if openMap {
-			mw.openMap(symbol.ECUTypeFromString(layout.ECU), parts[0])
+			mw.openMap(symbol.ECUTypeFromString(layout.ECU), h.Title, parts[0])
 		}
 
 	}
