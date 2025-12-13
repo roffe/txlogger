@@ -22,11 +22,15 @@ import (
 	// _ "net/http/pprof"
 )
 
-var workDirectory string
+var (
+	workDirectory          string
+	allowMultipleInstances = false
+)
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.StringVar(&workDirectory, "d", "", "working directory")
+	flag.BoolVar(&allowMultipleInstances, "m", false, "allow multiple instances")
 	flag.Parse()
 
 }
@@ -59,7 +63,7 @@ func main() {
 	defer debug.Log("txlogger exit")
 
 	// if another instance is running, just show its window and exit
-	if ipc.IsRunning() {
+	if ipc.IsRunning() && !allowMultipleInstances {
 		return
 	}
 

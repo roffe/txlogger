@@ -15,10 +15,11 @@ import (
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/kwp2000"
+	"github.com/roffe/txlogger/relayserver"
 )
 
 type T7Client struct {
-	BaseLogger
+	*BaseLogger
 }
 
 func NewT7(cfg Config, lw LogWriter) (IClient, error) {
@@ -274,22 +275,27 @@ func (c *T7Client) Start() error {
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				/*
-					// New shit -----
-					var values LogValues
-					for _, name := range order {
+				// New shit -----
+				if c.r != nil {
+					var values relayserver.LogValues
+					for _, name := range sysvarOrder {
 						val := c.sysvars.Get(name)
-						values = append(values, LogValue{Name: name, Value: val})
+						values = append(values, relayserver.LogValue{Name: name, Value: val})
 					}
 					for _, va := range c.Symbols {
 						if va.Number < 0 {
 							continue
 						}
-						values = append(values, LogValue{Name: va.Name, Value: va.Float64()})
+						values = append(values, relayserver.LogValue{Name: va.Name, Value: va.Float64()})
 					}
-					log.Println(values.String())
-					// --------
-				*/
+					if err := c.r.SendMessage(relayserver.Message{
+						Kind: relayserver.MsgTypeData,
+						Body: values,
+					}); err != nil {
+						c.onError()
+						c.OnMessage("failed to send relay message: " + err.Error())
+					}
+				}
 
 				if err := c.lw.Write(c.sysvars, sysvarOrder, c.Symbols, timeStamp); err != nil {
 					c.onError()

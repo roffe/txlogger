@@ -17,7 +17,7 @@ import (
 )
 
 type T8Client struct {
-	BaseLogger
+	*BaseLogger
 }
 
 func NewT8(cfg Config, lw LogWriter) (IClient, error) {

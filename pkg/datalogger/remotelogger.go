@@ -1,7 +1,7 @@
 package datalogger
 
 type RemoteClient struct {
-	BaseLogger
+	*BaseLogger
 }
 
 func NewRemote(cfg Config, lw LogWriter) (IClient, error) {

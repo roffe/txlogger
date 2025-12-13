@@ -490,7 +490,7 @@ func (db *Dashboard) layoutBars(dims *dims) {
 
 func (db *Dashboard) layoutIcons(dims *dims) {
 	// Limp mode icon
-	limpSize := fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight}
+	limpSize := fyne.Size{Width: dims.sixthWidth * .5, Height: dims.thirdHeight * 0.5}
 	db.image.limpMode.Resize(limpSize)
 	db.image.limpMode.Move(fyne.Position{
 		X: dims.centerX - limpSize.Width*0.5,

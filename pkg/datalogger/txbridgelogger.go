@@ -11,7 +11,7 @@ import (
 var _ IClient = (*TxBridge)(nil)
 
 type TxBridge struct {
-	BaseLogger
+	*BaseLogger
 }
 
 func NewTxbridge(cfg Config, lw LogWriter) (*TxBridge, error) {

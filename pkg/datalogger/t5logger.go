@@ -14,7 +14,7 @@ import (
 )
 
 type T5Client struct {
-	BaseLogger
+	*BaseLogger
 }
 
 func NewT5(cfg Config, lw LogWriter) (IClient, error) {
