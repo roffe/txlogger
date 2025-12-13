@@ -3,9 +3,8 @@ module github.com/roffe/txlogger
 go 1.25.5
 
 //replace github.com/roffe/gocan => ..\gocan
-replace github.com/roffe/ecusymbol => ..\ecusymbol
-
-// replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
+//replace github.com/roffe/ecusymbol => ..\ecusymbol
+//replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 
 require (
 	fyne.io/fyne/v2 v2.7.2-0.20251203185017-f400fa2c568a
@@ -14,7 +13,7 @@ require (
 	github.com/lusingander/colorpicker v0.7.4
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.0.7
-	github.com/roffe/ecusymbol v1.0.9
+	github.com/roffe/ecusymbol v1.1.0
 	github.com/roffe/gocan v1.3.1
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.4
