@@ -74,9 +74,9 @@ func (bl *BaseLogger) connectRelay() error {
 
 func (bl *BaseLogger) Close() {
 	bl.closeOnce.Do(func() {
-		if bl.r != nil {
-			bl.r.Close()
-		}
+		//if bl.r != nil {
+		//	bl.r.Close()
+		//}
 		close(bl.quitChan)
 		time.Sleep(150 * time.Millisecond)
 	})
