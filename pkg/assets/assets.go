@@ -60,3 +60,6 @@ var Taz []byte
 
 //go:embed korvring.mp3
 var Korvring []byte
+
+//go:embed stagafr.jpg
+var STAGAfr []byte
