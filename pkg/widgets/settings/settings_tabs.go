@@ -166,6 +166,7 @@ func (sw *Widget) wblTab() *container.TabItem {
 	sw.images.plx = newImageFromResource("plx")
 	sw.images.combi = newImageFromResource("combi")
 	sw.images.zeitronix = newImageFromResource("zeitronix")
+	sw.images.stagafr = newImageFromResource("stagafr")
 
 	sw.wblADscanner = sw.newADscannerCheck()
 
@@ -180,6 +181,7 @@ func (sw *Widget) wblTab() *container.TabItem {
 			sw.images.plx,
 			sw.images.combi,
 			sw.images.zeitronix,
+			sw.images.stagafr,
 			layout.NewSpacer(),
 		),
 		sw.wblSelectContainer,

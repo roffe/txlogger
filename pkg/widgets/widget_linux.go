@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/storage"
 	sdialog "github.com/sqweek/dialog"
 )
 
@@ -21,7 +22,7 @@ func SelectFolder(cb func(str string)) {
 	}()
 }
 
-func SelectFile(cb func(str string), desc string, exts ...string) {
+func SelectFile(cb func(r fyne.URIReadCloser), desc string, exts ...string) {
 	go func() {
 		filename, err := sdialog.File().Filter(desc, exts...).Load()
 		if err != nil {
@@ -31,8 +32,14 @@ func SelectFile(cb func(str string), desc string, exts ...string) {
 			fyne.LogError("Error selecting file", err)
 			return
 		}
+		uri := storage.NewFileURI(filename)
+		r, err := storage.Reader(uri)
+		if err != nil {
+			log.Println("Error reading file:", err)
+			return
+		}
 		fyne.Do(func() {
-			cb(filename)
+			cb(r)
 		})
 	}()
 }

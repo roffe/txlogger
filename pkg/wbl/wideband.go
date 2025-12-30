@@ -11,6 +11,7 @@ import (
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
 	"github.com/roffe/txlogger/pkg/wbl/plx"
+	"github.com/roffe/txlogger/pkg/wbl/stag"
 	"github.com/roffe/txlogger/pkg/wbl/zeitronix"
 )
 
@@ -53,6 +54,8 @@ func New(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvider,
 		return newAEM(ctx, cl, cfg)
 	case plx.ProductString:
 		return newPLX(ctx, cl, cfg)
+	case stag.ProductString:
+		return newSTAG(ctx, cfg)
 	case zeitronix.ProductString:
 		return newZeitronix(ctx, cl, cfg)
 	default:
@@ -197,5 +200,19 @@ func newZeitronix(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (Lambda
 			return nil, err
 		}
 	}
+	return wblClient, nil
+}
+
+func newSTAG(ctx context.Context, cfg *WBLConfig) (LambdaProvider, error) {
+	wblClient, err := stag.NewSTAGClient(cfg.Port, cfg.Log)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg.Log("Starting STAG serial client")
+	if err := wblClient.Start(ctx); err != nil {
+		return nil, err
+	}
+
 	return wblClient, nil
 }

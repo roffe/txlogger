@@ -128,6 +128,7 @@ type Widget struct {
 		plx         *canvas.Image
 		combi       *canvas.Image
 		zeitronix   *canvas.Image
+		stagafr     *canvas.Image
 	}
 
 	mu sync.Mutex

@@ -19,6 +19,7 @@ import (
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
 	"github.com/roffe/txlogger/pkg/wbl/plx"
+	"github.com/roffe/txlogger/pkg/wbl/stag"
 	"github.com/roffe/txlogger/pkg/wbl/zeitronix"
 )
 
@@ -49,6 +50,9 @@ func newImageFromResource(name string) *canvas.Image {
 	case "zeitronix":
 		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.ZeitronixZT2))
 		img.SetMinSize(fyne.NewSize(252, 252))
+	case "stagafr":
+		img = canvas.NewImageFromResource(fyne.NewStaticResource(name, assets.STAGAfr))
+		img.SetMinSize(fyne.NewSize(252, 252))
 	}
 	img.FillMode = canvas.ImageFillContain
 	img.ScaleMode = canvas.ImageScaleFastest
@@ -72,6 +76,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 		innovate.ProductString,
 		plx.ProductString,
 		zeitronix.ProductString,
+		stag.ProductString,
 	}, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsWblSource, s)
 		fyne.CurrentApp().Preferences().SetString(prefsWidebandSymbolName, sw.GetWidebandSymbolName())
@@ -87,6 +92,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.images.plx.Hide()
 			sw.images.combi.Hide()
 			sw.images.zeitronix.Hide()
+			sw.images.stagafr.Hide()
 			ecuSet = true
 			portSelect = false
 		case ecumaster.ProductString:
@@ -98,6 +104,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.images.plx.Hide()
 			sw.images.combi.Hide()
 			sw.images.zeitronix.Hide()
+			sw.images.stagafr.Hide()
 			portSelect = false
 		case innovate.ProductString:
 			sw.images.mtxl.Show()
@@ -108,6 +115,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.images.plx.Hide()
 			sw.images.combi.Hide()
 			sw.images.zeitronix.Hide()
+			sw.images.stagafr.Hide()
 			portSelect = true
 		case aem.ProductString:
 			sw.images.mtxl.Hide()
@@ -118,6 +126,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.images.plx.Hide()
 			sw.images.combi.Hide()
 			sw.images.zeitronix.Hide()
+			sw.images.stagafr.Hide()
 			portSelect = true
 		case plx.ProductString:
 			sw.images.mtxl.Hide()
@@ -128,6 +137,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.images.plx.Show()
 			sw.images.combi.Hide()
 			sw.images.zeitronix.Hide()
+			sw.images.stagafr.Hide()
 			portSelect = true
 		case "CombiAdapter":
 			sw.images.mtxl.Hide()
@@ -138,6 +148,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.images.plx.Hide()
 			sw.images.combi.Show()
 			sw.images.zeitronix.Hide()
+			sw.images.stagafr.Hide()
 			portSelect = false
 		case zeitronix.ProductString:
 			sw.images.mtxl.Hide()
@@ -148,6 +159,18 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.images.plx.Hide()
 			sw.images.combi.Hide()
 			sw.images.zeitronix.Show()
+			sw.images.stagafr.Hide()
+			portSelect = true
+		case stag.ProductString:
+			sw.images.mtxl.Hide()
+			sw.images.lc2.Hide()
+			sw.images.uego.Hide()
+			sw.images.lambdatocan.Hide()
+			sw.images.t7.Hide()
+			sw.images.plx.Hide()
+			sw.images.combi.Hide()
+			sw.images.zeitronix.Hide()
+			sw.images.stagafr.Show()
 			portSelect = true
 		default:
 			sw.images.mtxl.Hide()
@@ -158,6 +181,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.images.plx.Hide()
 			sw.images.combi.Hide()
 			sw.images.zeitronix.Hide()
+			sw.images.stagafr.Hide()
 			portSelect = false
 		}
 
