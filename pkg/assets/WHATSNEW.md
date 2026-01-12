@@ -1,5 +1,6 @@
 # 2.1.7
 - Added "Edit Parameters" dialog for Trionic 8 under Diagnostics menu. Allowing you to change VIN, E85%, Top Speed, Oil Quality, Diagnostic Tpe, Tank Type, Convertible, SAO, High Output, BioPower and ClutchStart
+- Fixed a possible crash in the combined logplayer
 
 # 2.1.6
 - Added all maps from "Manual tuning" in T5suite
