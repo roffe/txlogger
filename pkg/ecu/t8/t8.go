@@ -2,6 +2,7 @@ package t8
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -142,9 +143,29 @@ func (t *Client) SetVehicleVIN(ctx context.Context, vin string) error {
 	return t.gm.WriteDataByIdentifier(ctx, pidVIN, []byte(vin))
 }
 
+func (t *Client) GetE85Percent(ctx context.Context) (float64, error) {
+	resp, err := t.gm.ReadDataByPacketIdentifier(ctx, 0x01, dpidE85Percent)
+	if err != nil {
+		return 0, err
+	}
+	val := binary.LittleEndian.Uint32(resp[2:6])
+	return float64(val), nil
+}
+
+func (t *Client) SetE85Percent(ctx context.Context, percent float64) error {
+	val := uint32(percent)
+	data := []byte{0x00, byte(val)}
+
+	if err := t.gm.DeviceControlWithCode(ctx, 0x18, data); err != nil {
+		return err
+	}
+	return nil
+}
+
 const (
-	pidRPMLimiter = 0x29
-	pidOilQuality = 0x25
-	pidTopSpeed   = 0x02
-	pidVIN        = 0x90
+	pidRPMLimiter  = 0x29
+	pidOilQuality  = 0x25
+	pidTopSpeed    = 0x02
+	pidVIN         = 0x90
+	dpidE85Percent = 0x7A
 )

@@ -7,14 +7,14 @@ go 1.25.5
 //replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 
 require (
-	fyne.io/fyne/v2 v2.7.2-0.20251203185017-f400fa2c568a
+	fyne.io/fyne/v2 v2.7.3-0.20260106221416-6ab85631f261
 	fyne.io/x/fyne v0.0.0-20250106132206-3228f6c50107
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/lusingander/colorpicker v0.7.4
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.0.7
 	github.com/roffe/ecusymbol v1.1.0
-	github.com/roffe/gocan v1.3.1
+	github.com/roffe/gocan v1.3.2
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.4
 	golang.org/x/image v0.25.0
@@ -33,7 +33,7 @@ require (
 )
 
 require (
-	fyne.io/systray v1.11.1-0.20250603113521-ca66a66d8b58 // indirect
+	fyne.io/systray v1.12.0 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/FyshOS/fancyfs v0.0.0-20251025194026-1f03098ff624 // indirect
 	github.com/TheTitanrain/w32 v0.0.0-20200114052255-2654d97dbd3d // indirect

@@ -82,7 +82,7 @@ if ($txlogger) {
     $env:CGO_CFLAGS = ($includes | ForEach-Object { '-I' + $_ }) -join ' '
     # $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
     $env:GOARCH = "amd64"
-    fyne package -tags="canlib,canusb,combi,ftdi,j2534,pcan" --release
+    fyne package -tags="canlib,canusb,combi,ftdi,j2534,pcan,rcan" --release
 }
 
 if ($setup) {

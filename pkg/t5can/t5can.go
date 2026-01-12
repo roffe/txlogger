@@ -3,7 +3,6 @@ package t5can
 import (
 	"context"
 	"fmt"
-	"log"
 	"slices"
 	"time"
 
@@ -110,7 +109,7 @@ func (c *Client) WriteRam2(ctx context.Context, address uint32, data []byte) err
 
 func (c *Client) writeRamSingle(ctx context.Context, address uint32, data byte) error {
 	command := fmt.Sprintf("W%04X%02X\r", uint16(address), data)
-	log.Println(command)
+	//	log.Println(command)
 	if err := sendCommand(ctx, c.c, []byte(command), c.defaultTimeout); err != nil {
 		return err
 	}

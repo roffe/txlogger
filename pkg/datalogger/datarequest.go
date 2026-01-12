@@ -7,18 +7,19 @@ import (
 )
 
 type DataRequest struct {
-	Address  uint32
-	Length   uint32
+	Address uint32
+	Length  uint32
+	Data    []byte
+	Left    uint32
+
 	respChan chan error
-	Data     []byte
-	left     uint32
 }
 
 func NewReadDataRequest(address uint32, length uint32) *DataRequest {
 	return &DataRequest{
 		Address:  address,
 		Length:   length,
-		left:     length,
+		Left:     length,
 		respChan: make(chan error, 1),
 	}
 }
@@ -28,7 +29,7 @@ func NewWriteDataRequest(address uint32, data []byte) *DataRequest {
 		Address:  address,
 		Data:     data,
 		Length:   uint32(len(data)),
-		left:     uint32(len(data)),
+		Left:     uint32(len(data)),
 		respChan: make(chan error, 1),
 	}
 }

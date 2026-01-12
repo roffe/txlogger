@@ -1,7 +1,7 @@
-fyne.io/fyne/v2 v2.7.2-0.20251203185017-f400fa2c568a h1:PVrwYxrOd64kDuNmGNrYH57UOgFdf/OAerAgHd9xSD0=
-fyne.io/fyne/v2 v2.7.2-0.20251203185017-f400fa2c568a/go.mod h1:xo+SRRY+GLd0bNX/g8/FdXZ5Xlltobi1BA4VSNiEzpE=
-fyne.io/systray v1.11.1-0.20250603113521-ca66a66d8b58 h1:eA5/u2XRd8OUkoMqEv3IBlFYSruNlXD8bRHDiqm0VNI=
-fyne.io/systray v1.11.1-0.20250603113521-ca66a66d8b58/go.mod h1:RVwqP9nYMo7h5zViCBHri2FgjXF7H2cub7MAq4NSoLs=
+fyne.io/fyne/v2 v2.7.3-0.20260106221416-6ab85631f261 h1:5ArnC/vONx6lXRfmd1Uz/lapdyynx9d7aTYT/ZLj8Zs=
+fyne.io/fyne/v2 v2.7.3-0.20260106221416-6ab85631f261/go.mod h1:M3Fkb8eUU6se8E+coikK8x7f3vCIakxAW7bPyw3d9fA=
+fyne.io/systray v1.12.0 h1:CA1Kk0e2zwFlxtc02L3QFSiIbxJ/P0n582YrZHT7aTM=
+fyne.io/systray v1.12.0/go.mod h1:RVwqP9nYMo7h5zViCBHri2FgjXF7H2cub7MAq4NSoLs=
 fyne.io/x/fyne v0.0.0-20250106132206-3228f6c50107 h1:hSbnee3f6u0PRh8QnR8q4lrN6nW4WSiSHmlGIV0ola8=
 fyne.io/x/fyne v0.0.0-20250106132206-3228f6c50107/go.mod h1:wABgsyWBQOG0Pg5gCki7FmJhmhc5VZ4lfzel4gNHjFM=
 github.com/BurntSushi/toml v1.5.0 h1:W5quZX/G/csjUnuI8SUYlsHs9M38FC7znL0lIO+DvMg=
@@ -119,8 +119,8 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/roffe/ecusymbol v1.1.0 h1:5BwN+w7Rpooo6LD/eB/Wawz+ZI1Az2Yq4BjYrAc91rk=
 github.com/roffe/ecusymbol v1.1.0/go.mod h1:P53NLPps1rW3BEDM8QZtx9F0clYkA+cQUzc2arbtvrA=
-github.com/roffe/gocan v1.3.1 h1:Yr8g71PPJPiPRkmKpQ5ZrznjkdD6VF/wHF2Qs7Pl2QY=
-github.com/roffe/gocan v1.3.1/go.mod h1:vo1MhauJFNrpugFUiZKmN72bokN5D18ULCTgU1izFlU=
+github.com/roffe/gocan v1.3.2 h1:La1ST7eojdoDFt2V1Pls1YvgpnGpVFCzXQRtKiJlEZc=
+github.com/roffe/gocan v1.3.2/go.mod h1:nokYM25v2A0DP/jZVKhWwE03NwQx/vXhJOLMhhMXekc=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
 github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR38lUII=
 github.com/rogpeppe/go-internal v1.13.1/go.mod h1:uMEvuHeurkdAXX61udpOXGD/AzZDWNMNyH2VO9fmH0o=

@@ -351,10 +351,17 @@ func (mw *MainWindow) startLogging() {
 		mw.Error(fmt.Errorf("no symbols selected for logging"))
 		return
 	}
-	device, err := mw.settings.GetAdapter(mw.selects.ecuSelect.Selected)
-	if err != nil {
-		mw.Error(err)
-		return
+	var device gocan.Adapter
+	var err error
+	deviceName := mw.selects.remoteSelect.Selected
+
+	if mw.selects.remoteSelect.SelectedIndex() < 2 {
+		device, err = mw.settings.GetAdapter(mw.selects.ecuSelect.Selected)
+		if err != nil {
+			mw.Error(err)
+			return
+		}
+		deviceName = device.Name()
 	}
 
 	if mw.selects.ecuSelect.Selected == "T5" {
@@ -377,11 +384,11 @@ func (mw *MainWindow) startLogging() {
 	mw.Disable()
 	mw.canLED.On()
 	go func() {
-		mw.Log("Connecting to " + device.Name())
+		mw.Log("Connecting to " + deviceName)
 		if err := mw.dlc.Start(); err != nil {
 			mw.Error(err)
 		}
-		mw.Log(device.Name() + " disconnected")
+		mw.Log(deviceName + " disconnected")
 		mw.loggingRunning = false
 		mw.dlc = nil
 		fyne.Do(func() {
@@ -427,5 +434,7 @@ func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, st
 			Low:                    mw.settings.GetLow(),
 			High:                   mw.settings.GetHigh(),
 		},
+		//Remote: mw.selects.remoteSelect.Selected == "Remote",
+		RemoteMode: mw.selects.remoteSelect.SelectedIndex(),
 	})
 }

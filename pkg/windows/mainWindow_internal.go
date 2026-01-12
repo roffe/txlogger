@@ -64,7 +64,7 @@ func (mw *MainWindow) Close() {
 	}
 	mw.Window.Close()
 	time.Sleep(200 * time.Millisecond)
-	fyne.CurrentApp().Quit()
+	os.Exit(0)
 }
 
 func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {

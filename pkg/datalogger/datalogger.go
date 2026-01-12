@@ -2,6 +2,7 @@ package datalogger
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
@@ -45,6 +46,7 @@ type Config struct {
 	LogFormat      string
 	LogPath        string
 	WidebandConfig WidebandConfig
+	RemoteMode     int
 }
 
 type Client struct {
@@ -62,6 +64,7 @@ type WidebandConfig struct {
 }
 
 func New(cfg Config) (IClient, string, error) {
+	log.Println("RemoteMode", cfg.RemoteMode)
 	datalogger := &Client{
 		cfg: cfg,
 	}
@@ -72,6 +75,14 @@ func New(cfg Config) (IClient, string, error) {
 	}
 
 	cfg.OnMessage(fmt.Sprintf("Logging to %s", filename))
+
+	if cfg.RemoteMode == 2 {
+		datalogger.IClient, err = NewRemote(cfg, lw)
+		if err != nil {
+			return nil, "", err
+		}
+		return datalogger, filename, nil
+	}
 
 	if cfg.Device.Name() == "txbridge wifi" || cfg.Device.Name() == "txbridge bluetooth" {
 		dc, err := NewTxbridge(cfg, lw)
@@ -89,6 +100,7 @@ func New(cfg Config) (IClient, string, error) {
 		}
 	case "T7":
 		datalogger.IClient, err = NewT7(cfg, lw)
+		//datalogger.IClient, err = NewRemote(cfg, lw)
 		if err != nil {
 			return nil, "", err
 		}

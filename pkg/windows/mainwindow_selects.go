@@ -53,4 +53,17 @@ func (mw *MainWindow) createSelects() {
 	})
 	mw.selects.presetSelect.Alignment = fyne.TextAlignLeading
 	mw.selects.presetSelect.PlaceHolder = "Select preset"
+
+	remoteStrings := []string{"Local"}
+	if mw.previewFeatures {
+		remoteStrings = append(remoteStrings, "Local+Relay", "Remote")
+	}
+
+	mw.selects.remoteSelect = widget.NewSelect([]string{"Local", "Local+Relay", "Remote"}, func(s string) {
+		if s == "" {
+			return
+		}
+		mw.app.Preferences().SetString(prefsRemoteMode, s)
+	})
+	mw.selects.remoteSelect.SetSelected(mw.app.Preferences().StringWithFallback(prefsRemoteMode, "Local"))
 }

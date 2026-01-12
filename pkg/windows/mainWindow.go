@@ -44,6 +44,7 @@ const (
 	prefsSelectedECU    = "lastECU"
 	prefsSymbolList     = "symbolList"
 	prefsSelectedPreset = "selectedPreset"
+	prefsRemoteMode     = "remoteMode"
 )
 
 // var _ desktop.Mouseable = (*SecretText)(nil)
@@ -90,6 +91,7 @@ type mainWindowSelects struct {
 	ecuSelect    *widget.Select
 	presetSelect *widget.Select
 	layoutSelect *widget.Select
+	remoteSelect *widget.Select
 }
 
 type mainWindowButtons struct {
@@ -523,8 +525,11 @@ func (mw *MainWindow) Disable() {
 	if !mw.loggingRunning {
 		mw.buttons.logBtn.Disable()
 	}
+
 	mw.selects.ecuSelect.Disable()
 	mw.selects.presetSelect.Disable()
+	mw.selects.remoteSelect.Disable()
+
 	mw.symbolList.Disable()
 }
 
@@ -534,8 +539,11 @@ func (mw *MainWindow) Enable() {
 	//mw.buttons.loadSymbolsEcuBtn.Enable()
 	mw.buttons.syncSymbolsBtn.Enable()
 	mw.buttons.logBtn.Enable()
+
 	mw.selects.ecuSelect.Enable()
 	mw.selects.presetSelect.Enable()
+	mw.selects.remoteSelect.Enable()
+
 	mw.symbolList.Enable()
 }
 

@@ -288,7 +288,7 @@ func (c *T7Client) Start() error {
 							}
 							values = append(values, relayserver.LogValue{Name: va.Name, Value: va.Float64()})
 						}
-						if err := c.r.SendMessage(relayserver.Message{
+						if err := c.r.Send(relayserver.Message{
 							Kind: relayserver.MsgTypeData,
 							Body: values,
 						}); err != nil {

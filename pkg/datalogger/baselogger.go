@@ -3,6 +3,7 @@ package datalogger
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -35,7 +36,7 @@ type BaseLogger struct {
 	firstTimestamp uint32
 	currtimestamp  uint32
 
-	//r *relayserver.Client
+	r *relayserver.Client
 
 	Config
 }
@@ -50,33 +51,20 @@ func NewBaseLogger(cfg Config, lw LogWriter) *BaseLogger {
 		quitChan:     make(chan struct{}),
 		secondTicker: time.NewTicker(time.Second),
 	}
-	//if err := bl.connectRelay(); err != nil {
-	//	log.Println(err.Error())
-	//}
+
+	if cfg.RemoteMode == 1 {
+		if err := bl.runRelay(); err != nil {
+			log.Println(err.Error())
+		}
+	}
 	return bl
-}
-
-func (bl *BaseLogger) connectRelay() error {
-	c, err := relayserver.NewClient("localhost:9000")
-	if err != nil {
-		return fmt.Errorf("dial error: %w", err)
-	}
-	bl.OnMessage("Connected to relay server")
-
-	if err := c.JoinSession("1337"); err != nil {
-		return fmt.Errorf("join session error: %w", err)
-	}
-
-	//bl.r = c
-
-	return nil
 }
 
 func (bl *BaseLogger) Close() {
 	bl.closeOnce.Do(func() {
-		//if bl.r != nil {
-		//	bl.r.Close()
-		//}
+		if bl.r != nil {
+			bl.r.Close()
+		}
 		close(bl.quitChan)
 		time.Sleep(150 * time.Millisecond)
 	})

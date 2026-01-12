@@ -4,8 +4,8 @@ Website = "https://roffe.nu/"
   Icon = "Icon.png"
   Name = "txlogger"
   ID = "com.roffe.txlogger"
-  Version = "2.1.6"
-  Build = 682
+  Version = "2.1.7"
+  Build = 683
 
 [Migrations]
   fyneDo = true

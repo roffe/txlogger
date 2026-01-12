@@ -14,6 +14,7 @@ var T8SymbolsTuningOrder = []string{
 var T8SymbolsTuning = map[string][]string{
 	"Diagnostics": {
 		"DTC Reader",
+		"Edit Parameters",
 	},
 	"Airmass": {
 		"Max airmass map (manual)|BstKnkCal.MaxAirmass",

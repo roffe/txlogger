@@ -43,7 +43,9 @@ func New(cfg *CombinedLogplayerConfig) *Widget {
 
 	for _, name := range db.GetMetricNames() {
 		cancel := bus.SubscribeFunc(name, func(f float64) {
-			db.SetValue(name, f)
+			fyne.Do(func() {
+				db.SetValue(name, f)
+			})
 		})
 		cp.cancelFuncs = append(cp.cancelFuncs, cancel)
 	}

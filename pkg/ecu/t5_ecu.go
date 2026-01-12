@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"os"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
@@ -14,7 +13,7 @@ import (
 )
 
 func GetSymbolsT5(ctx context.Context, dev gocan.Adapter, cb func(string)) (symbol.SymbolCollection, error) {
-	cl, err := gocan.NewWithOpts(context.TODO(), dev)
+	cl, err := gocan.NewWithOpts(ctx, dev)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +71,7 @@ func sendCommand(ctx context.Context, c *gocan.Client, cmd []byte) error {
 		frame := gocan.NewFrame(0x05, []byte{0xC4, b}, gocan.ResponseRequired)
 		resp, err := c.SendAndWait(ctx, frame, 100*time.Millisecond, 0xC)
 		if err != nil {
-			return err
+			return fmt.Errorf("send command failed: %w", err)
 		}
 		if resp.Data[0] != 0xC6 {
 			return fmt.Errorf("invalid response")
@@ -95,16 +94,21 @@ func recvDataEND(ctx context.Context, c *gocan.Client) ([]byte, error) {
 			fmt.Print(".")
 			dd = 0
 		}
-		ack(c)
-		resp, err := c.Recv(ctx, 40*time.Millisecond, 0xC)
-		if err != nil {
-			os.WriteFile("dump", buff.Bytes(), 0644)
+		if err := ack(c); err != nil {
 			return nil, err
 		}
+
+		resp, err := c.Recv(ctx, 40*time.Millisecond, 0xC)
+		if err != nil {
+			return nil, err
+		}
+
 		if resp.Data[0] != 0xC6 && resp.Data[1] != 0x00 {
 			return nil, fmt.Errorf("invalid response")
 		}
+
 		buff.WriteByte(resp.Data[2])
+
 		if bytes.HasSuffix(buff.Bytes(), pattern) {
 			return bytes.TrimSuffix(buff.Bytes(), pattern), nil
 		}

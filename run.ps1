@@ -64,4 +64,4 @@ if (Test-Path -Path $firmware) {
 
 write-Output "Run txlogger"
 $env:GOEXPERIMENT = "greenteagc"
-go run -tags="canlib,canusb,combi,ftdi,j2534,pcan" . $args
+go run -tags="canlib,canusb,combi,ftdi,j2534,pcan,rcan" . $args

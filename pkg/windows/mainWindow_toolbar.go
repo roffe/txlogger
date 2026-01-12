@@ -19,7 +19,7 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 			nil,
 			nil,
 			widget.NewLabel("ECU"),
-			nil,
+			mw.selects.remoteSelect,
 			mw.selects.ecuSelect,
 		),
 		widget.NewSeparator(),

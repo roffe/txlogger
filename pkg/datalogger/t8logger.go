@@ -135,8 +135,8 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Client, gm *gmlan.Client, 
 			}
 			c.resetPerSecond()
 		case read := <-c.readChan:
-			for read.left > 0 {
-				chunkSize = uint32(math.Min(float64(read.left), T8ReadChunkSize))
+			for read.Left > 0 {
+				chunkSize = uint32(math.Min(float64(read.Left), T8ReadChunkSize))
 				log.Printf("Reading RAM 0x%X %d", read.Address, chunkSize)
 				data, err := gm.ReadMemoryByAddress(ctx, read.Address, chunkSize)
 				if err != nil {
@@ -144,7 +144,7 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Client, gm *gmlan.Client, 
 					continue
 				}
 				read.Data = append(read.Data, data...)
-				read.left -= chunkSize
+				read.Left -= chunkSize
 				read.Address += chunkSize
 			}
 			read.Complete(nil)

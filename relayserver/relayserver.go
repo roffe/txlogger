@@ -2,16 +2,22 @@ package relayserver
 
 import (
 	"encoding/gob"
-	"errors"
-	"io"
 	"log"
 	"net"
 	"sync"
+
+	symbol "github.com/roffe/ecusymbol"
+)
+
+const (
+	SERVER_HOST = "relay.txlogger.com:9000"
 )
 
 func init() {
-	gob.Register(&TestStruct{})
 	gob.Register(LogValues{})
+	gob.Register(&DataRequest{})
+	gob.Register([]*symbol.Symbol{})
+
 }
 
 type Server struct {
@@ -43,10 +49,15 @@ func (s *Server) Run(listenAddr string) error {
 		}
 		log.Printf("connection from %s", conn.RemoteAddr().String())
 		client := &Client{
-			conn: conn,
-			dec:  gob.NewDecoder(conn),
-			enc:  gob.NewEncoder(conn),
+			conn:        conn,
+			dec:         gob.NewDecoder(conn),
+			enc:         gob.NewEncoder(conn),
+			sendChan:    make(chan Message, 10),
+			recvChan:    make(chan Message, 10),
+			recevierMap: make(map[RelayMessageType]chan Message),
 		}
+		go client.sendHandler()
+		go client.receiveHandler()
 		go s.handle(client)
 	}
 }
@@ -61,7 +72,7 @@ func (s *Server) SendToSession(c *Client, sessionID string, msg Message) {
 	}
 	for _, client := range clients {
 		if client != c {
-			if err := client.SendMessage(msg); err != nil {
+			if err := client.Send(msg); err != nil {
 				log.Printf("Error sending message to client %s: %v", client.conn.RemoteAddr().String(), err)
 			}
 		}
@@ -92,25 +103,19 @@ func (s *Server) RemoveClient(client *Client, sessionID string) {
 }
 
 func (s *Server) handle(c *Client) {
+	defer log.Println("exit handle()!!")
 	defer c.conn.Close()
-	for {
-		var msg Message
-		if err := c.dec.Decode(&msg); err != nil {
-			if errors.Is(err, io.EOF) {
-				log.Printf("client %s disconnected", c.conn.RemoteAddr().String())
-				return
-			}
-			log.Println(err)
-			return
-		}
+	var sessionID string
+	for msg := range c.recvChan {
 		switch msg.Kind {
 		case MsgTypeJoinSession:
 			sessId := msg.Body.(string)
 			s.AddClient(c, sessId)
 			defer s.RemoveClient(c, sessId)
-			c.sessionID = sessId
+			sessionID = sessId
 		default:
-			s.SendToSession(c, c.sessionID, msg)
+			//log.Printf("Received %s from %s", msg.Kind.String(), c.conn.RemoteAddr().String())
+			s.SendToSession(c, sessionID, msg)
 		}
 	}
 }

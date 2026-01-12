@@ -20,6 +20,7 @@ import (
 	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/dtcreader"
+	"github.com/roffe/txlogger/pkg/widgets/editparameters"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
@@ -30,34 +31,45 @@ import (
 )
 
 func (mw *MainWindow) setupMenu() {
+
+	getAdapter := func() (gocan.Adapter, error) {
+		device, err := mw.settings.GetAdapter(mw.selects.ecuSelect.Selected)
+		if err != nil {
+			mw.Error(err)
+			return nil, err
+		}
+		return device, nil
+	}
+
+	getFW := func() symbol.SymbolCollection {
+		return mw.fw
+	}
+
+	getECU := func() string {
+		return mw.selects.ecuSelect.Selected
+	}
+
 	funcMap := map[string]func(string){
 		"DTC Reader": func(str string) {
 			if w := mw.wm.HasWindow("DTC Reader"); w != nil {
 				mw.wm.Raise(w)
 				return
 			}
-
-			getFW := func() symbol.SymbolCollection {
-				return mw.fw
-			}
-
-			getAdapter := func() (gocan.Adapter, error) {
-				device, err := mw.settings.GetAdapter(mw.selects.ecuSelect.Selected)
-				if err != nil {
-					mw.Error(err)
-					return nil, err
-				}
-				return device, nil
-			}
-
-			getECU := func() string {
-				return mw.selects.ecuSelect.Selected
-			}
-
 			inner := multiwindow.NewInnerWindow("DTC Reader", dtcreader.New(getFW, getECU, getAdapter, mw.Log, mw.Error))
 			inner.Icon = theme.InfoIcon()
 			mw.wm.Add(inner)
 			inner.Resize(fyne.Size{Width: 600, Height: 400})
+		},
+		"Edit Parameters": func(str string) {
+			if w := mw.wm.HasWindow("Edit Parameters"); w != nil {
+				mw.wm.Raise(w)
+				return
+			}
+			param := editparameters.NewEditParameters(getAdapter, mw.Error, mw.Log)
+			inner := multiwindow.NewInnerWindow("Edit Parameters", param)
+			inner.Icon = theme.InfoIcon()
+			mw.wm.Add(inner)
+
 		},
 		"Register EU0D": func(str string) {
 			if w := mw.wm.HasWindow("Register EU0D"); w != nil {
