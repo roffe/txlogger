@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -188,7 +189,15 @@ func (mw *MainWindow) setupMenu() {
 				widgets.SelectFile(cb, "Log file", "csv", "t5l", "t7l", "t8l")
 			}),
 			fyne.NewMenuItemWithIcon("Open log folder", theme.FolderIcon(), func() {
-				cmd := exec.Command("explorer.exe", mw.settings.GetLogPath())
+				var cmd *exec.Cmd
+				switch runtime.GOOS {
+				case "windows":
+					cmd = exec.Command("explorer", mw.settings.GetLogPath())
+				case "darwin":
+					cmd = exec.Command("open", mw.settings.GetLogPath())
+				default:
+					cmd = exec.Command("xdg-open", mw.settings.GetLogPath())
+				}
 				if err := cmd.Start(); err != nil {
 					mw.Error(err)
 				}
