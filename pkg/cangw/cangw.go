@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 )
 
 const (
-	exeName     = "cangateway.exe"
 	readyMarker = "server listening"
 	readyWait   = 3 * time.Second
 )
@@ -26,7 +26,10 @@ func Start() (*os.Process, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get working directory: %w", err)
 	}
-
+	var exeName = "cangateway"
+	if runtime.GOOS != "linux" {
+		exeName = exeName + ".exe"
+	}
 	cmd := exec.Command(filepath.Join(wd, exeName))
 
 	// Uncomment on Windows if you want to hide the console window:
@@ -54,7 +57,7 @@ func Start() (*os.Process, error) {
 		return cmd.Process, nil
 	case <-ctx.Done():
 		// Best effort cleanup if it never signaled ready.
-		log.Println("context done, kill cangateway.exe")
+		log.Println("context done, kill cangateway")
 		_ = cmd.Process.Kill()
 		_ = cmd.Wait()
 		return nil, fmt.Errorf("cangateway was not ready after %s", readyWait)
