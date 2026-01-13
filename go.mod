@@ -7,14 +7,14 @@ go 1.25.5
 //replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 
 require (
-	fyne.io/fyne/v2 v2.7.3-0.20260106221416-6ab85631f261
+	fyne.io/fyne/v2 v2.7.3-0.20260113230036-561446b11284
 	fyne.io/x/fyne v0.0.0-20250106132206-3228f6c50107
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/lusingander/colorpicker v0.7.4
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.0.7
 	github.com/roffe/ecusymbol v1.1.0
-	github.com/roffe/gocan v1.3.2
+	github.com/roffe/gocan v1.3.3
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.4
 	golang.org/x/image v0.25.0
@@ -54,7 +54,6 @@ require (
 	github.com/go-text/render v0.2.0 // indirect
 	github.com/go-text/typesetting v0.2.1 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
-	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gousb v1.1.3 // indirect
 	github.com/hack-pad/go-indexeddb v0.3.2 // indirect
@@ -77,10 +76,9 @@ require (
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9 // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
-	go.einride.tech/can v0.12.1 // indirect
+	go.einride.tech/can v0.16.1 // indirect
 	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/text v0.27.0 // indirect
-	golang.org/x/tools v0.34.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250804133106-a7a43d27e69b // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
