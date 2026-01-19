@@ -25,6 +25,7 @@ import (
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
 	"github.com/roffe/txlogger/pkg/wbl/plx"
+	"github.com/roffe/txlogger/pkg/wbl/stag"
 	"github.com/roffe/txlogger/pkg/wbl/zeitronix"
 	"github.com/roffe/txlogger/pkg/widgets/txconfigurator"
 	"go.bug.st/serial/enumerator"
@@ -395,7 +396,8 @@ func (sw *Widget) GetWidebandSymbolName() string {
 		aem.ProductString,
 		plx.ProductString,
 		"CombiAdapter",
-		zeitronix.ProductString:
+		zeitronix.ProductString,
+		stag.ProductString:
 		return datalogger.EXTERNALWBLSYM // Lambda.External
 	default:
 		return "None"

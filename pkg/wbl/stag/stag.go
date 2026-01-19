@@ -75,16 +75,13 @@ func (a *STAG) run(ctx context.Context) {
 	byteChan := make(chan byte, 100)
 	errChan := make(chan error, 1)
 
+	a.sendRequest([]byte{0xAC, 0x00, 0x00, 0x04, 0x00, 0x00, 0x32, 0xE2})
 	// Start a goroutine to read bytes
 	go func() {
 		for {
 			// read from serial
 			n, err := a.sp.Read(buf)
 			if ctx.Err() != nil {
-				return
-			}
-			if err != nil {
-				a.log("AEM: " + err.Error())
 				return
 			}
 			if n == 0 {
@@ -175,8 +172,8 @@ func (a *STAG) SetData(data []byte) error {
 		a.log("status_warming")
 	case 0x02:
 		// status_work
-		a.lambda = float64((data[12]<<24)|(data[13]<<16)|(data[14]<<8)|data[15]) * 0.001
-		a.oxygen = float64((data[16]<<8)|data[17]) * 0.1
+		a.lambda = float64(uint32(data[12])<<24|uint32(data[13])<<16|uint32(data[14])<<8|uint32(data[15])) * 0.001
+		a.oxygen = float64((uint16(data[16])<<8)|uint16(data[17])) * 0.1
 	case 0x03:
 		a.log("status_breakdown")
 	default:
