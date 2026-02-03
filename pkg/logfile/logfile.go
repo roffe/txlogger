@@ -1,6 +1,7 @@
 package logfile
 
 import (
+	"fmt"
 	"io"
 	"path"
 	"strings"
@@ -42,8 +43,8 @@ func Open(filename string, reader io.Reader) (Logfile, error) {
 	case ".csv":
 		return NewFromCSVLogfile(reader)
 	case ".t5l", ".t7l", ".t8l":
-		fallthrough
-	default:
 		return NewFromTxLogfile(reader)
+	default:
+		return nil, fmt.Errorf("Unsupported filetype")
 	}
 }

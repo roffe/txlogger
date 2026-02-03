@@ -20,7 +20,7 @@ func (t *CanFlasherWidget) ecuDump() {
 		return
 	}
 
-	dev, err := t.cfg.CSW.GetAdapter(t.cfg.GetECU())
+	dev, err := t.cfg.CSW.GetAdapter(t.ecuSelect.Selected)
 	if err != nil {
 		t.log(err.Error())
 		return
@@ -35,6 +35,9 @@ func (t *CanFlasherWidget) ecuDump() {
 		for {
 			select {
 			case err := <-dev.Err():
+				if err == nil {
+					return
+				}
 				log.Println("Error:", err)
 			case <-done:
 				return
@@ -44,7 +47,7 @@ func (t *CanFlasherWidget) ecuDump() {
 
 	go func() {
 		defer close(done)
-		ctx, cancel := context.WithTimeout(context.Background(), 900*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Second)
 		defer cancel()
 
 		//defer dev.Close()
@@ -60,7 +63,7 @@ func (t *CanFlasherWidget) ecuDump() {
 		defer c.Close()
 
 		tr, err := ecu.New(c, &ecu.Config{
-			Name:       translateName(t.cfg.GetECU()),
+			Name:       t.ecuSelect.Selected,
 			OnProgress: t.progress,
 			OnMessage: func(s string) {
 				t.logValues.Append(fmt.Sprintf("%s - %s\n", time.Now().Format("15:04:05.000"), s))

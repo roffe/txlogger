@@ -45,9 +45,6 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 			}
 			inner := multiwindow.NewInnerWindow("Canflasher", canflasher.New(&canflasher.Config{
 				CSW: mw.settings,
-				GetECU: func() string {
-					return mw.selects.ecuSelect.Selected
-				},
 			}))
 			inner.Icon = theme.UploadIcon()
 			mw.wm.Add(inner)
@@ -69,7 +66,7 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 						return err
 					}
 					return nil
-				case ".t5l", ".t7l", ".t8l", ".csv":
+				case ".csv": // ".t5l", ".t7l", ".t8l",
 					mw.LoadLogfile(name, bytes.NewReader(data), fyne.NewPos(100, 100))
 					return nil
 				}

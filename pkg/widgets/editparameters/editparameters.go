@@ -324,7 +324,6 @@ func (t *EditParameters) writeParameters() {
 		}
 		if err := t8c.SetVehicleVIN(ctx, vin); err != nil {
 			t.err(fmt.Errorf("Error setting VIN: %w", err))
-			return
 		}
 
 		e85content, err := t.GetE85Percent()

@@ -269,6 +269,13 @@ func (sw *Widget) canTab() *container.TabItem {
 		container.NewBorder(
 			nil,
 			nil,
+			xlayout.NewFixedWidth(70, widget.NewLabel("Info")),
+			nil,
+			sw.portDescription,
+		),
+		container.NewBorder(
+			nil,
+			nil,
 			xlayout.NewFixedWidth(70, widget.NewLabel("Speed")),
 			nil,
 			sw.speedSelector,

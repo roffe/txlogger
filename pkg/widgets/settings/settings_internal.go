@@ -330,6 +330,8 @@ func (sw *Widget) newAdapterSelector() *widget.Select {
 				sw.portSelector.Enable()
 				sw.speedSelector.Enable()
 				return
+			} else {
+				sw.portDescription.SetText("")
 			}
 			sw.portSelector.Disable()
 			sw.speedSelector.Disable()
@@ -340,6 +342,29 @@ func (sw *Widget) newAdapterSelector() *widget.Select {
 func (sw *Widget) newPortSelector() *widget.Select {
 	return widget.NewSelect(sw.ListPorts(), func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsPort, s)
+		itm, ok := portCache[s]
+		if ok {
+			var desc string
+			if itm.Manufacturer != "" {
+				desc += itm.Manufacturer
+			}
+			if itm.Product != "" {
+				if desc != "" {
+					desc += " "
+				}
+				desc += itm.Product
+			}
+			if itm.SerialNumber != "" {
+				if desc != "" {
+					desc += " "
+				}
+				desc += itm.SerialNumber
+			}
+			sw.portDescription.SetText(desc)
+		} else {
+			sw.portDescription.SetText("")
+		}
+
 	})
 }
 

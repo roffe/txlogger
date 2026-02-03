@@ -41,7 +41,8 @@ func CreateIPCRouter(mw *windows.MainWindow) Router {
 	}
 }
 
-var logfileExtensions = [...]string{".t5l", ".t7l", ".t8l", ".csv"}
+// var logfileExtensions = [...]string{".t5l", ".t7l", ".t8l", ".csv"}
+var logfileExtensions = [...]string{".csv"}
 
 func isLogfile(name string) bool {
 	filename := strings.ToLower(name)

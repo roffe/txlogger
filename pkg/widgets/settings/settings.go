@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"slices"
 	"sort"
 	"strconv"
@@ -18,6 +19,7 @@ import (
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/colors"
+	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/mdns"
 	"github.com/roffe/txlogger/pkg/ota"
@@ -100,6 +102,7 @@ type Widget struct {
 	adapterSelector *widget.Select
 	refreshBtn      *widget.Button
 	portSelector    *widget.Select
+	portDescription *widget.Label
 	speedSelector   *widget.Select
 
 	adapters map[string]*gocan.AdapterInfo
@@ -169,6 +172,8 @@ func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	// CAN
 	sw.adapterSelector = sw.newAdapterSelector()
 	sw.portSelector = sw.newPortSelector()
+	sw.portDescription = widget.NewLabel("")
+	sw.portDescription.Importance = widget.LowImportance
 	sw.speedSelector = sw.newSpeedSelector()
 	sw.debugCheckbox = sw.newDebugCheckbox()
 	sw.refreshBtn = sw.newPortRefreshButton()
@@ -204,6 +209,8 @@ func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 
 // Public API
 
+var portCache = make(map[string]*enumerator.PortDetails)
+
 func (sw *Widget) ListPorts() []string {
 	var portsList []string
 	ports, err := enumerator.GetDetailedPortsList()
@@ -221,7 +228,7 @@ func (sw *Widget) ListPorts() []string {
 		//m.output(fmt.Sprintf("  USB ID     %s:%s", port.VID, port.PID))
 		//m.output(fmt.Sprintf("  USB serial %s", port.SerialNumber))
 		portsList = append(portsList, port.Name)
-		//}
+		portCache[port.Name] = port
 	}
 	sort.Strings(portsList)
 	return portsList
@@ -322,17 +329,17 @@ func (cs *Widget) GetAdapter(ecuType string) (gocan.Adapter, error) {
 	var canRate float64
 
 	switch ecuType {
-	case "T5":
+	case "T5", "Trionic 5":
 		canFilter = []uint32{0xC}
 		canRate = 615.384
-	case "T7":
+	case "T7", "Trionic 7":
 		if strings.Contains(adapterName, "ELM327") || strings.Contains(adapterName, "STN") || strings.Contains(adapterName, "OBDLink") || strings.HasSuffix(adapterName, "Wifi") {
 			canFilter = []uint32{0x238, 0x258, 0x270}
 		} else {
 			canFilter = []uint32{0x180, 0x1A0, 0x238, 0x258, 0x270, 0x280, 0x3A0, 0x664, 0x665}
 		}
 		canRate = 500
-	case "T8":
+	case "T8", "Trionic 8", "Trionic 8 MCP":
 		if strings.Contains(adapterName, "ELM327") || strings.Contains(adapterName, "STN") || strings.Contains(adapterName, "OBDLink") {
 			canFilter = []uint32{0x5E8, 0x7E8}
 		} else {
@@ -458,7 +465,15 @@ func (sw *Widget) GetLogFormat() string {
 }
 
 func (sw *Widget) GetLogPath() string {
-	return fyne.CurrentApp().Preferences().String(prefsLogPath)
+	p := fyne.CurrentApp().Preferences().String(prefsLogPath)
+	if p == "" {
+		var err error
+		p, err = common.GetLogPath()
+		if err != nil {
+			log.Println("GetLogPath: ", err)
+		}
+	}
+	return p
 }
 
 func (sw *Widget) GetUseMPH() bool {

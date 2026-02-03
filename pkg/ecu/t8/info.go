@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
@@ -36,11 +37,11 @@ var T8Headers = []model.Header{
 	{Desc: "Supplier ID", ID: 0x92, Type: "string"},
 	{Desc: "Speed limiter", ID: 0x02, Type: "km/h"},
 	{Desc: "Oil quality", ID: 0x25, Type: "oilquality"},
-	{Desc: "SAAB partnumber", ID: 0x7C, Type: "int64"},
+	{Desc: "SAAB partnumber", ID: 0x7C, Type: "int32"},
 	{Desc: "Diagnostic Data Identifier", ID: 0x9A, Type: "ddi"},
-	{Desc: "End model partnumber", ID: 0xCB, Type: "int64"},
-	{Desc: "Base model partnumber", ID: 0xCC, Type: "int64"},
-	{Desc: "ManufacturersEnableCounter", ID: 0xA0, Type: "uint32"},
+	{Desc: "End model partnumber", ID: 0xCB, Type: "rint32"},
+	{Desc: "Base model partnumber", ID: 0xCC, Type: "int32"},
+	{Desc: "ManufacturersEnableCounter", ID: 0xA0, Type: "hex"},
 	{Desc: "Tester Serial", ID: 0x98, Type: "string"},
 	//{Desc: "E85", ID: 0x7A, Type: "e85"},
 }
@@ -69,7 +70,7 @@ func (t *Client) Info(ctx context.Context) ([]model.HeaderResult, error) {
 		case "string":
 			data, err := t.gm.ReadDataByIdentifierString(ctx, h.ID)
 			if err != nil {
-				t.cfg.OnError(err)
+				t.cfg.OnError(fmt.Errorf("failed to read %s: %w", h.Desc, err))
 				continue
 			}
 			res := model.HeaderResult{
@@ -81,7 +82,7 @@ func (t *Client) Info(ctx context.Context) ([]model.HeaderResult, error) {
 		case "int64":
 			data, err := t.RequestECUInfoAsInt64(ctx, h.ID)
 			if err != nil {
-				t.cfg.OnError(err)
+				t.cfg.OnError(fmt.Errorf("failed to read %s: %w", h.Desc, err))
 				continue
 			}
 			res := model.HeaderResult{
@@ -93,7 +94,7 @@ func (t *Client) Info(ctx context.Context) ([]model.HeaderResult, error) {
 		case "hex":
 			data, err := t.RequestECUInfo(ctx, h.ID)
 			if err != nil {
-				t.cfg.OnError(err)
+				t.cfg.OnError(fmt.Errorf("failed to read %s: %w", h.Desc, err))
 				continue
 			}
 			res := model.HeaderResult{
@@ -102,10 +103,10 @@ func (t *Client) Info(ctx context.Context) ([]model.HeaderResult, error) {
 			res.ID = h.ID
 			res.Desc = h.Desc
 			out = append(out, res)
-		case "uint32":
-			data, err := t.RequestECUInfoAsUint32(ctx, h.ID)
+		case "int32":
+			data, err := t.RequestECUInfoAsInt32(ctx, h.ID)
 			if err != nil {
-				t.cfg.OnError(err)
+				t.cfg.OnError(fmt.Errorf("failed to read %s: %w", h.Desc, err))
 				continue
 			}
 			res := model.HeaderResult{
@@ -114,10 +115,40 @@ func (t *Client) Info(ctx context.Context) ([]model.HeaderResult, error) {
 			res.ID = h.ID
 			res.Desc = h.Desc
 			out = append(out, res)
+		case "uint32":
+			data, err := t.RequestECUInfoAsUint32(ctx, h.ID)
+			if err != nil {
+				t.cfg.OnError(fmt.Errorf("failed to read %s: %w", h.Desc, err))
+				continue
+			}
+			res := model.HeaderResult{
+				Value: strconv.Itoa(int(data)),
+			}
+			res.ID = h.ID
+			res.Desc = h.Desc
+			out = append(out, res)
+		case "rint32":
+			resp, err := t.RequestECUInfo(ctx, h.ID)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			var retval uint32
+			if err := binary.Read(bytes.NewReader(resp), binary.LittleEndian, &retval); err != nil {
+				log.Println(err)
+				continue
+			}
+			res := model.HeaderResult{
+				Value: strconv.Itoa(int(retval)),
+			}
+			res.ID = h.ID
+			res.Desc = h.Desc
+			out = append(out, res)
+
 		case "km/h":
 			data, err := t.RequestECUInfo(ctx, h.ID)
 			if err != nil {
-				t.cfg.OnError(err)
+				t.cfg.OnError(fmt.Errorf("failed to read %s: %w", h.Desc, err))
 				continue
 			}
 			var retval uint32
@@ -133,9 +164,9 @@ func (t *Client) Info(ctx context.Context) ([]model.HeaderResult, error) {
 			res.Desc = h.Desc
 			out = append(out, res)
 		case "oilquality":
-			data, err := t.RequestECUInfoAsUint64(ctx, h.ID)
+			data, err := t.RequestECUInfoAsUint32(ctx, h.ID)
 			if err != nil {
-				t.cfg.OnError(err)
+				t.cfg.OnError(fmt.Errorf("failed to read %s: %w", h.Desc, err))
 				continue
 			}
 			quality := float64(data) / 256
@@ -149,7 +180,7 @@ func (t *Client) Info(ctx context.Context) ([]model.HeaderResult, error) {
 		case "ddi":
 			data, err := t.RequestECUInfo(ctx, h.ID)
 			if err != nil {
-				t.cfg.OnError(err)
+				t.cfg.OnError(fmt.Errorf("failed to read %s: %w", h.Desc, err))
 				continue
 			}
 			var retval string
@@ -165,7 +196,7 @@ func (t *Client) Info(ctx context.Context) ([]model.HeaderResult, error) {
 		case "e85":
 			data, err := t.gm.ReadDataByPacketIdentifier(ctx, 0x01, 0x7A)
 			if err != nil && err.Error() != "Request out of range or session dropped" {
-				t.cfg.OnError(err)
+				t.cfg.OnError(fmt.Errorf("failed to read %s: %w", h.Desc, err))
 				continue
 			}
 			if len(data) == 2 {
@@ -198,13 +229,27 @@ func (t *Client) RequestECUInfoAsString(ctx context.Context, pid byte) (string, 
 	return strings.ReplaceAll(string(resp[:]), "\x00", ""), nil
 }
 
+func (t *Client) RequestECUInfoAsInt32(ctx context.Context, pid byte) (int32, error) {
+	resp, err := t.RequestECUInfo(ctx, pid)
+	if err != nil {
+		return 0, err
+	}
+	var retval int32
+	if err := binary.Read(bytes.NewReader(resp), binary.BigEndian, &retval); err != nil {
+		return 0, err
+	}
+	return retval, nil
+}
+
 func (t *Client) RequestECUInfoAsUint32(ctx context.Context, pid byte) (uint32, error) {
 	resp, err := t.RequestECUInfo(ctx, pid)
 	if err != nil {
 		return 0, err
 	}
 	var retval uint32
-	binary.Read(bytes.NewReader(resp), binary.BigEndian, &retval)
+	if err := binary.Read(bytes.NewReader(resp), binary.BigEndian, &retval); err != nil {
+		return 0, err
+	}
 	return retval, nil
 }
 
@@ -213,13 +258,22 @@ func (t *Client) RequestECUInfoAsInt64(ctx context.Context, pid byte) (int64, er
 	if err != nil {
 		return 0, err
 	}
-	if len(resp) != 4 {
-		return 0, fmt.Errorf("invalid response length")
+	if len(resp) != 8 {
+		return 0, fmt.Errorf("invalid response length for int64: %d", len(resp))
 	}
-	retval := int64(resp[0]) * 256 * 256 * 256
-	retval += int64(resp[1]) * 256 * 256
-	retval += int64(resp[2]) * 256
-	retval += int64(resp[3])
+	//retval := int64(resp[0]) * 256 * 256 * 256 * 256 * 256 * 256 * 256
+	//retval += int64(resp[1]) * 256 * 256 * 256 * 256 * 256 * 256
+	//retval += int64(resp[2]) * 256 * 256 * 256 * 256 * 256
+	//retval += int64(resp[3]) * 256 * 256 * 256 * 256
+	//retval += int64(resp[4]) * 256 * 256 * 256
+	//retval += int64(resp[5]) * 256 * 256
+	//retval += int64(resp[6]) * 256
+	//retval += int64(resp[7])
+
+	var retval int64
+	if err := binary.Read(bytes.NewReader(resp), binary.BigEndian, &retval); err != nil {
+		return 0, err
+	}
 	return retval, nil
 }
 
@@ -228,10 +282,17 @@ func (t *Client) RequestECUInfoAsUint64(ctx context.Context, pid byte) (uint64, 
 	if err != nil {
 		return 0, err
 	}
-	retval := uint64(resp[0]) * 256 * 256 * 256
-	retval += uint64(resp[1]) * 256 * 256
-	retval += uint64(resp[2]) * 256
-	retval += uint64(resp[3])
+	if len(resp) != 8 {
+		return 0, fmt.Errorf("invalid response length for uint64: %d", len(resp))
+	}
+	//retval := uint64(resp[0]) * 256 * 256 * 256
+	//retval += uint64(resp[1]) * 256 * 256
+	//retval += uint64(resp[2]) * 256
+	//retval += uint64(resp[3])
+	var retval uint64
+	if err := binary.Read(bytes.NewReader(resp), binary.BigEndian, &retval); err != nil {
+		return 0, err
+	}
 	return retval, nil
 }
 

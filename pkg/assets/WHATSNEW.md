@@ -1,5 +1,13 @@
+# 2.1.8
+Development is now done on Linux as i've decided to permanently ditch Windows once and for all. There will still be Windows builds
+
+- Linux Drewtech Mongoose GM II driver, it's a highly experimental driver from reverse engineering their binary protocol enabling logging of T7 & T8 on linux
+
+Known issues:
+- d2xx OBDLink ftdi driver does not work for OBDLink devices on Linux so do not use 
+
 # 2.1.7
-- Added "Edit Parameters" dialog for Trionic 8 under Diagnostics menu. Allowing you to change VIN, E85%, Top Speed, Oil Quality, Diagnostic Tpe, Tank Type, Convertible, SAO, High Output, BioPower and ClutchStart
+- Added "Edit Parameters" dialog for Trionic 8 under Diagnostics menu. Allowing you to change VIN, E85%, Top Speed, Oil Quality, Diagnostic Type, Tank Type, Convertible, SAI, High Output, BioPower and ClutchStart
 - Fixed a possible crash in the combined logplayer
 
 # 2.1.6

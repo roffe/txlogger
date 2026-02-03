@@ -9,6 +9,7 @@ func addSuffix(s, suffix string) string {
 	return s
 }
 
+/*
 func translateName(s string) string {
 	switch s {
 	case "T5":
@@ -21,3 +22,4 @@ func translateName(s string) string {
 		return "Unknown"
 	}
 }
+*/

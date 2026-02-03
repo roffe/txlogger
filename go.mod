@@ -5,16 +5,17 @@ go 1.25.5
 //replace github.com/roffe/gocan => ..\gocan
 //replace github.com/roffe/ecusymbol => ..\ecusymbol
 //replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
+replace go.bug.st/serial => ../../../go.bug.st/serial
 
 require (
-	fyne.io/fyne/v2 v2.7.3-0.20260113230036-561446b11284
+	fyne.io/fyne/v2 v2.7.3-0.20260120194904-4f3fd2ba1e65
 	fyne.io/x/fyne v0.0.0-20250106132206-3228f6c50107
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/lusingander/colorpicker v0.7.4
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.0.7
 	github.com/roffe/ecusymbol v1.1.0
-	github.com/roffe/gocan v1.3.3
+	github.com/roffe/gocan v1.3.4
 	github.com/sqweek/dialog v0.0.0-20240226140203-065105509627
 	go.bug.st/serial v1.6.4
 	golang.org/x/image v0.25.0

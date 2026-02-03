@@ -46,13 +46,16 @@ func (t *Client) Bootstrap(ctx context.Context) error {
 		if err := t.bootstrapPreFlight(ctx); err != nil {
 			return err
 		}
-		time.Sleep(100 * time.Millisecond)
+
+		time.Sleep(50 * time.Millisecond)
+
 		if err := t.UploadBootloader(ctx); err != nil {
 			return err
 		}
 		t.cfg.OnMessage("starting bootloader")
 		if err := t.StartBootloader(ctx, 0x102400); err != nil {
 			t.cfg.OnError(err)
+			// intentional fallthrough
 		}
 		t.legionRunning = t.Alive(ctx)
 	}
@@ -70,17 +73,21 @@ func (t *Client) Bootstrap(ctx context.Context) error {
 }
 
 func (t *Client) bootstrapPreFlight(ctx context.Context) error {
-	t.gm.TesterPresentNoResponseAllowed()
+	_ = t.gm.TesterPresentNoResponseAllowed()
 
-	//time.Sleep(50 * time.Millisecond)
+	time.Sleep(25 * time.Millisecond)
 
 	if err := t.gm.InitiateDiagnosticOperation(ctx, gmlan.LEV_DADTC); err != nil {
 		return err
 	}
 
+	time.Sleep(25 * time.Millisecond)
+
 	if err := t.gm.DisableNormalCommunication(ctx); err != nil {
 		return err
 	}
+
+	time.Sleep(25 * time.Millisecond)
 
 	if b, err := t.gm.ReportProgrammedState(ctx); err != nil {
 		return err
@@ -88,9 +95,13 @@ func (t *Client) bootstrapPreFlight(ctx context.Context) error {
 		t.cfg.OnMessage("ECU Programmed state: " + gmlan.TranslateProgrammedState(b))
 	}
 
+	time.Sleep(25 * time.Millisecond)
+
 	if err := t.gm.ProgrammingModeRequest(ctx); err != nil {
 		return err
 	}
+
+	time.Sleep(25 * time.Millisecond)
 
 	if err := t.gm.ProgrammingModeEnable(ctx); err != nil {
 		return err
@@ -98,7 +109,10 @@ func (t *Client) bootstrapPreFlight(ctx context.Context) error {
 
 	time.Sleep(50 * time.Millisecond)
 
-	t.gm.TesterPresentNoResponseAllowed()
+	_ = t.gm.TesterPresentNoResponseAllowed()
+
+	time.Sleep(25 * time.Millisecond)
+
 	if err := t.gm.RequestSecurityAccess(ctx, 0x01, 0, t8sec.CalculateAccessKey); err != nil {
 		return err
 	}

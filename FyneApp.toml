@@ -1,11 +1,11 @@
 Website = "https://roffe.nu/"
 
 [Details]
-  Icon = "Icon.png"
-  Name = "txlogger"
-  ID = "com.roffe.txlogger"
-  Version = "2.1.8"
-  Build = 686
+Icon = "Icon.png"
+Name = "txlogger"
+ID = "com.roffe.txlogger"
+Version = "2.1.8"
+Build = 689
 
 [Migrations]
-  fyneDo = true
+fyneDo = true

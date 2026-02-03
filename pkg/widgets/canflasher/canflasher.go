@@ -30,6 +30,8 @@ type CanFlasherWidget struct {
 
 	container *container.Split
 
+	ecuSelect *widget.Select
+
 	logList     *widget.List
 	logValues   binding.StringList
 	infoBTN     *widget.Button
@@ -43,8 +45,7 @@ type CanFlasherWidget struct {
 }
 
 type Config struct {
-	CSW    *settings.Widget
-	GetECU func() string
+	CSW *settings.Widget
 }
 
 func New(cfg *Config) *CanFlasherWidget {
@@ -92,11 +93,18 @@ func (t *CanFlasherWidget) progress(v float64) {
 }
 
 func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
+	t.ecuSelect = widget.NewSelect([]string{"Trionic 5", "Trionic 7", "Trionic 8", "Trionic 8 MCP"}, func(s string) {
+		fyne.CurrentApp().Preferences().SetString("canflasher_ecu", s)
+	})
+
+	t.ecuSelect.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback("canflasher_ecu", "Trionic 5"))
+
 	t.logList = widget.NewListWithData(
 		t.logValues,
 		func() fyne.CanvasObject {
 			w := widget.NewLabel("")
 			w.TextStyle.Monospace = true
+			w.Selectable = true
 			return w
 		},
 		func(item binding.DataItem, obj fyne.CanvasObject) {
@@ -131,6 +139,7 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 
 	left := container.New(layout.NewStackLayout(), t.logList)
 	right := container.NewVBox(
+		t.ecuSelect,
 		t.infoBTN,
 		//t.dtcBTN,
 		t.dumpBTN,

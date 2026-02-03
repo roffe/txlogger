@@ -57,8 +57,11 @@ func New(c *gocan.Client, cfg *ecu.Config, canID uint32, recvID ...uint32) *Clie
 		ifl = 10
 	case strings.HasPrefix(lower, "slcan"):
 		ifl = 10
+	case strings.HasPrefix(lower, "rcan"):
+		ifl = 10
 	}
-	cfg.OnMessage("Using interframe latency " + strconv.Itoa(int(ifl)) + " for " + c.Adapter().Name())
+
+	log.Println("Using interframe latency " + strconv.Itoa(int(ifl)) + " for " + c.Adapter().Name())
 
 	return &Client{
 		c:                 c,
@@ -85,7 +88,6 @@ func (t *Client) UploadBootloader(ctx context.Context) error {
 	}
 	startAddress := 0x102400
 	noTransfers := len(bootloaderBytes) / 238
-	seq := byte(0x21)
 
 	start := time.Now()
 
@@ -106,7 +108,7 @@ func (t *Client) UploadBootloader(ctx context.Context) error {
 		if err := t.gm.TransferData(ctx, 0x00, 0xF0, startAddress); err != nil {
 			return err
 		}
-		seq = 0x21
+		var seq byte = 0x21
 		for j := 0; j <= 0x21; j++ {
 			payload := []byte{seq, 0, 0, 0, 0, 0, 0, 0}
 			n, err := r.Read(payload[1:])
@@ -127,6 +129,7 @@ func (t *Client) UploadBootloader(ctx context.Context) error {
 				seq = 0x20
 			}
 			t.cfg.OnProgress(float64(progress))
+			time.Sleep(500 * time.Microsecond)
 		}
 		resp, err := t.c.Recv(ctx, t.defaultTimeout*2, t.recvID...)
 		if err != nil {
