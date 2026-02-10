@@ -1,5 +1,3 @@
-fyne.io/fyne/v2 v2.7.3-0.20260118142305-7b753c7ce621 h1:y9A3tiHhjb8z1Oveifno9Xcqb1zVcKNc7o1IPpPI7n8=
-fyne.io/fyne/v2 v2.7.3-0.20260118142305-7b753c7ce621/go.mod h1:M3Fkb8eUU6se8E+coikK8x7f3vCIakxAW7bPyw3d9fA=
 fyne.io/fyne/v2 v2.7.3-0.20260120194904-4f3fd2ba1e65 h1:n3pyd9/RxsWYyjLp2hIuGZ33nm8fUM5Mif+TiE5ffkY=
 fyne.io/fyne/v2 v2.7.3-0.20260120194904-4f3fd2ba1e65/go.mod h1:M3Fkb8eUU6se8E+coikK8x7f3vCIakxAW7bPyw3d9fA=
 fyne.io/systray v1.12.0 h1:CA1Kk0e2zwFlxtc02L3QFSiIbxJ/P0n582YrZHT7aTM=
@@ -121,8 +119,6 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/roffe/ecusymbol v1.1.0 h1:5BwN+w7Rpooo6LD/eB/Wawz+ZI1Az2Yq4BjYrAc91rk=
 github.com/roffe/ecusymbol v1.1.0/go.mod h1:P53NLPps1rW3BEDM8QZtx9F0clYkA+cQUzc2arbtvrA=
-github.com/roffe/gocan v1.3.3 h1:n9IrRRYVfLkFJROA2wS9TMdqMmzrELX442buUAO+vX8=
-github.com/roffe/gocan v1.3.3/go.mod h1:VV6A9Je3V/NPHB8mjNpHLK2PZ/w4QXVTTxK/tN50NLU=
 github.com/roffe/gocan v1.3.4 h1:zQvo3jSN+15ruriyLxyHeYTW/j73SfmnbfM5rR9gCCw=
 github.com/roffe/gocan v1.3.4/go.mod h1:+Iv2n6O0PqeZ098qy8CbM4iQ+grq25tO1OvpwtfO9mw=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
@@ -142,6 +138,8 @@ github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9 h1:K8gF0eekWPEX+57l30ixxz
 github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9/go.mod h1:9BnoKCcgJ/+SLhfAXj15352hTOuVmG5Gzo8xNRINfqI=
 github.com/yuin/goldmark v1.7.8 h1:iERMLn0/QJeHFhxSt3p6PeN9mGnvIKSpG9YYorDMnic=
 github.com/yuin/goldmark v1.7.8/go.mod h1:uzxRWxtg69N339t3louHJ7+O03ezfj6PlliRlaOzY1E=
+go.bug.st/serial v1.6.4 h1:7FmqNPgVp3pu2Jz5PoPtbZ9jJO5gnEnZIvnI1lzve8A=
+go.bug.st/serial v1.6.4/go.mod h1:nofMJxTeNVny/m6+KaafC6vJGj3miwQZ6vW4BZUGJPI=
 go.einride.tech/can v0.16.1 h1:s9MqX1OR6ujGxvl+gOWAGL54MC3kaPE+cgxBCUfDrB8=
 go.einride.tech/can v0.16.1/go.mod h1:9pgqXNGpPfrd/WGXGmiKW8cUvIep/o+o76JgUKpQuWI=
 go.opentelemetry.io/auto/sdk v1.1.0 h1:cH53jehLUN6UFLY71z+NDOiNJqDdPRaXzTel0sJySYA=
