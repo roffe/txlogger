@@ -5,7 +5,7 @@ go 1.25.5
 //replace github.com/roffe/gocan => ..\gocan
 //replace github.com/roffe/ecusymbol => ..\ecusymbol
 //replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
-replace go.bug.st/serial => ../../../go.bug.st/serial
+//replace go.bug.st/serial => ../../../go.bug.st/serial
 
 require (
 	fyne.io/fyne/v2 v2.7.3-0.20260120194904-4f3fd2ba1e65

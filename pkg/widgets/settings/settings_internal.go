@@ -344,23 +344,25 @@ func (sw *Widget) newPortSelector() *widget.Select {
 		fyne.CurrentApp().Preferences().SetString(prefsPort, s)
 		itm, ok := portCache[s]
 		if ok {
-			var desc string
-			if itm.Manufacturer != "" {
+			/*
+				var desc string
+				if itm.Manufacturer != "" {
 				desc += itm.Manufacturer
-			}
-			if itm.Product != "" {
-				if desc != "" {
-					desc += " "
+
+				if itm.Product != "" {
+					if desc != "" {
+						desc += " "
+					}
+					desc += itm.Product
 				}
-				desc += itm.Product
-			}
-			if itm.SerialNumber != "" {
-				if desc != "" {
-					desc += " "
+				if itm.SerialNumber != "" {
+					if desc != "" {
+						desc += " "
+					}
+					desc += itm.SerialNumber
 				}
-				desc += itm.SerialNumber
-			}
-			sw.portDescription.SetText(desc)
+			*/
+			sw.portDescription.SetText(itm.SerialNumber)
 		} else {
 			sw.portDescription.SetText("")
 		}
