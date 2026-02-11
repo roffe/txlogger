@@ -1,4 +1,4 @@
-name: Build Linux Debug
+name: Build Linux Develop
 
 on:
   push:
