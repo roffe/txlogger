@@ -21,6 +21,8 @@ jobs:
         cache: false
     - name: Get dependencies
       run: sudo apt-get update && sudo apt-get install 7zip gcc libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev libusb-1.0-0-dev libgtk-3-dev libasound2-dev libftdi1 libftdi1-dev
+    - name: Get Go dependencies
+      run: go get .
     - name: Build CanGateway
       run: GOPATH=$PWD/go go install -tags="j2534" github.com/roffe/gocangateway@latest
     - name: Build txlogger
