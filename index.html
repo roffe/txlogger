@@ -146,24 +146,45 @@
         <section id="downloads" class="mb-12 md:mb-16">
             <div class="bg-gray-800/40 border border-gray-700 p-8 max-w-2xl mx-auto text-center">
                 <h2 class="font-exo text-3xl font-bold text-white mb-6 uppercase">Downloads</h2>
-                <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
-                    <div class="text-lg text-gray-300">Windows 64bit:</div>
-                    <a href="https://github.com/roffe/txlogger/releases/latest/download/txlogger_setup.zip"
-                        class="w-full sm:w-auto bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 transition-all duration-300">
-                        Installer
-                    </a>
-                    <a href="https://github.com/roffe/txlogger/releases/latest/download/txlogger.zip"
-                        class="w-full sm:w-auto bg-saab-green hover:bg-saab-green-dark text-black font-bold py-3 px-6 transition-all duration-300">
-                        Standalone
-                    </a>
-                </div>
-                <br/>
-                <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
-                    <div class="text-lg text-gray-300">Microsoft Visual C++ 2015-2022 Runtime<br>(required if you get missing VCRUNTIME140.dll)</div>
-                    <a href="https://aka.ms/vc14/vc_redist.x64.exe"
-                        class="w-full sm:w-auto bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 transition-all duration-300">
-                        Installer
-                    </a>
+                <div class="flex flex-col gap-6">
+                    <!-- Windows 64bit -->
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div class="text-lg text-gray-300 sm:text-left">Windows 64bit:</div>
+                        <div class="flex gap-3 justify-center sm:justify-end">
+                            <a href="https://github.com/roffe/txlogger/releases/latest/download/txlogger_setup.zip"
+                                class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 transition-all duration-300">
+                                Installer
+                            </a>
+                            <a href="https://github.com/roffe/txlogger/releases/latest/download/txlogger.zip"
+                                class="bg-saab-green hover:bg-saab-green-dark text-black font-bold py-3 px-6 transition-all duration-300">
+                                Standalone
+                            </a>
+                        </div>
+                    </div>
+                    <!-- VC++ Runtime -->
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div class="text-lg text-gray-300 sm:text-left">Microsoft Visual C++ 2015-2022 Runtime<br><span
+                                class="text-sm text-gray-400">Required if you get missing VCRUNTIME140.dll</span>
+                        </div>
+                        <div class="flex gap-3 justify-center sm:justify-end shrink-0">
+                            <a href="https://aka.ms/vc14/vc_redist.x64.exe"
+                                class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 transition-all duration-300">
+                                Installer
+                            </a>
+                        </div>
+                    </div>
+                    <!-- Mesa3D -->
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div class="text-lg text-gray-300 sm:text-left">Mesa3D For Windows<br><span
+                                class="text-sm text-gray-400">Unzip into the txlogger folder if your system lacks proper
+                                OpenGL support</span></div>
+                        <div class="flex gap-3 justify-center sm:justify-end shrink-0">
+                            <a href="https://downloads.fdossena.com/geth.php?r=mesa64-latest"
+                                class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 transition-all duration-300">
+                                Zip
+                            </a>
+                        </div>
+                    </div>
                 </div>
                 <p class="text-gray-500 mt-6 text-sm">*Requires Windows 10 or newer</p>
             </div>
