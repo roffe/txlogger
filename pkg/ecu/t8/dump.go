@@ -12,14 +12,14 @@ import (
 )
 
 func (t *Client) DumpECU(ctx context.Context) ([]byte, error) {
-	if err := t.legion.Bootstrap(ctx); err != nil {
+	if err := t.legion.Bootstrap(ctx, false); err != nil {
 		return nil, err
 	}
 
 	t.cfg.OnMessage("Dumping ECU")
 	start := time.Now()
 
-	bin, err := t.legion.ReadFlash(ctx, t8legion.EcuByte_T8, 0x100000, false)
+	bin, err := t.legion.ReadFlash(ctx, t8legion.EcuByte_T8, 0x100000)
 	if err != nil {
 		return nil, err
 	}

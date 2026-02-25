@@ -1,4 +1,4 @@
-package t8mcp
+package t8mcpz22se
 
 import (
 	"bytes"
@@ -12,13 +12,12 @@ import (
 	"github.com/roffe/txlogger/pkg/dtc"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ecu/t8legion"
-	"github.com/roffe/txlogger/pkg/ecu/t8util"
 	"github.com/roffe/txlogger/pkg/model"
 )
 
 func init() {
 	ecu.Register(&ecu.EcuInfo{
-		Name:    "Trionic 8 MCP",
+		Name:    "Trionic 8 MCP z22se",
 		NewFunc: New,
 		CANRate: 500,
 		Filter:  []uint32{0x7E8},
@@ -47,22 +46,6 @@ func (t *Client) ReadDTC(ctx context.Context) ([]dtc.DTC, error) {
 }
 
 func (t *Client) Info(ctx context.Context) ([]model.HeaderResult, error) {
-	if err := t.legion.Bootstrap(ctx, false); err != nil {
-		return nil, err
-	}
-
-	_, err := t.legion.IDemand(ctx, t8legion.StartSecondaryBootloader, 0)
-	if err != nil {
-		return nil, errors.New("failed to start secondary bootloader")
-	}
-
-	ver, err := t.legion.GetMCPVersion(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	t.cfg.OnMessage("MCP Firmware information: " + ver)
-
 	return nil, nil
 }
 
@@ -71,28 +54,11 @@ func (t *Client) PrintECUInfo(ctx context.Context) error {
 }
 
 func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
-	if err := t.legion.Bootstrap(ctx, false); err != nil {
-		return err
-	}
-	t.cfg.OnMessage("Comparing MD5's for erase")
-	t.cfg.OnProgress(-9)
-	t.cfg.OnProgress(0)
-	for i := 1; i <= 9; i++ {
-		lmd5 := t8util.GetPartitionMD5(bin, 6, i)
-		md5, err := t.legion.GetMD5(ctx, t8legion.GetTrionic8MCPMD5, uint16(i))
-		if err != nil {
-			return err
-		}
-		t.cfg.OnMessage(fmt.Sprintf("local partition   %d> %X", i, lmd5))
-		t.cfg.OnMessage(fmt.Sprintf("remote partition  %d> %X", i, md5))
-		t.cfg.OnProgress(float64(i))
-	}
-
 	return nil
 }
 
 func (t *Client) DumpECU(ctx context.Context) ([]byte, error) {
-	if err := t.legion.Bootstrap(ctx, false); err != nil {
+	if err := t.legion.Bootstrap(ctx, true); err != nil {
 		return nil, err
 	}
 

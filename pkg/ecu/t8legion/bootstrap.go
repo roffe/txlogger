@@ -41,7 +41,7 @@ func (t *Client) Alive(ctx context.Context) bool {
 	return err == nil
 }
 
-func (t *Client) Bootstrap(ctx context.Context) error {
+func (t *Client) Bootstrap(ctx context.Context, z22se bool) error {
 	if !t.Alive(ctx) {
 		if err := t.bootstrapPreFlight(ctx); err != nil {
 			return err
@@ -49,7 +49,20 @@ func (t *Client) Bootstrap(ctx context.Context) error {
 
 		time.Sleep(50 * time.Millisecond)
 
-		if err := t.UploadBootloader(ctx); err != nil {
+		if z22se {
+			if err := t.UploadZ22sePreloader(ctx); err != nil {
+				return err
+			}
+			time.Sleep(500 * time.Millisecond)
+			t.cfg.OnMessage("starting z22se preloader")
+			if err := t.StartBootloader(ctx, 0xFF2000); err != nil {
+				t.cfg.OnError(err)
+				return err
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+
+		if err := t.UploadBootloader(ctx, z22se); err != nil {
 			return err
 		}
 		t.cfg.OnMessage("starting bootloader")

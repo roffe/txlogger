@@ -339,7 +339,7 @@ func (cs *Widget) GetAdapter(ecuType string) (gocan.Adapter, error) {
 			canFilter = []uint32{0x180, 0x1A0, 0x238, 0x258, 0x270, 0x280, 0x3A0, 0x664, 0x665}
 		}
 		canRate = 500
-	case "T8", "Trionic 8", "Trionic 8 MCP":
+	case "T8", "Trionic 8", "Trionic 8 MCP", "Trionic 8 z22se", "Trionic 8 MCP z22se":
 		if strings.Contains(adapterName, "ELM327") || strings.Contains(adapterName, "STN") || strings.Contains(adapterName, "OBDLink") {
 			canFilter = []uint32{0x5E8, 0x7E8}
 		} else {

@@ -18,6 +18,8 @@ import (
 	_ "github.com/roffe/txlogger/pkg/ecu/t7"
 	_ "github.com/roffe/txlogger/pkg/ecu/t8"
 	_ "github.com/roffe/txlogger/pkg/ecu/t8mcp"
+	_ "github.com/roffe/txlogger/pkg/ecu/t8mcpz22se"
+	_ "github.com/roffe/txlogger/pkg/ecu/t8z22se"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 )
 
@@ -93,7 +95,7 @@ func (t *CanFlasherWidget) progress(v float64) {
 }
 
 func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
-	t.ecuSelect = widget.NewSelect([]string{"Trionic 5", "Trionic 7", "Trionic 8", "Trionic 8 MCP"}, func(s string) {
+	t.ecuSelect = widget.NewSelect([]string{"Trionic 5", "Trionic 7", "Trionic 8", "Trionic 8 z22se", "Trionic 8 MCP", "Trionic 8 MCP z22se"}, func(s string) {
 		fyne.CurrentApp().Preferences().SetString("canflasher_ecu", s)
 	})
 

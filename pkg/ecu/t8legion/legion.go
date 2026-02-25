@@ -82,8 +82,8 @@ func (t *Client) StartBootloader(ctx context.Context, startAddress uint32) error
 	return t.gm.Execute(ctx, startAddress)
 }
 
-func (t *Client) UploadBootloader(ctx context.Context) error {
-	if err := t.gm.RequestDownload(ctx, false); err != nil {
+func (t *Client) UploadBootloader(ctx context.Context, z22se bool) error {
+	if err := t.gm.RequestDownload(ctx, z22se); err != nil {
 		return err
 	}
 	startAddress := 0x102400
@@ -130,6 +130,104 @@ func (t *Client) UploadBootloader(ctx context.Context) error {
 			}
 			t.cfg.OnProgress(float64(progress))
 			time.Sleep(500 * time.Microsecond)
+		}
+		resp, err := t.c.Recv(ctx, t.defaultTimeout*2, t.recvID...)
+		if err != nil {
+			return err
+		}
+		if err := gmlan.CheckErr(resp); err != nil {
+			log.Println(resp.String())
+			return err
+		}
+		if resp.Data[0] != 0x01 || resp.Data[1] != 0x76 {
+			return errors.New("invalid transfer data response")
+		}
+		startAddress += 0xEA
+	}
+
+	if err := t.gm.TransferData(ctx, 0x00, 0x0A, startAddress); err != nil {
+		return err
+	}
+
+	payload := []byte{0x21, 0, 0, 0, 0, 0, 0, 0}
+	if _, err := r.Read(payload[1:]); err != nil && err != io.EOF {
+		return err
+	}
+
+	f2 := gocan.NewFrame(t.canID, payload, gocan.ResponseRequired)
+	resp, err := t.c.SendAndWait(ctx, f2, t.defaultTimeout, t.recvID...)
+	if err != nil {
+		return err
+	}
+
+	if err := gmlan.CheckErr(resp); err != nil {
+		return err
+	}
+
+	if resp.Data[0] != 0x01 || resp.Data[1] != 0x76 {
+		return errors.New("invalid transfer data response")
+	}
+	t.gm.TesterPresentNoResponseAllowed()
+
+	startAddress += 0x06
+
+	t.cfg.OnProgress(float64(9997))
+	t.cfg.OnMessage(fmt.Sprintf("Done, took: %s", time.Since(start).String()))
+
+	return nil
+}
+
+func (t *Client) UploadZ22sePreloader(ctx context.Context) error {
+	if err := t.gm.RequestDownload(ctx, true); err != nil {
+		return err
+	}
+	startAddress := 0xFF2000
+	noTransfers := 6
+
+	start := time.Now()
+
+	t.cfg.OnProgress(-float64(9997))
+	t.cfg.OnProgress(float64(0))
+	t.cfg.OnMessage("Uploading z22se preloader " + strconv.Itoa(len(bootloaderz22seBytes)) + " bytes")
+
+	r := bytes.NewReader(bootloaderz22seBytes)
+
+	progress := 0
+	pp := 0
+	for range noTransfers {
+		pp++
+		if pp == 10 {
+			t.gm.TesterPresentNoResponseAllowed()
+			pp = 0
+		}
+		if err := t.gm.TransferData(ctx, 0x00, 0xF0, startAddress); err != nil {
+			return err
+		}
+		var seq byte = 0x21
+		for j := 0; j <= 0x21; j++ {
+			payload := []byte{seq, 0, 0, 0, 0, 0, 0, 0}
+			n, err := r.Read(payload[1:])
+			if err != nil && err != io.EOF {
+				return err
+			}
+			progress += n
+			f := gocan.NewFrame(t.canID, payload, gocan.Outgoing)
+			if j == 0x21 {
+				f.Timeout = uint32(t.defaultTimeout * 8)
+				f.FrameType = gocan.ResponseRequired
+			}
+			if err := t.c.SendFrame(f); err != nil {
+				return err
+			}
+			seq++
+			if seq > 0x2F {
+				seq = 0x20
+			}
+			t.cfg.OnProgress(float64(progress))
+			if j != 0x21 {
+				time.Sleep(500 * time.Microsecond)
+			}
+
 		}
 		resp, err := t.c.Recv(ctx, t.defaultTimeout*2, t.recvID...)
 		if err != nil {
@@ -350,7 +448,7 @@ func (t *Client) IDemand(ctx context.Context, command Command, wish uint16) ([]b
 	return out, nil
 }
 
-func (t *Client) ReadFlash(ctx context.Context, device byte, lastAddress int, z22se bool) ([]byte, error) {
+func (t *Client) ReadFlash(ctx context.Context, device byte, lastAddress int) ([]byte, error) {
 	if !t.legionRunning {
 		return nil, fmt.Errorf("legion not running")
 	}
