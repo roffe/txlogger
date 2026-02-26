@@ -71,6 +71,9 @@ func (t *Client) PrintECUInfo(ctx context.Context) error {
 }
 
 func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
+	if len(bin) != 0x40100 {
+		return errors.New("err: Invalid T8 MCP file size")
+	}
 	if err := t.legion.Bootstrap(ctx, false); err != nil {
 		return err
 	}

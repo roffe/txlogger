@@ -132,7 +132,7 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	//t.dtcBTN = widget.NewButton("Read DTC", nil)   //t.readDTC)
 	t.dumpBTN = widget.NewButton("Dump", t.ecuDump)
 	//t.sramBTN = widget.NewButton("Dump SRAM", nil) //t.dumpSRAM)
-	t.flashBTN = widget.NewButton("Flash", nil) //t.ecuFlash)
+	t.flashBTN = widget.NewButton("Flash", t.ecuFlash)
 
 	// t.ecuList.PlaceHolder = "Select ECU"
 	// t.adapterList.PlaceHolder = "Select Adapter"
