@@ -1,4 +1,4 @@
-package t8mcpz22se
+package z22semcp
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ import (
 
 func init() {
 	ecu.Register(&ecu.EcuInfo{
-		Name:    "Trionic 8 MCP z22se",
+		Name:    "Z22SE MCP",
 		NewFunc: New,
 		CANRate: 500,
 		Filter:  []uint32{0x7E8},

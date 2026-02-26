@@ -112,6 +112,7 @@ func recvDataEND(ctx context.Context, c *gocan.Client) ([]byte, error) {
 		if bytes.HasSuffix(buff.Bytes(), pattern) {
 			return bytes.TrimSuffix(buff.Bytes(), pattern), nil
 		}
+
 		dd++
 	}
 }
