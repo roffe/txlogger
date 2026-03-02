@@ -1,6 +1,8 @@
 package t8util
 
-import "crypto/md5"
+import (
+	"crypto/md5"
+)
 
 var t8parts = []uint32{
 	0x000000, // Boot (0)

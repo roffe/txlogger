@@ -113,6 +113,9 @@ func (t *Client) DumpECU(ctx context.Context) ([]byte, error) {
 }
 
 func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
+	if len(bin) != 0x100000 {
+		return errors.New("err: Invalid Z22SE file size")
+	}
 	if err := t.legion.Bootstrap(ctx, true); err != nil {
 		return err
 	}

@@ -3,6 +3,7 @@ package t8legion
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -502,6 +503,38 @@ func (t *Client) ReadFlash(ctx context.Context, device byte, lastAddress int) ([
 	}
 	t.cfg.OnProgress(float64(lastAddress))
 	return buf, nil
+}
+
+func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, flashData []byte, z22se bool) error {
+	if !t.legionRunning {
+		return fmt.Errorf("legion not running")
+	}
+	const startAddress = 0x020000
+
+	if err := t.gm.TransferData(ctx, 0x00, 0xF0, startAddress); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (t *Client) EraseFlash(ctx context.Context, device byte, formatMask uint64) error {
+	if !t.legionRunning {
+		return fmt.Errorf("legion not running")
+	}
+	t.cfg.OnMessage("Erasing flash, " + fmt.Sprintf("format mask: %b", formatMask))
+	tmp := ((formatMask&0xff)<<8 | (formatMask>>8)&0xFF)
+	cmd := (tmp<<40 | ((^tmp)&0xFFFF)<<24 | 0x13400) + uint64(device)
+	payload := make([]byte, 8)
+	binary.LittleEndian.PutUint64(payload, uint64(cmd))
+	frame := gocan.NewFrame(t.canID, payload, gocan.ResponseRequired)
+	return fmt.Errorf("%s", "erase frame to send"+frame.String())
+	//_, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.recvID...)
+
+	//resp, _, err := t.ReadDataByLocalIdentifier(ctx, true, EcuByte_MCP, 0x8100, 0x80)
+	//if err != nil {
+	//	return "", err
+	//}
+	//return err
 }
 
 const (
