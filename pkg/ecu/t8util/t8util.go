@@ -88,3 +88,122 @@ func MCPSwapped(filebytes []byte) bool {
 	}
 	return false
 }
+
+func CodeByte(b byte, count int) byte {
+	var rb byte
+	switch count {
+	case 0:
+		rb = b ^ 0x39
+	case 1:
+		rb = b ^ 0x68
+	case 2:
+		rb = b ^ 0x77
+	case 3:
+		rb = b ^ 0x6D
+	case 4:
+		rb = b ^ 0x47
+	case 5:
+		rb = b ^ 0x39
+	}
+	return rb
+}
+
+func GetCurrentBlock(filebytes []byte, block int, byteswapped bool) []byte {
+	_blockNumber := block
+	address := _blockNumber * 0x80
+
+	buffer := make([]byte, 0x80)
+	array := make([]byte, 0x88)
+
+	if byteswapped {
+		for byteCount := 0; byteCount < int(0x80); byteCount += 2 {
+			buffer[byteCount+1] = filebytes[address]
+			buffer[byteCount] = filebytes[address+1]
+			address += 2
+		}
+	} else {
+		for byteCount := 0; byteCount < int(0x80); byteCount++ {
+			buffer[byteCount] = filebytes[address]
+			address++
+		}
+	}
+	var cnt int = 0
+	for byteCount := 0; byteCount < int(0x80); byteCount++ {
+		array[byteCount] = CodeByte(buffer[byteCount], cnt)
+		cnt++
+		if cnt == 6 {
+			cnt = 0
+		}
+	}
+	return array
+}
+
+func FFblock(filebytes []byte, address int, size byte) bool {
+	var count int = 0
+	len := len(filebytes)
+	for byteCount := 0; byteCount < int(size); byteCount++ {
+		if address == len {
+			break
+		}
+		if filebytes[address] == 0xFF {
+			count++
+		}
+		address++
+	}
+	if count == int(size) {
+		return true
+	}
+	return false
+}
+
+func Erasedregion(address int, device byte, formatMask uint64) bool {
+	// Note: The format function count partitions as 1 to 9.
+	// this on the other hand will count from 0 to 8
+	var part int = 0
+
+	// T8 main
+	switch device {
+	case 6:
+		if address >= 0xC0000 {
+			part = 8
+		} else if address >= 0x80000 {
+			part = 7
+		} else if address >= 0x60000 {
+			part = 6
+		} else if address >= 0x40000 {
+			part = 5
+		} else if address >= 0x20000 {
+			part = 4
+		} else if address >= 0x8000 {
+			part = 3
+		} else if address >= 0x6000 {
+			part = 2
+		} else if address >= 0x4000 {
+			part = 1
+		}
+	case 5: //MCP
+		part = int(address>>15) & 0xF
+	}
+
+	// Read one bit from selected part of the format mask to figure out if this partition should be written or not.
+	if ((formatMask >> part) & 1) > 0 {
+		return true
+	} else {
+		return false
+	}
+}
+
+func getUlong(arr []byte, startIndex int, count int) uint64 {
+	var result uint64 = 0x00
+	for i := startIndex + count - 1; i >= startIndex; i-- {
+		result <<= 8
+		result += uint64(arr[i])
+	}
+	return result
+}
+
+func GetFrameCmd(frameNo int, array []byte, startIndex int) uint64 {
+	res := getUlong(array, startIndex, 7)
+	res = (res << 8) | uint64(frameNo&0xFF)
+	return res
+}
