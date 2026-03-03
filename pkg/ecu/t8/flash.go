@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"time"
 
+	"fyne.io/fyne/v2"
 	"github.com/roffe/txlogger/pkg/ecu/t8legion"
 	"github.com/roffe/txlogger/pkg/ecu/t8util"
+	"github.com/roffe/txlogger/pkg/widgets/settings"
 )
 
 func (t *Client) VerifyFlash(ctx context.Context, file []byte, fmask uint64) (bool, error) {
@@ -79,7 +81,10 @@ func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
 		return err
 	}
 
-	fmask, err := t.DeterminePartitionmask(ctx, bin, t8legion.EcuByte_T8, false, false, false)
+	nvme := fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsNvme, false)
+	boot := fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsBoot, false)
+
+	fmask, err := t.DeterminePartitionmask(ctx, bin, t8legion.EcuByte_T8, boot, nvme, false)
 	if err != nil {
 		return err
 	}

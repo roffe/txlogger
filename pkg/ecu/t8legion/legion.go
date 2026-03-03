@@ -51,7 +51,7 @@ func New(c *gocan.Client, cfg *ecu.Config, canID uint32, recvID ...uint32) *Clie
 		ifl = 50
 	case lower == "combiadapter":
 		ifl = 680
-	case strings.HasPrefix(lower, "j2537"):
+	case strings.HasPrefix(lower, "j2534"):
 		ifl = 100
 	case lower == "yaca":
 		ifl = 10
@@ -60,6 +60,8 @@ func New(c *gocan.Client, cfg *ecu.Config, canID uint32, recvID ...uint32) *Clie
 	case strings.HasPrefix(lower, "slcan"):
 		ifl = 10
 	case strings.HasPrefix(lower, "rcan"):
+		ifl = 10
+	case lower == "socketcan":
 		ifl = 10
 	}
 
@@ -598,8 +600,8 @@ func (t *Client) EraseFlash(ctx context.Context, device byte, formatMask uint64)
 	for !eraseDone {
 		formatbuf, _, err := t.ReadDataByLocalIdentifier(ctx, true, 0xF0, 0, 4)
 		if err != nil {
+			retryCount++
 			if retryCount > 20 {
-				retryCount++
 				return fmt.Errorf("erase failed, no response")
 			}
 			continue

@@ -39,6 +39,8 @@ type CanFlasherWidget struct {
 	infoBTN     *widget.Button
 	dumpBTN     *widget.Button
 	flashBTN    *widget.Button
+	bootBOX     *widget.Check
+	nvmeBOX     *widget.Check
 	progressBar *widget.ProgressBar
 
 	l binding.DataListener
@@ -134,6 +136,15 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	//t.sramBTN = widget.NewButton("Dump SRAM", nil) //t.dumpSRAM)
 	t.flashBTN = widget.NewButton("Flash", t.ecuFlash)
 
+	t.bootBOX = widget.NewCheck("boot", func(b bool) {
+		fyne.CurrentApp().Preferences().SetBool(settings.PrefsBoot, b)
+	})
+	t.nvmeBOX = widget.NewCheck("nvme", func(b bool) {
+		fyne.CurrentApp().Preferences().SetBool(settings.PrefsNvme, b)
+	})
+
+	t.nvmeBOX.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsNvme, false))
+	t.bootBOX.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsBoot, false))
 	// t.ecuList.PlaceHolder = "Select ECU"
 	// t.adapterList.PlaceHolder = "Select Adapter"
 	// t.portList.PlaceHolder = "Select Port"
@@ -147,6 +158,9 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 		t.dumpBTN,
 		//t.sramBTN,
 		t.flashBTN,
+		widget.NewLabel("Flash options:"),
+		t.bootBOX,
+		t.nvmeBOX,
 	)
 
 	split := container.NewHSplit(left, right)
