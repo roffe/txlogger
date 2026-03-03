@@ -16,6 +16,7 @@ import (
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/gmlan"
 	"github.com/roffe/txlogger/pkg/ecu"
+	"github.com/roffe/txlogger/pkg/ecu/t8util"
 )
 
 var (
@@ -505,14 +506,73 @@ func (t *Client) ReadFlash(ctx context.Context, device byte, lastAddress int) ([
 	return buf, nil
 }
 
-func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, flashData []byte, z22se bool) error {
+func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, flashData []byte, formatMask uint64, z22se bool) error {
 	if !t.legionRunning {
 		return fmt.Errorf("legion not running")
 	}
-	const startAddress = 0x020000
+	t.cfg.OnMessage("Writing flash")
+	const startAddress = 0x000000
+	var length byte = 0x88
+	var numberOfFrames = 19
+	var blockNumber int = 0
+	var lastBlockNumber int = (lastAddress / 0x80) - 1
+	var byteswapped bool = false
+	var problem bool = false
 
-	if err := t.gm.TransferData(ctx, 0x00, 0xF0, startAddress); err != nil {
-		return err
+	t.cfg.OnProgress(-float64(lastBlockNumber))
+	t.cfg.OnProgress(float64(0))
+
+	if device == 5 {
+		byteswapped = t8util.MCPSwapped(flashData)
+	}
+
+	for blockNumber <= lastBlockNumber {
+		problem = false
+		var currentAddress int = startAddress + (blockNumber * 0x80)
+		data2Send := t8util.GetCurrentBlock(flashData, blockNumber, byteswapped)
+		var Csum16 int16 = 0
+		for i := 0; i < (int(length) - 8); i++ {
+			Csum16 += int16(data2Send[i])
+		}
+		data2Send[length-8] = (byte)(Csum16 >> 8 & 0xff)
+		data2Send[length-7] = (byte)(Csum16 & 0xff)
+
+		eregion := t8util.Erasedregion(currentAddress, device, formatMask)
+		ffblock := t8util.FFblock(flashData, currentAddress, length-8)
+
+		if !ffblock && eregion {
+			if err := t.gm.TransferData(ctx, 0x00, length, currentAddress); err != nil {
+				problem = true
+			} else {
+				iFrameNumber := 0x21
+				txpnt := 0
+				for i := 0; i < numberOfFrames; i++ {
+					payload := make([]byte, 8)
+					cmd := t8util.GetFrameCmd(iFrameNumber, data2Send, txpnt)
+					binary.LittleEndian.PutUint64(payload, uint64(cmd))
+					frame := gocan.NewFrame(t.canID, payload, gocan.Outgoing)
+					iFrameNumber++
+					iFrameNumber &= 0x2F
+					txpnt += 7
+					if err := t.c.SendFrame(frame); err != nil {
+						return err
+					}
+				}
+				resp, err := t.c.Recv(ctx, time.Millisecond*150, 0x7E8)
+				if err != nil {
+					t.cfg.OnMessage("problem0")
+					problem = true
+				}
+				if resp.Data[0] != 0x01 && resp.Data[1] != 0x76 {
+					problem = true
+					t.cfg.OnMessage("problem1")
+				}
+			}
+		}
+		if !problem {
+			blockNumber++
+			t.cfg.OnProgress(float64(blockNumber))
+		}
 	}
 	return nil
 }
@@ -526,15 +586,58 @@ func (t *Client) EraseFlash(ctx context.Context, device byte, formatMask uint64)
 	cmd := (tmp<<40 | ((^tmp)&0xFFFF)<<24 | 0x13400) + uint64(device)
 	payload := make([]byte, 8)
 	binary.LittleEndian.PutUint64(payload, uint64(cmd))
-	frame := gocan.NewFrame(t.canID, payload, gocan.ResponseRequired)
-	return fmt.Errorf("%s", "erase frame to send"+frame.String())
-	//_, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.recvID...)
+	frame := gocan.NewFrame(t.canID, payload, gocan.Outgoing)
+	if err := t.c.SendFrame(frame); err != nil {
+		return err
+	}
 
-	//resp, _, err := t.ReadDataByLocalIdentifier(ctx, true, EcuByte_MCP, 0x8100, 0x80)
-	//if err != nil {
-	//	return "", err
-	//}
-	//return err
+	var eraseDone bool = false
+	var firstPass bool = true
+	var retryCount uint16 = 0
+
+	for !eraseDone {
+		formatbuf, _, err := t.ReadDataByLocalIdentifier(ctx, true, 0xF0, 0, 4)
+		if err != nil {
+			if retryCount > 20 {
+				retryCount++
+				return fmt.Errorf("erase failed, no response")
+			}
+			continue
+		}
+		if firstPass {
+			if formatbuf[3] != device {
+				time.Sleep(5 * time.Second)
+				if err := t.c.SendFrame(frame); err != nil {
+					return err
+				}
+			} else {
+				t.cfg.OnMessage("Erasing device: " + fmt.Sprintf("%d", formatbuf[3]))
+				firstPass = false
+			}
+		} else {
+			if formatbuf[3] == 1 {
+				t.cfg.OnMessage("Erasing done")
+				eraseDone = true
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return nil
+}
+
+func (t *Client) MarryMCP(ctx context.Context) error {
+	t.cfg.OnMessage("MarryMCP...")
+	_, err := t.IDemand(ctx, MarrySecondaryProcessor, 0)
+	if err != nil {
+		return err
+	}
+	ver, err := t.GetMCPVersion(ctx)
+	if err != nil {
+		return err
+	}
+	t.cfg.OnMessage("MCP Firmware information: " + ver)
+	return nil
 }
 
 const (
@@ -601,6 +704,8 @@ func demandErr(command Command, d []byte) error {
 		case 0xFE:
 			// Failed to format!
 			return errors.New("retrying format")
+		case 1:
+			return nil
 		default:
 			time.Sleep(500 * time.Millisecond)
 			return errors.New("busy marrying")
