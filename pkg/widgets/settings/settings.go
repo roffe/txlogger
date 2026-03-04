@@ -60,6 +60,10 @@ const (
 	prefsPort    = "port"
 	prefsSpeed   = "speed"
 	prefsDebug   = "debug"
+
+	//Flash
+	PrefsNvme = "nvme"
+	PrefsBoot = "boot"
 )
 
 var portSpeeds = []string{"9600", "19200", "38400", "57600", "115200", "230400", "460800", "500000", "921600", "1mbit", "2mbit", "3mbit"}
