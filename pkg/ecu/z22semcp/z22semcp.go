@@ -57,6 +57,39 @@ func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
 	if len(bin) != 0x40100 {
 		return errors.New("err: Invalid Z22SE MCP file size")
 	}
+	if err := t.legion.Bootstrap(ctx, true); err != nil {
+		return err
+	}
+	if err := t.legion.StartSecondaryBootloader(ctx); err != nil {
+		return err
+	}
+	fmask, err := t.legion.DeterminePartitionmask(ctx, bin, t8legion.EcuByte_MCP, true, true, true)
+	if err != nil {
+		return err
+	}
+	if fmask == 0 {
+		t.cfg.OnMessage("Noting to flash, ecu and local bin are same.. returning")
+		return nil
+	}
+	err = t.legion.EraseFlash(ctx, t8legion.EcuByte_MCP, fmask)
+	if err != nil {
+		return err
+	}
+	start := time.Now()
+	err = t.legion.WriteFlash(ctx, t8legion.EcuByte_MCP, 0x40100, bin, fmask)
+	if err != nil {
+		return err
+	}
+	t.cfg.OnMessage("Done, took: " + time.Since(start).String())
+
+	status, err := t.legion.VerifyFlash(ctx, bin, t8legion.EcuByte_MCP, fmask)
+	if err != nil {
+		return err
+	}
+	if !status {
+		return errors.New("failed md5 verification")
+	}
+	t.cfg.OnMessage("Verifying md5: sucess")
 	return nil
 }
 
@@ -64,11 +97,10 @@ func (t *Client) DumpECU(ctx context.Context) ([]byte, error) {
 	if err := t.legion.Bootstrap(ctx, true); err != nil {
 		return nil, err
 	}
-
-	_, err := t.legion.IDemand(ctx, t8legion.StartSecondaryBootloader, 0)
-	if err != nil {
-		return nil, errors.New("failed to start secondary bootloader")
+	if err := t.legion.StartSecondaryBootloader(ctx); err != nil {
+		return nil, err
 	}
+
 	t.cfg.OnMessage("Dumping MCP")
 
 	start := time.Now()

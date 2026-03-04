@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -16,7 +17,6 @@ import (
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ecu/t8legion"
 	"github.com/roffe/txlogger/pkg/ecu/t8sec"
-	"github.com/roffe/txlogger/pkg/ecu/t8util"
 	"github.com/roffe/txlogger/pkg/model"
 )
 
@@ -119,25 +119,42 @@ func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
 	if err := t.legion.Bootstrap(ctx, true); err != nil {
 		return err
 	}
-	t.cfg.OnMessage("Comparing MD5's for erase")
-	t.cfg.OnProgress(-9)
-	t.cfg.OnProgress(0)
-	for i := 1; i <= 9; i++ {
-		lmd5 := t8util.GetPartitionMD5(bin, 6, i)
-		md5, err := t.legion.GetMD5(ctx, t8legion.GetTrionic8MD5, uint16(i))
-		if err != nil {
-			return err
-		}
-		t.cfg.OnMessage(fmt.Sprintf("local partition   %d> %X", i, lmd5))
-		t.cfg.OnMessage(fmt.Sprintf("remote partition  %d> %X", i, md5))
-		t.cfg.OnProgress(float64(i))
+
+	fmask, err := t.legion.DeterminePartitionmask(ctx, bin, t8legion.EcuByte_T8, true, true, true)
+	if err != nil {
+		return err
 	}
+
+	if fmask == 0 {
+		t.cfg.OnMessage("Noting to flash, ecu and local bin are same.. returning")
+		return nil
+	}
+
+	err = t.legion.EraseFlash(ctx, t8legion.EcuByte_T8, fmask)
+	if err != nil {
+		return err
+	}
+	start := time.Now()
+	err = t.legion.WriteFlash(ctx, t8legion.EcuByte_T8, 0x100000, bin, fmask)
+	if err != nil {
+		return err
+	}
+	t.cfg.OnMessage("Done, took: " + time.Since(start).String())
+
+	status, err := t.legion.VerifyFlash(ctx, bin, t8legion.EcuByte_T8, fmask)
+	if err != nil {
+		return err
+	}
+	if !status {
+		return errors.New("failed md5 verification")
+	}
+	t.cfg.OnMessage("Verifying md5: sucess")
 
 	return nil
 }
 
 func (t *Client) EraseECU(ctx context.Context) error {
-	return nil
+	return t.legion.EraseFlash(ctx, t8legion.EcuByte_T8, uint64(math.MaxUint64))
 }
 
 func (t *Client) RequestSecurityAccess(ctx context.Context) error {
