@@ -326,14 +326,12 @@ func (t *Client) EnableHighSpeed(ctx context.Context) error {
 
 func (t *Client) GetMD5(ctx context.Context, md5type Command, partition uint16) ([]byte, error) {
 	switch md5type {
-	case GetTrionic8MD5:
-		md5sum, err := t.IDemand(ctx, GetTrionic8MD5, partition)
+	case GetTrionic8MD5, GetTrionic8MCPMD5:
+		md5sum, err := t.IDemand(ctx, md5type, partition)
 		if err != nil {
 			return nil, fmt.Errorf("legion: failed to get md5 for block %d: %w", partition, err)
 		}
 		return md5sum, nil
-	case GetTrionic8MCPMD5:
-		return nil, nil
 	default:
 		return nil, errors.New("invalid md5 type")
 	}
@@ -508,7 +506,72 @@ func (t *Client) ReadFlash(ctx context.Context, device byte, lastAddress int) ([
 	return buf, nil
 }
 
-func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, flashData []byte, formatMask uint64, z22se bool) error {
+func (t *Client) VerifyFlash(ctx context.Context, file []byte, device byte, fmask uint64) (bool, error) {
+	start := uint32(0)
+	eq := bool(true)
+	md5type := Command(GetTrionic8MD5)
+	if device == 5 {
+		md5type = GetTrionic8MCPMD5
+	}
+	for i := start; i <= 9; i++ {
+		if fmask&uint64(1<<(i-1)) == 0 {
+			continue
+		}
+		lmd5 := t8util.GetPartitionMD5(file, device, int(i))
+		md5, err := t.GetMD5(ctx, md5type, uint16(i))
+		if err != nil {
+			return false, err
+		}
+		eq = eq && bytes.Equal(lmd5, md5)
+	}
+	return eq, nil
+}
+
+func (t *Client) DeterminePartitionmask(ctx context.Context, file []byte, device byte, boot, nvme, z22se bool) (uint64, error) {
+	t.cfg.OnMessage(fmt.Sprintf("Determine Partition Mask, format boot: %t, nvme: %t", boot, nvme))
+	start := uint32(5)
+	formatmask := uint64(0)
+	md5type := Command(GetTrionic8MD5)
+	if device == 5 {
+		md5type = GetTrionic8MCPMD5
+	}
+
+	if z22se || boot {
+		start = 1
+	} else if device == 5 {
+		start = 2
+	}
+	for i := start; i <= 9; i++ {
+		lmd5 := t8util.GetPartitionMD5(file, device, int(i))
+		md5, err := t.GetMD5(ctx, md5type, uint16(i))
+		if err != nil {
+			return 0, err
+		}
+		if !bytes.Equal(lmd5, md5) {
+			formatmask |= uint64(1 << (i - 1))
+		}
+	}
+
+	if !z22se {
+		if !boot {
+			formatmask &= 0x1FE
+		}
+		if !nvme {
+			formatmask &= 0x1F9
+		}
+	}
+
+	if device == 5 {
+		formatmask &= uint64(0x1BF)
+		formatmask |= uint64((formatmask & 1) << 8)
+		if !z22se {
+			formatmask &= uint64(0x1BF)
+		}
+	}
+	return formatmask, nil
+}
+
+func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, flashData []byte, formatMask uint64) error {
 	if !t.legionRunning {
 		return fmt.Errorf("legion not running")
 	}
@@ -622,10 +685,17 @@ func (t *Client) EraseFlash(ctx context.Context, device byte, formatMask uint64)
 				eraseDone = true
 			}
 		}
+
 		time.Sleep(500 * time.Millisecond)
 	}
 
 	return nil
+}
+func (t *Client) StartSecondaryBootloader(ctx context.Context) error {
+	t.cfg.OnMessage("Start MCP bootloader...")
+	_, err := t.IDemand(ctx, StartSecondaryBootloader, 0)
+
+	return err
 }
 
 func (t *Client) MarryMCP(ctx context.Context) error {

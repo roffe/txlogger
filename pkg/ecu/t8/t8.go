@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -66,7 +67,7 @@ func (t *Client) ResetECU(ctx context.Context) error {
 }
 
 func (t *Client) EraseECU(ctx context.Context) error {
-	return nil
+	return t.legion.EraseFlash(ctx, t8legion.EcuByte_T8, uint64(math.MaxUint64))
 }
 
 func (t *Client) RequestSecurityAccess(ctx context.Context) error {

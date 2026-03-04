@@ -8,12 +8,13 @@ import (
 	"fmt"
 	"time"
 
+	"fyne.io/fyne/v2"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/dtc"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ecu/t8legion"
-	"github.com/roffe/txlogger/pkg/ecu/t8util"
 	"github.com/roffe/txlogger/pkg/model"
+	"github.com/roffe/txlogger/pkg/widgets/settings"
 )
 
 func init() {
@@ -77,32 +78,51 @@ func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
 	if err := t.legion.Bootstrap(ctx, false); err != nil {
 		return err
 	}
-	t.cfg.OnMessage("Comparing MD5's for erase")
-	t.cfg.OnProgress(-9)
-	t.cfg.OnProgress(0)
-	for i := 1; i <= 9; i++ {
-		lmd5 := t8util.GetPartitionMD5(bin, 6, i)
-		md5, err := t.legion.GetMD5(ctx, t8legion.GetTrionic8MCPMD5, uint16(i))
-		if err != nil {
-			return err
-		}
-		t.cfg.OnMessage(fmt.Sprintf("local partition   %d> %X", i, lmd5))
-		t.cfg.OnMessage(fmt.Sprintf("remote partition  %d> %X", i, md5))
-		t.cfg.OnProgress(float64(i))
+	if err := t.legion.StartSecondaryBootloader(ctx); err != nil {
+		return err
 	}
+	boot := fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsBoot, false)
+	fmask, err := t.legion.DeterminePartitionmask(ctx, bin, t8legion.EcuByte_MCP, boot, true, false)
+	if err != nil {
+		return err
+	}
+	if fmask == 0 {
+		t.cfg.OnMessage("Noting to flash, ecu and local bin are same.. returning")
+		return nil
+	}
+	err = t.legion.EraseFlash(ctx, t8legion.EcuByte_MCP, fmask)
+	if err != nil {
+		return err
+	}
+	start := time.Now()
+	err = t.legion.WriteFlash(ctx, t8legion.EcuByte_MCP, 0x40100, bin, fmask)
+	if err != nil {
+		return err
+	}
+	t.cfg.OnMessage("Done, took: " + time.Since(start).String())
 
-	return nil
+	status, err := t.legion.VerifyFlash(ctx, bin, t8legion.EcuByte_MCP, fmask)
+	if err != nil {
+		return err
+	}
+	if !status {
+		return errors.New("failed md5 verification")
+	}
+	t.cfg.OnMessage("Verifying md5: sucess")
+
+	err = t.legion.MarryMCP(ctx)
+
+	return err
 }
 
 func (t *Client) DumpECU(ctx context.Context) ([]byte, error) {
 	if err := t.legion.Bootstrap(ctx, false); err != nil {
 		return nil, err
 	}
-
-	_, err := t.legion.IDemand(ctx, t8legion.StartSecondaryBootloader, 0)
-	if err != nil {
-		return nil, errors.New("failed to start secondary bootloader")
+	if err := t.legion.StartSecondaryBootloader(ctx); err != nil {
+		return nil, err
 	}
+
 	t.cfg.OnMessage("Dumping MCP")
 
 	start := time.Now()

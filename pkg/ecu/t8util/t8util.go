@@ -21,7 +21,7 @@ var t8parts = []uint32{
 	0x020000,
 }
 
-func GetPartitionMD5(filebytes []byte, device, partition int) []byte {
+func GetPartitionMD5(filebytes []byte, device byte, partition int) []byte {
 	start := uint32(0)
 	e := 0
 	end := uint32(0x40100)
@@ -41,7 +41,7 @@ func GetPartitionMD5(filebytes []byte, device, partition int) []byte {
 		}
 	case 5:
 		byteswapped = MCPSwapped(filebytes)
-		if partition > 0 && partition > 10 {
+		if partition > 0 && partition < 10 {
 			if partition == 9 {
 				start = 0x40000
 				end = 0x40100
@@ -58,10 +58,6 @@ func GetPartitionMD5(filebytes []byte, device, partition int) []byte {
 
 	if !byteswapped {
 		copy(buf, filebytes[start:end])
-		//for i := start; i < end; i++ {
-		//	buf[e] = filebytes[i]
-		//	e++
-		//}
 	} else {
 		for i := start; i < end; i += 2 {
 			buf[e] = filebytes[i+1]
