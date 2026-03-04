@@ -62,7 +62,7 @@ const (
 	prefsDebug   = "debug"
 
 	//Flash
-	PrefsNvme = "nvme"
+	PrefsNvdm = "nvdm"
 	PrefsBoot = "boot"
 )
 

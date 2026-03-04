@@ -62,7 +62,7 @@ func New(c *gocan.Client, cfg *ecu.Config, canID uint32, recvID ...uint32) *Clie
 	case strings.HasPrefix(lower, "rcan"):
 		ifl = 10
 	case lower == "socketcan":
-		ifl = 10
+		ifl = 50
 	}
 
 	log.Println("Using interframe latency " + strconv.Itoa(int(ifl)) + " for " + c.Adapter().Name())
@@ -527,9 +527,9 @@ func (t *Client) VerifyFlash(ctx context.Context, file []byte, device byte, fmas
 	return eq, nil
 }
 
-func (t *Client) DeterminePartitionmask(ctx context.Context, file []byte, device byte, boot, nvme, z22se bool) (uint64, error) {
-	t.cfg.OnMessage(fmt.Sprintf("Determine Partition Mask, format boot: %t, nvme: %t", boot, nvme))
-	start := uint32(5)
+func (t *Client) DeterminePartitionmask(ctx context.Context, file []byte, device byte, boot, nvdm, z22se bool) (uint64, error) {
+	t.cfg.OnMessage(fmt.Sprintf("Determine Partition Mask, format boot: %t, nvdm: %t", boot, nvdm))
+	start := uint32(2)
 	formatmask := uint64(0)
 	md5type := Command(GetTrionic8MD5)
 	if device == 5 {
@@ -538,9 +538,8 @@ func (t *Client) DeterminePartitionmask(ctx context.Context, file []byte, device
 
 	if z22se || boot {
 		start = 1
-	} else if device == 5 {
-		start = 2
 	}
+
 	for i := start; i <= 9; i++ {
 		lmd5 := t8util.GetPartitionMD5(file, device, int(i))
 		md5, err := t.GetMD5(ctx, md5type, uint16(i))
@@ -552,17 +551,19 @@ func (t *Client) DeterminePartitionmask(ctx context.Context, file []byte, device
 		}
 	}
 
+	t.cfg.OnMessage(fmt.Sprintf("Partition's MD5 missmath mask: %b", formatmask))
+
 	if !z22se {
 		if !boot {
-			formatmask &= 0x1FE
+			formatmask &= uint64(0x1FE)
 		}
-		if !nvme {
-			formatmask &= 0x1F9
+		if !nvdm {
+			formatmask &= uint64(0x1F9)
 		}
 	}
 
 	if device == 5 {
-		formatmask &= uint64(0x1BF)
+		formatmask &= uint64(0xFF)
 		formatmask |= uint64((formatmask & 1) << 8)
 		if !z22se {
 			formatmask &= uint64(0x1BF)
@@ -574,6 +575,9 @@ func (t *Client) DeterminePartitionmask(ctx context.Context, file []byte, device
 func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, flashData []byte, formatMask uint64) error {
 	if !t.legionRunning {
 		return fmt.Errorf("legion not running")
+	}
+	if formatMask == 0 {
+		return nil
 	}
 	t.cfg.OnMessage("Writing flash")
 	const startAddress = 0x000000
@@ -625,12 +629,11 @@ func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, f
 				}
 				resp, err := t.c.Recv(ctx, time.Millisecond*150, 0x7E8)
 				if err != nil {
-					t.cfg.OnMessage("problem0")
 					problem = true
+					continue
 				}
 				if resp.Data[0] != 0x01 && resp.Data[1] != 0x76 {
 					problem = true
-					t.cfg.OnMessage("problem1")
 				}
 			}
 		}
@@ -645,6 +648,9 @@ func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, f
 func (t *Client) EraseFlash(ctx context.Context, device byte, formatMask uint64) error {
 	if !t.legionRunning {
 		return fmt.Errorf("legion not running")
+	}
+	if formatMask == 0 {
+		return nil
 	}
 	t.cfg.OnMessage("Erasing flash, " + fmt.Sprintf("format mask: %b", formatMask))
 	tmp := ((formatMask&0xff)<<8 | (formatMask>>8)&0xFF)
@@ -688,13 +694,12 @@ func (t *Client) EraseFlash(ctx context.Context, device byte, formatMask uint64)
 
 		time.Sleep(500 * time.Millisecond)
 	}
-
 	return nil
 }
+
 func (t *Client) StartSecondaryBootloader(ctx context.Context) error {
 	t.cfg.OnMessage("Start MCP bootloader...")
 	_, err := t.IDemand(ctx, StartSecondaryBootloader, 0)
-
 	return err
 }
 

@@ -19,17 +19,12 @@ func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
 		return err
 	}
 
-	nvme := fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsNvme, false)
+	nvdm := fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsNvdm, false)
 	boot := fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsBoot, false)
 
-	fmask, err := t.legion.DeterminePartitionmask(ctx, bin, t8legion.EcuByte_T8, boot, nvme, false)
+	fmask, err := t.legion.DeterminePartitionmask(ctx, bin, t8legion.EcuByte_T8, boot, nvdm, false)
 	if err != nil {
 		return err
-	}
-
-	if fmask == 0 {
-		t.cfg.OnMessage("Noting to flash, ecu and local bin are same.. returning")
-		return nil
 	}
 
 	err = t.legion.EraseFlash(ctx, t8legion.EcuByte_T8, fmask)
