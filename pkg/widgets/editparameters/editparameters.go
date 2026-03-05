@@ -100,10 +100,10 @@ func (t *EditParameters) CreateRenderer() fyne.WidgetRenderer {
 	topSpeedEntry.Validator = func(s string) error {
 		val, err := strconv.Atoi(s)
 		if err != nil {
-			return errors.New("Must be between 0 and 3276")
+			return errors.New("Must be between 0 and 5000")
 		}
-		if val < 0 || val > 3276 {
-			return errors.New("Must be between 0 and 3276")
+		if val < 0 || val > 5000 {
+			return errors.New("Must be between 0 and 5000")
 		}
 		return nil
 	}

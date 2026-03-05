@@ -40,7 +40,7 @@ type CanFlasherWidget struct {
 	dumpBTN     *widget.Button
 	flashBTN    *widget.Button
 	bootBOX     *widget.Check
-	nvmeBOX     *widget.Check
+	nvdmBOX     *widget.Check
 	progressBar *widget.ProgressBar
 
 	l binding.DataListener
@@ -66,12 +66,16 @@ func (t *CanFlasherWidget) Disable() {
 	t.infoBTN.Disable()
 	t.dumpBTN.Disable()
 	t.flashBTN.Disable()
+	t.bootBOX.Disable()
+	t.nvdmBOX.Disable()
 }
 
 func (t *CanFlasherWidget) Enable() {
 	t.infoBTN.Enable()
 	t.dumpBTN.Enable()
 	t.flashBTN.Enable()
+	t.bootBOX.Enable()
+	t.nvdmBOX.Enable()
 }
 
 func (t *CanFlasherWidget) log(s string) {
@@ -139,11 +143,11 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	t.bootBOX = widget.NewCheck("boot", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(settings.PrefsBoot, b)
 	})
-	t.nvmeBOX = widget.NewCheck("nvme", func(b bool) {
-		fyne.CurrentApp().Preferences().SetBool(settings.PrefsNvme, b)
+	t.nvdmBOX = widget.NewCheck("nvdm", func(b bool) {
+		fyne.CurrentApp().Preferences().SetBool(settings.PrefsNvdm, b)
 	})
 
-	t.nvmeBOX.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsNvme, false))
+	t.nvdmBOX.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsNvdm, false))
 	t.bootBOX.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsBoot, false))
 	// t.ecuList.PlaceHolder = "Select ECU"
 	// t.adapterList.PlaceHolder = "Select Adapter"
@@ -160,7 +164,7 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 		t.flashBTN,
 		widget.NewLabel("Flash options:"),
 		t.bootBOX,
-		t.nvmeBOX,
+		t.nvdmBOX,
 	)
 
 	split := container.NewHSplit(left, right)
