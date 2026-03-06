@@ -17,7 +17,6 @@ import (
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ecu/t8legion"
 	"github.com/roffe/txlogger/pkg/ecu/t8sec"
-	"github.com/roffe/txlogger/pkg/model"
 )
 
 func init() {
@@ -35,11 +34,6 @@ type Client struct {
 	legion         *t8legion.Client
 	gm             *gmlan.Client
 	cfg            *ecu.Config
-}
-
-// Info implements [ecu.Client].
-func (t *Client) Info(context.Context) ([]model.HeaderResult, error) {
-	return nil, nil
 }
 
 // ReadDTC implements [ecu.Client].
