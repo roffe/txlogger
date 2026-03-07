@@ -290,6 +290,10 @@ func (c *Widget) Enable() {
 }
 
 func (cs *Widget) GetAdapter(ecuType string) (gocan.Adapter, error) {
+	return cs.GetAdapterWithExtraFilters(ecuType, []uint32{})
+}
+
+func (cs *Widget) GetAdapterWithExtraFilters(ecuType string, filters []uint32) (gocan.Adapter, error) {
 	debug := fyne.CurrentApp().Preferences().Bool(prefsDebug)
 	port := fyne.CurrentApp().Preferences().String(prefsPort)
 
@@ -340,15 +344,23 @@ func (cs *Widget) GetAdapter(ecuType string) (gocan.Adapter, error) {
 		if strings.Contains(adapterName, "ELM327") || strings.Contains(adapterName, "STN") || strings.Contains(adapterName, "OBDLink") || strings.HasSuffix(adapterName, "Wifi") {
 			canFilter = []uint32{0x238, 0x258, 0x270}
 		} else {
-			canFilter = []uint32{0x180, 0x1A0, 0x238, 0x258, 0x270, 0x280, 0x3A0, 0x664, 0x665}
+			canFilter = []uint32{0x1A0, 0x238, 0x258, 0x270, 0x280, 0x3A0, 0x664, 0x665}
+		}
+		if fyne.CurrentApp().Preferences().StringWithFallback(prefsWblSource, "None") == "CAN" {
+			canFilter = append(canFilter, 0x180)
 		}
 		canRate = 500
 	case "T8", "Trionic 8", "Trionic 8 MCP", "Z22SE", "Z22SE MCP":
 		if strings.Contains(adapterName, "ELM327") || strings.Contains(adapterName, "STN") || strings.Contains(adapterName, "OBDLink") {
 			canFilter = []uint32{0x5E8, 0x7E8}
 		} else {
-			canFilter = []uint32{0x180, 0x5E8, 0x7E8, 0x664, 0x665}
+			canFilter = []uint32{0x5E8, 0x7E8, 0x664, 0x665}
 		}
+		if fyne.CurrentApp().Preferences().StringWithFallback(prefsWblSource, "None") == "CAN" {
+			canFilter = append(canFilter, 0x180)
+		}
+		canFilter = append(canFilter, filters...)
+
 		canRate = 500
 	}
 

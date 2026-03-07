@@ -1,6 +1,7 @@
 package canflasher
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 
@@ -40,8 +42,10 @@ type CanFlasherWidget struct {
 	infoBTN     *widget.Button
 	dumpBTN     *widget.Button
 	flashBTN    *widget.Button
+	marryBTN    *widget.Button
 	bootBOX     *widget.Check
 	nvdmBOX     *widget.Check
+	pinBOX      *widget.Entry
 	progressBar *widget.ProgressBar
 
 	l binding.DataListener
@@ -67,16 +71,20 @@ func (t *CanFlasherWidget) Disable() {
 	t.infoBTN.Disable()
 	t.dumpBTN.Disable()
 	t.flashBTN.Disable()
+	t.marryBTN.Disable()
 	t.bootBOX.Disable()
 	t.nvdmBOX.Disable()
+	t.pinBOX.Disable()
 }
 
 func (t *CanFlasherWidget) Enable() {
 	t.infoBTN.Enable()
 	t.dumpBTN.Enable()
 	t.flashBTN.Enable()
+	t.marryBTN.Enable()
 	t.bootBOX.Enable()
 	t.nvdmBOX.Enable()
+	t.pinBOX.Enable()
 }
 
 func (t *CanFlasherWidget) log(s string) {
@@ -133,6 +141,13 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	t.logValues.AddListener(t.l)
 
 	t.progressBar = widget.NewProgressBar()
+	t.pinBOX = widget.NewEntry()
+	t.pinBOX.Validator = func(s string) error {
+		if len(s) != 4 {
+			return errors.New("wrong PIN")
+		}
+		return nil
+	}
 
 	// t.wizzardBTN = widget.NewButton("Wizzard", nil) //t.wizzard)
 	t.infoBTN = widget.NewButton("Info", t.ecuInfo) //t.ecuInfo)
@@ -147,6 +162,21 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 		widgets.SelectFile(func(r fyne.URIReadCloser) {
 			t.ecuFlash(r.URI().Path())
 		}, "Bin file", "bin")
+	})
+	t.marryBTN = widget.NewButton("MarryECM", func() {
+		done := make(chan bool)
+		d := dialog.NewConfirm("Confirmation", "You must do it with ignition ON. "+
+			"This operation will erase NVDM flash, are you sure to continue ??", func(b bool) {
+			done <- b
+		}, fyne.CurrentApp().Driver().AllWindows()[0])
+		d.Show()
+
+		go func() {
+			result := <-done
+			if result {
+				t.ecuMarry(t.pinBOX.Text)
+			}
+		}()
 	})
 
 	t.bootBOX = widget.NewCheck("boot", func(b bool) {
@@ -171,9 +201,12 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 		t.dumpBTN,
 		//t.sramBTN,
 		t.flashBTN,
+		t.marryBTN,
 		widget.NewLabel("Flash options:"),
 		t.bootBOX,
 		t.nvdmBOX,
+		widget.NewLabel("PIN code:"),
+		t.pinBOX,
 	)
 
 	split := container.NewHSplit(left, right)
