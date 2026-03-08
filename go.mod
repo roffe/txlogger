@@ -10,7 +10,7 @@ go 1.25.5
 replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 
 require (
-	fyne.io/fyne/v2 v2.7.4-0.20260223203311-84d728683911
+	fyne.io/fyne/v2 v2.7.4-0.20260308132240-3c07b652eb0e
 	fyne.io/x/fyne v0.0.0-20260128204654-7fd4ce591d29
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/lusingander/colorpicker v0.7.5
@@ -33,6 +33,7 @@ require (
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	golang.org/x/sys v0.41.0
+	kernel.org/pub/linux/libs/security/libcap/cap v1.2.77
 )
 
 require (
@@ -53,8 +54,8 @@ require (
 	github.com/fyne-io/oksvg v0.2.0 // indirect
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71 // indirect
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20250301202403-da16c1255728 // indirect
-	github.com/go-text/render v0.2.0 // indirect
-	github.com/go-text/typesetting v0.3.3 // indirect
+	github.com/go-text/render v0.2.1 // indirect
+	github.com/go-text/typesetting v0.3.4 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/gousb v1.1.3 // indirect
@@ -84,4 +85,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260209200024-4cfbd4190f57 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	kernel.org/pub/linux/libs/security/libcap/psx v1.2.77 // indirect
 )

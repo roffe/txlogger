@@ -1,6 +1,6 @@
 $temp_dir = ".\setup_temp"
 $canusb = "https://www.canusb.com/files/canusb_dll_driver.zip"
-$canlib = "https://pim.kvaser.com/var/assets/Product_Resources/canlib.exe"
+$canlib = "https://pim.kvaser.com/var/assets/Product_Resources/7330130980150/5.51.461/canlib_5_51_461.exe"
 $llvm = "https://github.com/mstorsjo/llvm-mingw/releases/download/20251216/llvm-mingw-20251216-ucrt-x86_64.zip"
 
 # create directory temp if not existing
