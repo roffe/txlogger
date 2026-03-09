@@ -40,6 +40,7 @@ require (
 	fyne.io/systray v1.12.0 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/FyshOS/fancyfs v0.0.1 // indirect
+	github.com/TheTitanrain/w32 v0.0.0-20180517000239-4f5cfb03fabf // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
 	github.com/bendikro/dl v0.0.0-20190410215913-e41fdb9069d4 // indirect
 	github.com/creack/goselect v0.1.3 // indirect
@@ -73,6 +74,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/rymdport/portal v0.4.2 // indirect
+	github.com/sqweek/dialog v0.0.0-20260123140253-64c163d53aac // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.11.1 // indirect

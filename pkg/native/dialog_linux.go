@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/godbus/dbus/v5"
+	"github.com/sqweek/dialog"
 )
 
 // GenerateDBusToken generates a random D-Bus authentication token
@@ -115,11 +116,15 @@ func OpenFileDialog(title string, filters ...FileFilter) (string, error) {
 	if len(filters) > 0 {
 		options["filters"] = buildPortalFilters(filters)
 	}
-	return portalCall(
+	filename, err := portalCall(
 		"org.freedesktop.portal.FileChooser.OpenFile",
 		options,
 		title,
 	)
+	if err == nil {
+		return filename, err
+	}
+	return dialog.File().Title("Open File").Filter("bin file", "bin").Load()
 }
 
 func OpenFolderDialog(title string) (string, error) {
@@ -128,11 +133,15 @@ func OpenFolderDialog(title string) (string, error) {
 		"multiple":     dbus.MakeVariant(false),
 		"directory":    dbus.MakeVariant(true),
 	}
-	return portalCall(
+	filename, err := portalCall(
 		"org.freedesktop.portal.FileChooser.OpenFile",
 		options,
 		title,
 	)
+	if err == nil {
+		return filename, err
+	}
+	return dialog.File().Title("Open folder").Load()
 }
 
 func SaveFileDialog(title string, defaultExt string, filters ...FileFilter) (string, error) {
@@ -192,9 +201,13 @@ func SaveFileDialog(title string, defaultExt string, filters ...FileFilter) (str
 		// If filters is non-empty but no match found, skip current_filter entirely
 		// to avoid the portal rejecting the call.
 	}
-	return portalCall(
+	filename, err := portalCall(
 		"org.freedesktop.portal.FileChooser.SaveFile",
 		options,
 		title,
 	)
+	if err == nil {
+		return filename, err
+	}
+	return dialog.File().Title("Save File").Filter("bin file", "bin").Save()
 }
