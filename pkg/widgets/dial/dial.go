@@ -108,12 +108,23 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 	c.displayText.Alignment = fyne.TextAlignCenter
 
 	// Pip color gradient
-	fac := float64(0xA5) / float64(c.cfg.Steps)
+	// Green to Yellow to Red gradient
+	// 0% - 50% Green to Yellow
+	// 50% - 100% Yellow to Red
+	halfSteps := float64(c.cfg.Steps) / 2.0
 
 	// Build pips + labels once; also track the longest label length
+	var col color.RGBA
 	for i := 0; i < c.cfg.Steps+1; i++ {
-		col := color.RGBA{byte(float64(i) * fac), 0x00, 0x00, 0xFF}
-		col.G = 0xA5 - col.R
+		if float64(i) <= halfSteps {
+			// Green to Yellow
+			ratio := float64(i) / halfSteps
+			col = color.RGBA{R: byte(255 * ratio), G: 255, B: 0, A: 255}
+		} else {
+			// Yellow to Red
+			ratio := (float64(i) - halfSteps) / halfSteps
+			col = color.RGBA{R: 255, G: byte(255 * (1 - ratio)), B: 0, A: 255}
+		}
 		pip := &canvas.Line{StrokeColor: col, StrokeWidth: 2}
 		c.pips = append(c.pips, pip)
 

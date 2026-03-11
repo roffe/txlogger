@@ -10,19 +10,19 @@ import (
 	"fyne.io/fyne/v2"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/ecu"
-	"github.com/roffe/txlogger/pkg/native"
 )
 
-func (t *CanFlasherWidget) ecuFlash() {
-	filename, err := native.OpenFileDialog("Bin file", native.FileFilter{
-		Description: "Bin file",
-		Extensions:  []string{"bin"},
-	})
-	if err != nil {
-		t.log(err.Error())
-		return
-	}
-
+func (t *CanFlasherWidget) ecuFlash(filename string) {
+	/*
+		filename, err := native.OpenFileDialog("Bin file", native.FileFilter{
+			Description: "Bin file",
+			Extensions:  []string{"bin"},
+		})
+		if err != nil {
+			t.log(err.Error())
+			return
+		}
+	*/
 	dev, err := t.cfg.CSW.GetAdapter(t.ecuSelect.Selected)
 	if err != nil {
 		t.log(err.Error())

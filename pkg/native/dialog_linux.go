@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/godbus/dbus/v5"
@@ -101,10 +102,18 @@ func portalCall(method string, options map[string]dbus.Variant, args ...interfac
 		if !ok || len(uris) == 0 {
 			return "", errors.New("no files selected")
 		}
-		return strings.TrimPrefix(uris[0], "file://"), nil
+		return uriToPath(uris[0])
 	}
 
 	return "", errors.New("signal channel closed unexpectedly")
+}
+
+func uriToPath(uri string) (string, error) {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return "", err
+	}
+	return u.Path, nil
 }
 
 func OpenFileDialog(title string, filters ...FileFilter) (string, error) {

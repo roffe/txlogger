@@ -2,23 +2,26 @@ package native
 
 import (
 	"errors"
-	"reflect"
-	"unsafe"
 )
 
 var (
 	ErrCancelled = errors.New("Cancelled")
 )
 
+// FileFilter describes a file filter for file dialogs.
 type FileFilter struct {
 	Description string
 	Extensions  []string
 }
 
-func utf16ptr(utf16 []uint16) *uint16 {
-	if utf16[len(utf16)-1] != 0 {
-		panic("refusing to make ptr to non-NUL terminated utf16 slice")
-	}
-	h := (*reflect.SliceHeader)(unsafe.Pointer(&utf16))
-	return (*uint16)(unsafe.Pointer(h.Data))
+type FileRequest struct {
+	Op    string
+	Title string
+	Desc  string
+	Exts  []string
+}
+
+type FileResponse struct {
+	Path string
+	Err  string
 }

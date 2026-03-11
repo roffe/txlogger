@@ -22,6 +22,7 @@
 			"*.rmd": "markdown",
 			"*.tmpl": "gohtml",
 			"*.cfile": "c"
-		}
+		},
+		"makefile.configureOnOpen": false
 	}
 }

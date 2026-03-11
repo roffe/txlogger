@@ -20,6 +20,7 @@ import (
 	_ "github.com/roffe/txlogger/pkg/ecu/t8mcp"
 	_ "github.com/roffe/txlogger/pkg/ecu/z22se"
 	_ "github.com/roffe/txlogger/pkg/ecu/z22semcp"
+	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 )
 
@@ -136,9 +137,17 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	// t.wizzardBTN = widget.NewButton("Wizzard", nil) //t.wizzard)
 	t.infoBTN = widget.NewButton("Info", t.ecuInfo) //t.ecuInfo)
 	//t.dtcBTN = widget.NewButton("Read DTC", nil)   //t.readDTC)
-	t.dumpBTN = widget.NewButton("Dump", t.ecuDump)
+	t.dumpBTN = widget.NewButton("Dump", func() {
+		widgets.SaveFile(func(filename string) {
+			t.ecuDump(filename)
+		}, "Bin file", "bin")
+	})
 	//t.sramBTN = widget.NewButton("Dump SRAM", nil) //t.dumpSRAM)
-	t.flashBTN = widget.NewButton("Flash", t.ecuFlash)
+	t.flashBTN = widget.NewButton("Flash", func() {
+		widgets.SelectFile(func(r fyne.URIReadCloser) {
+			t.ecuFlash(r.URI().Path())
+		}, "Bin file", "bin")
+	})
 
 	t.bootBOX = widget.NewCheck("boot", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(settings.PrefsBoot, b)
