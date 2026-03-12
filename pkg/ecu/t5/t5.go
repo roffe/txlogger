@@ -52,6 +52,10 @@ type Client struct {
 	cfg *ecu.Config
 }
 
+func (t *Client) MarryECU(context.Context, string) error {
+	return errors.New("not supported")
+}
+
 func New(c *gocan.Client, cfg *ecu.Config) ecu.Client {
 	t := &Client{
 		c:              c,

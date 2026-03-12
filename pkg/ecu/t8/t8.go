@@ -31,6 +31,7 @@ type Client struct {
 	defaultTimeout time.Duration
 	legion         *t8legion.Client
 	gm             *gmlan.Client
+	gmc            *gmlan.Client
 	cfg            *ecu.Config
 }
 
@@ -41,6 +42,7 @@ func New(c *gocan.Client, cfg *ecu.Config) ecu.Client {
 		defaultTimeout: 150 * time.Millisecond,
 		legion:         t8legion.New(c, cfg, 0x7e0, 0x7e8),
 		gm:             gmlan.New(c, 0x7e0, 0x5e8, 0x7e8),
+		gmc:            gmlan.New(c, 0x245, 0x645),
 	}
 	return t
 }

@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 )
 
+var T8binSize = uint64(0x100000)
 var t8parts = []uint32{
 	0x000000, // Boot (0)
 	0x004000, // NVDM
@@ -202,4 +203,14 @@ func GetFrameCmd(frameNo int, array []byte, startIndex int) uint64 {
 	res := getUlong(array, startIndex, 7)
 	res = (res << 8) | uint64(frameNo&0xFF)
 	return res
+}
+
+func GetVirginNVDM() []byte {
+	buff := make([]byte, T8binSize)
+	for i := range buff {
+		buff[i] = 0xFF
+	}
+	copy(buff[t8parts[1]:], nvdmBytes)
+
+	return buff
 }

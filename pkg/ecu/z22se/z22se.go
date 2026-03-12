@@ -52,6 +52,10 @@ func New(c *gocan.Client, cfg *ecu.Config) ecu.Client {
 	return t
 }
 
+func (t *Client) MarryECU(context.Context, string) error {
+	return errors.New("not supported")
+}
+
 func (t *Client) PrintECUInfo(ctx context.Context) error {
 	return nil
 }
