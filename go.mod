@@ -10,14 +10,14 @@ go 1.25.5
 replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 
 require (
-	fyne.io/fyne/v2 v2.7.4-0.20260309205831-1ce04a723d57
+	fyne.io/fyne/v2 v2.7.4-0.20260311232400-408c1bef45ea
 	fyne.io/x/fyne v0.0.0-20260128204654-7fd4ce591d29
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/lusingander/colorpicker v0.7.5
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.1.0
 	github.com/roffe/ecusymbol v1.1.0
-	github.com/roffe/gocan v1.3.6
+	github.com/roffe/gocan v1.3.8
 	go.bug.st/serial v1.6.4
 	golang.org/x/image v0.36.0
 	golang.org/x/mod v0.33.0

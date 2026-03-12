@@ -1,5 +1,5 @@
-fyne.io/fyne/v2 v2.7.4-0.20260309205831-1ce04a723d57 h1:JGolX7MpBUQ987lYups+D0oqychlBf4qXep7t0MUGc4=
-fyne.io/fyne/v2 v2.7.4-0.20260309205831-1ce04a723d57/go.mod h1:CrnszhsGo6XoBe0u4xYUC/vhz7J4aiZNvv6gzKhmFKM=
+fyne.io/fyne/v2 v2.7.4-0.20260311232400-408c1bef45ea h1:YyL7yO6LJyDStMLr5/dNEHTkwb05uqLMYuSPZoBayJY=
+fyne.io/fyne/v2 v2.7.4-0.20260311232400-408c1bef45ea/go.mod h1:CrnszhsGo6XoBe0u4xYUC/vhz7J4aiZNvv6gzKhmFKM=
 fyne.io/systray v1.12.0 h1:CA1Kk0e2zwFlxtc02L3QFSiIbxJ/P0n582YrZHT7aTM=
 fyne.io/systray v1.12.0/go.mod h1:RVwqP9nYMo7h5zViCBHri2FgjXF7H2cub7MAq4NSoLs=
 fyne.io/x/fyne v0.0.0-20260128204654-7fd4ce591d29 h1:FV2MT0oaWNteVJLx00WVw9NgELvDylRnw7IEyMk5Gk4=
@@ -116,8 +116,8 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/roffe/ecusymbol v1.1.0 h1:5BwN+w7Rpooo6LD/eB/Wawz+ZI1Az2Yq4BjYrAc91rk=
 github.com/roffe/ecusymbol v1.1.0/go.mod h1:P53NLPps1rW3BEDM8QZtx9F0clYkA+cQUzc2arbtvrA=
-github.com/roffe/gocan v1.3.6 h1:4V4hBoC0C18N9rTzHzFP+3RKqT6pAik+oERq3xBzccY=
-github.com/roffe/gocan v1.3.6/go.mod h1:+Iv2n6O0PqeZ098qy8CbM4iQ+grq25tO1OvpwtfO9mw=
+github.com/roffe/gocan v1.3.8 h1:1/zaVHx2hTnHoz/4J4xaL5ar1w3DfKEU4bCDu45pMHw=
+github.com/roffe/gocan v1.3.8/go.mod h1:+Iv2n6O0PqeZ098qy8CbM4iQ+grq25tO1OvpwtfO9mw=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
