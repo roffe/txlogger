@@ -66,6 +66,10 @@ func (t *Client) MarryECU(context.Context, string) error {
 	return errors.New("not supported")
 }
 
+func (t *Client) RecoverECU(context.Context, []byte) error {
+	return errors.New("not supported")
+}
+
 var chipTypes []byte
 
 func (t *Client) GetChipTypes(ctx context.Context) ([]byte, error) {

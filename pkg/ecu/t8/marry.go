@@ -7,10 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"fyne.io/fyne/v2"
 	"github.com/roffe/gocan/pkg/gmlan"
+	"github.com/roffe/txlogger/pkg/ecu/t8/t8file"
 	"github.com/roffe/txlogger/pkg/ecu/t8legion"
 	"github.com/roffe/txlogger/pkg/ecu/t8sec"
 	"github.com/roffe/txlogger/pkg/ecu/t8util"
+	"github.com/roffe/txlogger/pkg/widgets/settings"
 )
 
 func (t *Client) CheckIfCanChangeVIN(ctx context.Context) error {
@@ -30,10 +33,44 @@ func (t *Client) CheckIfCanChangeVIN(ctx context.Context) error {
 func (t *Client) MarryECU(ctx context.Context, pin string) error {
 	t.cfg.OnMessage("Marry ECU")
 	if err := t.CheckIfCanChangeVIN(ctx); err != nil {
+		t.cfg.OnMessage("Virginize ECU by pin stored in ECU")
+		if err := t.legion.Bootstrap(ctx, false); err != nil {
+			return err
+		}
+
+		bin, err := t.legion.ReadFlashRange(ctx, t8legion.EcuByte_T8, 0x4000, 0x8000)
+		if err != nil {
+			return err
+		}
+		if err := t.ResetECU(ctx); err != nil {
+			return err
+		}
+		tf := new(t8file.T8Header)
+		tf.DecodeExtraInfo(bin)
+		t.cfg.OnMessage("PIN stored in ECU: " + tf.PIN() + ", security access delay 30s")
+		time.Sleep(30 * time.Second)
+
+		pin := []byte(tf.PIN())
+		pinCmd := []byte{0x00}
+		pinCmd = append(pinCmd, pin...)
+
+		if err := t.gm.RequestSecurityAccess(ctx, 0x01, 1, t8sec.CalculateAccessKey); err != nil {
+			return err
+		}
+		t.gm.DeviceControlWithCode(ctx, 0x60, pinCmd)
+		t.gm.DeviceControlWithCode(ctx, 0x6e, pinCmd)
+	}
+
+	if err := t.CheckIfCanChangeVIN(ctx); err != nil {
+		t.cfg.OnMessage("Virginize by pin stored in ECU failed, trying by flashing T8 NVDM")
+		nvdm := fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsNvdm, false)
+		if !nvdm {
+			return errors.New("System partition not unlocked, try again with checked this option")
+		}
 		// ---------- Virginize ECU -----------------
 		nvdmBytes := t8util.GetVirginNVDM()
 		fmask := uint64(0b110) //format nvdm
-		t.cfg.OnMessage("Virginize T8 NVDM")
+
 		if err := t.legion.Bootstrap(ctx, false); err != nil {
 			return err
 		}

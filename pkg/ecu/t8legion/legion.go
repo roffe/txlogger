@@ -450,12 +450,16 @@ func (t *Client) IDemand(ctx context.Context, command Command, wish uint16) ([]b
 	return out, nil
 }
 
-func (t *Client) ReadFlash(ctx context.Context, device byte, lastAddress int) ([]byte, error) {
+func (t *Client) ReadFlashRange(ctx context.Context, device byte, startAdress, lastAddress int) ([]byte, error) {
 	if !t.legionRunning {
 		return nil, fmt.Errorf("legion not running")
 	}
 	buf := make([]byte, lastAddress)
 	bufpnt := 0
+
+	if startAdress > 0x80 {
+		bufpnt = startAdress / 0x80
+	}
 
 	// Pre-fill buffer with 0xFF (unprogrammed FLASH chip value)
 	buf[0] = 0xFF

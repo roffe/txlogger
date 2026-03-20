@@ -45,6 +45,10 @@ func (t *Client) MarryECU(context.Context, string) error {
 	return errors.New("not supported")
 }
 
+func (t *Client) RecoverECU(context.Context, []byte) error {
+	return errors.New("not supported")
+}
+
 func (t *Client) ReadDTC(ctx context.Context) ([]dtc.DTC, error) {
 	return nil, errors.New("MCP cannot do this")
 }
@@ -109,7 +113,7 @@ func (t *Client) DumpECU(ctx context.Context) ([]byte, error) {
 
 	start := time.Now()
 
-	bin, err := t.legion.ReadFlash(ctx, t8legion.EcuByte_MCP, 0x40100)
+	bin, err := t.legion.ReadFlashRange(ctx, t8legion.EcuByte_MCP, 0, 0x40100)
 	if err != nil {
 		return nil, err
 	}

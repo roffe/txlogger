@@ -13,7 +13,7 @@ import (
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/gmlan"
 	"github.com/roffe/txlogger/pkg/ebus"
-	"github.com/roffe/txlogger/pkg/ecu"
+	"github.com/roffe/txlogger/pkg/ecu/t8sec"
 )
 
 type T8Client struct {
@@ -216,7 +216,7 @@ func initT8Logging(ctx context.Context, gm *gmlan.Client, symbols []*symbol.Symb
 		return err
 	}
 
-	if err := gm.RequestSecurityAccess(ctx, 0xFD, 1, ecu.CalculateT8AccessKey); err != nil {
+	if err := gm.RequestSecurityAccess(ctx, 0xFD, 1, t8sec.CalculateAccessKey); err != nil {
 		return err
 	}
 

@@ -18,6 +18,7 @@ import (
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/ebus"
+	"github.com/roffe/txlogger/pkg/ecu/t8/t8file"
 	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/dtcreader"
@@ -107,6 +108,17 @@ func (mw *MainWindow) setupMenu() {
 				inner.Icon = theme.InfoIcon()
 				mw.wm.Add(inner)
 			}
+		},
+		"Firmware info edit": func(str string) {
+			if w := mw.wm.HasWindow("Firmware info edit"); w != nil {
+				mw.wm.Raise(w)
+				return
+			}
+			tf := new(t8file.T8File)
+			filename := fyne.CurrentApp().Preferences().String("lastBinFile")
+			tf.GetInfo(filename)
+			tf.ShowEditT8Dialog(mw)
+
 		},
 		"Pgm_mod!": func(str string) {
 			if w := mw.wm.HasWindow("Pgm_mod!"); w != nil {
