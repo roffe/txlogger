@@ -45,7 +45,7 @@ type CanFlasherWidget struct {
 	marryBTN    *widget.Button
 	bootBOX     *widget.Check
 	nvdmBOX     *widget.Check
-	pinBOX      *widget.Entry
+	pinEntry    *widget.Entry
 	progressBar *widget.ProgressBar
 
 	l binding.DataListener
@@ -74,7 +74,7 @@ func (t *CanFlasherWidget) Disable() {
 	t.marryBTN.Disable()
 	t.bootBOX.Disable()
 	t.nvdmBOX.Disable()
-	t.pinBOX.Disable()
+	t.pinEntry.Disable()
 }
 
 func (t *CanFlasherWidget) Enable() {
@@ -84,7 +84,7 @@ func (t *CanFlasherWidget) Enable() {
 	t.marryBTN.Enable()
 	t.bootBOX.Enable()
 	t.nvdmBOX.Enable()
-	t.pinBOX.Enable()
+	t.pinEntry.Enable()
 }
 
 func (t *CanFlasherWidget) log(s string) {
@@ -141,8 +141,8 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	t.logValues.AddListener(t.l)
 
 	t.progressBar = widget.NewProgressBar()
-	t.pinBOX = widget.NewEntry()
-	t.pinBOX.Validator = func(s string) error {
+	t.pinEntry = widget.NewEntry()
+	t.pinEntry.Validator = func(s string) error {
 		if len(s) != 4 {
 			return errors.New("wrong PIN")
 		}
@@ -159,9 +159,22 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	})
 	//t.sramBTN = widget.NewButton("Dump SRAM", nil) //t.dumpSRAM)
 	t.flashBTN = widget.NewButton("Flash", func() {
+		if t.nvdmBOX.Checked {
+			dialog.ShowConfirm("⚠️ Warning ⚠️", "Are you sure you want to overwrite keys and marriage status in the ECU?", func(confirm bool) {
+				if !confirm {
+					return
+				}
+				widgets.SelectFile(func(r fyne.URIReadCloser) {
+					t.ecuFlash(r.URI().Path())
+				}, "Bin file", "bin")
+			}, fyne.CurrentApp().Driver().AllWindows()[0])
+			return
+		}
+
 		widgets.SelectFile(func(r fyne.URIReadCloser) {
 			t.ecuFlash(r.URI().Path())
 		}, "Bin file", "bin")
+
 	})
 	t.marryBTN = widget.NewButton("MarryECM", func() {
 		done := make(chan bool)
@@ -174,20 +187,50 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 		go func() {
 			result := <-done
 			if result {
-				t.ecuMarry(t.pinBOX.Text)
+				t.ecuMarry(t.pinEntry.Text)
 			}
 		}()
 	})
 
-	t.bootBOX = widget.NewCheck("boot", func(b bool) {
+	t.bootBOX = widget.NewCheck("Unlock boot partition", func(b bool) {
+		if b {
+			confirmFN := func(confirm bool) {
+				if confirm {
+					fyne.CurrentApp().Preferences().SetBool(settings.PrefsBoot, b)
+					return
+				}
+				t.bootBOX.SetChecked(false)
+			}
+
+			dialog.ShowConfirm("⚠️ Warning ⚠️", "Boot is for advanced users only. If you don't know what it is, don't use it as it can possibly brick your ECU.", func(confirm bool) {
+				confirmFN(confirm)
+			}, fyne.CurrentApp().Driver().AllWindows()[0])
+			return
+		}
 		fyne.CurrentApp().Preferences().SetBool(settings.PrefsBoot, b)
 	})
-	t.nvdmBOX = widget.NewCheck("nvdm", func(b bool) {
+
+	t.nvdmBOX = widget.NewCheck("Unlock systems partition", func(b bool) {
+		if b {
+			confirmFN := func(confirm bool) {
+				if confirm {
+					fyne.CurrentApp().Preferences().SetBool(settings.PrefsNvdm, b)
+					return
+				}
+				t.nvdmBOX.SetChecked(false)
+			}
+
+			dialog.ShowConfirm("⚠️ Warning ⚠️", "This will overwrite any keys and marriage status in the ECU", func(confirm bool) {
+				confirmFN(confirm)
+			}, fyne.CurrentApp().Driver().AllWindows()[0])
+			return
+		}
 		fyne.CurrentApp().Preferences().SetBool(settings.PrefsNvdm, b)
 	})
 
-	t.nvdmBOX.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsNvdm, false))
-	t.bootBOX.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsBoot, false))
+	t.nvdmBOX.Checked = (fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsNvdm, false))
+	t.bootBOX.Checked = fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsBoot, false)
+	//t.bootBOX.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsBoot, false))
 	// t.ecuList.PlaceHolder = "Select ECU"
 	// t.adapterList.PlaceHolder = "Select Adapter"
 	// t.portList.PlaceHolder = "Select Port"
@@ -206,7 +249,7 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 		t.bootBOX,
 		t.nvdmBOX,
 		widget.NewLabel("PIN code:"),
-		t.pinBOX,
+		t.pinEntry,
 	)
 
 	split := container.NewHSplit(left, right)
@@ -230,7 +273,8 @@ func (tr *CanFlasherWidgetRenderer) Layout(space fyne.Size) {
 }
 
 func (tr *CanFlasherWidgetRenderer) MinSize() fyne.Size {
-	return tr.t.container.MinSize()
+	//return tr.t.container.MinSize()
+	return fyne.NewSize(600, 450)
 }
 
 func (tr *CanFlasherWidgetRenderer) Refresh() {

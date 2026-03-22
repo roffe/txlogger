@@ -289,7 +289,7 @@ func (c *DualDialRenderer) Layout(space fyne.Size) {
 	radius87 := c.radius * common.OneEight * 7
 
 	// Label padding and cached box dims (avoid lbl.MinSize per label)
-	labelPad := max(float32(6.0), c.radius*0.04)
+	labelPad := max(float32(6.0), c.radius*0.14)
 	const charWidthFactor = 0.62
 	const heightFactor = 1.15
 	labelTextSize := c.radius * 0.10

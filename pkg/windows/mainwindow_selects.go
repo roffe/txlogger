@@ -59,7 +59,7 @@ func (mw *MainWindow) createSelects() {
 		remoteStrings = append(remoteStrings, "Local+Relay", "Remote")
 	}
 
-	mw.selects.remoteSelect = widget.NewSelect([]string{"Local", "Local+Relay", "Remote"}, func(s string) {
+	mw.selects.remoteSelect = widget.NewSelect(remoteStrings, func(s string) {
 		if s == "" {
 			return
 		}

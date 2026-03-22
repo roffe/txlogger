@@ -283,7 +283,7 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 	radius87 := c.radius * common.OneEight * 7
 
 	// Label padding and cached box dims (avoid lbl.MinSize per label)
-	labelPad := max(float32(6.0), c.radius*0.04)
+	labelPad := max(float32(6.0), c.radius*0.14)
 
 	// Assume monospace, digits only: width ≈ chars * 0.62 * TextSize; height ≈ 1.15 * TextSize
 	// This keeps alignment stable and removes per-label measuring.
@@ -312,7 +312,8 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 				boxW := c.labelBoxW
 				boxH := c.labelBoxH
 				lbl.Resize(fyne.NewSize(boxW, boxH))
-				lbl.Move(fyne.NewPos(cx-boxW/2, cy-boxH/2))
+				//lbl.Move(fyne.NewPos(cx-boxW/2, cy-boxH/2))
+				lbl.Move(fyne.Position{X: cx - boxW/2, Y: cy - boxH/2})
 			}
 		} else {
 			p.StrokeWidth = max(2.0, smallStroke)

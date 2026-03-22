@@ -1,16 +1,12 @@
 package windows
 
 import (
-	"bytes"
-	"path/filepath"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/widgets/canflasher"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
-	"github.com/roffe/txlogger/pkg/widgets/txweb"
 )
 
 func (mw *MainWindow) newToolbar() *fyne.Container {
@@ -53,31 +49,33 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 		}),
 		)
 
-		toolbar.Add(widget.NewButtonWithIcon("", theme.DocumentIcon(), func() {
-			if w := mw.wm.HasWindow("txweb"); w != nil {
-				mw.wm.Raise(w)
-				return
-			}
-			txb := txweb.New()
-			txb.LoadFileFunc = func(name string, data []byte) error {
-				switch filepath.Ext(name) {
-				case ".bin":
-					if err := mw.LoadSymbolsFromBytes(name, data); err != nil {
-						return err
+		/*
+			toolbar.Add(widget.NewButtonWithIcon("", theme.DocumentIcon(), func() {
+				if w := mw.wm.HasWindow("txweb"); w != nil {
+					mw.wm.Raise(w)
+					return
+				}
+				txb := txweb.New()
+				txb.LoadFileFunc = func(name string, data []byte) error {
+					switch filepath.Ext(name) {
+					case ".bin":
+						if err := mw.LoadSymbolsFromBytes(name, data); err != nil {
+							return err
+						}
+						return nil
+					case ".csv": // ".t5l", ".t7l", ".t8l",
+						mw.LoadLogfile(name, bytes.NewReader(data), fyne.NewPos(100, 100))
+						return nil
 					}
 					return nil
-				case ".csv": // ".t5l", ".t7l", ".t8l",
-					mw.LoadLogfile(name, bytes.NewReader(data), fyne.NewPos(100, 100))
-					return nil
 				}
-				return nil
-			}
-			inner := multiwindow.NewInnerWindow("txweb", txb)
-			inner.Icon = theme.FileApplicationIcon()
-			mw.wm.Add(inner)
-			inner.Resize(fyne.NewSize(700, 500))
-		}),
-		)
+				inner := multiwindow.NewInnerWindow("txweb", txb)
+				inner.Icon = theme.FileApplicationIcon()
+				mw.wm.Add(inner)
+				inner.Resize(fyne.NewSize(700, 500))
+			}),
+			)
+		*/
 
 		/*
 			widget.NewButtonWithIcon("", theme.NavigateNextIcon(), func() {
