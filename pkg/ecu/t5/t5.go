@@ -56,6 +56,10 @@ func (t *Client) MarryECU(context.Context, string) error {
 	return errors.New("not supported")
 }
 
+func (t *Client) RecoverECU(context.Context, []byte) error {
+	return errors.New("not supported")
+}
+
 func New(c *gocan.Client, cfg *ecu.Config) ecu.Client {
 	t := &Client{
 		c:              c,

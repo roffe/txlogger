@@ -5,6 +5,7 @@ import (
 )
 
 var T8binSize = uint64(0x100000)
+
 var t8parts = []uint32{
 	0x000000, // Boot (0)
 	0x004000, // NVDM

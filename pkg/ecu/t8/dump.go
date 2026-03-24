@@ -19,7 +19,7 @@ func (t *Client) DumpECU(ctx context.Context) ([]byte, error) {
 	t.cfg.OnMessage("Dumping ECU")
 	start := time.Now()
 
-	bin, err := t.legion.ReadFlash(ctx, t8legion.EcuByte_T8, 0x100000)
+	bin, err := t.legion.ReadFlashRange(ctx, t8legion.EcuByte_T8, 0, 0x100000)
 	if err != nil {
 		return nil, err
 	}

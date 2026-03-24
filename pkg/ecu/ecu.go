@@ -17,6 +17,7 @@ type Client interface {
 	Info(context.Context) ([]model.HeaderResult, error)
 	DumpECU(context.Context) ([]byte, error)
 	FlashECU(context.Context, []byte) error
+	RecoverECU(context.Context, []byte) error
 	EraseECU(context.Context) error
 	MarryECU(context.Context, string) error
 	ResetECU(context.Context) error

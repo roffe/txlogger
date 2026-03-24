@@ -14,8 +14,8 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/gmlan"
-	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ecu/t8"
+	"github.com/roffe/txlogger/pkg/ecu/t8sec"
 )
 
 type EditParameters struct {
@@ -312,7 +312,7 @@ func (t *EditParameters) writeParameters() {
 			time.Sleep(75 * time.Millisecond)
 		}()
 
-		if err := gm.RequestSecurityAccess(ctx, 0xFD, 1, ecu.CalculateT8AccessKey); err != nil {
+		if err := gm.RequestSecurityAccess(ctx, 0xFD, 1, t8sec.CalculateAccessKey); err != nil {
 			t.err(err)
 			return
 		}

@@ -42,15 +42,16 @@ type CanFlasherWidget struct {
 	infoBTN     *widget.Button
 	dumpBTN     *widget.Button
 	flashBTN    *widget.Button
+	recoveryBTN *widget.Button
 	marryBTN    *widget.Button
 	bootBOX     *widget.Check
 	nvdmBOX     *widget.Check
 	pinEntry    *widget.Entry
 	progressBar *widget.ProgressBar
-
-	l binding.DataListener
-
-	cfg *Config
+	flashLabel  *widget.Label
+	pinLabel    *widget.Label
+	l           binding.DataListener
+	cfg         *Config
 }
 
 type Config struct {
@@ -72,6 +73,7 @@ func (t *CanFlasherWidget) Disable() {
 	t.dumpBTN.Disable()
 	t.flashBTN.Disable()
 	t.marryBTN.Disable()
+	t.recoveryBTN.Disable()
 	t.bootBOX.Disable()
 	t.nvdmBOX.Disable()
 	t.pinEntry.Disable()
@@ -82,6 +84,7 @@ func (t *CanFlasherWidget) Enable() {
 	t.dumpBTN.Enable()
 	t.flashBTN.Enable()
 	t.marryBTN.Enable()
+	t.recoveryBTN.Enable()
 	t.bootBOX.Enable()
 	t.nvdmBOX.Enable()
 	t.pinEntry.Enable()
@@ -192,6 +195,13 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 		}()
 	})
 
+	t.recoveryBTN = widget.NewButton("Recovery", func() {
+		widgets.SelectFile(func(r fyne.URIReadCloser) {
+			t.ecuRecover(r.URI().Path())
+		}, "Bin file", "bin")
+
+	})
+
 	t.bootBOX = widget.NewCheck("Unlock boot partition", func(b bool) {
 		if b {
 			confirmFN := func(confirm bool) {
@@ -235,7 +245,8 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	// t.adapterList.PlaceHolder = "Select Adapter"
 	// t.portList.PlaceHolder = "Select Port"
 	// t.speedList.PlaceHolder = "Select Speed"
-
+	t.flashLabel = widget.NewLabel("Flash options:")
+	t.pinLabel = widget.NewLabel("PIN code:")
 	left := container.New(layout.NewStackLayout(), t.logList)
 	right := container.NewVBox(
 		t.ecuSelect,
@@ -245,10 +256,11 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 		//t.sramBTN,
 		t.flashBTN,
 		t.marryBTN,
-		widget.NewLabel("Flash options:"),
+		t.recoveryBTN,
+		t.flashLabel,
 		t.bootBOX,
 		t.nvdmBOX,
-		widget.NewLabel("PIN code:"),
+		t.pinLabel,
 		t.pinEntry,
 	)
 
@@ -257,6 +269,26 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 
 	t.container = container.NewVSplit(split, t.progressBar)
 	t.container.Offset = 1
+
+	t.ecuSelect.OnChanged = func(s string) {
+		if s != "Trionic 8" {
+			t.marryBTN.Hide()
+			t.recoveryBTN.Hide()
+			t.bootBOX.Hide()
+			t.nvdmBOX.Hide()
+			t.pinEntry.Hide()
+			t.pinLabel.Hide()
+			t.flashLabel.Hide()
+		} else {
+			t.marryBTN.Show()
+			t.recoveryBTN.Show()
+			t.bootBOX.Show()
+			t.nvdmBOX.Show()
+			t.pinEntry.Show()
+			t.pinLabel.Show()
+			t.flashLabel.Show()
+		}
+	}
 
 	//return widget.NewSimpleRenderer(t.container)
 	return &CanFlasherWidgetRenderer{
