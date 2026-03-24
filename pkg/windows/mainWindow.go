@@ -499,8 +499,10 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Positio
 	if pos2.X < 0 {
 		pos2.X = 0
 	}
+	if pos2.Y < 0 {
+		pos2.Y = 80
+	}
 	iw.Move(pos2)
-
 }
 
 func (mw *MainWindow) Log(s string) {

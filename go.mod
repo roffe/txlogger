@@ -4,13 +4,13 @@ go 1.25.5
 
 //replace github.com/roffe/gocan => ..\gocan
 //replace github.com/roffe/ecusymbol => ..\ecusymbol
-//replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
+replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 //replace go.bug.st/serial => ../../../go.bug.st/serial
 
 replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 
 require (
-	fyne.io/fyne/v2 v2.7.4-0.20260318091837-9a4759694b4f
+	fyne.io/fyne/v2 v2.7.4-0.20260320100324-b06b9916e628
 	fyne.io/x/fyne v0.0.0-20260128204654-7fd4ce591d29
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/lusingander/colorpicker v0.7.5
