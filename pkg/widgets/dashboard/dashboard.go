@@ -187,6 +187,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 			},
 			activeAirDem: &canvas.Text{
 				Text:      "None (0)",
+				Color:     color.RGBA{R: 0x6C, G: 0xC4, B: 0x31, A: 0xFF},
 				Alignment: fyne.TextAlignCenter,
 				TextSize:  35,
 			},
@@ -585,7 +586,7 @@ func (db *Dashboard) layoutTexts(dims *dims) {
 		db.text.time.TextSize = dims.smallTextSize
 		db.text.time.Move(fyne.Position{
 			X: dims.centerX - (db.text.time.MinSize().Width * 0.5),
-			Y: db.size.Height * common.OneHalfSix,
+			Y: db.text.activeAirDem.Position().Y + db.text.time.MinSize().Height + 5,
 		})
 	}
 

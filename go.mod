@@ -1,10 +1,10 @@
 module github.com/roffe/txlogger
 
-go 1.25.5
+go 1.26.0
 
 //replace github.com/roffe/gocan => ..\gocan
 //replace github.com/roffe/ecusymbol => ..\ecusymbol
-replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
+//replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
 //replace go.bug.st/serial => ../../../go.bug.st/serial
 
 replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
