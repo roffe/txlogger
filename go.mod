@@ -10,14 +10,14 @@ go 1.26.0
 replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 
 require (
-	fyne.io/fyne/v2 v2.7.4-0.20260320100324-b06b9916e628
+	fyne.io/fyne/v2 v2.7.4-0.20260504083939-7c2981130815
 	fyne.io/x/fyne v0.0.0-20260128204654-7fd4ce591d29
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/lusingander/colorpicker v0.7.5
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.1.0
 	github.com/roffe/ecusymbol v1.1.0
-	github.com/roffe/gocan v1.3.8
+	github.com/roffe/gocan v1.3.9
 	go.bug.st/serial v1.6.4
 	golang.org/x/image v0.36.0
 	golang.org/x/mod v0.33.0
@@ -67,11 +67,13 @@ require (
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-runewidth v0.0.17 // indirect
 	github.com/mdlayher/netlink v1.8.0 // indirect
 	github.com/mdlayher/socket v0.5.1 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.6.1 // indirect
 	github.com/pion/logging v0.2.4 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/rymdport/portal v0.4.2 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
