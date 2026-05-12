@@ -57,7 +57,7 @@ func main() {
 
 	InitConsole()
 	// create txlogger dir in user home for debug log and such
-	if err := common.CreatetxloggerDir(); err != nil {
+	if err := common.CreatetxloggerDirs(); err != nil {
 		log.Printf("error creating txlogger dir in user home: %v", err)
 	}
 

@@ -1,12 +1,14 @@
 package windows
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -34,7 +36,6 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/secrettext"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
-	"golang.org/x/net/context"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -550,6 +551,10 @@ func (mw *MainWindow) Enable() {
 }
 
 func (mw *MainWindow) SyncSymbols() {
+	// Print where SyncSymbols was called from
+	_, file, line, _ := runtime.Caller(1)
+	log.Printf("SyncSymbols called from %s:%d", file, line)
+
 	if mw.fw == nil {
 		return
 	}

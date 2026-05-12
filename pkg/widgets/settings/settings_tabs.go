@@ -16,6 +16,13 @@ func (sw *Widget) generalTab() *container.TabItem {
 		container.NewBorder(
 			nil,
 			nil,
+			widget.NewLabel("WD"),
+			nil,
+			sw.workDir,
+		),
+		container.NewBorder(
+			nil,
+			nil,
 			widget.NewIcon(theme.InfoIcon()),
 			nil,
 			sw.autoLoad,

@@ -1,6 +1,7 @@
 package windows
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
-	"golang.org/x/net/context"
 )
 
 type T7Extras struct {

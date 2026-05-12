@@ -4,123 +4,149 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"slices"
 
 	"github.com/roffe/txlogger/pkg/colors"
 )
 
-// VertexPair represents a line segment between two vertices
-type VertexPair struct {
-	v1, v2     Vertex
-	val1, val2 float64
+// lineSegment indexes into the precomputed projected/color slices so we don't
+// duplicate the Vertex data per edge.
+type lineSegment struct {
+	idx1, idx2 int
 	x1, y1     int
 	x2, y2     int
 	depth      float64
+	diagonal   bool
 }
 
-// drawMeshgridLines creates a new image with the meshgrid drawn
+// drawMeshgridLines renders the meshgrid into a reusable RGBA buffer.
 func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
-	img := image.NewRGBA(image.Rect(0, 0, int(m.size.Width), int(m.size.Height)))
+	w, h := int(m.size.Width), int(m.size.Height)
+	if w <= 0 || h <= 0 {
+		return image.NewRGBA(image.Rect(0, 0, 0, 0))
+	}
 
-	// Find the min and max Z values after projection for depth scaling
+	// Reuse the backing image across frames when the size hasn't changed,
+	// otherwise allocate a fresh one.
+	img := m.scratchImg
+	if img == nil || img.Bounds().Dx() != w || img.Bounds().Dy() != h {
+		img = image.NewRGBA(image.Rect(0, 0, w, h))
+		m.scratchImg = img
+	} else {
+		clearPix(img.Pix)
+	}
+
+	// Find min/max of the view-space Z for depth shading.
 	minZ, maxZ := math.Inf(1), math.Inf(-1)
 	for i := 0; i < m.rows; i++ {
+		row := m.vertices[i]
 		for j := 0; j < m.cols; j++ {
-			if m.vertices[i][j].Z < minZ {
-				minZ = m.vertices[i][j].Z
+			z := row[j].Z
+			if z < minZ {
+				minZ = z
 			}
-			if m.vertices[i][j].Z > maxZ {
-				maxZ = m.vertices[i][j].Z
+			if z > maxZ {
+				maxZ = z
 			}
 		}
 	}
 	zRange := maxZ - minZ
 	if zRange == 0 {
-		zRange = 1 // Prevent division by zero
+		zRange = 1
 	}
 
-	// Sort vertices by Z value for proper depth
-	// Instead of using a map-based z-buffer, we'll use a simpler approach:
-	// 1. Collect all line segments
-	// 2. Sort them by depth (back to front)
-	// 3. Draw them in order
+	// Precompute screen-space projection and color for each vertex once.
+	n := m.rows * m.cols
+	if cap(m.scratchProjX) < n {
+		m.scratchProjX = make([]int, n)
+		m.scratchProjY = make([]int, n)
+		m.scratchColors = make([]color.RGBA, n)
+	}
+	projX := m.scratchProjX[:n]
+	projY := m.scratchProjY[:n]
+	vertCol := m.scratchColors[:n]
 
-	// Capacity preallocation helps performance
-	lineSegments := make([]VertexPair, 0, m.rows*m.cols*3)
+	cx := float64(m.size.Width) * 0.5
+	cy := float64(m.size.Height) * 0.5
+	for i := 0; i < m.rows; i++ {
+		row := m.vertices[i]
+		base := i * m.cols
+		for j := 0; j < m.cols; j++ {
+			v := row[j]
+			idx := base + j
+			projX[idx] = int(cx + v.X)
+			projY[idx] = int(cy + v.Y)
+			depth := (v.Z - minZ) / zRange
+			vertCol[idx] = m.getColorWithDepth(m.values[idx], depth)
+		}
+	}
 
-	// Collect line segments with all necessary data pre-computed
+	// Collect line segments using cached projections.
+	segs := m.scratchLines[:0]
 	for i := 0; i < m.rows; i++ {
 		for j := 0; j < m.cols; j++ {
-			vertex := m.vertices[i][j]
-			value := m.values[i*m.cols+j]
-			x1, y1 := m.project(vertex)
-
-			neighbors := []struct{ di, dj int }{{1, 0}, {0, 1}, {1, -1}}
-			for _, n := range neighbors {
-				ni, nj := i+n.di, j+n.dj
-				if ni < m.rows && nj >= 0 && nj < m.cols {
-					neighborVertex := m.vertices[ni][nj]
-					neighborValue := m.values[ni*m.cols+nj]
-					x2, y2 := m.project(neighborVertex)
-
-					// Skip if line is too small to be visible
-					dx, dy := x2-x1, y2-y1
-					if dx*dx+dy*dy < 4 {
-						continue
-					}
-
-					// Calculate average Z for sorting - farther objects have larger Z values
-					depth := -(vertex.Z + neighborVertex.Z) / 2.0
-
-					lineSegments = append(lineSegments, VertexPair{
-						v1:    vertex,
-						v2:    neighborVertex,
-						val1:  value,
-						val2:  neighborValue,
-						x1:    x1,
-						y1:    y1,
-						x2:    x2,
-						y2:    y2,
-						depth: depth,
-					})
+			idx := i*m.cols + j
+			x1, y1 := projX[idx], projY[idx]
+			// neighbors: (+1,0) down, (0,+1) right, (+1,-1) diagonal
+			tryAddSeg := func(ni, nj int) {
+				if ni >= m.rows || nj < 0 || nj >= m.cols {
+					return
 				}
+				nidx := ni*m.cols + nj
+				x2, y2 := projX[nidx], projY[nidx]
+				dx, dy := x2-x1, y2-y1
+				if dx*dx+dy*dy < 4 {
+					return
+				}
+				segs = append(segs, lineSegment{
+					idx1:     idx,
+					idx2:     nidx,
+					x1:       x1,
+					y1:       y1,
+					x2:       x2,
+					y2:       y2,
+					depth:    -(m.vertices[i][j].Z + m.vertices[ni][nj].Z) * 0.5,
+					diagonal: x1 != x2 && y1 != y2,
+				})
 			}
+			tryAddSeg(i+1, j)
+			tryAddSeg(i, j+1)
+			tryAddSeg(i+1, j-1)
 		}
 	}
+	m.scratchLines = segs
 
-	// Sort line segments by depth (back to front)
-	// Using quick sort to improve performance
-	quickSortLineSegments(lineSegments, 0, len(lineSegments)-1)
-
-	// Draw lines from back to front
-	for _, segment := range lineSegments {
-		// Calculate depth factors
-		depth1 := (segment.v1.Z - minZ) / zRange
-		depth2 := (segment.v2.Z - minZ) / zRange
-
-		// Calculate colors based on values and depth
-		color1 := m.getColorWithDepth(segment.val1, depth1)
-		color2 := m.getColorWithDepth(segment.val2, depth2)
-
-		// Determine if this is a diagonal line
-		isDiagonal := segment.x1 != segment.x2 && segment.y1 != segment.y2
-
-		// Adjust colors and thickness for diagonals
-		if isDiagonal {
-			color1 = fadeColor(color1, 0.7)
-			color2 = fadeColor(color2, 0.7)
+	// Back-to-front painter's order.
+	slices.SortFunc(segs, func(a, b lineSegment) int {
+		switch {
+		case a.depth < b.depth:
+			return -1
+		case a.depth > b.depth:
+			return 1
+		default:
+			return 0
 		}
+	})
 
-		// Draw the line using Bresenham's algorithm for speed
-		drawBresenhamLine(img,
-			segment.x1, segment.y1,
-			segment.x2, segment.y2,
-			color1, color2)
+	for _, s := range segs {
+		c1 := vertCol[s.idx1]
+		c2 := vertCol[s.idx2]
+		if s.diagonal {
+			c1 = fadeColor(c1, 0.7)
+			c2 = fadeColor(c2, 0.7)
+		}
+		drawBresenhamLine(img, s.x1, s.y1, s.x2, s.y2, c1, c2)
 	}
 
-	// Draw the axis indicator on top
 	m.drawAxisIndicator(img)
 
 	return img
+}
+
+func clearPix(p []uint8) {
+	for i := range p {
+		p[i] = 0
+	}
 }
 
 // getColorWithDepth combines color interpolation and depth enhancement in one step
@@ -166,30 +192,6 @@ func fadeColor(c color.RGBA, factor float64) color.RGBA {
 		B: uint8(float64(c.B) * factor),
 		A: uint8(float64(c.A) * factor),
 	}
-}
-
-// Quick sort implementation for line segments (faster than bubble sort)
-func quickSortLineSegments(segments []VertexPair, low, high int) {
-	if low < high {
-		pivotIndex := partitionLineSegments(segments, low, high)
-		quickSortLineSegments(segments, low, pivotIndex-1)
-		quickSortLineSegments(segments, pivotIndex+1, high)
-	}
-}
-
-func partitionLineSegments(segments []VertexPair, low, high int) int {
-	pivot := segments[high].depth
-	i := low - 1
-
-	for j := low; j < high; j++ {
-		if segments[j].depth <= pivot {
-			i++
-			segments[i], segments[j] = segments[j], segments[i]
-		}
-	}
-
-	segments[i+1], segments[high] = segments[high], segments[i+1]
-	return i + 1
 }
 
 // Fast Bresenham with clipping + direct Pix writes + fixed-point color interpolation.
@@ -347,16 +349,6 @@ func clipCohenSutherland(x0, y0, x1, y1 *int, xmin, ymin, xmax, ymax int) bool {
 	}
 	*x0, *y0, *x1, *y1 = x0i, y0i, x1i, y1i
 	return true
-}
-
-// Color interpolation
-func interpolateColor(c1, c2 color.RGBA, t float64) color.RGBA {
-	return color.RGBA{
-		R: uint8(float64(c1.R)*(1-t) + float64(c2.R)*t),
-		G: uint8(float64(c1.G)*(1-t) + float64(c2.G)*t),
-		B: uint8(float64(c1.B)*(1-t) + float64(c2.B)*t),
-		A: uint8(float64(c1.A)*(1-t) + float64(c2.A)*t),
-	}
 }
 
 func abs(v int) int {

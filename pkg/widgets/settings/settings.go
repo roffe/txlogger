@@ -1,16 +1,15 @@
 package settings
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -21,7 +20,6 @@ import (
 	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/datalogger"
-	"github.com/roffe/txlogger/pkg/mdns"
 	"github.com/roffe/txlogger/pkg/ota"
 	"github.com/roffe/txlogger/pkg/wbl/aem"
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
@@ -86,6 +84,8 @@ type Widget struct {
 	widget.BaseWidget
 
 	cfg *Config
+
+	workDir *widget.Label
 
 	//CANSettings           *cansettings.Widget
 	freqSlider            *widget.Slider
@@ -157,6 +157,15 @@ func New(cfg *Config) *Widget {
 }
 
 func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
+	sw.workDir = widget.NewLabel("")
+	sw.workDir.Selectable = true
+	wd, err := os.Getwd()
+	if err != nil {
+		sw.workDir.SetText(fmt.Sprintf("Error getting working directory: %v", err))
+	} else {
+		sw.workDir.SetText(wd)
+	}
+
 	sw.freqSlider = sw.newFreqSlider()
 	sw.freqValue = widget.NewLabel("")
 	sw.autoLoad = sw.newAutoUpdateLoad()
@@ -378,17 +387,17 @@ func (cs *Widget) GetAdapterWithExtraFilters(ecuType string, filters []uint32) (
 	}
 
 	if adapterName == "txbridge wifi" {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		addr, err := mdns.Query(ctx, "txbridge.local")
-		if err != nil {
-			cs.cfg.Logger(fmt.Sprintf("Failed to resolve txbridge address via mDNS: %v", err))
-		} else {
-			cfg.AdditionalConfig = map[string]string{
-				"address":    fmt.Sprintf("%s:%d", addr.String(), 1337),
-				"minversion": ota.MinimumtxbridgeVersion,
-			}
+		//ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		//defer cancel()
+		//addr, err := mdns.Query(ctx, "txbridge.local")
+		//if err != nil {
+		//	cs.cfg.Logger(fmt.Sprintf("Failed to resolve txbridge address via mDNS: %v", err))
+		//} else {
+		cfg.AdditionalConfig = map[string]string{
+			"address":    fmt.Sprintf("%s:%d", "192.168.4.1", 1337),
+			"minversion": ota.MinimumtxbridgeVersion,
 		}
+		//}
 	}
 	return gocan.NewAdapter(adapterName, cfg)
 }

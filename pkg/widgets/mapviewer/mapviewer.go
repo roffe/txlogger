@@ -94,7 +94,9 @@ func New(config *Config) (*MapViewer, error) {
 		colorMode:     config.ColorblindMode,
 	}
 	mv.ExtendBaseWidget(mv)
+
 	log.Printf("%s c:%d r:%d len:%d", config.Name, mv.numColumns, mv.numRows, mv.numData)
+
 	if len(mv.cfg.ZData) == 0 {
 		return nil, fmt.Errorf("mapViewer zData is empty")
 	}

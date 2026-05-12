@@ -56,6 +56,15 @@ func GetLogPath() (string, error) {
 	return logPath, createDirIfNotExists(logPath)
 }
 
+func GetLayoutPath() (string, error) {
+	dir, err := GetUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	layoutPath := GetComponentPath(dir, "layouts")
+	return layoutPath, createDirIfNotExists(layoutPath)
+}
+
 func GetBinPath() (string, error) {
 	dir, err := GetUserHomeDir()
 	if err != nil {
@@ -77,14 +86,24 @@ func GetUserHomeDir() (string, error) {
 	return dir, nil
 }
 
-func CreatetxloggerDir() error {
+func CreatetxloggerDirs() error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("could not determine user home directory: %w", err)
 	}
 	path := filepath.Join(homeDir, "txlogger")
-	path = filepath.Join(path, "logs")
-	return createDirIfNotExists(path)
+
+	logs := filepath.Join(path, "logs")
+	layouts := filepath.Join(path, "layouts")
+	bins := filepath.Join(path, "bins")
+
+	for _, p := range []string{logs, layouts, bins} {
+		if err := createDirIfNotExists(p); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func createDirIfNotExists(path string) error {

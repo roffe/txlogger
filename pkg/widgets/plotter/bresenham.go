@@ -1,64 +1,49 @@
 package plotter
 
 import (
+	"image"
 	"image/color"
 	"math"
 )
 
-type IPlotter interface {
-	SetRGBA(x int, y int, c color.RGBA)
-}
+// BresenhamThick draws a line of given thickness directly into img.Pix,
+// bypassing image.RGBA.SetRGBA and its interface dispatch.
+func BresenhamThick(img *image.RGBA, x1, y1, x2, y2 int, thickness int, col color.RGBA) {
+	pix := img.Pix
+	stride := img.Stride
+	w := img.Rect.Dx()
+	h := img.Rect.Dy()
 
-const (
-	Down = -1
-	Zero = 0
-	Up   = 1
-	Two  = 2
-)
-
-// BresenhamThick draws a line with specified thickness
-func BresenhamThick(p IPlotter, x1, y1, x2, y2 int, thickness int, col color.RGBA) {
-	// For thickness of 1, use the simple version
 	if thickness <= 1 {
-		bresenhamCore(p, x1, y1, x2, y2, col)
+		bresenhamCore(pix, stride, w, h, x1, y1, x2, y2, col)
 		return
 	}
 
-	// Calculate the half-thickness
 	halfThick := thickness / 2
 
-	// Calculate the line vector
 	dx := float64(x2 - x1)
 	dy := float64(y2 - y1)
 	length := math.Sqrt(dx*dx + dy*dy)
 
-	// Avoid division by zero
 	if length == 0 {
-		fillCircle(p, x1, y1, halfThick, col)
+		fillCircle(pix, stride, w, h, x1, y1, halfThick, col)
 		return
 	}
 
-	// Calculate the normalized perpendicular vector
 	perpX := -dy / length
 	perpY := dx / length
 
-	// Draw filled circles at endpoints for rounded caps
-	//fillCircle(p, x1, y1, halfThick, col)
-	//fillCircle(p, x2, y2, halfThick, col)
-
-	// Draw the main line body using parallel lines
 	for i := -halfThick; i <= halfThick; i++ {
 		offsetX := int(float64(i) * perpX)
 		offsetY := int(float64(i) * perpY)
-		bresenhamCore(p,
+		bresenhamCore(pix, stride, w, h,
 			x1+offsetX, y1+offsetY,
 			x2+offsetX, y2+offsetY,
 			col)
 	}
 }
 
-// bresenhamCore implements the core Bresenham line algorithm
-func bresenhamCore(p IPlotter, x1, y1, x2, y2 int, col color.RGBA) {
+func bresenhamCore(pix []uint8, stride, w, h, x1, y1, x2, y2 int, col color.RGBA) {
 	dx := abs(x2 - x1)
 	dy := abs(y2 - y1)
 	steep := dy > dx
@@ -82,10 +67,21 @@ func bresenhamCore(p IPlotter, x1, y1, x2, y2 int, col color.RGBA) {
 	}
 
 	for x := x1; x <= x2; x++ {
+		var px, py int
 		if steep {
-			p.SetRGBA(y, x, col)
+			px, py = y, x
 		} else {
-			p.SetRGBA(x, y, col)
+			px, py = x, y
+		}
+		// Single combined bounds check (negative values wrap to large uints).
+		if uint(px) < uint(w) && uint(py) < uint(h) {
+			i := py*stride + px*4
+			// Max-blend so overlapping lines render order-independently —
+			// avoids per-frame z-flicker when two series share pixels.
+			pix[i+0] = max(pix[i+0], col.R)
+			pix[i+1] = max(pix[i+1], col.G)
+			pix[i+2] = max(pix[i+2], col.B)
+			pix[i+3] = max(pix[i+3], col.A)
 		}
 		err -= dy
 		if err < 0 {
@@ -95,82 +91,29 @@ func bresenhamCore(p IPlotter, x1, y1, x2, y2 int, col color.RGBA) {
 	}
 }
 
-// fillCircle fills a circle using the midpoint circle algorithm
-func fillCircle(p IPlotter, centerX, centerY, radius int, col color.RGBA) {
+func fillCircle(pix []uint8, stride, w, h, centerX, centerY, radius int, col color.RGBA) {
+	rr := radius * radius
 	for y := -radius; y <= radius; y++ {
 		for x := -radius; x <= radius; x++ {
-			if x*x+y*y <= radius*radius {
-				p.SetRGBA(centerX+x, centerY+y, col)
+			if x*x+y*y > rr {
+				continue
+			}
+			px := centerX + x
+			py := centerY + y
+			if uint(px) < uint(w) && uint(py) < uint(h) {
+				i := py*stride + px*4
+				pix[i+0] = max(pix[i+0], col.R)
+				pix[i+1] = max(pix[i+1], col.G)
+				pix[i+2] = max(pix[i+2], col.B)
+				pix[i+3] = max(pix[i+3], col.A)
 			}
 		}
-	}
-}
-
-func Bresenham(p IPlotter, x1, y1, x2, y2 int, col color.RGBA) {
-	dx, dy := x2-x1, y2-y1
-	absDx, absDy := abs(dx), abs(dy)
-
-	// Is line a point?
-	if absDx == Zero && absDy == Zero {
-		p.SetRGBA(x1, y1, col)
-		return
-	}
-
-	// Determine the direction of increment along x and y
-	xInc, yInc := sign(dx), sign(dy)
-
-	// Initialize decision variables
-	isXDominant := absDx > absDy
-
-	doubleAbsDy := Two * absDy
-	doubleAbsDx := Two * absDx
-
-	var direction, dInc1, dInc2 int
-	if isXDominant {
-		direction, dInc1, dInc2 = doubleAbsDy-absDx, doubleAbsDy, Two*(absDy-absDx)
-	} else {
-		direction, dInc1, dInc2 = doubleAbsDx-absDy, doubleAbsDx, Two*(absDx-absDy)
-	}
-
-	// Draw the line
-	for {
-		p.SetRGBA(x1, y1, col)
-		if x1 == x2 && y1 == y2 {
-			break
-		}
-		if isXDominant {
-			if direction < Zero {
-				direction += dInc1
-			} else {
-				y1 += yInc
-				direction += dInc2
-			}
-			x1 += xInc
-			continue
-		}
-		if direction < Zero {
-			direction += dInc1
-			y1 += yInc
-			continue
-		}
-		x1 += xInc
-		direction += dInc2
-		y1 += yInc
 	}
 }
 
 func abs(n int) int {
-	if n < Zero {
+	if n < 0 {
 		return -n
 	}
 	return n
-}
-
-func sign(n int) int {
-	if n < Zero {
-		return Down
-	} else if n > Zero {
-		return Up
-	}
-	return Zero
 }

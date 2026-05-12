@@ -2,7 +2,6 @@ package windows
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/widgets"
@@ -40,12 +40,12 @@ func (mw *MainWindow) SaveLayout() error {
 		if !b {
 			return
 		}
-		bb, err := mw.jsonLayout()
+		layoutBytes, err := mw.jsonLayout()
 		if err != nil {
 			mw.Error(fmt.Errorf("failed to save layout: %w", err))
 			return
 		}
-		if err := writeLayout(input.Text, bb); err != nil {
+		if err := writeLayout(input.Text, layoutBytes); err != nil {
 			mw.Error(fmt.Errorf("failed to save layout: %w", err))
 			return
 		}
@@ -59,21 +59,12 @@ func (mw *MainWindow) SaveLayout() error {
 	return nil
 }
 func writeLayout(name string, data []byte) error {
-	if f, err := os.Stat("layouts"); err != nil {
-		if os.IsNotExist(err) {
-			if err := os.Mkdir("layouts", 0777); err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-	} else {
-		if !f.IsDir() {
-			return errors.New("layouts exists but is not a directory")
-		}
-		if err := os.WriteFile("layouts/"+name+".json", data, 0777); err != nil {
-			return err
-		}
+	layoutPath, err := common.GetLayoutPath()
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(layoutPath, name+".json"), data, 0644); err != nil {
+		return err
 	}
 	return nil
 }
@@ -134,8 +125,11 @@ func (mw *MainWindow) jsonLayout() ([]byte, error) {
 }
 
 func (mw *MainWindow) LoadLayout(name string) error {
-
-	fname := filepath.Join("layouts", name+".json")
+	layoutPath, err := common.GetLayoutPath()
+	if err != nil {
+		return err
+	}
+	fname := filepath.Join(layoutPath, name+".json")
 	debug.Log("LoadLayout: " + fname)
 	b, err := os.ReadFile(fname)
 	if err != nil {
@@ -150,7 +144,8 @@ func (mw *MainWindow) LoadLayout(name string) error {
 	mw.wm.CloseAll()
 
 	if mw.dlc == nil {
-		mw.selects.ecuSelect.SetSelected(layout.ECU)
+		//mw.selects.ecuSelect.SetSelected(layout.ECU)
+		mw.selects.ecuSelect.Selected = layout.ECU
 		mw.selects.presetSelect.SetSelected(layout.Preset)
 	}
 

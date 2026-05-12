@@ -3,6 +3,7 @@ package meshgrid
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"log"
 	"time"
 
@@ -29,6 +30,16 @@ type Meshgrid struct {
 	depth              float64
 
 	vertices [][]Vertex
+
+	// Cached mesh center of the original (untransformed) coordinates.
+	centerX, centerY, centerZ float64
+
+	// Scratch buffers reused between frames to avoid per-frame allocations.
+	scratchImg    *image.RGBA
+	scratchProjX  []int
+	scratchProjY  []int
+	scratchColors []color.RGBA
+	scratchLines  []lineSegment
 
 	lastMouseX, lastMouseY float32
 
@@ -118,16 +129,23 @@ func (m *Meshgrid) SetColorBlindMode(mode colors.ColorBlindMode) {
 }
 
 func (m *Meshgrid) createVertices(width, height float32) {
-	var vertices [][]Vertex
+	// Guard against a zero range (e.g. all values identical / all zero) so we
+	// produce a flat mesh at Z=0 instead of NaN from a div-by-zero.
+	zrange := m.zrange
+	if zrange == 0 {
+		zrange = 1
+	}
+
+	vertices := make([][]Vertex, 0, m.rows)
 	valueIndex := 0
+	var sumX, sumY, sumZ float64
+	var count int
 	for i := m.rows; i > 0; i-- {
-		var row []Vertex
+		row := make([]Vertex, 0, m.cols)
 		for j := 0; j < m.cols; j++ {
-			// Calculate the x and y coordinates based on the current row and column
 			x := -float64(width)*.5 + float64(j)*float64(m.cellWidth)
 			y := -float64(height)*.5 + float64(i)*float64(m.cellHeight)
-			z := ((m.values[valueIndex] - m.zmin) / m.zrange) * m.depth // Normalize to [0, 1]
-			//zValues = append(zValues, m.values[valueIndex])
+			z := ((m.values[valueIndex] - m.zmin) / zrange) * m.depth
 			row = append(row, Vertex{
 				Ox: x,
 				Oy: y,
@@ -136,11 +154,22 @@ func (m *Meshgrid) createVertices(width, height float32) {
 				Y:  y,
 				Z:  z,
 			})
+			sumX += x
+			sumY += y
+			sumZ += z
+			count++
 			valueIndex++
 		}
 		vertices = append(vertices, row)
 	}
 	m.vertices = vertices
+
+	if count > 0 {
+		inv := 1.0 / float64(count)
+		m.centerX = sumX * inv
+		m.centerY = sumY * inv
+		m.centerZ = sumZ * inv
+	}
 }
 
 func (m *Meshgrid) scaleMeshgrid(factor float64) {
@@ -148,7 +177,19 @@ func (m *Meshgrid) scaleMeshgrid(factor float64) {
 	m.updateVertexPositions()
 }
 
-// Replace rotateMeshgrid with this camera-centric approach
+// orbit performs a Fusion 360-style "turntable" orbit. Yaw is applied around
+// the world Y axis (right-multiplied so it rotates the world before the
+// camera), pitch is applied around the camera-local X axis (left-multiplied).
+// Composing the two this way prevents roll from sneaking in on diagonal drags.
+func (m *Meshgrid) orbit(yawDelta, pitchDelta float64) {
+	pitchRot := RotationMatrixX(pitchDelta)
+	yawRot := RotationMatrixY(yawDelta)
+	m.cameraRotation = pitchRot.Multiply(m.cameraRotation).Multiply(yawRot)
+	m.updateVertexPositions()
+}
+
+// rotateMeshgrid is the free 3DOF rotation, kept for the initial view setup
+// (which wants a roll component) and for the RMB roll handler.
 func (m *Meshgrid) rotateMeshgrid(pitchDelta, yawDelta, rollDelta float64) {
 	// Create rotation matrices for each axis
 	rotX := RotationMatrixX(pitchDelta) // Pitch (around X axis)
@@ -167,42 +208,24 @@ func (m *Meshgrid) rotateMeshgrid(pitchDelta, yawDelta, rollDelta float64) {
 }
 
 func (m *Meshgrid) updateVertexPositions() {
-	// Calculate mesh center from original coordinates
-	var sumX, sumY, sumZ float64
-	var count int
-	for i := range m.vertices {
-		for j := range m.vertices[i] {
-			sumX += m.vertices[i][j].Ox
-			sumY += m.vertices[i][j].Oy
-			sumZ += m.vertices[i][j].Oz
-			count++
-		}
-	}
-	centerX := sumX / float64(count)
-	centerY := sumY / float64(count)
-	centerZ := sumZ / float64(count)
-
-	viewMatrix := m.cameraRotation
+	// Original coordinates never change after createVertices, so reuse the
+	// pre-computed mesh center instead of recomputing it every frame.
+	cx, cy, cz := m.centerX, m.centerY, m.centerZ
+	scale := m.scale
+	r := m.cameraRotation
+	camX, camY, camZ := m.cameraPosition[0], m.cameraPosition[1], m.cameraPosition[2]
 
 	for i := range m.vertices {
-		for j := range m.vertices[i] {
-			// Scale and translate so mesh is centered at origin
-			vx := (m.vertices[i][j].Ox - centerX) * m.scale
-			vy := (m.vertices[i][j].Oy - centerY) * m.scale
-			vz := (m.vertices[i][j].Oz - centerZ) * m.scale
+		row := m.vertices[i]
+		for j := range row {
+			v := &row[j]
+			vx := (v.Ox - cx) * scale
+			vy := (v.Oy - cy) * scale
+			vz := (v.Oz - cz) * scale
 
-			// Rotate
-			viewVec := viewMatrix.MultiplyVector([3]float64{vx, vy, vz})
-
-			// Apply camera offset
-			viewVec[0] -= m.cameraPosition[0]
-			viewVec[1] -= m.cameraPosition[1]
-			viewVec[2] -= m.cameraPosition[2]
-
-			// Store in mesh-local coordinates (already centered)
-			m.vertices[i][j].X = viewVec[0]
-			m.vertices[i][j].Y = viewVec[1]
-			m.vertices[i][j].Z = viewVec[2]
+			v.X = r[0][0]*vx + r[0][1]*vy + r[0][2]*vz - camX
+			v.Y = r[1][0]*vx + r[1][1]*vy + r[1][2]*vz - camY
+			v.Z = r[2][0]*vx + r[2][1]*vy + r[2][2]*vz - camZ
 		}
 	}
 }
@@ -211,15 +234,19 @@ func (m *Meshgrid) SetFloat64(idx int, value float64) {
 	log.Println("SetFloat64", idx, value)
 	m.values[idx] = value
 	m.zmin, m.zmax, m.zrange = findMinMaxRange(m.values)
-	m.vertices[idx/m.cols][idx%m.cols].Z = ((value - m.zmin) / m.zrange) * m.depth // Normalize to [0, 1]
-	m.refresh()                                                                    // Refresh without recreating all vertices
+	zrange := m.zrange
+	if zrange == 0 {
+		zrange = 1
+	}
+	m.vertices[idx/m.cols][idx%m.cols].Z = ((value - m.zmin) / zrange) * m.depth
+	m.refresh()
 }
 
 func (m *Meshgrid) SetFloat642(idx int, value float64) {
 	m.values[idx] = value
 	m.zmin, m.zmax, m.zrange = findMinMaxRange(m.values)
-	m.vertices[idx/m.cols][idx%m.cols].Z = ((value - m.zmin) / m.zrange) * m.depth // Normalize to [0, 1]
-	m.createVertices(fyne.Min(float32(m.cols), 1), fyne.Min(float32(m.rows), 1))
+	m.createVertices(fyne.Max(float32(m.cols), 1), fyne.Max(float32(m.rows), 1))
+	m.updateVertexPositions()
 	m.refresh()
 }
 
@@ -234,12 +261,8 @@ func (m *Meshgrid) LoadFloat64s(min, max float64, floats []float64) {
 		return
 	}
 
-	// Reset vertices with new values
-	m.createVertices(fyne.Min(float32(m.cols), 1), fyne.Min(float32(m.rows), 1))
-
-	// Update vertex positions based on current camera state
+	m.createVertices(fyne.Max(float32(m.cols), 1), fyne.Max(float32(m.rows), 1))
 	m.updateVertexPositions()
-
 	m.refresh()
 }
 

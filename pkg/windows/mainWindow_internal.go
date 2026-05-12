@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	xwidget "fyne.io/x/fyne/widget"
 	"github.com/roffe/gocan/proto"
+	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/widgets/ebusmonitor"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
@@ -107,7 +108,18 @@ func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
 // list .json files in the folder layouts
 func listLayouts() []string {
 	opts := []string{"Save Layout"}
-	files, err := os.ReadDir("layouts")
+
+	layoutPath, err := common.GetLayoutPath()
+	if err != nil {
+		fyne.LogError("Error getting layout path", err)
+		return opts
+	}
+
+	if layoutPath == "" {
+		layoutPath = "layouts"
+	}
+
+	files, err := os.ReadDir(layoutPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return opts
