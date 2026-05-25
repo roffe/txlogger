@@ -1,8 +1,8 @@
 package cbar
 
 import (
-	"fmt"
 	"image/color"
+	"strconv"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -32,11 +32,17 @@ type CBar struct {
 	barHeight float32
 	barWidth  float32
 
+	displayY float32
+
 	// Cache layout calculations
 	middleHeight     float32
 	heightOneThird   float32
 	heightOneSeventh float32
 	stepFactor       float32
+
+	// Fast float formatting
+	fmtPrec int
+	buf     []byte
 }
 
 func New(cfg *widgets.GaugeConfig) *CBar {
@@ -60,6 +66,10 @@ func New(cfg *widgets.GaugeConfig) *CBar {
 		cfg:        cfg,
 		value:      cfg.Center,
 		valueRange: cfg.Max - cfg.Min,
+		fmtPrec:    -1,
+	}
+	if n := common.ParseFixedPrec(cfg.DisplayString); n >= 0 {
+		s.fmtPrec = n
 	}
 	s.ExtendBaseWidget(s)
 	return s
@@ -88,8 +98,14 @@ func (s *CBar) initializeVisualElements() {
 		Alignment: fyne.TextAlignCenter,
 	}
 
+	s.buf = s.buf[:0]
+	if s.fmtPrec >= 0 {
+		s.buf = strconv.AppendFloat(s.buf, 0, 'f', s.fmtPrec, 64)
+	} else {
+		s.buf = common.AppendFormatFloat(s.buf, s.cfg.DisplayString, 0)
+	}
 	s.displayText = &canvas.Text{
-		Text:      fmt.Sprintf(s.cfg.DisplayString, 0.00),
+		Text:      string(s.buf),
 		Color:     color.RGBA{0xF0, 0xF0, 0xF0, 0xFF},
 		TextSize:  float32(s.cfg.DisplayTextSize),
 		TextStyle: fyne.TextStyle{Monospace: true},
@@ -106,29 +122,73 @@ func (s *CBar) initializeVisualElements() {
 }
 
 func (s *CBar) SetValue(value float64) {
-	if value != s.value {
-		s.value = max(s.cfg.Min, min(s.cfg.Max, value))
+	if value == s.value {
+		return
 	}
+	s.value = max(s.cfg.Min, min(s.cfg.Max, value))
+
 	barPosition := s.center
+	var pxWidth float32
 	switch {
 	case s.value < s.cfg.Center:
 		s.bar.FillColor = color.RGBA{0x26, 0xcc, 0x00, 0x80}
 		s.barWidth = float32(s.cfg.Center - s.value)
-		barPosition -= s.barWidth * s.widthFactor
+		pxWidth = s.barWidth * s.widthFactor
+		barPosition -= pxWidth
 	case s.value > s.cfg.Center:
 		s.bar.FillColor = color.RGBA{0xA5, 0x00, 0x00, 0x80}
 		s.barWidth = float32(s.value - s.cfg.Center)
+		pxWidth = s.barWidth * s.widthFactor
 	default:
 		s.bar.FillColor = color.RGBA{252, 186, 3, 0x80}
 		barPosition -= 3
 		s.barWidth = 6 / s.widthFactor
+		pxWidth = 6
 	}
 
 	s.bar.Move(fyne.Position{X: barPosition, Y: 0})
-	s.bar.Resize(fyne.Size{Width: s.barWidth * s.widthFactor, Height: s.barHeight})
+	s.bar.Resize(fyne.Size{Width: pxWidth, Height: s.barHeight})
 
-	s.displayText.Text = fmt.Sprintf(s.cfg.DisplayString, s.value)
-	s.displayText.Refresh()
+	s.buf = s.buf[:0]
+	if s.fmtPrec >= 0 {
+		s.buf = strconv.AppendFloat(s.buf, s.value, 'f', s.fmtPrec, 64)
+	} else {
+		s.buf = common.AppendFormatFloat(s.buf, s.cfg.DisplayString, s.value)
+	}
+	if !common.SameTextBytes(s.displayText.Text, s.buf) {
+		s.displayText.Text = string(s.buf)
+		s.displayText.Refresh()
+		s.updateDisplayTextPosition()
+	}
+}
+
+// updateDisplayTextPosition positions the display text so that the decimal
+// point stays at the widget's horizontal center. Falls back to centering by
+// width when no "." is present in the text.
+func (s *CBar) updateDisplayTextPosition() {
+	text := s.displayText.Text
+	if len(text) == 0 {
+		return
+	}
+	minSize := s.displayText.MinSize()
+
+	dotIdx := -1
+	for i := 0; i < len(text); i++ {
+		if text[i] == '.' {
+			dotIdx = i
+			break
+		}
+	}
+
+	var x float32
+	if dotIdx >= 0 {
+		charWidth := minSize.Width / float32(len(text))
+		x = s.lastSize.Width*0.5 - charWidth*(float32(dotIdx)+0.5)
+	} else {
+		x = s.lastSize.Width*0.5 - minSize.Width*0.5
+	}
+
+	s.displayText.Move(fyne.Position{X: x, Y: s.displayY})
 }
 
 func (s *CBar) SetValue2(value float64) {
@@ -211,14 +271,14 @@ func (r *CBarRenderer) Layout(space fyne.Size) {
 	case widgets.TextAtTop:
 		y = -r.bar.MinSize().Height - r.displayText.MinSize().Height
 	case widgets.TextAtBottom:
-		y = r.lastSize.Height
+		y = r.lastSize.Height - 2
 	}
 
-	titleX := r.lastSize.Width*0.5 - r.titleText.MinSize().Width*0.5
-	displayX := r.lastSize.Width*0.5 - r.displayText.MinSize().Width*0.5
+	r.displayY = y
 
+	titleX := r.lastSize.Width*0.5 - r.titleText.MinSize().Width*0.5
 	r.titleText.Move(fyne.Position{X: titleX, Y: r.lastSize.Height - 30})
-	r.displayText.Move(fyne.Position{X: displayX, Y: y})
+	r.updateDisplayTextPosition()
 }
 
 func (r *CBarRenderer) Objects() []fyne.CanvasObject {

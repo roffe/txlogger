@@ -35,11 +35,17 @@ type VBar struct {
 	cacheMinInt  int // first value represented in caches
 	cacheSpan    float64
 	cacheSpanInv float64
+
+	// Hot-path skips
+	lastColorIdx   int
+	lastDisplayInt int
+	hasLastDisplay bool
 }
 
 func New(cfg *widgets.GaugeConfig) *VBar {
 	s := &VBar{
-		cfg: cfg,
+		cfg:          cfg,
+		lastColorIdx: -1,
 	}
 
 	if s.cfg.Steps == 0 {
@@ -107,26 +113,25 @@ func (s *VBar) SetValue(value float64) {
 	}
 	s.value = value
 
-	// pick color based on value
 	idx := s.cacheIndexForValue(value)
-	s.bar.FillColor = s.fillCache[idx]
-	s.bar.StrokeColor = s.strokeCache[idx]
+	if idx != s.lastColorIdx {
+		s.bar.FillColor = s.fillCache[idx]
+		s.bar.StrokeColor = s.strokeCache[idx]
+		s.lastColorIdx = idx
+	}
 
-	// compute normalized height (0..1 of total height)
 	norm := s.clampNorm(value)
 	barHeight := norm * float32(s.size.Height)
+	s.bar.Resize(fyne.Size{Width: s.size.Width, Height: barHeight})
+	s.bar.Move(fyne.Position{X: 0, Y: s.size.Height - barHeight})
 
-	s.bar.Resize(fyne.Size{
-		Width:  s.size.Width,
-		Height: barHeight,
-	})
-	s.bar.Move(fyne.Position{
-		X: 0,
-		Y: s.size.Height - barHeight,
-	})
-
-	s.displayText.Text = strconv.Itoa(int(value))
-	s.displayText.Refresh()
+	iv := int(value)
+	if !s.hasLastDisplay || iv != s.lastDisplayInt {
+		s.lastDisplayInt = iv
+		s.hasLastDisplay = true
+		s.displayText.Text = strconv.Itoa(iv)
+		s.displayText.Refresh()
+	}
 }
 
 func (s *VBar) SetValue2(value float64) {
@@ -264,7 +269,8 @@ func (r *VBarRenderer) Layout(space fyne.Size) {
 	// Text layout (title below bar, displayText inside bar near top)
 	r.titleText.Move(fyne.Position{
 		X: r.layoutValues.middle + r.layoutValues.titleX,
-		Y: space.Height + 2,
+		// Y: space.Height + 2,
+		Y: 0,
 	})
 
 	r.displayText.Move(fyne.Position{

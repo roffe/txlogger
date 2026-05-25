@@ -32,7 +32,7 @@ type Dashboard struct {
 	gauges Gauges
 
 	fullscreenBtn *widget.Button
-	//dbgBar *fyne.Container
+	// dbgBar *fyne.Container
 
 	logplayer bool
 
@@ -250,7 +250,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 		db.text.time.Resize(fyne.NewSize(200, 50))
 	}
 
-	//db.dbgBar = db.newDebugBar()
+	// db.dbgBar = db.newDebugBar()
 
 	db.image.knockIcon.Hide()
 	db.text.cruise.Hide()
@@ -435,8 +435,8 @@ func (db *Dashboard) layoutDials(dims *dims) {
 	}
 
 	// Calculate dial size
-	//dialWidth := dims.sixthWidth
-	//dialHeight := dims.thirdHeight
+	// dialWidth := dims.sixthWidth
+	// dialHeight := dims.thirdHeight
 
 	// Calculate total height needed for all dials (3 dials on left side including the main dial)
 	totalDialHeight := dims.thirdHeight * 3 // Three dials on left side (main + 2), two on right
@@ -469,7 +469,7 @@ func (db *Dashboard) layoutDials(dims *dims) {
 }
 
 func (db *Dashboard) layoutBars(dims *dims) {
-	//Horizontal bars
+	// Horizontal bars
 	cbarHeight := min(dims.tenthHeight, 50)
 	cbarSize := fyne.Size{Width: (dims.sixthWidth * 3), Height: cbarHeight}
 	cbarX := dims.sixthWidth * 1.5
@@ -481,7 +481,8 @@ func (db *Dashboard) layoutBars(dims *dims) {
 	db.gauges.wblambda.Move(fyne.Position{X: cbarX, Y: db.size.Height - cbarHeight})
 
 	// Vertical bars
-	vbarSize := fyne.Size{Width: min(dims.sixthWidth*common.OneThird, 70), Height: db.size.Height - 120}
+	vbarSize := fyne.Size{Width: min(dims.sixthWidth*common.OneThird, 70), Height: db.size.Height - 50}
+
 	db.gauges.pwm.Resize(vbarSize)
 	db.gauges.pwm.Move(fyne.Position{X: dims.sixthWidth + 8, Y: 25})
 
@@ -615,7 +616,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 		centerY:     space.Height * 0.5,
 		bottomY:     space.Height - 55,
 
-		//textSize: max(min(space.Height, space.Width)*0.07, 20),
+		// textSize: max(min(space.Height, space.Width)*0.07, 20),
 	}
 	// Layout horizontal bars
 	dr.db.layoutBars(dims)

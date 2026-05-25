@@ -4,8 +4,10 @@ import (
 	"fmt"
 )
 
-type InterPolFunc func(xAxis, yAxis, data []int, xValue, yValue int) (float64, float64, float64, error)
-type InterPolFunc64 func(xAxis, yAxis, data []float64, xValue, yValue float64) (float64, float64, float64, error)
+type (
+	InterPolFunc   func(xAxis, yAxis, data []int, xValue, yValue int) (float64, float64, float64, error)
+	InterPolFunc64 func(xAxis, yAxis, data []float64, xValue, yValue float64) (float64, float64, float64, error)
+)
 
 // Helper function to clamp offset values
 func clamp(offset, max int) int {
@@ -274,8 +276,8 @@ func U16_u16_int2(xAxis, yAxis []uint16, data []int, xValue uint16, yValue uint1
 	value01 := float64(data[offset01])
 	value10 := float64(data[offset10])
 	value11 := float64(data[offset11])
-	//log.Printf("%.02f %.02f", value10*.01, value11*.01)
-	//log.Printf("%.02f %.02f", value00*.01, value01*.01)
+	// log.Printf("%.02f %.02f", value10*.01, value11*.01)
+	// log.Printf("%.02f %.02f", value00*.01, value01*.01)
 
 	interpolatedX0 := (1.0-xFrac)*value00 + xFrac*value01
 	interpolatedX1 := (1.0-xFrac)*value10 + xFrac*value11

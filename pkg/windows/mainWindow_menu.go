@@ -33,7 +33,6 @@ import (
 )
 
 func (mw *MainWindow) setupMenu() {
-
 	getAdapter := func() (gocan.Adapter, error) {
 		device, err := mw.settings.GetAdapter(mw.selects.ecuSelect.Selected)
 		if err != nil {
@@ -71,7 +70,6 @@ func (mw *MainWindow) setupMenu() {
 			inner := multiwindow.NewInnerWindow("Edit Parameters", param)
 			inner.Icon = theme.InfoIcon()
 			mw.wm.Add(inner)
-
 		},
 		"Register EU0D": func(str string) {
 			if w := mw.wm.HasWindow("Register EU0D"); w != nil {
@@ -118,7 +116,6 @@ func (mw *MainWindow) setupMenu() {
 			filename := fyne.CurrentApp().Preferences().String("lastBinFile")
 			tf.GetInfo(filename)
 			tf.ShowEditT8Dialog(mw)
-
 		},
 		"Pgm_mod!": func(str string) {
 			if w := mw.wm.HasWindow("Pgm_mod!"); w != nil {
@@ -199,6 +196,14 @@ func (mw *MainWindow) setupMenu() {
 					mw.LoadLogfile(filename, r, p)
 				}
 				widgets.SelectFile(cb, "Log file", "csv", "t5l", "t7l", "t8l")
+			}),
+			fyne.NewMenuItemWithIcon("Open log in new window", theme.DocumentIcon(), func() {
+				cb := func(r fyne.URIReadCloser) {
+					defer r.Close()
+					filename := r.URI().Path()
+					mw.LoadLogfileCombined(filename, r, fyne.Position{}, true)
+				}
+				widgets.SelectFile(cb, "logfile", "t5l", "t7l", "t8l", "csv")
 			}),
 			fyne.NewMenuItemWithIcon("Open log folder", theme.FolderIcon(), func() {
 				var cmd *exec.Cmd
@@ -375,7 +380,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) 
 				mw.Error(err)
 				return
 			}
-			//mw.Log(fmt.Sprintf("set $%d %s %s", addr, axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
+			// mw.Log(fmt.Sprintf("set $%d %s %s", addr, axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 			mw.Log(fmt.Sprintf("set %s $%X %dms", axis.Z, addr+uint32(idx*dataLen), time.Since(start).Truncate(10*time.Millisecond).Milliseconds()))
 		}
 	}
@@ -430,13 +435,13 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) 
 		}
 		buff.Reset()
 
-		//mw.Log(fmt.Sprintf("save %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
+		// mw.Log(fmt.Sprintf("save %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 		mw.Log(fmt.Sprintf("save %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 	}
 
 	loadFileFunc := func() {
 		if symZ != nil {
-			//log.Println("load", symZ.Name)
+			// log.Println("load", symZ.Name)
 			if err := mv.SetZData(symZ.Float64s()); err != nil {
 				mw.Error(err)
 				return
@@ -571,16 +576,10 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) 
 
 	var cancelFuncs []func()
 	if axis.XFrom != "" {
-		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.XFrom, func(value float64) {
-			// log.Printf("set %s %f", axis.XFrom, value)
-			mv.SetX(value)
-		}))
+		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.XFrom, mv.SetX))
 	}
 	if axis.YFrom != "" {
-		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.YFrom, func(value float64) {
-			// log.Printf("set %s %f", axis.YFrom, value)
-			mv.SetY(value)
-		}))
+		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.YFrom, mv.SetY))
 	}
 
 	cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(ebus.TOPIC_COLORBLINDMODE, func(value float64) {
@@ -588,8 +587,8 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) 
 	}))
 
 	mapWindow.OnClose = func() {
-		for _, f := range cancelFuncs {
-			f()
+		for _, fn := range cancelFuncs {
+			fn()
 		}
 	}
 
@@ -628,7 +627,7 @@ func LookupCoolantTemperature(axisvalue int, kyltempSteg, kyltempTab []int) int 
 		retval = kyltempTab[index]
 		firstvalue := kyltempSteg[index]
 
-		//sval := -1000
+		// sval := -1000
 		diff := int(math.Abs(float64(secondvalue - firstvalue)))
 		if diff == 0 {
 			// avoid div by zero; just return base value minus 40 like original end

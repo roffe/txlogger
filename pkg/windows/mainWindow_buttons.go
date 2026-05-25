@@ -14,20 +14,17 @@ import (
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
-	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/msglist"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
 
 func (mw *MainWindow) createButtons() {
-	// mw.buttons.logplayerBtn = mw.newLogplayerBtn()
-	//mw.buttons.loadSymbolsEcuBtn = mw.loadSymbolsEcuBtnFunc()
+	// mw.buttons.loadSymbolsEcuBtn = mw.loadSymbolsEcuBtnFunc()
 	mw.buttons.addSymbolBtn = mw.addSymbolBtnFunc()
 	mw.buttons.syncSymbolsBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), mw.SyncSymbols)
 	mw.buttons.dashboardBtn = mw.newDashboardBtn()
 	mw.buttons.logBtn = mw.newLogBtn()
-	mw.buttons.openLogBtn = mw.newOpenLogBtn()
 	mw.buttons.layoutRefreshBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
 		mw.selects.layoutSelect.SetOptions(listLayouts())
 	})
@@ -72,8 +69,8 @@ func (mw *MainWindow) newSymbolListBtn() *widget.Button {
 				),
 				mw.selects.presetSelect,
 			),
-			//layout.NewSpacer(),
-			//mw.buttons.loadSymbolsEcuBtn,
+			// layout.NewSpacer(),
+			// mw.buttons.loadSymbolsEcuBtn,
 			nil,
 			nil,
 			container.NewBorder(
@@ -142,17 +139,6 @@ func (mw *MainWindow) newDebugBtn() *widget.Button {
 		}
 		xy := mw.wm.Size().Subtract(dbl.MinSize().AddWidthHeight(20, 60))
 		mw.wm.Add(debugWindow, fyne.NewPos(xy.Width, xy.Height))
-	})
-}
-
-func (mw *MainWindow) newOpenLogBtn() *widget.Button {
-	return widget.NewButtonWithIcon("Open log in new Window", theme.MediaFastForwardIcon(), func() {
-		cb := func(r fyne.URIReadCloser) {
-			defer r.Close()
-			filename := r.URI().Path()
-			mw.LoadLogfileCombined(filename, r, fyne.Position{}, true)
-		}
-		widgets.SelectFile(cb, "logfile", "t5l", "t7l", "t8l", "csv")
 	})
 }
 
@@ -279,8 +265,8 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 			Logplayer:       false,
 			UseMPH:          mw.settings.GetUseMPH(),
 			SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
-			High:            mw.settings.GetHigh(),
-			Low:             mw.settings.GetLow(),
+			High:            1.5,
+			Low:             0.5,
 			WidebandSymbol:  mw.settings.GetWidebandSymbolName(),
 		}
 
@@ -346,6 +332,7 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 		}
 	})
 }
+
 func (mw *MainWindow) startLogging() {
 	if mw.symbolList.Count() == 0 {
 		mw.Error(fmt.Errorf("no symbols selected for logging"))
@@ -427,14 +414,17 @@ func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, st
 		LogFormat: mw.settings.GetLogFormat(),
 		LogPath:   mw.settings.GetLogPath(),
 		WidebandConfig: datalogger.WidebandConfig{
-			Type:                   mw.settings.GetWidebandType(),
-			Port:                   mw.settings.GetWidebandPort(),
-			MinimumVoltageWideband: mw.settings.GetMinimumVoltageWideband(),
-			MaximumVoltageWideband: mw.settings.GetMaximumVoltageWideband(),
-			Low:                    mw.settings.GetLow(),
-			High:                   mw.settings.GetHigh(),
+			Name:          mw.settings.GetWidebandName(),
+			Port:          mw.settings.GetWidebandPort(),
+			ADScanner:     mw.settings.GetUseADScanner(),
+			SupportPoints: mw.settings.GetWBLSupportPoints(),
+			LambdaValues:  mw.settings.GetWBLLambdaValues(),
+			// MinimumVoltageWideband: mw.settings.GetMinimumVoltageWideband(),
+			// MaximumVoltageWideband: mw.settings.GetMaximumVoltageWideband(),
+			// Low:                    mw.settings.GetLow(),
+			// High:                   mw.settings.GetHigh(),
 		},
-		//Remote: mw.selects.remoteSelect.Selected == "Remote",
+		// Remote: mw.selects.remoteSelect.Selected == "Remote",
 		RemoteMode: mw.selects.remoteSelect.SelectedIndex(),
 	})
 }

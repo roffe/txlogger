@@ -26,7 +26,6 @@ func NewT7(cfg Config, lw LogWriter) (IClient, error) {
 }
 
 func t7broadcastListener(ctx context.Context, cl *gocan.Client, sysvars *ThreadSafeMap) {
-	//log.Println("Started T7 broadcast listener")
 	broadcast := cl.Subscribe(ctx, 0x1A0, 0x280, 0x3A0)
 	defer broadcast.Close()
 	var speed uint16
@@ -126,6 +125,10 @@ func (c *T7Client) Start() error {
 		sysvarOrder = append(sysvarOrder, EXTERNALWBLSYM)
 	}
 
+	if c.WidebandConfig.Name == "ECU" && c.WidebandConfig.ADScanner {
+		sysvarOrder = append(sysvarOrder, LAMBDAADSCANNER)
+	}
+
 	for _, sym := range c.Symbols {
 		if c.sysvars.Exists(sym.Name) {
 			log.Println("Skipping", sym.Name, "in broadcast")
@@ -136,7 +139,7 @@ func (c *T7Client) Start() error {
 
 	kwp := kwp2000.New(cl)
 
-	adConverter := newDisplProtADConverterT7(c.WidebandConfig)
+	adConverter := NewWBLInterpolator(c.WidebandConfig)
 
 	if err := initT7logging(ctx, kwp, c.Symbols, c.OnMessage); err != nil {
 		return fmt.Errorf("failed to init t7 logging: %w", err)
@@ -258,8 +261,9 @@ func (c *T7Client) Start() error {
 						break
 					}
 					if va.Name == "DisplProt.AD_Scanner" {
-						ebus.Publish(va.Name, adConverter(va.Float64()))
-						continue
+						lambda := adConverter(va.Int())
+						ebus.Publish(LAMBDAADSCANNER, lambda)
+						c.sysvars.Set(LAMBDAADSCANNER, lambda)
 					}
 					ebus.Publish(va.Name, va.Float64())
 				}
@@ -457,12 +461,13 @@ func FCutToStringT7(value float64) string {
 	}
 }
 
+/*
 func newDisplProtADConverterT7(wbl WidebandConfig) func(float64) float64 {
 	return func(value float64) float64 {
 		voltage := (value / 1023) * (wbl.MaximumVoltageWideband - wbl.MinimumVoltageWideband)
 		voltage = clamp(voltage, wbl.MinimumVoltageWideband, wbl.MaximumVoltageWideband)
 		steepness := (wbl.High - wbl.Low) / (wbl.MaximumVoltageWideband - wbl.MinimumVoltageWideband)
 		return wbl.Low + (steepness * (voltage - wbl.MinimumVoltageWideband))
-
 	}
 }
+*/

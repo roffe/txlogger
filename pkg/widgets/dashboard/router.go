@@ -115,13 +115,13 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 
 		ebus.TOPIC_ECU: func(value float64) {
 			switch symbol.ECUType(int(value)) {
-			case symbol.ECU_T5: //T5
+			case symbol.ECU_T5: // T5
 				db.cfg.AirDemToString = func(f float64) string {
 					return fmt.Sprintf("%.0f", f)
 				}
-			case symbol.ECU_T7: //T7
+			case symbol.ECU_T7: // T7
 				db.cfg.AirDemToString = datalogger.AirDemToStringT7
-			case symbol.ECU_T8: //T8
+			case symbol.ECU_T8: // T8
 				db.cfg.AirDemToString = datalogger.AirDemToStringT8
 			}
 		},

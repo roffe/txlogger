@@ -137,7 +137,7 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 				Color:     color.RGBA{0xE0, 0xE0, 0xE0, 0xFF},
 				Alignment: fyne.TextAlignCenter,
 			}
-			//lbl.TextStyle.Monospace = true
+			// lbl.TextStyle.Monospace = true
 			if n := len(txt); n > c.maxLabelChars {
 				c.maxLabelChars = n
 			}
@@ -200,30 +200,39 @@ func (c *Dial) SetValue(value float64) {
 	// Update needle position (no immediate refresh)
 	c.rotateNeedleNoRefresh(c.needle, value, c.needleOffset, c.needleLength)
 
-	// Highest observed marker with lazy reset
+	// Highest observed marker with lazy reset; only refresh when it actually moves
+	markerMoved := false
 	if value > c.highestObserved {
 		c.highestObserved = value
 		c.lastHighestObserved = time.Now()
 		c.rotateNeedleNoRefresh(c.highestObservedMarker, value, c.radius-2, 6)
+		markerMoved = true
 	} else if time.Since(c.lastHighestObserved) > 10*time.Second {
 		c.highestObserved = value
 		c.lastHighestObserved = time.Now()
 		c.rotateNeedleNoRefresh(c.highestObservedMarker, value, c.radius-2, 6)
+		markerMoved = true
 	}
 
-	// Update text with minimal allocs
+	// Update text with minimal allocs; skip refresh if formatted output is unchanged
 	c.buf = c.buf[:0]
 	if c.fmtPrec >= 0 {
 		c.buf = strconv.AppendFloat(c.buf, value, 'f', c.fmtPrec, 64)
 	} else {
 		c.buf = common.AppendFormatFloat(c.buf, c.displayString, value)
 	}
-	c.displayText.Text = string(c.buf)
+	textChanged := !common.SameTextBytes(c.displayText.Text, c.buf)
+	if textChanged {
+		c.displayText.Text = string(c.buf)
+	}
 
-	// Single refresh for the three updated objects
 	canvas.Refresh(c.needle)
-	canvas.Refresh(c.highestObservedMarker)
-	canvas.Refresh(c.displayText)
+	if markerMoved {
+		canvas.Refresh(c.highestObservedMarker)
+	}
+	if textChanged {
+		canvas.Refresh(c.displayText)
+	}
 }
 
 func (c *Dial) SetValue2(value float64) { c.SetValue(value) }
@@ -312,7 +321,7 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 				boxW := c.labelBoxW
 				boxH := c.labelBoxH
 				lbl.Resize(fyne.NewSize(boxW, boxH))
-				//lbl.Move(fyne.NewPos(cx-boxW/2, cy-boxH/2))
+				// lbl.Move(fyne.NewPos(cx-boxW/2, cy-boxH/2))
 				lbl.Move(fyne.Position{X: cx - boxW/2, Y: cy - boxH/2})
 			}
 		} else {
@@ -323,7 +332,6 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 
 	c.highestObservedMarker.StrokeWidth = max(2.0, midStroke)
 	c.rotateNeedleNoRefresh(c.highestObservedMarker, c.highestObserved, c.radius-2, 6)
-
 }
 
 func (c *DialRenderer) MinSize() fyne.Size { return c.minsize }
@@ -357,3 +365,4 @@ func max(a, b float32) float32 {
 	}
 	return b
 }
+

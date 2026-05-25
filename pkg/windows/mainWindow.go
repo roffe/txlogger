@@ -40,8 +40,7 @@ import (
 )
 
 const (
-	prefsLastBinFile = "lastBinFile"
-	//prefsLastConfig     = "lastConfig"
+	prefsLastBinFile    = "lastBinFile"
 	prefsSelectedECU    = "lastECU"
 	prefsSymbolList     = "symbolList"
 	prefsSelectedPreset = "selectedPreset"
@@ -100,9 +99,9 @@ type mainWindowButtons struct {
 	addSymbolBtn *widget.Button
 	logBtn       *widget.Button
 	// loadSymbolsEcuBtn *widget.Button
-	syncSymbolsBtn   *widget.Button
-	dashboardBtn     *widget.Button
-	openLogBtn       *widget.Button
+	syncSymbolsBtn *widget.Button
+	dashboardBtn   *widget.Button
+
 	layoutRefreshBtn *widget.Button
 	symbolListBtn    *widget.Button
 	addGaugeBtn      *widget.Button
@@ -268,47 +267,7 @@ func (mw *MainWindow) setupShortcuts() {
 }
 
 func (mw *MainWindow) render() {
-	/*
-		mw.tabs = container.NewAppTabs(
-			container.NewTabItem("Symbols", container.NewBorder(
-				container.NewGridWithRows(2,
-					container.NewHBox(
-						container.NewBorder(
-							nil,
-							nil,
-							widget.NewLabel("Preset"),
-							nil,
-							mw.selects.presetSelect,
-						),
-						widget.NewButtonWithIcon("", theme.DocumentSaveIcon(), mw.savePreset),
-						widget.NewButtonWithIcon("", theme.DocumentCreateIcon(), mw.newPreset),
-						widget.NewButtonWithIcon("", theme.UploadIcon(), mw.exportPreset),
-						widget.NewButtonWithIcon("", theme.DownloadIcon(), mw.importPreset),
-						widget.NewButtonWithIcon("", theme.DeleteIcon(), mw.deletePreset),
-					),
-					container.NewBorder(
-						nil,
-						nil,
-						widget.NewIcon(theme.SearchIcon()),
-						container.NewHBox(
-							mw.buttons.addSymbolBtn,
-							mw.buttons.syncSymbolsBtn,
-						),
-						mw.selects.symbolLookup,
-					),
-				),
-				nil,
-				nil,
-				nil,
-				mw.symbolList,
-			)),
-			container.NewTabItem("Settings", mw.settings),
-			container.NewTabItem("Open Windows", mw.wm),
-		)
-	*/
-
 	toolbar := mw.newToolbar()
-
 	footer := container.NewBorder(
 		nil,
 		nil,
@@ -355,8 +314,8 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 		Logplayer:       true,
 		UseMPH:          mw.settings.GetUseMPH(),
 		SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
-		High:            mw.settings.GetHigh(),
-		Low:             mw.settings.GetLow(),
+		High:            0.5,
+		Low:             1.5,
 		WidebandSymbol:  mw.settings.GetWidebandSymbolName(),
 	}
 
@@ -367,7 +326,7 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 				dbcfg.AirDemToString = datalogger.AirDemToStringT8
 				break
 			} else if k == "Lufttemp" {
-				//T5
+				// T5
 				break
 			} else {
 				dbcfg.AirDemToString = datalogger.AirDemToStringT7
@@ -390,8 +349,8 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 	}
 
 	cp := combinedlogplayer.New(cpCfg)
-	//iw := multiwindow.NewSystemWindow(fp, cp)
-	//iw.Icon = theme.MediaPlayIcon()
+	// iw := multiwindow.NewSystemWindow(fp, cp)
+	// iw.Icon = theme.MediaPlayIcon()
 
 	/*
 		dbcfg.FullscreenFunc = func(b bool) {
@@ -435,8 +394,8 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 		do()
 	}
 
-	//w.Show()
-	//mw.wm.Add(iw, p)
+	// w.Show()
+	// mw.wm.Add(iw, p)
 	mw.Log("loaded log file " + filename + " in combined logplayer")
 }
 
@@ -517,13 +476,13 @@ func (mw *MainWindow) Error(err error) {
 	go fyne.Do(func() {
 		dialog.ShowError(err, mw.Window)
 	})
-	//log.Printf("error: %s", err)
+	// log.Printf("error: %s", err)
 }
 
 func (mw *MainWindow) Disable() {
 	mw.buttonsDisabled = true
 	mw.buttons.addSymbolBtn.Disable()
-	//mw.buttons.loadSymbolsEcuBtn.Disable()
+	// mw.buttons.loadSymbolsEcuBtn.Disable()
 	mw.buttons.syncSymbolsBtn.Disable()
 	if !mw.loggingRunning {
 		mw.buttons.logBtn.Disable()
@@ -539,7 +498,7 @@ func (mw *MainWindow) Disable() {
 func (mw *MainWindow) Enable() {
 	mw.buttonsDisabled = false
 	mw.buttons.addSymbolBtn.Enable()
-	//mw.buttons.loadSymbolsEcuBtn.Enable()
+	// mw.buttons.loadSymbolsEcuBtn.Enable()
 	mw.buttons.syncSymbolsBtn.Enable()
 	mw.buttons.logBtn.Enable()
 
@@ -633,10 +592,10 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	mw.app.Preferences().SetString(prefsLastBinFile, filename)
 
 	mw.LoadSymbols(symbols, ecuType.String())
-	//mw.selects.ecuSelect.SetSelected(ecuType.String())
-	//mw.fw = symbols
+	// mw.selects.ecuSelect.SetSelected(ecuType.String())
+	// mw.fw = symbols
 	mw.filename = filename
-	//mw.SyncSymbols()
+	// mw.SyncSymbols()
 	return nil
 }
 
@@ -677,7 +636,7 @@ func (mw *MainWindow) SavePreset(filename string) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal config file: %w", err)
 	}
-	if err := os.WriteFile(filename, b, 0644); err != nil {
+	if err := os.WriteFile(filename, b, 0o644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 	return nil

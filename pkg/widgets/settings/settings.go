@@ -32,26 +32,28 @@ import (
 )
 
 const (
-	prefsFreq                   = "freq"
-	prefsAutoUpdateLoadEcu      = "autoUpdateLoadEcu"
-	prefsAutoUpdateSaveEcu      = "autoUpdateSaveEcu"
-	prefsLivePreview            = "livePreview"
-	prefsMeshView               = "liveMeshView"
-	prefsRealtimeBars           = "realtimeBars"
-	prefsLogFormat              = "logFormat"
-	prefsLogPath                = "logPath"
-	prefsWblSource              = "wblSource"
-	prefsWidebandSymbolName     = "widebandSymbolName"
-	prefsUseMPH                 = "useMPH"
-	prefsSwapRPMandSpeed        = "swapRPMandSpeed"
-	prefsCursorFollowCrosshair  = "cursorFollowCrosshair"
-	prefsWBLPort                = "wblPort"
-	prefsminimumVoltageWideband = "minimumVoltageWideband"
-	prefsmaximumVoltageWideband = "maximumVoltageWideband"
-	prefslowValue               = "lowValue"
-	prefshighValue              = "highValue"
-	prefsUseADScanner           = "useADScanner"
-	prefsColorBlindMode         = "colorBlindMode"
+	prefsFreq                  = "freq"
+	prefsAutoUpdateLoadEcu     = "autoUpdateLoadEcu"
+	prefsAutoUpdateSaveEcu     = "autoUpdateSaveEcu"
+	prefsLivePreview           = "livePreview"
+	prefsMeshView              = "liveMeshView"
+	prefsRealtimeBars          = "realtimeBars"
+	prefsLogFormat             = "logFormat"
+	prefsLogPath               = "logPath"
+	prefsWblSource             = "wblSource"
+	prefsWidebandSymbolName    = "widebandSymbolName"
+	prefsUseMPH                = "useMPH"
+	prefsSwapRPMandSpeed       = "swapRPMandSpeed"
+	prefsCursorFollowCrosshair = "cursorFollowCrosshair"
+	prefsWBLPort               = "wblPort"
+
+	prefsLastADScannerPreset = "lastADScannerPreset"
+	prefsWBLSupportPoints    = "wblSupportPoints"
+	prefsWBLLambdaValues     = "wblLambdaValues"
+	prefsLastADScannerECU    = "lastADScannerECU"
+
+	prefsUseADScanner   = "useADScanner"
+	prefsColorBlindMode = "colorBlindMode"
 
 	// CAN
 	prefsAdapter = "adapter"
@@ -59,7 +61,7 @@ const (
 	prefsSpeed   = "speed"
 	prefsDebug   = "debug"
 
-	//Flash
+	// Flash
 	PrefsNvdm = "nvdm"
 	PrefsBoot = "boot"
 )
@@ -87,7 +89,7 @@ type Widget struct {
 
 	workDir *widget.Label
 
-	//CANSettings           *cansettings.Widget
+	// CANSettings           *cansettings.Widget
 	freqSlider            *widget.Slider
 	freqValue             *widget.Label
 	autoSave              *widget.Check
@@ -101,7 +103,7 @@ type Widget struct {
 	useMPH                *widget.Check
 	swapRPMandSpeed       *widget.Check
 	colorBlindMode        *widget.Select
-	//can settings
+	// can settings
 	debugCheckbox   *widget.Check
 	adapterSelector *widget.Select
 	refreshBtn      *widget.Button
@@ -112,31 +114,30 @@ type Widget struct {
 	adapters map[string]*gocan.AdapterInfo
 
 	// WBL Specific
-	wblADscanner                *widget.Check
-	wblSelectContainer          *fyne.Container
-	wblSource                   *widget.Select
-	wblPortLabel                *widget.Label
-	wblPortSelect               *widget.Select
-	wblPortRefreshButton        *widget.Button
-	minimumVoltageWidebandLabel *widget.Label
-	minimumVoltageWidebandEntry *widget.Entry
-	maximumVoltageWidebandLabel *widget.Label
-	maximumVoltageWidebandEntry *widget.Entry
-	lowLabel                    *widget.Label
-	lowEntry                    *widget.Entry
-	highLabel                   *widget.Label
-	highEntry                   *widget.Entry
+
+	wbleditor *WBLEditor
+
+	wblADscanner         *widget.Check
+	wblSelectContainer   *fyne.Container
+	wblSource            *widget.Select
+	wblPortLabel         *widget.Label
+	wblPortSelect        *widget.Select
+	wblPortRefreshButton *widget.Button
 
 	images struct {
-		mtxl        *canvas.Image
-		lc2         *canvas.Image
-		uego        *canvas.Image
-		lambdatocan *canvas.Image
-		t7          *canvas.Image
-		plx         *canvas.Image
-		combi       *canvas.Image
-		zeitronix   *canvas.Image
-		stagafr     *canvas.Image
+		wblImage *canvas.Image
+
+		/*
+			mtxl        *canvas.Image
+			lc2         *canvas.Image
+			uego        *canvas.Image
+			lambdatocan *canvas.Image
+			t7          *canvas.Image
+			plx         *canvas.Image
+			combi       *canvas.Image
+			zeitronix   *canvas.Image
+			stagafr     *canvas.Image
+		*/
 	}
 
 	mu sync.Mutex
@@ -151,6 +152,8 @@ func New(cfg *Config) *Widget {
 	for _, adapter := range gocan.ListAdapters() {
 		sw.adapters[adapter.Name] = &adapter
 	}
+
+	sw.images.wblImage = newImageFromResource("t7")
 
 	sw.ExtendBaseWidget(sw)
 	return sw
@@ -207,10 +210,10 @@ func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	tabs.Append(sw.generalTab())
 	tabs.Append(sw.canTab())
 	tabs.Append(sw.loggingTab())
-	tabs.Append(sw.wblTab())
 	tabs.Append(sw.dashboardTab())
+	tabs.Append(sw.wblTab())
+	tabs.Append(sw.adScannerTab())
 	tabs.Append(container.NewTabItem("txbridge", txconfigurator.NewConfigurator()))
-	//sw.container = tabs
 
 	for _, adapter := range gocan.ListAdapters() {
 		sw.adapters[adapter.Name] = &adapter
@@ -228,18 +231,18 @@ func (sw *Widget) ListPorts() []string {
 	var portsList []string
 	ports, err := enumerator.GetDetailedPortsList()
 	if err != nil {
-		//m.output(err.Error())
+		// m.output(err.Error())
 		return []string{}
 	}
 	if len(ports) == 0 {
-		//m.output("No serial ports found!")
+		// m.output("No serial ports found!")
 		return []string{}
 	}
 	for _, port := range ports {
-		//m.output(fmt.Sprintf("Found port: %s", port.Name))
-		//if port.IsUSB {
-		//m.output(fmt.Sprintf("  USB ID     %s:%s", port.VID, port.PID))
-		//m.output(fmt.Sprintf("  USB serial %s", port.SerialNumber))
+		// m.output(fmt.Sprintf("Found port: %s", port.Name))
+		// if port.IsUSB {
+		// m.output(fmt.Sprintf("  USB ID     %s:%s", port.VID, port.PID))
+		// m.output(fmt.Sprintf("  USB serial %s", port.SerialNumber))
 		portsList = append(portsList, port.Name)
 		portCache[port.Name] = port
 	}
@@ -334,7 +337,6 @@ func (cs *Widget) GetAdapterWithExtraFilters(ecuType string, filters []uint32) (
 		if ad.RequiresSerialPort {
 			if port == "" {
 				return nil, errors.New("Select port in setings") //lint:ignore ST1005 This is ok
-
 			}
 			if baudstring == "" {
 				return nil, errors.New("Select port speed in settings") //lint:ignore ST1005 This is ok
@@ -402,34 +404,37 @@ func (cs *Widget) GetAdapterWithExtraFilters(ecuType string, filters []uint32) (
 	return gocan.NewAdapter(adapterName, cfg)
 }
 
-func (sw *Widget) GetWidebandType() string {
+func (sw *Widget) GetWidebandName() string {
 	return fyne.CurrentApp().Preferences().StringWithFallback(prefsWblSource, "None")
-
 }
 
 func (sw *Widget) GetWidebandSymbolName() string {
-	switch sw.GetWidebandType() {
+	useADScanner := fyne.CurrentApp().Preferences().Bool(prefsUseADScanner)
+	switch sw.GetWidebandName() {
 	case "ECU":
 		switch sw.cfg.SelectedEcuFunc() {
 		case "T5":
-			return "AD_EGR"
+			return datalogger.LAMBDAADSCANNER // Lambda.ADScanner
 		case "T7":
-			if fyne.CurrentApp().Preferences().BoolWithFallback(prefsUseADScanner, false) {
-				return "DisplProt.AD_Scanner"
+			if useADScanner {
+				return datalogger.LAMBDAADSCANNER // Lambda.ADScanner
 			}
 			return "DisplProt.LambdaScanner"
 		case "T8":
+			if useADScanner {
+				return datalogger.LAMBDAADSCANNER // Lambda.ADScanner
+			}
 			return "LambdaScan.LambdaScanner"
 		default:
 			return "None"
 		}
-	case ecumaster.ProductString,
-		innovate.ProductString,
-		aem.ProductString,
-		plx.ProductString,
+	case aem.ProductString,
 		"CombiAdapter",
-		zeitronix.ProductString,
-		stag.ProductString:
+		ecumaster.ProductString,
+		innovate.ProductString,
+		plx.ProductString,
+		stag.ProductString,
+		zeitronix.ProductString:
 		return datalogger.EXTERNALWBLSYM // Lambda.External
 	default:
 		return "None"
@@ -438,27 +443,25 @@ func (sw *Widget) GetWidebandSymbolName() string {
 
 func (sw *Widget) GetColorBlindMode() colors.ColorBlindMode {
 	return colors.StringToColorBlindMode(fyne.CurrentApp().Preferences().StringWithFallback(prefsColorBlindMode, "Normal"))
-
 }
 
 func (sw *Widget) GetWidebandPort() string {
 	return fyne.CurrentApp().Preferences().String(prefsWBLPort)
 }
 
-func (sw *Widget) GetMinimumVoltageWideband() float64 {
-	return fyne.CurrentApp().Preferences().FloatWithFallback(prefsminimumVoltageWideband, 0.00)
+func (sw *Widget) GetWBLSupportPoints() []int {
+	return fyne.CurrentApp().Preferences().IntListWithFallback(prefsWBLSupportPoints, []int{0, 1024})
 }
 
-func (sw *Widget) GetMaximumVoltageWideband() float64 {
-	return fyne.CurrentApp().Preferences().FloatWithFallback(prefsmaximumVoltageWideband, 5.00)
+func (sw *Widget) GetWBLLambdaValues() []float64 {
+	return fyne.CurrentApp().Preferences().FloatListWithFallback(prefsWBLLambdaValues, []float64{0.5, 1.5})
 }
 
-func (sw *Widget) GetLow() float64 {
-	return fyne.CurrentApp().Preferences().FloatWithFallback(prefslowValue, 0.50)
-}
-
-func (sw *Widget) GetHigh() float64 {
-	return fyne.CurrentApp().Preferences().FloatWithFallback(prefshighValue, 1.50)
+func (sw *Widget) GetUseADScanner() bool {
+	if fyne.CurrentApp().Preferences().String(prefsWblSource) != "ECU" {
+		return false
+	}
+	return fyne.CurrentApp().Preferences().Bool(prefsUseADScanner)
 }
 
 func (sw *Widget) GetFreq() int {

@@ -136,7 +136,7 @@ func New(cfg *widgets.GaugeConfig) *DualDial {
 				Color:     color.RGBA{0xE0, 0xE0, 0xE0, 0xFF},
 				Alignment: fyne.TextAlignCenter,
 			}
-			//lbl.TextStyle.Monospace = true
+			// lbl.TextStyle.Monospace = true
 			if n := len(txt); n > s.maxLabelChars {
 				s.maxLabelChars = n
 			}
@@ -194,19 +194,23 @@ func (c *DualDial) SetValue(value float64) {
 	}
 	c.value = value
 
-	// needles & text without per-object Refresh
 	c.rotateNeedleNoRefresh(c.needle, value, c.needleOffset, c.needleLength)
+
 	c.buf1 = c.buf1[:0]
 	if c.fmtPrec >= 0 {
 		c.buf1 = strconv.AppendFloat(c.buf1, value, 'f', c.fmtPrec, 64)
 	} else {
 		c.buf1 = common.AppendFormatFloat(c.buf1, c.displayString, value)
 	}
-	c.displayText.Text = string(c.buf1)
+	textChanged := !common.SameTextBytes(c.displayText.Text, c.buf1)
+	if textChanged {
+		c.displayText.Text = string(c.buf1)
+	}
 
-	// single refresh for changed objects
 	canvas.Refresh(c.needle)
-	canvas.Refresh(c.displayText)
+	if textChanged {
+		canvas.Refresh(c.displayText)
+	}
 }
 
 func (c *DualDial) SetValue2(value float64) {
@@ -216,16 +220,22 @@ func (c *DualDial) SetValue2(value float64) {
 	c.value2 = value
 
 	c.rotateNeedleNoRefresh(c.needle2, value, c.needleOffset, c.needleLength)
+
 	c.buf2 = c.buf2[:0]
 	if c.fmtPrec >= 0 {
 		c.buf2 = strconv.AppendFloat(c.buf2, value, 'f', c.fmtPrec, 64)
 	} else {
 		c.buf2 = common.AppendFormatFloat(c.buf2, c.displayString, value)
 	}
-	c.displayText2.Text = string(c.buf2)
+	textChanged := !common.SameTextBytes(c.displayText2.Text, c.buf2)
+	if textChanged {
+		c.displayText2.Text = string(c.buf2)
+	}
 
 	canvas.Refresh(c.needle2)
-	canvas.Refresh(c.displayText2)
+	if textChanged {
+		canvas.Refresh(c.displayText2)
+	}
 }
 
 func (c *DualDial) CreateRenderer() fyne.WidgetRenderer { return &DualDialRenderer{DualDial: c} }

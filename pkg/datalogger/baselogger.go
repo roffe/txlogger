@@ -116,7 +116,7 @@ func (bl *BaseLogger) calculateCompensatedTimestamp() time.Time {
 
 func (bl *BaseLogger) setupWBL(ctx context.Context, cl *gocan.Client) error {
 	cfg := &wbl.WBLConfig{
-		WBLType:  bl.Config.WidebandConfig.Type,
+		WBLType:  bl.Config.WidebandConfig.Name,
 		Port:     bl.Config.WidebandConfig.Port,
 		Log:      bl.OnMessage,
 		Txbridge: strings.HasPrefix(cl.AdapterName(), "txbridge"),

@@ -2,6 +2,7 @@
 - Performance optimization for the log plotter and meshgrid
 - force layouts to be loaded and saved in users home directory under the txlogger forlder
 - update ecusymbol to be able to read T5 versions
+- Added new config widget for AD scanner WBL settings inspired by T7's DisplAdap.LamScannerTab
 
 # 2.1.9
 - Updated default T7 preset to include MAF.m_AirFromp_AirInlet

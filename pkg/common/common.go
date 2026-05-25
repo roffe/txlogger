@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -47,6 +48,20 @@ func SanitizeFilename(name string) string {
 	return name
 }
 
+func ListFilesInPathByExtension(path, ext string) ([]string, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+	var files []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.EqualFold(filepath.Ext(entry.Name()), ext) {
+			files = append(files, entry.Name())
+		}
+	}
+	return files, nil
+}
+
 func GetLogPath() (string, error) {
 	dir, err := GetUserHomeDir()
 	if err != nil {
@@ -54,6 +69,15 @@ func GetLogPath() (string, error) {
 	}
 	logPath := GetComponentPath(dir, "logs")
 	return logPath, createDirIfNotExists(logPath)
+}
+
+func GetADScannerPath() (string, error) {
+	dir, err := GetUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	adScannerPath := GetComponentPath(dir, "adscanner")
+	return adScannerPath, createDirIfNotExists(adScannerPath)
 }
 
 func GetLayoutPath() (string, error) {
@@ -96,8 +120,9 @@ func CreatetxloggerDirs() error {
 	logs := filepath.Join(path, "logs")
 	layouts := filepath.Join(path, "layouts")
 	bins := filepath.Join(path, "bins")
+	adscanner := filepath.Join(path, "adscanner")
 
-	for _, p := range []string{logs, layouts, bins} {
+	for _, p := range []string{logs, layouts, bins, adscanner} {
 		if err := createDirIfNotExists(p); err != nil {
 			return err
 		}
@@ -108,7 +133,7 @@ func CreatetxloggerDirs() error {
 
 func createDirIfNotExists(path string) error {
 	if err := os.MkdirAll(path, os.ModePerm); err != nil {
-		return fmt.Errorf("could not create log directory: %v", err)
+		return fmt.Errorf("could not create directory %s: %v", path, err)
 	}
 	return nil
 }
@@ -136,5 +161,18 @@ func AppendFormatFloat(dst []byte, format string, v float64) []byte {
 	if n := ParseFixedPrec(format); n >= 0 {
 		return strconv.AppendFloat(dst, v, 'f', n, 64)
 	}
-	return strconv.AppendFloat(dst, v, 'f', 0, 64)
+	return fmt.Appendf(dst, format, v)
+}
+
+// SameTextBytes reports whether s and b have identical contents, without allocating.
+func SameTextBytes(s string, b []byte) bool {
+	if len(s) != len(b) {
+		return false
+	}
+	for i, v := range b {
+		if s[i] != v {
+			return false
+		}
+	}
+	return true
 }

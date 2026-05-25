@@ -78,29 +78,16 @@ func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
 				mw.Error(err)
 			}
 		case ".t5l", ".t7l", ".t8l", ".csv":
-			// Check if we dropped it on the open log button
-			// log.Println(mw.buttons.openLogBtn.Position(), mw.buttons.openLogBtn.Size())
-			if p.X >= mw.buttons.openLogBtn.Position().X && p.X <= mw.buttons.openLogBtn.Position().X+mw.buttons.openLogBtn.Size().Width &&
-				p.Y >= mw.buttons.openLogBtn.Position().Y+30 && p.Y <= mw.buttons.openLogBtn.Position().Y+30+mw.buttons.openLogBtn.Size().Height {
-				f, err := os.Open(filename)
-				if err != nil {
-					mw.Error(err)
-					return
-				}
-				defer f.Close()
-				mw.LoadLogfileCombined(filename, f, p, false)
-			} else {
-				f, err := os.Open(filename)
-				if err != nil {
-					mw.Error(err)
-					return
-				}
-				defer f.Close()
-				if p.X < 100 {
-					p.X = 100
-				}
-				mw.LoadLogfile(filename, f, p)
+			f, err := os.Open(filename)
+			if err != nil {
+				mw.Error(err)
+				return
 			}
+			defer f.Close()
+			if p.X < 100 {
+				p.X = 100
+			}
+			mw.LoadLogfile(filename, f, p)
 		}
 	}
 }
@@ -189,7 +176,6 @@ func (mw *MainWindow) loadPrefs() {
 			mw.filename = filename
 		}
 	*/
-
 }
 
 func (mw *MainWindow) newSymbolnameTypeahead() {
@@ -205,7 +191,7 @@ func (mw *MainWindow) newSymbolnameTypeahead() {
 			return
 		}
 		// Get the list of possible completion
-		//results := []string{"ADC1", "ADC2", "ADC3", "ADC4", "ADC5"}
+		// results := []string{"ADC1", "ADC2", "ADC3", "ADC4", "ADC5"}
 		var results []string
 		for _, sym := range mw.fw.Symbols() {
 			if sym.Length > 8 {
@@ -225,7 +211,6 @@ func (mw *MainWindow) newSymbolnameTypeahead() {
 
 		mw.selects.symbolLookup.SetOptions(results)
 		mw.selects.symbolLookup.ShowCompletion()
-
 	}
 
 	mw.selects.symbolLookup.OnSubmitted = func(s string) {

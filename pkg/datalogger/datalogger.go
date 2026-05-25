@@ -9,13 +9,14 @@ import (
 	"github.com/roffe/gocan"
 )
 
-var (
-	ErrToManyErrors = fmt.Errorf("too many errors, aborting logging")
-)
+var ErrToManyErrors = fmt.Errorf("too many errors, aborting logging")
 
-const ISO8601 = "2006-01-02T15:04:05.999-0700"
-const ISONICO = "2006-01-02 15:04:05,999"
-const EXTERNALWBLSYM = "Lambda.External"
+const (
+	ISO8601         = "2006-01-02T15:04:05.999-0700"
+	ISONICO         = "2006-01-02 15:04:05,999"
+	EXTERNALWBLSYM  = "Lambda.External"
+	LAMBDAADSCANNER = "Lambda.ADScanner"
+)
 
 type LogWriter interface {
 	Write(sysvars *ThreadSafeMap, sysvarOrder []string, vars []*symbol.Symbol, ts time.Time) error
@@ -55,12 +56,11 @@ type Client struct {
 }
 
 type WidebandConfig struct {
-	Type                   string
-	Port                   string
-	MinimumVoltageWideband float64
-	MaximumVoltageWideband float64
-	Low                    float64
-	High                   float64
+	Name          string
+	Port          string
+	ADScanner     bool
+	SupportPoints []int
+	LambdaValues  []float64
 }
 
 func New(cfg Config) (IClient, string, error) {
@@ -100,7 +100,7 @@ func New(cfg Config) (IClient, string, error) {
 		}
 	case "T7":
 		datalogger.IClient, err = NewT7(cfg, lw)
-		//datalogger.IClient, err = NewRemote(cfg, lw)
+		// datalogger.IClient, err = NewRemote(cfg, lw)
 		if err != nil {
 			return nil, "", err
 		}

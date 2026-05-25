@@ -66,122 +66,52 @@ func (sw *Widget) newLogFormat() *widget.Select {
 	})
 }
 
+var wblAdapters = []string{
+	"None",
+	"ECU",
+	aem.ProductString,
+	"CombiAdapter",
+	ecumaster.ProductString,
+	innovate.ProductString,
+	plx.ProductString,
+	stag.ProductString,
+	zeitronix.ProductString,
+}
+
 func (sw *Widget) newWBLSelector() *fyne.Container {
-	sw.wblSource = widget.NewSelect([]string{
-		"None",
-		"ECU",
-		aem.ProductString,
-		"CombiAdapter",
-		ecumaster.ProductString,
-		innovate.ProductString,
-		plx.ProductString,
-		zeitronix.ProductString,
-		stag.ProductString,
-	}, func(s string) {
+	wblImages := map[string]*canvas.Image{
+		"ECU":                   newImageFromResource("t7"), // Using T7 image for ECU as a placeholder
+		ecumaster.ProductString: newImageFromResource("lambdatocan"),
+		innovate.ProductString:  newImageFromResource("mtx-l"), // Using MTX-L image for Innovate as a placeholder
+		aem.ProductString:       newImageFromResource("uego"),
+		plx.ProductString:       newImageFromResource("plx"),
+		"CombiAdapter":          newImageFromResource("combi"),
+		zeitronix.ProductString: newImageFromResource("zeitronix"),
+		stag.ProductString:      newImageFromResource("stagafr"),
+	}
+
+	sw.wblSource = widget.NewSelect(wblAdapters, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsWblSource, s)
 		fyne.CurrentApp().Preferences().SetString(prefsWidebandSymbolName, sw.GetWidebandSymbolName())
-		var ecuSet bool
-		var portSelect bool
+
+		var adScanner, portSelect bool
+
+		img, found := wblImages[s]
+		if found && img != nil {
+			sw.images.wblImage.Resource = img.Resource
+			sw.images.wblImage.SetMinSize(img.MinSize())
+			sw.images.wblImage.Refresh()
+		}
+
 		switch s {
-		case "ECU":
-			sw.images.mtxl.Hide()
-			sw.images.lc2.Hide()
-			sw.images.uego.Hide()
-			sw.images.lambdatocan.Hide()
-			sw.images.t7.Show()
-			sw.images.plx.Hide()
-			sw.images.combi.Hide()
-			sw.images.zeitronix.Hide()
-			sw.images.stagafr.Hide()
-			ecuSet = true
+		case "ECU", "CombiAdapter":
+			adScanner = true
 			portSelect = false
+		case aem.ProductString, innovate.ProductString, plx.ProductString, stag.ProductString, zeitronix.ProductString:
+			portSelect = true
 		case ecumaster.ProductString:
-			sw.images.mtxl.Hide()
-			sw.images.lc2.Hide()
-			sw.images.uego.Hide()
-			sw.images.lambdatocan.Show()
-			sw.images.t7.Hide()
-			sw.images.plx.Hide()
-			sw.images.combi.Hide()
-			sw.images.zeitronix.Hide()
-			sw.images.stagafr.Hide()
 			portSelect = false
-		case innovate.ProductString:
-			sw.images.mtxl.Show()
-			sw.images.lc2.Show()
-			sw.images.uego.Hide()
-			sw.images.lambdatocan.Hide()
-			sw.images.t7.Hide()
-			sw.images.plx.Hide()
-			sw.images.combi.Hide()
-			sw.images.zeitronix.Hide()
-			sw.images.stagafr.Hide()
-			portSelect = true
-		case aem.ProductString:
-			sw.images.mtxl.Hide()
-			sw.images.lc2.Hide()
-			sw.images.uego.Show()
-			sw.images.lambdatocan.Hide()
-			sw.images.t7.Hide()
-			sw.images.plx.Hide()
-			sw.images.combi.Hide()
-			sw.images.zeitronix.Hide()
-			sw.images.stagafr.Hide()
-			portSelect = true
-		case plx.ProductString:
-			sw.images.mtxl.Hide()
-			sw.images.lc2.Hide()
-			sw.images.uego.Hide()
-			sw.images.lambdatocan.Hide()
-			sw.images.t7.Hide()
-			sw.images.plx.Show()
-			sw.images.combi.Hide()
-			sw.images.zeitronix.Hide()
-			sw.images.stagafr.Hide()
-			portSelect = true
-		case "CombiAdapter":
-			sw.images.mtxl.Hide()
-			sw.images.lc2.Hide()
-			sw.images.uego.Hide()
-			sw.images.lambdatocan.Hide()
-			sw.images.t7.Hide()
-			sw.images.plx.Hide()
-			sw.images.combi.Show()
-			sw.images.zeitronix.Hide()
-			sw.images.stagafr.Hide()
-			portSelect = false
-		case zeitronix.ProductString:
-			sw.images.mtxl.Hide()
-			sw.images.lc2.Hide()
-			sw.images.uego.Hide()
-			sw.images.lambdatocan.Hide()
-			sw.images.t7.Hide()
-			sw.images.plx.Hide()
-			sw.images.combi.Hide()
-			sw.images.zeitronix.Show()
-			sw.images.stagafr.Hide()
-			portSelect = true
-		case stag.ProductString:
-			sw.images.mtxl.Hide()
-			sw.images.lc2.Hide()
-			sw.images.uego.Hide()
-			sw.images.lambdatocan.Hide()
-			sw.images.t7.Hide()
-			sw.images.plx.Hide()
-			sw.images.combi.Hide()
-			sw.images.zeitronix.Hide()
-			sw.images.stagafr.Show()
-			portSelect = true
 		default:
-			sw.images.mtxl.Hide()
-			sw.images.lc2.Hide()
-			sw.images.uego.Hide()
-			sw.images.lambdatocan.Hide()
-			sw.images.t7.Hide()
-			sw.images.plx.Hide()
-			sw.images.combi.Hide()
-			sw.images.zeitronix.Hide()
-			sw.images.stagafr.Hide()
 			portSelect = false
 		}
 
@@ -195,31 +125,11 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 			sw.wblPortRefreshButton.Hide()
 		}
 
-		if ecuSet || s == "CombiAdapter" {
+		if adScanner {
 			sw.wblADscanner.Show()
-			if sw.wblADscanner.Checked {
-				sw.minimumVoltageWidebandLabel.Show()
-				sw.maximumVoltageWidebandLabel.Show()
-				sw.lowLabel.Show()
-				sw.highLabel.Show()
-				sw.minimumVoltageWidebandEntry.Show()
-				sw.maximumVoltageWidebandEntry.Show()
-				sw.lowEntry.Show()
-				sw.highEntry.Show()
-			}
 		} else {
 			sw.wblADscanner.Hide()
-			sw.minimumVoltageWidebandLabel.Hide()
-			sw.maximumVoltageWidebandLabel.Hide()
-			sw.lowLabel.Hide()
-			sw.highLabel.Hide()
-			sw.minimumVoltageWidebandEntry.Hide()
-			sw.maximumVoltageWidebandEntry.Hide()
-			sw.lowEntry.Hide()
-			sw.highEntry.Hide()
 		}
-
-		//sw.container.Refresh()
 	})
 	return container.NewBorder(
 		nil,
@@ -245,25 +155,6 @@ func (sw *Widget) newFreqSlider() *widget.Slider {
 func (sw *Widget) newADscannerCheck() *widget.Check {
 	return widget.NewCheck("use AD Scanner (don't forget to add symbol)", func(b bool) {
 		fyne.CurrentApp().Preferences().SetBool(prefsUseADScanner, b)
-		if b {
-			sw.minimumVoltageWidebandLabel.Show()
-			sw.maximumVoltageWidebandLabel.Show()
-			sw.lowLabel.Show()
-			sw.highLabel.Show()
-			sw.minimumVoltageWidebandEntry.Show()
-			sw.maximumVoltageWidebandEntry.Show()
-			sw.lowEntry.Show()
-			sw.highEntry.Show()
-		} else {
-			sw.minimumVoltageWidebandLabel.Hide()
-			sw.maximumVoltageWidebandLabel.Hide()
-			sw.lowLabel.Hide()
-			sw.highLabel.Hide()
-			sw.minimumVoltageWidebandEntry.Hide()
-			sw.maximumVoltageWidebandEntry.Hide()
-			sw.lowEntry.Hide()
-			sw.highEntry.Hide()
-		}
 	})
 }
 
@@ -366,7 +257,6 @@ func (sw *Widget) newPortSelector() *widget.Select {
 		} else {
 			sw.portDescription.SetText("")
 		}
-
 	})
 }
 
@@ -410,30 +300,12 @@ func (sw *Widget) loadPreferences() {
 	loadPrefsCheck(sw.useMPH, prefsUseMPH, false)
 	loadPrefsCheck(sw.swapRPMandSpeed, prefsSwapRPMandSpeed, false)
 	loadPrefsSelect(sw.wblPortSelect, prefsWBLPort, "")
-	loadPrefsText(sw.minimumVoltageWidebandEntry, prefsminimumVoltageWideband, "0.0")
-	loadPrefsText(sw.maximumVoltageWidebandEntry, prefsmaximumVoltageWideband, "5.0")
-	loadPrefsText(sw.lowEntry, prefslowValue, "0.5")
-	loadPrefsText(sw.highEntry, prefshighValue, "1.5")
 	loadPrefsSelect(sw.colorBlindMode, prefsColorBlindMode, "Normal")
 
 	if sw.wblADscanner.Checked {
-		sw.minimumVoltageWidebandLabel.Show()
-		sw.maximumVoltageWidebandLabel.Show()
-		sw.lowLabel.Show()
-		sw.highLabel.Show()
-		sw.minimumVoltageWidebandEntry.Show()
-		sw.maximumVoltageWidebandEntry.Show()
-		sw.lowEntry.Show()
-		sw.highEntry.Show()
+		sw.wbleditor.Show()
 	} else {
-		sw.minimumVoltageWidebandLabel.Hide()
-		sw.maximumVoltageWidebandLabel.Hide()
-		sw.lowLabel.Hide()
-		sw.highLabel.Hide()
-		sw.minimumVoltageWidebandEntry.Hide()
-		sw.maximumVoltageWidebandEntry.Hide()
-		sw.lowEntry.Hide()
-		sw.highEntry.Hide()
+		sw.wbleditor.Hide()
 	}
 
 	loadPrefsSelect(sw.adapterSelector, prefsAdapter, "")

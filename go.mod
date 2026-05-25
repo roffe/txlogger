@@ -10,19 +10,19 @@ go 1.26.0
 replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 
 require (
-	fyne.io/fyne/v2 v2.7.4-0.20260511200948-3ee723dc3a3b
-	fyne.io/x/fyne v0.0.0-20260128204654-7fd4ce591d29
+	fyne.io/fyne/v2 v2.7.5-0.20260519143814-bcc0232dbfb9
+	fyne.io/x/fyne v0.0.0-20260404122735-cbbdf562353e
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/lusingander/colorpicker v0.7.5
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.1.0
-	github.com/roffe/ecusymbol v1.1.0
+	github.com/roffe/ecusymbol v1.1.5
 	github.com/roffe/gocan v1.3.9
 	go.bug.st/serial v1.6.4
-	golang.org/x/image v0.36.0
-	golang.org/x/mod v0.33.0
-	golang.org/x/net v0.50.0
-	golang.org/x/sync v0.19.0
+	golang.org/x/image v0.40.0
+	golang.org/x/mod v0.36.0
+	golang.org/x/net v0.54.0
+	golang.org/x/sync v0.20.0
 	google.golang.org/grpc v1.79.1 // indirect
 	google.golang.org/protobuf v1.36.11
 )
@@ -32,12 +32,12 @@ require (
 	github.com/ebitengine/oto/v3 v3.4.0
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/hajimehoshi/go-mp3 v0.3.4
-	golang.org/x/sys v0.41.0
-	kernel.org/pub/linux/libs/security/libcap/cap v1.2.77
+	golang.org/x/sys v0.44.0
+	kernel.org/pub/linux/libs/security/libcap/cap v1.2.78
 )
 
 require (
-	fyne.io/systray v1.12.0 // indirect
+	fyne.io/systray v1.12.1 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/FyshOS/fancyfs v0.0.1 // indirect
 	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
@@ -73,7 +73,7 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.6.1 // indirect
 	github.com/pion/logging v0.2.4 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/rymdport/portal v0.4.2 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
@@ -82,11 +82,11 @@ require (
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9 // indirect
 	github.com/yuin/goldmark v1.7.16 // indirect
 	go.einride.tech/can v0.16.1 // indirect
-	golang.org/x/crypto v0.48.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
-	golang.org/x/tools v0.42.0 // indirect
+	golang.org/x/crypto v0.51.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/tools v0.45.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260209200024-4cfbd4190f57 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	kernel.org/pub/linux/libs/security/libcap/psx v1.2.77 // indirect
+	kernel.org/pub/linux/libs/security/libcap/psx v1.2.78 // indirect
 )

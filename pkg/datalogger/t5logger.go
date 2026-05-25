@@ -45,9 +45,9 @@ func (c *T5Client) Start() error {
 	defer t.Stop()
 	t5 := t5can.NewClient(cl)
 
-	order := make([]string, len(c.Symbols))
+	sysvarOrder := make([]string, len(c.Symbols))
 	for n, s := range c.Symbols {
-		order[n] = s.Name
+		sysvarOrder[n] = s.Name
 		s.Correctionfactor = 0.1
 	}
 
@@ -57,13 +57,18 @@ func (c *T5Client) Start() error {
 
 	if c.lamb != nil {
 		defer c.lamb.Stop()
-		order = append(order, EXTERNALWBLSYM)
+		sysvarOrder = append(sysvarOrder, EXTERNALWBLSYM)
+	}
+
+	if c.WidebandConfig.Name == "ECU" && c.WidebandConfig.ADScanner {
+		sysvarOrder = append(sysvarOrder, LAMBDAADSCANNER)
 	}
 
 	tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
 	defer tx.Close()
 
-	converto := newT5Converter(c.WidebandConfig)
+	converto := newT5Converter()
+	adscannerConverter := NewWBLInterpolator(c.WidebandConfig)
 
 	go func() {
 		defer cl.Close()
@@ -111,6 +116,11 @@ func (c *T5Client) Start() error {
 						return
 					}
 					val := converto(sym.Name, sym.Bytes())
+					if sym.Name == "AD_EGR" {
+						lambda := adscannerConverter(int(val))
+						c.sysvars.Set(LAMBDAADSCANNER, lambda)
+						ebus.Publish(LAMBDAADSCANNER, lambda)
+					}
 					c.sysvars.Set(sym.Name, val)
 					ebus.Publish(sym.Name, val)
 				}
@@ -121,7 +131,7 @@ func (c *T5Client) Start() error {
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				if err := c.lw.Write(c.sysvars, order, []*symbol.Symbol{}, ts); err != nil {
+				if err := c.lw.Write(c.sysvars, sysvarOrder, []*symbol.Symbol{}, ts); err != nil {
 					c.OnMessage("failed to write log: " + err.Error())
 					return
 				}
@@ -149,7 +159,8 @@ func clamp(value, min, max float64) float64 {
 func ConvertByteStringToDouble(ecudata []byte) float64 {
 	var retval float64
 	// Iterate over the bytes in ecudata and accumulate the result
-	for i := 0; i < len(ecudata); i++ {
+	// for i := 0; i < len(ecudata); i++ {
+	for i := range len(ecudata) {
 		// Multiply the current byte by the appropriate power of 256 and add it to the result
 		retval += float64(ecudata[i]) * math.Pow(256, float64(len(ecudata)-i-1))
 	}
@@ -159,7 +170,8 @@ func ConvertByteStringToDouble(ecudata []byte) float64 {
 func ConvertByteToI16(ecudata []byte) int16 {
 	var retval int16
 	// Iterate over the bytes in ecudata and accumulate the result
-	for i := 0; i < len(ecudata); i++ {
+	// for i := 0; i < len(ecudata); i++ {
+	for i := range len(ecudata) {
 		// Multiply the current byte by the appropriate power of 256 and add it to the result
 		retval += int16(ecudata[i]) * int16(math.Pow(256, float64(len(ecudata)-i-1)))
 	}
@@ -179,13 +191,14 @@ func ConvertByteStringToDoubleStatus(ecudata []byte) float64 {
 	n := min(len(ecudata), 8)
 
 	var u uint64
-	for i := 0; i < n; i++ {
+	// for i := 0; i < n; i++ {
+	for i := range n {
 		u |= uint64(ecudata[i]) << (8 * uint(i))
 	}
 	return float64(u)
 }
 
-func newT5Converter(wb WidebandConfig) func(string, []byte) float64 {
+func newT5Converter() func(string, []byte) float64 {
 	return func(name string, data []byte) float64 {
 		switch name {
 		case "P_medel", "P_Manifold10", "P_Manifold", "Max_tryck", "Regl_tryck": // inlet manifold pressure
@@ -206,11 +219,15 @@ func newT5Converter(wb WidebandConfig) func(string, []byte) float64 {
 			// fix
 			// retval = ConvertToAFR(retval)
 		case "AD_EGR":
-			value := ConvertByteStringToDouble(data)
-			voltage := (value / 255) * (wb.MaximumVoltageWideband - wb.MinimumVoltageWideband)
-			voltage = clamp(voltage, wb.MinimumVoltageWideband, wb.MaximumVoltageWideband)
-			steepness := (wb.High - wb.Low) / (wb.MaximumVoltageWideband - wb.MinimumVoltageWideband)
-			return wb.Low + (steepness * (voltage - wb.MinimumVoltageWideband))
+			return ConvertByteStringToDouble(data)
+			// i want to do linear interpolattion between the support points and corresponding lambda values:
+			// wb.SupportPoints the AD values for voltage values
+			// wb.LambdaValues the corresponding lambda values for the support points
+
+			// voltage := (value / 255) * (wb.MaximumVoltageWideband - wb.MinimumVoltageWideband)
+			// voltage = clamp(voltage, wb.MinimumVoltageWideband, wb.MaximumVoltageWideband)
+			// steepness := (wb.High - wb.Low) / (wb.MaximumVoltageWideband - wb.MinimumVoltageWideband)
+			// return wb.Low + (steepness * (voltage - wb.MinimumVoltageWideband))
 		case "Pgm_status":
 			// now what, just pass it on in a seperate structure
 			// fix
@@ -218,7 +235,7 @@ func newT5Converter(wb WidebandConfig) func(string, []byte) float64 {
 		case "Insptid_ms10":
 			// return value using multiplication instead of division
 			return ConvertByteStringToDouble(data) * 0.1
-			//return ConvertByteStringToDouble(data) / 10
+			// return ConvertByteStringToDouble(data) / 10
 
 		case "Lacc_mangd", "Acc_mangd", "Lret_mangd", "Ret_mangd":
 			// 4 values in one variable, one for each cylinder
@@ -236,7 +253,7 @@ func newT5Converter(wb WidebandConfig) func(string, []byte) float64 {
 			}
 			return retval / 10
 		case "Medeltrot":
-			//TODO: should substract trot_min from this value?
+			// TODO: should substract trot_min from this value?
 			return ConvertByteStringToDouble(data) - 34
 		case "Apc_decrese":
 			return ConvertByteStringToDouble(data) * correctionForMapsensor * 0.01
@@ -263,3 +280,26 @@ func newT5Converter(wb WidebandConfig) func(string, []byte) float64 {
 		}
 	}
 }
+
+/*
+func Interpolate(supportPoints []int, values []float64, value int) float64 {
+	if len(supportPoints) != len(values) {
+		return -1
+	}
+	if value <= supportPoints[0] {
+		return values[0]
+	}
+	if value >= supportPoints[len(supportPoints)-1] {
+		return values[len(values)-1]
+	}
+
+	for i := 0; i < len(supportPoints)-1; i++ {
+		if value >= supportPoints[i] && value <= supportPoints[i+1] {
+			x0, y0 := float64(supportPoints[i]), values[i]
+			x1, y1 := float64(supportPoints[i+1]), values[i+1]
+			return y0 + (y1-y0)*(float64(value)-x0)/(x1-x0)
+		}
+	}
+	return -1
+}
+*/

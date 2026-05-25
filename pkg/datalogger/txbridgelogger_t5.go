@@ -18,15 +18,19 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
-	order := make([]string, len(c.Symbols))
+	sysvarOrder := make([]string, len(c.Symbols))
 	for n, s := range c.Symbols {
-		order[n] = s.Name
+		sysvarOrder[n] = s.Name
 		s.Correctionfactor = 0.1
 	}
 
 	if c.lamb != nil {
 		defer c.lamb.Stop()
-		order = append(order, EXTERNALWBLSYM)
+		sysvarOrder = append(sysvarOrder, EXTERNALWBLSYM)
+	}
+
+	if c.WidebandConfig.Name == "ECU" && c.WidebandConfig.ADScanner {
+		sysvarOrder = append(sysvarOrder, LAMBDAADSCANNER)
 	}
 
 	expectedPayloadSize, err := c.configureT5Symbols(cl)
@@ -41,7 +45,8 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 		return fmt.Errorf("error starting logging: %w", err)
 	}
 
-	converto := newT5Converter(c.WidebandConfig)
+	converto := newT5Converter()
+	adscannerConverter := NewWBLInterpolator(c.WidebandConfig)
 
 	go func() {
 		defer cl.Close()
@@ -171,6 +176,11 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 						return
 					}
 					val := converto(sym.Name, sym.Bytes())
+					if sym.Name == "AD_EGR" {
+						lambda := adscannerConverter(int(val))
+						c.sysvars.Set(LAMBDAADSCANNER, lambda)
+						ebus.Publish(LAMBDAADSCANNER, lambda)
+					}
 					c.sysvars.Set(sym.Name, val)
 					ebus.Publish(sym.Name, val)
 				}
@@ -181,7 +191,7 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				if err := c.lw.Write(c.sysvars, order, []*symbol.Symbol{}, timeStamp); err != nil {
+				if err := c.lw.Write(c.sysvars, sysvarOrder, []*symbol.Symbol{}, timeStamp); err != nil {
 					c.OnMessage("failed to write log: " + err.Error())
 					return
 				}

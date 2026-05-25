@@ -8,8 +8,10 @@ import (
 	"github.com/roffe/txlogger/pkg/eventbus"
 )
 
-var once sync.Once
-var CONTROLLER *eventbus.Controller
+var (
+	once       sync.Once
+	CONTROLLER *eventbus.Controller
+)
 
 const (
 	TOPIC_COLORBLINDMODE = "color_blind_mode"

@@ -21,9 +21,6 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 		widget.NewSeparator(),
 		mw.buttons.symbolListBtn,
 		mw.buttons.logBtn,
-
-		//mw.buttons.logplayerBtn,
-		mw.buttons.openLogBtn,
 		mw.buttons.dashboardBtn,
 		widget.NewButtonWithIcon("", theme.GridIcon(), func() {
 			mw.wm.Arrange(&multiwindow.GridArranger{})
@@ -45,7 +42,6 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 			inner.Icon = theme.UploadIcon()
 			mw.wm.Add(inner)
 			inner.Resize(fyne.NewSize(450, 250))
-
 		}),
 		)
 

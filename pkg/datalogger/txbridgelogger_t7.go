@@ -25,17 +25,21 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 
 	c.OnMessage("Watching for broadcast messages")
 	<-time.After(1550 * time.Millisecond)
-	order := c.sysvars.Keys()
-	sort.StringSlice(order).Sort()
-	c.OnMessage(fmt.Sprintf("Found %s", order))
+	sysvarOrder := c.sysvars.Keys()
+	sort.StringSlice(sysvarOrder).Sort()
+	c.OnMessage(fmt.Sprintf("Found %s", sysvarOrder))
 
-	if len(order) == 0 {
+	if len(sysvarOrder) == 0 {
 		bcancel()
 	}
 
 	if c.lamb != nil {
 		defer c.lamb.Stop()
-		order = append(order, EXTERNALWBLSYM)
+		sysvarOrder = append(sysvarOrder, EXTERNALWBLSYM)
+	}
+
+	if c.WidebandConfig.Name == "ECU" && c.WidebandConfig.ADScanner {
+		sysvarOrder = append(sysvarOrder, LAMBDAADSCANNER)
 	}
 
 	for _, sym := range c.Symbols {
@@ -66,7 +70,7 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 		return fmt.Errorf("error starting logging: %w", err)
 	}
 
-	adConverter := newDisplProtADConverterT7(c.WidebandConfig)
+	adConverter := NewWBLInterpolator(c.WidebandConfig)
 
 	go func() {
 		defer cl.Close()
@@ -176,9 +180,9 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 				if msg.DLC() != int(expectedPayloadSize+4) {
 					c.onError()
 					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, msg.DLC()))
-					//log.Printf("unexpected data %X", msg.Data)
+					// log.Printf("unexpected data %X", msg.Data)
 					continue
-					//return fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff))
+					// return fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff))
 				}
 
 				r := bytes.NewReader(msg.Data)
@@ -208,13 +212,14 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 						break
 					}
 					if va.Name == "DisplProt.AD_Scanner" {
-						//value := va.Float64()
-						//voltage := (value / 1023) * (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
-						//voltage = clamp(voltage, c.WidebandConfig.MinimumVoltageWideband, c.WidebandConfig.MaximumVoltageWideband)
-						//steepness := (c.WidebandConfig.High - c.WidebandConfig.Low) / (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
-						//result := c.WidebandConfig.Low + (steepness * (voltage - c.WidebandConfig.MinimumVoltageWideband))
-						ebus.Publish(va.Name, adConverter(va.Float64()))
-						continue
+						// value := va.Float64()
+						// voltage := (value / 1023) * (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
+						// voltage = clamp(voltage, c.WidebandConfig.MinimumVoltageWideband, c.WidebandConfig.MaximumVoltageWideband)
+						// steepness := (c.WidebandConfig.High - c.WidebandConfig.Low) / (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
+						// result := c.WidebandConfig.Low + (steepness * (voltage - c.WidebandConfig.MinimumVoltageWideband))
+						lambda := adConverter(va.Int())
+						c.sysvars.Set(LAMBDAADSCANNER, lambda)
+						ebus.Publish(LAMBDAADSCANNER, lambda)
 					}
 
 					ebus.Publish(va.Name, va.Float64())
@@ -230,7 +235,7 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				if err := c.lw.Write(c.sysvars, order, c.Symbols, timeStamp); err != nil {
+				if err := c.lw.Write(c.sysvars, sysvarOrder, c.Symbols, timeStamp); err != nil {
 					c.onError()
 					c.OnMessage("failed to write log: " + err.Error())
 				}

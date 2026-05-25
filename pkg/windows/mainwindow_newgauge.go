@@ -52,11 +52,10 @@ func NewGaugeCreator(mw *MainWindow) *GaugeCreator {
 
 	g.entries.displayString = widget.NewSelectEntry([]string{"%.0f", "%.1f", "%.2f", "%.3f", "%.4f", "%.5f"})
 
-	g.entries.symbolName = widget.NewSelect(mw.symbolList.Names(), func(s string) {
-	})
+	symbols := mw.symbolList.Names()
 
-	g.entries.symbolNameSecondary = widget.NewSelect(mw.symbolList.Names(), func(s string) {
-	})
+	g.entries.symbolName = widget.NewSelect(symbols, func(s string) {})
+	g.entries.symbolNameSecondary = widget.NewSelect(symbols, func(s string) {})
 	g.entries.symbolNameSecondary.Disable()
 
 	g.entries.min = numericentry.New()
@@ -151,6 +150,7 @@ func float64or0(s string) float64 {
 	}
 	return f
 }
+
 func intor10(s string) int {
 	i, err := strconv.Atoi(s)
 	if err != nil {

@@ -82,7 +82,10 @@ func (bl *BaseLogger) runRelay() error {
 				if err != nil {
 					bl.onError()
 					bl.OnMessage("Error setting RAM for write request: " + err.Error())
-					c.SendWriteResponse(false)
+					if err := c.SendWriteResponse(false); err != nil {
+						bl.onError()
+						bl.OnMessage("Error sending write response: " + err.Error())
+					}
 					continue
 				}
 				if err := c.SendWriteResponse(true); err != nil {

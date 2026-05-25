@@ -33,20 +33,19 @@ func init() {
 	flag.StringVar(&workDirectory, "d", "", "working directory")
 	flag.BoolVar(&allowMultipleInstances, "m", false, "allow multiple instances")
 	flag.Parse()
-
 }
 
 // Unfortunately Fyne installs its own signal handler that needs to be overridden to allow graceful shutdown on SIGINT/SIGTERM.
 func signalHandler(mw *windows.MainWindow) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	signal.Reset(syscall.SIGINT, syscall.SIGTERM)
-	//debug.Log("installed signal handler")
+	// debug.Log("installed signal handler")
 	sig := make(chan os.Signal, 2)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	s := <-sig
 	debug.Log("caught:" + s.String())
 	fyne.DoAndWait(mw.Close)
-	//fyne.CurrentApp().Driver().Quit()
+	// fyne.CurrentApp().Driver().Quit()
 }
 
 func main() {
@@ -69,7 +68,7 @@ func main() {
 		}
 	}
 
-	//startpprof()
+	// startpprof()
 	defer debug.Close()
 	defer debug.Log("txlogger exit")
 

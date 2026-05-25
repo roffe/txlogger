@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 
 	"fyne.io/fyne/v2"
@@ -35,7 +36,7 @@ type Widget struct {
 }
 
 type Config struct {
-	//EBus           *eventbus.Controller
+	// EBus           *eventbus.Controller
 	Symbols        []*symbol.Symbol
 	ColorBlindMode colors.ColorBlindMode
 }
@@ -55,14 +56,12 @@ func New(cfg *Config) *Widget {
 func (s *Widget) render() {
 	s.container = container.NewVBox()
 	s.scroll = container.NewVScroll(s.container)
-
 }
 
 func (s *Widget) SetColorBlindMode(mode colors.ColorBlindMode) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.cfg.ColorBlindMode = mode
-
 }
 
 func (s *Widget) UpdateBars(enabled bool) {
@@ -75,7 +74,9 @@ func (s *Widget) Names() []string {
 		names[i] = s.Name
 	}
 	names[len(names)-1] = datalogger.EXTERNALWBLSYM
-	sort.Strings(names)
+	sort.Slice(names, func(i, j int) bool {
+		return strings.ToLower(names[i]) < strings.ToLower(names[j])
+	})
 	return names
 }
 
@@ -107,14 +108,14 @@ func (s *Widget) SetValue(name string, value float64) {
 
 func (s *Widget) Disable() {
 	for _, e := range s.entries {
-		//e.symbolCorrectionfactor.Disable()
+		// e.symbolCorrectionfactor.Disable()
 		e.deleteBTN.Disable()
 	}
 }
 
 func (s *Widget) Enable() {
 	for _, e := range s.entries {
-		//e.symbolCorrectionfactor.Enable()
+		// e.symbolCorrectionfactor.Enable()
 		e.deleteBTN.Enable()
 	}
 }
@@ -212,14 +213,14 @@ func (s *Widget) CreateRenderer() fyne.WidgetRenderer {
 	// num := widget.NewLabel("#")
 	// num.TextStyle = fyne.TextStyle{Bold: true}
 
-	//typ := widget.NewLabel("Type")
-	//typ.TextStyle = fyne.TextStyle{Bold: true}
+	// typ := widget.NewLabel("Type")
+	// typ.TextStyle = fyne.TextStyle{Bold: true}
 
-	//factor := widget.NewLabel("Factor")
-	//factor.TextStyle = fyne.TextStyle{Bold: true}
+	// factor := widget.NewLabel("Factor")
+	// factor.TextStyle = fyne.TextStyle{Bold: true}
 
 	customLayout := xlayout.NewHPortion(headerSizes)
-	//header := container.New(ll, name, value, num /* typ,*/, factor, widget.NewLabel(""))
+	// header := container.New(ll, name, value, num /* typ,*/, factor, widget.NewLabel(""))
 	header := container.New(customLayout, name, value, widget.NewLabel(""))
 
 	return widget.NewSimpleRenderer(container.NewBorder(
@@ -253,7 +254,7 @@ func (s *Widget) newSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*Symbo
 		}
 	*/
 
-	//sw.SetCorrectionFactor(sym.Correctionfactor)
+	// sw.SetCorrectionFactor(sym.Correctionfactor)
 
 	sw.deleteBTN = widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
 		if sw.deleteFunc != nil {
@@ -269,8 +270,8 @@ func (s *Widget) newSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*Symbo
 	sw.body = container.New(layout,
 		sw.symbolName,
 		sw.symbolValue,
-		//sw.symbolNumber,
-		//sw.symbolCorrectionfactor,
+		// sw.symbolNumber,
+		// sw.symbolCorrectionfactor,
 		sw.deleteBTN,
 	)
 	sw.container = container.NewStack(
@@ -289,8 +290,8 @@ type SymbolWidgetEntry struct {
 	symbol      *symbol.Symbol
 	symbolName  *widget.Label
 	symbolValue *widget.Label
-	//symbolNumber           *widget.Label
-	//symbolCorrectionfactor *widget.Entry
+	// symbolNumber           *widget.Label
+	// symbolCorrectionfactor *widget.Entry
 	deleteBTN      *widget.Button
 	valueBar       *canvas.Rectangle
 	valueBarFactor float32
@@ -326,7 +327,7 @@ func (sw *SymbolWidgetEntry) SetCorrectionFactor(f float64) {
 
 func (sw *SymbolWidgetEntry) CreateRenderer() fyne.WidgetRenderer {
 	return &symbolWidgetEntryRenderer{sw}
-	//return widget.NewSimpleRenderer(sw.container)
+	// return widget.NewSimpleRenderer(sw.container)
 }
 
 type symbolWidgetEntryRenderer struct {
@@ -352,14 +353,13 @@ func (s *symbolWidgetEntryRenderer) MinSize() fyne.Size {
 func (s *symbolWidgetEntryRenderer) Refresh() {
 	s.e.symbolName.Refresh()
 	s.e.symbolValue.Refresh()
-	//s.e.symbolNumber.Refresh()
-	//s.e.symbolCorrectionfactor.Refresh()
+	// s.e.symbolNumber.Refresh()
+	// s.e.symbolCorrectionfactor.Refresh()
 	col := colors.GetColorInterpolation(s.e.min, s.e.max, s.e.value, s.e.w.cfg.ColorBlindMode)
 	col.A = barAlpha
 	s.e.valueBar.FillColor = col
 	s.e.valueBar.StrokeColor = col
 	s.e.valueBar.Refresh()
-
 }
 
 func (s *symbolWidgetEntryRenderer) Objects() []fyne.CanvasObject {

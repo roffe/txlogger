@@ -122,7 +122,7 @@ func (mv *MapViewer) CreateRenderer() fyne.WidgetRenderer {
 	mv.createTextValues()
 	mv.content = mv.render()
 	return widget.NewSimpleRenderer(mv.content)
-	//return &mapViewerRenderer{mv: mv}
+	// return &mapViewerRenderer{mv: mv}
 }
 
 type movingRectsLayout struct {
@@ -166,13 +166,13 @@ func (mr *movingRectsLayout) Layout(_ []fyne.CanvasObject, size fyne.Size) {
 }
 
 func (mv *MapViewer) render() fyne.CanvasObject {
-	//mv.crosshair.CornerRadius = 4
+	// mv.crosshair.CornerRadius = 4
 	mv.crosshair.Resize(fyne.NewSize(34, 14))
 	mv.crosshair.Hide()
 
-	//mv.selectionRect.CornerRadius = 4
+	// mv.selectionRect.CornerRadius = 4
 	mv.selectionRect.Resize(fyne.NewSize(34, 14))
-	//mv.selectionRect.Hide()
+	// mv.selectionRect.Hide()
 
 	mv.innerView = container.NewStack(
 		mv.valueRects,
@@ -259,12 +259,12 @@ func (mv *MapViewer) SetY(yValue float64) {
 	mv.yValue = yValue
 	if mv.crosshair.Hidden {
 		size := fyne.Size{Width: mv.widthFactor, Height: mv.heightFactor}
-		fyne.Do(func() {
-			mv.crosshair.Show()
-			if mv.crosshair.Size() != size {
-				mv.crosshair.Resize(size)
-			}
-		})
+
+		mv.crosshair.Show()
+		if mv.crosshair.Size() != size {
+			mv.crosshair.Resize(size)
+		}
+
 	}
 	if err := mv.setXY(); err != nil {
 		log.Println("MapViewer SetXY error:", err)
@@ -475,7 +475,7 @@ func (mv *MapViewer) resizeSelectionRect() {
 	// Batch UI updates
 	mv.selectionRect.Move(pos)
 	mv.selectionRect.Resize(size)
-	//mv.selectionRect.MoveAndResize(pos, size)
+	// mv.selectionRect.MoveAndResize(pos, size)
 }
 
 /*

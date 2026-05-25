@@ -33,9 +33,11 @@ func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
 	return req.Data, req.Wait()
 }
 
-const T8ReadChunkSize = 245
-const T8WriteChunkSize = 245
-const lastPresentInterval = 2500 * time.Millisecond
+const (
+	T8ReadChunkSize     = 245
+	T8WriteChunkSize    = 245
+	lastPresentInterval = 2500 * time.Millisecond
+)
 
 func (c *T8Client) Start() error {
 	defer c.secondTicker.Stop()
@@ -66,6 +68,10 @@ func (c *T8Client) Start() error {
 	if c.lamb != nil {
 		defer c.lamb.Stop()
 		order = append(order, EXTERNALWBLSYM)
+	}
+
+	if c.WidebandConfig.Name == "ECU" && c.WidebandConfig.ADScanner {
+		order = append(order, LAMBDAADSCANNER)
 	}
 
 	// sort order
@@ -102,7 +108,6 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Client, gm *gmlan.Client, 
 
 	testerPresent := func() {
 		if time.Since(lastPresent) > lastPresentInterval {
-			//log.Println("sending tester present")
 			if err := gm.TesterPresentNoResponseAllowed(); err != nil {
 				c.onError()
 				c.OnMessage("Failed to send tester present: " + err.Error())
@@ -115,6 +120,8 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Client, gm *gmlan.Client, 
 		_ = gm.ReturnToNormalMode(ctx)
 		time.Sleep(50 * time.Millisecond)
 	}()
+
+	adConverter := NewWBLInterpolator(c.WidebandConfig)
 
 	t := time.NewTicker(time.Second / time.Duration(c.Rate))
 	defer t.Stop()
@@ -189,7 +196,14 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Client, gm *gmlan.Client, 
 					c.OnMessage("failed to set data: " + err.Error())
 					break
 				}
+
 				ebus.Publish(va.Name, va.Float64())
+
+				if va.Name == "LambdaScan.AD_Scanner" {
+					lambda := adConverter(va.Int())
+					c.sysvars.Set(LAMBDAADSCANNER, lambda)
+					ebus.Publish(LAMBDAADSCANNER, lambda)
+				}
 			}
 
 			if r.Len() > 0 {
@@ -230,7 +244,7 @@ func initT8Logging(ctx context.Context, gm *gmlan.Client, symbols []*symbol.Symb
 		if err := setUpDynamicallyDefinedRegisterBySymbol(ctx, gm, uint16(sym.Number)); err != nil {
 			return err
 		}
-		//onMessage(fmt.Sprintf("Configured dynamic register %d: %s %d", i, sym.Name, sym.Value))
+		// onMessage(fmt.Sprintf("Configured dynamic register %d: %s %d", i, sym.Name, sym.Value))
 	}
 	onMessage("Configured dynamic register")
 	return nil

@@ -19,19 +19,19 @@ jobs:
             vcpkgCommitId: '74e6536215718009aae747d86d84b78376bf9e09'
     steps:
    
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6.0.2
       with:
         submodules: recursive
 
     - name: Install NSIS
-      uses: repolevedavaj/install-nsis@v1.1.0
+      uses: repolevedavaj/install-nsis@v1.2.0
       with:
         nsis-version: '3.11'
     
     - name: Set up Go
-      uses: actions/setup-go@v6
+      uses: actions/setup-go@v6.4.0
       with:
-        go-version: '1.26.1'
+        go-version: '1.26.3'
         cache: false
     
     - name: Install dependencies
@@ -46,15 +46,13 @@ jobs:
         .\build.ps1 -cangateway -usegitsrc -txlogger -setup
 
     - name: Creating Zip
-      if: startsWith(github.ref, 'refs/tags/')
       run: 7z a txlogger.zip txlogger.exe cangateway.exe .\debug.bat C:\Progra~2\Kvaser\Canlib\Bin\canlib32.dll .\vcpkg\packages\libusb_x64-windows\bin\libusb-1.0.dll .\canusb\dll64\canusbdrv64.dll
 
     - name: Creating Setup Zip
-      if: startsWith(github.ref, 'refs/tags/')
       run: 7z a txlogger_setup.zip txlogger_setup.exe
 
     - name: Release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       if: github.ref_type == 'tag'
       env:
         GITHUB_REPOSITORY: roffe/txlogger

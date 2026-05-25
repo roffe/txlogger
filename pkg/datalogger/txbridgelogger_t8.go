@@ -44,7 +44,6 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 
 	testerPresent := func() {
 		if time.Since(lastPresent) > lastPresentInterval {
-			//log.Println("sending tester present")
 			if err := gm.TesterPresentNoResponseAllowed(); err != nil {
 				c.onError()
 				c.OnMessage("Failed to send tester present: " + err.Error())
@@ -62,6 +61,8 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 
 	go func() {
 		defer cl.Close()
+
+		adConverter := NewWBLInterpolator(c.WidebandConfig)
 
 		defer func() {
 			_ = gm.ReturnToNormalMode(ctx)
@@ -122,6 +123,12 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 						break
 					}
 					ebus.Publish(va.Name, va.Float64())
+
+					if va.Name == "LambdaScan.AD_Scanner" {
+						lambda := adConverter(va.Int())
+						ebus.Publish(LAMBDAADSCANNER, lambda)
+						c.sysvars.Set(LAMBDAADSCANNER, lambda)
+					}
 				}
 
 				if r.Len() > 0 {
