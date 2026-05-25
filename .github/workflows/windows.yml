@@ -26,6 +26,11 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Install NSIS
+      uses: repolevedavaj/install-nsis@v1.2.0
+      with:
+        nsis-version: '3.11'
+
     - name: Set up Go
       uses: actions/setup-go@v6.4.0
       with:
