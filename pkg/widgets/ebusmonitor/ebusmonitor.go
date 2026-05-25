@@ -62,8 +62,8 @@ func (t *Widget) SetText(value string, data float64) {
 }
 
 func (t *Widget) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(t.container)
-	// return &WidgetRenderer{t: t}
+	// return widget.NewSimpleRenderer(t.container)
+	return &WidgetRenderer{t: t}
 }
 
 type WidgetRenderer struct {
@@ -84,7 +84,6 @@ func (tr *WidgetRenderer) MinSize() fyne.Size {
 }
 
 func (tr *WidgetRenderer) Refresh() {
-
 }
 
 func (tr *WidgetRenderer) Objects() []fyne.CanvasObject {

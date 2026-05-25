@@ -1,6 +1,6 @@
 # 2.1.10
 - Performance optimization for the log plotter and meshgrid
-- force layouts to be loaded and saved in users home directory under the txlogger forlder
+- force layouts to be loaded and saved in users home directory under the txlogger folder
 - update ecusymbol to be able to read T5 versions
 - Added new config widget for AD scanner WBL settings inspired by T7's DisplAdap.LamScannerTab
 

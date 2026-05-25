@@ -134,7 +134,13 @@ func (mw *MainWindow) openEBUSMonitor() {
 	mon := ebusmonitor.New()
 	eb := multiwindow.NewSystemWindow("EBUS Monitor", mon)
 	eb.Icon = theme.ComputerIcon()
-	ebus.SetOnMessage(mon.SetText)
+	ebus.SetOnMessage(
+		func(topic string, data float64) {
+			fyne.Do(func() {
+				mon.SetText(topic, data)
+			})
+		},
+	)
 	eb.OnClose = func() {
 		ebus.SetOnMessage(nil)
 	}
