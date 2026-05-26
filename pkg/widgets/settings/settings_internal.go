@@ -1,9 +1,7 @@
 package settings
 
 import (
-	"errors"
 	"strconv"
-	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -127,8 +125,10 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 
 		if adScanner {
 			sw.wblADscanner.Show()
+			sw.wblADScannerSymbol.Show()
 		} else {
 			sw.wblADscanner.Hide()
+			sw.wblADScannerSymbol.Hide()
 		}
 	})
 	return container.NewBorder(
@@ -154,6 +154,11 @@ func (sw *Widget) newFreqSlider() *widget.Slider {
 
 func (sw *Widget) newADscannerCheck() *widget.Check {
 	return widget.NewCheck("use AD Scanner (don't forget to add symbol)", func(b bool) {
+		if b {
+			sw.wblADScannerSymbol.Show()
+		} else {
+			sw.wblADScannerSymbol.Hide()
+		}
 		fyne.CurrentApp().Preferences().SetBool(prefsUseADScanner, b)
 	})
 }
@@ -326,6 +331,7 @@ func loadPrefsText(obj SetText, prefKey string, fallback string) {
 	obj.SetText(fyne.CurrentApp().Preferences().StringWithFallback(prefKey, fallback))
 }
 
+/*
 func positiveFloatValidator(s string) (float64, error) {
 	s = strings.ReplaceAll(s, ",", ".")
 	s = strings.TrimSuffix(s, ".")
@@ -339,3 +345,4 @@ func positiveFloatValidator(s string) (float64, error) {
 	}
 	return val, nil
 }
+*/

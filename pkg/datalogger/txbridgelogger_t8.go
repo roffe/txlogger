@@ -25,6 +25,10 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 		order = append(order, EXTERNALWBLSYM)
 	}
 
+	if c.WidebandConfig.ADScanner && c.WidebandConfig.Name == "ECU" {
+		order = append(order, LAMBDAADSCANNER)
+	}
+
 	sort.StringSlice(order).Sort()
 
 	gm := gmlan.New(cl, 0x7e0, 0x7e8)
@@ -124,10 +128,10 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 					}
 					ebus.Publish(va.Name, va.Float64())
 
-					if va.Name == "LambdaScan.AD_Scanner" {
+					if c.WidebandConfig.ADScanner && va.Name == c.WidebandConfig.ADScannerSymbol {
 						lambda := adConverter(va.Int())
-						ebus.Publish(LAMBDAADSCANNER, lambda)
 						c.sysvars.Set(LAMBDAADSCANNER, lambda)
+						ebus.Publish(LAMBDAADSCANNER, lambda)
 					}
 				}
 

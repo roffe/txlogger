@@ -60,7 +60,7 @@ func (c *T5Client) Start() error {
 		sysvarOrder = append(sysvarOrder, EXTERNALWBLSYM)
 	}
 
-	if c.WidebandConfig.Name == "ECU" && c.WidebandConfig.ADScanner {
+	if c.WidebandConfig.ADScanner && c.WidebandConfig.Name == "ECU" {
 		sysvarOrder = append(sysvarOrder, LAMBDAADSCANNER)
 	}
 
@@ -116,7 +116,7 @@ func (c *T5Client) Start() error {
 						return
 					}
 					val := converto(sym.Name, sym.Bytes())
-					if sym.Name == "AD_EGR" {
+					if c.WidebandConfig.ADScanner && sym.Name == c.WidebandConfig.ADScannerSymbol {
 						lambda := adscannerConverter(int(val))
 						c.sysvars.Set(LAMBDAADSCANNER, lambda)
 						ebus.Publish(LAMBDAADSCANNER, lambda)
@@ -145,16 +145,6 @@ func (c *T5Client) Start() error {
 const (
 	correctionForMapsensor = 1.0
 )
-
-func clamp(value, min, max float64) float64 {
-	if value < min {
-		return min
-	}
-	if value > max {
-		return max
-	}
-	return value
-}
 
 func ConvertByteStringToDouble(ecudata []byte) float64 {
 	var retval float64

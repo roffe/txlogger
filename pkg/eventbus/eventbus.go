@@ -33,7 +33,7 @@ type Controller struct {
 	incoming chan EBusMessage
 	sub      chan newSub
 	unsub    chan chan float64
-	//cache    *ttlcache.Cache[string, float64]
+	// cache    *ttlcache.Cache[string, float64]
 
 	aggregatorIndex map[string][]*EventAggregator
 
@@ -66,6 +66,8 @@ func New(cfg *Config) *Controller {
 	// Register default aggregators before starting the run loop so no
 	// synchronization is needed on aggregatorIndex.
 	c.registerAggregator(
+		DIFFAggregator("ActualIn.v_Vehicle", "ActualIn.v_Vehicle2", "VDIFFL"),
+		DIFFAggregator("ActualIn.v_Vehicle3", "ActualIn.v_Vehicle2", "VDIFFR"),
 		DIFFAggregator("MAF.m_AirInlet", "m_Request", "AirDIFF"),
 		DIFFAggregator("MAF.m_AirInlet", "AirMassMast.m_Request", "AirDIFF"),
 	)

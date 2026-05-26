@@ -29,7 +29,7 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 		sysvarOrder = append(sysvarOrder, EXTERNALWBLSYM)
 	}
 
-	if c.WidebandConfig.Name == "ECU" && c.WidebandConfig.ADScanner {
+	if c.WidebandConfig.ADScanner && c.WidebandConfig.Name == "ECU" {
 		sysvarOrder = append(sysvarOrder, LAMBDAADSCANNER)
 	}
 
@@ -176,7 +176,7 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 						return
 					}
 					val := converto(sym.Name, sym.Bytes())
-					if sym.Name == "AD_EGR" {
+					if c.WidebandConfig.ADScanner && sym.Name == c.WidebandConfig.ADScannerSymbol {
 						lambda := adscannerConverter(int(val))
 						c.sysvars.Set(LAMBDAADSCANNER, lambda)
 						ebus.Publish(LAMBDAADSCANNER, lambda)

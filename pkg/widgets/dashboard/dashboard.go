@@ -6,6 +6,8 @@ import (
 	"log"
 	"time"
 
+	_ "embed"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/theme"
@@ -19,6 +21,12 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/icon"
 	"github.com/roffe/txlogger/pkg/widgets/vbar"
 )
+
+//go:embed wheel_left.svg
+var wheelLeftIconBytes []byte
+
+//go:embed wheel_right.svg
+var wheelRightIconBytes []byte
 
 const rpmIDCconstant = 1.0 / 1200.0
 
@@ -48,6 +56,8 @@ type Images struct {
 	limpMode    *canvas.Image
 	knockIcon   *icon.Icon
 	taz         *canvas.Image
+	wheelLeft   *canvas.Image
+	wheelRight  *canvas.Image
 }
 
 type Texts struct {
@@ -224,8 +234,10 @@ func NewDashboard(cfg *Config) *Dashboard {
 				Image:   canvas.NewImageFromResource(fyne.NewStaticResource("knock.png", assets.KnockBytes)),
 				Minsize: fyne.NewSize(90, 90),
 			}),
-			limpMode: canvas.NewImageFromResource(fyne.NewStaticResource("limp.png", assets.LimpBytes)),
-			taz:      canvas.NewImageFromResource(fyne.NewStaticResource("taz.png", assets.Taz)),
+			limpMode:   canvas.NewImageFromResource(fyne.NewStaticResource("limp.png", assets.LimpBytes)),
+			taz:        canvas.NewImageFromResource(fyne.NewStaticResource("taz.png", assets.Taz)),
+			wheelLeft:  canvas.NewImageFromResource(fyne.NewStaticResource("wheelLeft.svg", wheelLeftIconBytes)),
+			wheelRight: canvas.NewImageFromResource(fyne.NewStaticResource("wheelRight.svg", wheelRightIconBytes)),
 		},
 	}
 	db.ExtendBaseWidget(db)
@@ -257,6 +269,8 @@ func NewDashboard(cfg *Config) *Dashboard {
 	db.image.checkEngine.Hide()
 	db.image.limpMode.Hide()
 	db.image.taz.Hide()
+	db.image.wheelLeft.Hide()
+	db.image.wheelRight.Hide()
 
 	db.image.checkEngine.FillMode = canvas.ImageFillContain
 	db.image.checkEngine.ScaleMode = canvas.ImageScaleFastest
@@ -514,13 +528,29 @@ func (db *Dashboard) layoutIcons(dims *dims) {
 	})
 
 	// Taz icon
-
 	tazMin := fyne.Min(dims.sixthWidth, dims.thirdHeight)
 	tazSize := fyne.Size{Width: tazMin, Height: tazMin + 16}
+
 	db.image.taz.Resize(tazSize)
 	db.image.taz.Move(fyne.Position{
 		X: dims.centerX - tazSize.Width*0.58,
 		Y: dims.centerY - tazSize.Height,
+	})
+
+	tw := dims.sixthWidth * 0.3
+
+	// Wheel icons. to the left and right of the center
+	wheelSize := fyne.Size{Width: dims.sixthWidth * 0.25, Height: dims.thirdHeight * 0.5}
+	db.image.wheelLeft.Resize(wheelSize)
+	db.image.wheelLeft.Move(fyne.Position{
+		X: dims.centerX - wheelSize.Width - tw,
+		Y: dims.centerY - wheelSize.Height*0.30,
+	})
+
+	db.image.wheelRight.Resize(wheelSize)
+	db.image.wheelRight.Move(fyne.Position{
+		X: dims.centerX + tw,
+		Y: dims.centerY - wheelSize.Height*0.30,
 	})
 }
 
@@ -652,6 +682,8 @@ func (dr *DashboardRenderer) Destroy() {
 
 func (dr *DashboardRenderer) Objects() []fyne.CanvasObject {
 	cont := []fyne.CanvasObject{
+		dr.db.image.wheelLeft,
+		dr.db.image.wheelRight,
 		dr.db.image.limpMode,
 		dr.db.image.taz,
 		dr.db.gauges.rpm,

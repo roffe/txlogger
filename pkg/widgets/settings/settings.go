@@ -51,6 +51,7 @@ const (
 	prefsWBLSupportPoints    = "wblSupportPoints"
 	prefsWBLLambdaValues     = "wblLambdaValues"
 	prefsLastADScannerECU    = "lastADScannerECU"
+	prefsWBLADScannerSymbol  = "wblADScannerSymbol"
 
 	prefsUseADScanner   = "useADScanner"
 	prefsColorBlindMode = "colorBlindMode"
@@ -118,6 +119,7 @@ type Widget struct {
 	wbleditor *WBLEditor
 
 	wblADscanner         *widget.Check
+	wblADScannerSymbol   *widget.Select
 	wblSelectContainer   *fyne.Container
 	wblSource            *widget.Select
 	wblPortLabel         *widget.Label
@@ -402,6 +404,10 @@ func (cs *Widget) GetAdapterWithExtraFilters(ecuType string, filters []uint32) (
 		//}
 	}
 	return gocan.NewAdapter(adapterName, cfg)
+}
+
+func (sw *Widget) GetADScannerSymbolName() string {
+	return fyne.CurrentApp().Preferences().String(prefsWBLADScannerSymbol)
 }
 
 func (sw *Widget) GetWidebandName() string {

@@ -56,11 +56,12 @@ type Client struct {
 }
 
 type WidebandConfig struct {
-	Name          string
-	Port          string
-	ADScanner     bool
-	SupportPoints []int
-	LambdaValues  []float64
+	Name            string
+	Port            string
+	ADScanner       bool
+	ADScannerSymbol string
+	SupportPoints   []int
+	LambdaValues    []float64
 }
 
 func New(cfg Config) (IClient, string, error) {

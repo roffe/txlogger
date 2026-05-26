@@ -38,7 +38,7 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 		sysvarOrder = append(sysvarOrder, EXTERNALWBLSYM)
 	}
 
-	if c.WidebandConfig.Name == "ECU" && c.WidebandConfig.ADScanner {
+	if c.WidebandConfig.ADScanner && c.WidebandConfig.Name == "ECU" {
 		sysvarOrder = append(sysvarOrder, LAMBDAADSCANNER)
 	}
 
@@ -211,7 +211,7 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 						c.OnMessage(err.Error())
 						break
 					}
-					if va.Name == "DisplProt.AD_Scanner" {
+					if c.WidebandConfig.ADScanner && va.Name == c.WidebandConfig.ADScannerSymbol {
 						// value := va.Float64()
 						// voltage := (value / 1023) * (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
 						// voltage = clamp(voltage, c.WidebandConfig.MinimumVoltageWideband, c.WidebandConfig.MaximumVoltageWideband)

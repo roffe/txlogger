@@ -18,8 +18,10 @@ import (
 
 // var _ fyne.Focusable = (*Plotter)(nil)
 // var _ fyne.Tappable = (*Plotter)(nil)
-var _ fyne.Draggable = (*Plotter)(nil)
-var _ fyne.Widget = (*Plotter)(nil)
+var (
+	_ fyne.Draggable = (*Plotter)(nil)
+	_ fyne.Widget    = (*Plotter)(nil)
+)
 
 type PlotterControl interface {
 	Seek(int)
@@ -134,11 +136,11 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 			// log.Printf("\"%s\": {%d, %d, %d, %d},", k, uint8(r), uint8(g), uint8(b), uint8(a))
 			p.refreshImage(false)
 		}
-		//var oldColor color.RGBA
+		// var oldColor color.RGBA
 		onHover := func(hover bool) {
 			if hover {
-				//oldColor = p.ts[n].Color
-				//p.ts[n].Color = color.RGBA{255, 0, 0, 255}
+				// oldColor = p.ts[n].Color
+				// p.ts[n].Color = color.RGBA{255, 0, 0, 255}
 				p.overlayText.Text = k
 				p.overlayText.Color = p.ts[n].Color
 				p.hilightLine = n
@@ -146,7 +148,7 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 				p.legendTexts[n].value.TextStyle.Bold = true
 				p.refreshImage(false)
 			} else {
-				//p.ts[n].Color = oldColor
+				// p.ts[n].Color = oldColor
 				p.legendTexts[n].text.TextStyle.Bold = false
 				p.legendTexts[n].value.TextStyle.Bold = false
 				p.overlayText.Text = ""
@@ -244,7 +246,7 @@ func (p *Plotter) Seek(pos int) {
 		valueIndex := min(p.dataLength, p.cursorPos)
 		obj := p.legendTexts[i]
 		newValue := fmt.Sprintf("%.4g", p.values[v][valueIndex])
-		//newValue := strconv.FormatFloat(p.values[v][valueIndex], 'f', obj.precission, 64)
+		// newValue := strconv.FormatFloat(p.values[v][valueIndex], 'f', obj.precission, 64)
 		if obj.value.Text == newValue {
 			continue
 		}
@@ -279,7 +281,6 @@ func (p *Plotter) refreshImage(goroutine bool) {
 	} else {
 		p.canvasImage.Refresh()
 	}
-
 }
 
 type TimeSeries struct {
@@ -317,6 +318,9 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 	case "ActualIn.p_AirInlet", "In.p_AirInlet", "ActualIn.p_AirBefThrottle", "In.p_AirBefThrottle":
 		ts.Min = -1.0
 		ts.Max = 3.0
+	case "DisplProt.LambdaScanner", "Lambda.ADScanner", "LambdaScan.LambdaScanner", "LambdaScan.LambdaScanner2":
+		ts.Min = 0.5
+		ts.Max = 1.5
 	case "IgnProt.fi_Offset":
 		ts.Min = -30
 		ts.Max = 10
@@ -348,7 +352,7 @@ func (ts *TimeSeries) PlotImage(img *image.RGBA, values map[string][]float64, st
 	w := s.X
 	h := s.Y
 
-	//log.Println("Plotting", ts.Name, "from", start, "to", numPoints, "width", w, "height", h)
+	// log.Println("Plotting", ts.Name, "from", start, "to", numPoints, "width", w, "height", h)
 	hh := h - 1
 	dataLen := endN - startN
 	heightFactor := float64(hh) / ts.valueRange
@@ -369,7 +373,6 @@ func (ts *TimeSeries) PlotImage(img *image.RGBA, values map[string][]float64, st
 		y1 := int(float64(hh) - (data[x]-ts.Min)*heightFactor)
 		BresenhamThick(img, x0, y0, x1, y1, thickness, ts.Color)
 	}
-
 }
 
 // Updated cursor positioning method

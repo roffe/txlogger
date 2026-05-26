@@ -125,7 +125,7 @@ func (c *T7Client) Start() error {
 		sysvarOrder = append(sysvarOrder, EXTERNALWBLSYM)
 	}
 
-	if c.WidebandConfig.Name == "ECU" && c.WidebandConfig.ADScanner {
+	if c.WidebandConfig.ADScanner && c.WidebandConfig.Name == "ECU" {
 		sysvarOrder = append(sysvarOrder, LAMBDAADSCANNER)
 	}
 
@@ -260,7 +260,7 @@ func (c *T7Client) Start() error {
 						c.OnMessage(err.Error())
 						break
 					}
-					if va.Name == "DisplProt.AD_Scanner" {
+					if c.WidebandConfig.ADScanner && va.Name == c.WidebandConfig.ADScannerSymbol {
 						lambda := adConverter(va.Int())
 						ebus.Publish(LAMBDAADSCANNER, lambda)
 						c.sysvars.Set(LAMBDAADSCANNER, lambda)

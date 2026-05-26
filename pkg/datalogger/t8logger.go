@@ -70,7 +70,7 @@ func (c *T8Client) Start() error {
 		order = append(order, EXTERNALWBLSYM)
 	}
 
-	if c.WidebandConfig.Name == "ECU" && c.WidebandConfig.ADScanner {
+	if c.WidebandConfig.ADScanner && c.WidebandConfig.Name == "ECU" {
 		order = append(order, LAMBDAADSCANNER)
 	}
 
@@ -199,7 +199,7 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Client, gm *gmlan.Client, 
 
 				ebus.Publish(va.Name, va.Float64())
 
-				if va.Name == "LambdaScan.AD_Scanner" {
+				if c.WidebandConfig.ADScanner && va.Name == c.WidebandConfig.ADScannerSymbol {
 					lambda := adConverter(va.Int())
 					c.sysvars.Set(LAMBDAADSCANNER, lambda)
 					ebus.Publish(LAMBDAADSCANNER, lambda)

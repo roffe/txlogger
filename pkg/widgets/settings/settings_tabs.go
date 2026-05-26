@@ -124,6 +124,18 @@ func (sw *Widget) wblTab() *container.TabItem {
 
 	sw.wblADscanner = sw.newADscannerCheck()
 
+	adSymbols := []string{
+		"AD_EGR",
+		"DisplProt.AD_Scanner",
+		"LambdaScan.AD_Scanner",
+		"LambdaScan.AD_Scanner2",
+	}
+
+	sw.wblADScannerSymbol = widget.NewSelect(adSymbols, func(s string) {
+		fyne.CurrentApp().Preferences().SetString(prefsWBLADScannerSymbol, s)
+	})
+	sw.wblADScannerSymbol.SetSelected(sw.GetADScannerSymbolName())
+
 	return container.NewTabItem(
 		"WBL",
 		container.NewBorder(
@@ -137,13 +149,7 @@ func (sw *Widget) wblTab() *container.TabItem {
 			nil,
 			container.NewVBox(
 				sw.wblSelectContainer,
-				container.NewBorder(
-					nil,
-					nil,
-					nil,
-					nil,
-					sw.wblADscanner,
-				),
+				sw.wblADscanner,
 				container.NewBorder(
 					nil,
 					nil,
@@ -151,6 +157,7 @@ func (sw *Widget) wblTab() *container.TabItem {
 					sw.wblPortRefreshButton,
 					sw.wblPortSelect,
 				),
+				sw.wblADScannerSymbol,
 			),
 		),
 	)
