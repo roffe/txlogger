@@ -169,12 +169,38 @@ func (c *T7Client) Start() error {
 	//	}
 	//}
 
+	/*
+		wheelSlipFN := func(s string, v float64) {
+			switch s {
+			case "In.v_Vehicle", "In.v_Vehicle3":
+				// Front wheel speed, if this is higher than rear wheel speed, we have wheel slip
+				rearSpeed := c.sysvars.Get("In.v_Vehicle2")
+				if rearSpeed > 0 {
+					slip := (v - rearSpeed) / rearSpeed
+					c.sysvars.Set("WheelSlip."+s, slip)
+					ebus.Publish("WheelSlip."+s, slip)
+				}
+			}
+		}
+
+		specialFN := map[string]func(string, float64){
+			"In.v_Vehicle":  wheelSlipFN,
+			"In.v_Vehicle2": wheelSlipFN,
+			"In.v_Vehicle3": wheelSlipFN,
+		}
+	*/
+
 	go func() {
 		defer cl.Close()
 		defer func() {
 			_ = kwp.StopSession(ctx)
 			time.Sleep(50 * time.Millisecond)
 		}()
+
+		// In.v_Vehicle Left front wheel speed
+		// In.v_Vehicle2 Vehicle speed, measured on the rear wheel
+		// In.v_Vehicle3 Right front wheel speed
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -260,11 +286,13 @@ func (c *T7Client) Start() error {
 						c.OnMessage(err.Error())
 						break
 					}
+
 					if c.WidebandConfig.ADScanner && va.Name == c.WidebandConfig.ADScannerSymbol {
 						lambda := adConverter(va.Int())
 						ebus.Publish(LAMBDAADSCANNER, lambda)
 						c.sysvars.Set(LAMBDAADSCANNER, lambda)
 					}
+
 					ebus.Publish(va.Name, va.Float64())
 				}
 

@@ -5,8 +5,6 @@ import (
 	"io"
 	"strconv"
 	"time"
-
-	"github.com/roffe/txlogger/pkg/datalogger"
 )
 
 var _ Logfile = (*CSVLogfile)(nil)
@@ -35,7 +33,7 @@ func (l *CSVLogfile) parseCSVLogfile(reader io.Reader) error {
 	}
 
 	for i := 1; i < len(records); i++ {
-		ts, err := time.Parse(datalogger.ISONICO, records[i][0])
+		ts, err := time.Parse(ISONICO, records[i][0])
 		if err != nil {
 			return err
 		}
@@ -58,7 +56,7 @@ func (l *CSVLogfile) parseCSVLogfile(reader io.Reader) error {
 		}
 
 		if i < len(records)-1 {
-			ts2, err := time.Parse(datalogger.ISONICO, records[i+1][0])
+			ts2, err := time.Parse(ISONICO, records[i+1][0])
 			if err != nil {
 				return err
 			}

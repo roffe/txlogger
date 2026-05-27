@@ -8,6 +8,7 @@ import (
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/txlogger/pkg/logfile"
 )
 
 func NewCSVWriter(f *os.File) *CSVWriter {
@@ -31,7 +32,7 @@ func (c *CSVWriter) Write(sysvars *ThreadSafeMap, sysvarOrder []string, vars []*
 		}
 	}
 	var record []string
-	record = append(record, ts.Format(ISONICO))
+	record = append(record, ts.Format(logfile.ISONICO))
 	for _, k := range sysvarOrder {
 		val := sysvars.Get(k)
 		if val == math.Trunc(val) {

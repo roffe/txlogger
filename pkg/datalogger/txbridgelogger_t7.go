@@ -212,11 +212,6 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 						break
 					}
 					if c.WidebandConfig.ADScanner && va.Name == c.WidebandConfig.ADScannerSymbol {
-						// value := va.Float64()
-						// voltage := (value / 1023) * (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
-						// voltage = clamp(voltage, c.WidebandConfig.MinimumVoltageWideband, c.WidebandConfig.MaximumVoltageWideband)
-						// steepness := (c.WidebandConfig.High - c.WidebandConfig.Low) / (c.WidebandConfig.MaximumVoltageWideband - c.WidebandConfig.MinimumVoltageWideband)
-						// result := c.WidebandConfig.Low + (steepness * (voltage - c.WidebandConfig.MinimumVoltageWideband))
 						lambda := adConverter(va.Int())
 						c.sysvars.Set(LAMBDAADSCANNER, lambda)
 						ebus.Publish(LAMBDAADSCANNER, lambda)

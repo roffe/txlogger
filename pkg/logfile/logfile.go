@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+const (
+	ISO8601 = "2006-01-02T15:04:05.999-0700"
+	ISONICO = "2006-01-02 15:04:05,999"
+)
+
 type Logfile interface {
 	Get() Record
 	Next() Record
