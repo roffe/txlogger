@@ -302,16 +302,16 @@ func (sw *Widget) loadPreferences() {
 	loadPrefsText(sw.logPath, prefsLogPath, logPath)
 	loadPrefsSelect(sw.wblSource, prefsWblSource, "None")
 	loadPrefsCheck(sw.wblADscanner, prefsUseADScanner, false)
+	if sw.wblADscanner.Checked && sw.wblSource.Selected == "ECU" {
+		sw.wblADScannerSymbol.Show()
+	} else {
+		sw.wblADScannerSymbol.Hide()
+	}
+
 	loadPrefsCheck(sw.useMPH, prefsUseMPH, false)
 	loadPrefsCheck(sw.swapRPMandSpeed, prefsSwapRPMandSpeed, false)
 	loadPrefsSelect(sw.wblPortSelect, prefsWBLPort, "")
 	loadPrefsSelect(sw.colorBlindMode, prefsColorBlindMode, "Normal")
-
-	if sw.wblADscanner.Checked {
-		sw.wbleditor.Show()
-	} else {
-		sw.wbleditor.Hide()
-	}
 
 	loadPrefsSelect(sw.adapterSelector, prefsAdapter, "")
 	loadPrefsSelect(sw.portSelector, prefsPort, "")
