@@ -29,7 +29,6 @@ type CombinedLogplayerConfig struct {
 }
 
 func New(cfg *CombinedLogplayerConfig) *Widget {
-
 	cp := &Widget{}
 
 	if cfg.DBcfg.AirDemToString == nil {
@@ -63,11 +62,9 @@ func New(cfg *CombinedLogplayerConfig) *Widget {
 }
 
 func (cp *Widget) FocusGained() {
-
 }
 
 func (cp *Widget) FocusLost() {
-
 }
 
 func (cp *Widget) TypedRune(r rune) {

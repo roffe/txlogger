@@ -627,7 +627,8 @@ func (db *Dashboard) layoutTexts(dims *dims) {
 }
 
 type DashboardRenderer struct {
-	db *Dashboard
+	db      *Dashboard
+	objects []fyne.CanvasObject
 }
 
 func (dr *DashboardRenderer) Layout(space fyne.Size) {
@@ -681,35 +682,41 @@ func (dr *DashboardRenderer) Destroy() {
 }
 
 func (dr *DashboardRenderer) Objects() []fyne.CanvasObject {
-	cont := []fyne.CanvasObject{
-		dr.db.image.wheelLeft,
-		dr.db.image.wheelRight,
-		dr.db.image.limpMode,
-		dr.db.image.taz,
-		dr.db.gauges.rpm,
-		dr.db.gauges.speed,
-		dr.db.gauges.airmass,
-		dr.db.gauges.pressure,
-		dr.db.gauges.iat,
-		dr.db.gauges.engineTemp,
-		dr.db.text.ign,
-		dr.db.text.ioff,
-		dr.db.text.idc,
-		dr.db.text.amul,
-		dr.db.text.activeAirDem,
-		dr.db.gauges.nblambda,
-		dr.db.gauges.wblambda,
-		dr.db.gauges.throttle,
-		dr.db.gauges.pwm,
-		dr.db.image.checkEngine,
-		dr.db.text.cruise,
-		dr.db.image.knockIcon,
-		dr.db.fullscreenBtn,
+	// The object set is fixed for the lifetime of the renderer, so build it
+	// once and reuse it. Fyne calls Objects() on every render/refresh pass,
+	// and during live logging this would otherwise allocate a new slice each
+	// time, creating needless GC pressure.
+	if dr.objects == nil {
+		dr.objects = []fyne.CanvasObject{
+			dr.db.image.wheelLeft,
+			dr.db.image.wheelRight,
+			dr.db.image.limpMode,
+			dr.db.image.taz,
+			dr.db.gauges.rpm,
+			dr.db.gauges.speed,
+			dr.db.gauges.airmass,
+			dr.db.gauges.pressure,
+			dr.db.gauges.iat,
+			dr.db.gauges.engineTemp,
+			dr.db.text.ign,
+			dr.db.text.ioff,
+			dr.db.text.idc,
+			dr.db.text.amul,
+			dr.db.text.activeAirDem,
+			dr.db.gauges.nblambda,
+			dr.db.gauges.wblambda,
+			dr.db.gauges.throttle,
+			dr.db.gauges.pwm,
+			dr.db.image.checkEngine,
+			dr.db.text.cruise,
+			dr.db.image.knockIcon,
+			dr.db.fullscreenBtn,
+		}
+
+		if dr.db.logplayer {
+			dr.objects = append(dr.objects, dr.db.text.time)
+		}
 	}
 
-	if dr.db.logplayer {
-		cont = append(cont, dr.db.text.time)
-	}
-
-	return cont
+	return dr.objects
 }

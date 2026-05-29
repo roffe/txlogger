@@ -30,10 +30,12 @@ type controlMsg struct {
 	Rate float64
 }
 
-var _ fyne.Widget = (*Logplayer)(nil)
-var _ fyne.Focusable = (*Logplayer)(nil)
-var _ fyne.Tappable = (*Logplayer)(nil)
-var _ desktop.Mouseable = (*Logplayer)(nil)
+var (
+	_ fyne.Widget       = (*Logplayer)(nil)
+	_ fyne.Focusable    = (*Logplayer)(nil)
+	_ fyne.Tappable     = (*Logplayer)(nil)
+	_ desktop.Mouseable = (*Logplayer)(nil)
+)
 
 type Logplayer struct {
 	widget.BaseWidget
@@ -246,7 +248,7 @@ func (l *Logplayer) render() {
 		values,
 		plotter.WithPlotResolutionFactor(1),
 		plotter.WithOnDragged(func(event *fyne.DragEvent) {
-			pos := l.objs.positionSlider.Value - float64(event.Dragged.DX)
+			pos := l.objs.positionSlider.Value - l.objs.plotter.DragFrameDelta(event.Dragged.DX)
 			if pos < 0 {
 				pos = 0
 			} else if pos > l.objs.positionSlider.Max {
@@ -429,9 +431,6 @@ func (l *Logplayer) playLog() {
 					pos := l.logFile.Pos()
 					l.objs.positionSlider.Value = float64(pos)
 					timeSetter(rec.Time)
-					fyne.Do(func() {
-
-					})
 					if l.state == statePlaying {
 						timer.Reset(0)
 					} else {

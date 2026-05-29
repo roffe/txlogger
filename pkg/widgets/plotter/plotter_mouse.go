@@ -11,6 +11,25 @@ import (
 // 	}
 // }
 
+// dragZoomThreshold is the zoom slider value below which dragging stays a
+// strict 1 frame per pixel for fine, precise scrubbing. At or above it the
+// drag distance scales with how many data points each pixel covers, so the
+// plot tracks the cursor and feels natural when zoomed out.
+const dragZoomThreshold = 20
+
+// DragFrameDelta converts a horizontal drag distance (in pixels) into the
+// number of log frames to move. Below dragZoomThreshold it is 1:1; when zoomed
+// out it scales by the data-points-per-pixel of the current view.
+func (p *Plotter) DragFrameDelta(dx float32) float64 {
+	scale := 1.0
+	// widthFactor is pixels-per-point; <1 means each pixel spans more than one
+	// data point, i.e. we're zoomed out far enough for scaling to add frames.
+	if p.zoom.Value >= dragZoomThreshold && p.widthFactor > 0 && p.widthFactor < 1 {
+		scale = 1.0 / float64(p.widthFactor)
+	}
+	return float64(dx) * scale
+}
+
 func (p *Plotter) Dragged(event *fyne.DragEvent) {
 	//p.sel.SetValue(p.sel.Value - float64(event.Dragged.DX))
 	if f := p.OnDragged; f != nil {

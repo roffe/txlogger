@@ -100,9 +100,11 @@ func (s *Widget) SetValue(name string, value float64) {
 			totalWidth := val.symbolName.Size().Width
 			val.valueBar.Resize(fyne.Size{Width: val.valueBarFactor * totalWidth, Height: 26})
 		}
-		prec := symbol.GetPrecision(val.symbol.Correctionfactor)
-		textValue := strconv.FormatFloat(value, 'f', prec, 64)
-		val.symbolValue.SetText(textValue)
+		textValue := strconv.FormatFloat(value, 'f', val.prec, 64)
+		if textValue != val.lastText {
+			val.lastText = textValue
+			val.symbolValue.SetText(textValue)
+		}
 	}
 }
 
@@ -161,6 +163,7 @@ func (s *Widget) Add(symbols ...*symbol.Symbol) {
 
 func (s *Widget) Clear() {
 	for _, e := range s.entries {
+		e.lastText = "---"
 		e.symbolValue.SetText("---")
 	}
 }
@@ -236,6 +239,7 @@ func (s *Widget) newSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*Symbo
 	sw := &SymbolWidgetEntry{
 		w:          s,
 		symbol:     sym,
+		prec:       symbol.GetPrecision(sym.Correctionfactor),
 		deleteFunc: deleteFunc,
 	}
 	sw.ExtendBaseWidget(sw)
@@ -300,6 +304,8 @@ type SymbolWidgetEntry struct {
 
 	value    float64
 	min, max float64
+	prec     int
+	lastText string
 
 	oldSize fyne.Size
 

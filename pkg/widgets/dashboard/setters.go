@@ -31,14 +31,10 @@ func (db *Dashboard) activeAirSetter(obj *canvas.Text) func(float64) {
 
 func knkDetSetter(icon *icon.Icon) func(float64) {
 	knkStr2 := make([]byte, 4)
-	var oldValue float64
-	var showTime time.Time
+	var hideTimer *time.Timer
 	return func(value float64) {
-		if value == oldValue {
-			return
-		}
 		knockValue := uint32(value)
-		if knockValue <= 0 {
+		if knockValue == 0 {
 			return
 		}
 
@@ -56,7 +52,6 @@ func knkDetSetter(icon *icon.Icon) func(float64) {
 		}
 		if knkCyl2 > 0 {
 			knkStr2[1] = '2'
-
 		} else {
 			knkStr2[1] = '-'
 		}
@@ -71,16 +66,15 @@ func knkDetSetter(icon *icon.Icon) func(float64) {
 			knkStr2[3] = '-'
 		}
 		icon.SetText(string(knkStr2))
-
-		showTime = time.Now()
-		go func() {
-			time.Sleep(5 * time.Second)
-			if time.Since(showTime) > 4*time.Second {
-				icon.Hide()
-			}
-		}()
-
 		icon.Show()
+
+		if hideTimer == nil {
+			hideTimer = time.AfterFunc(5*time.Second, func() {
+				fyne.Do(icon.Hide)
+			})
+		} else {
+			hideTimer.Reset(5 * time.Second)
+		}
 	}
 }
 

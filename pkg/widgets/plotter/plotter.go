@@ -51,6 +51,9 @@ type Plotter struct {
 	plotResolution       fyne.Size
 	plotResolutionFactor float32
 
+	imgBuffers [2]*image.RGBA
+	imgIndex   int
+
 	// textBuffer []byte
 
 	size fyne.Size
@@ -86,7 +89,7 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		values:               values,
 		dataPointsToShow:     0,
 		legend:               container.NewVBox(),
-		zoom:                 widget.NewSlider(1, 100),
+		zoom:                 widget.NewSlider(1, 400),
 		canvasImage:          canvas.NewImageFromImage(image.NewRGBA(image.Rect(0, 0, 400, 200))),
 		cursor:               canvas.NewLine(color.White),
 		ts:                   make([]*TimeSeries, len(values)),
@@ -242,8 +245,12 @@ func (p *Plotter) Seek(pos int) {
 		p.plotStartPos = min(offsetPosition, p.dataLength)
 	}
 	p.cursorPos = pos
+
+	// Update legend values, collecting the ones that actually changed so we
+	// can refresh them together in a single fyne.Do below.
+	valueIndex := min(p.dataLength, p.cursorPos)
+	var changed []*TappableText
 	for i, v := range p.valueOrder {
-		valueIndex := min(p.dataLength, p.cursorPos)
 		obj := p.legendTexts[i]
 		newValue := fmt.Sprintf("%.4g", p.values[v][valueIndex])
 		// newValue := strconv.FormatFloat(p.values[v][valueIndex], 'f', obj.precission, 64)
@@ -251,16 +258,42 @@ func (p *Plotter) Seek(pos int) {
 			continue
 		}
 		obj.value.Text = newValue
-		fyne.Do(func() {
-			obj.Refresh()
-		})
+		changed = append(changed, obj)
 	}
-	p.updateCursor(true)
-	p.refreshImage(true)
+
+	p.drawImage()
+	p.layoutCursor()
+
+	// Collapse all refreshes for this frame into one dispatch onto the main
+	// goroutine instead of one per changed legend item plus cursor plus image.
+	fyne.Do(func() {
+		for _, obj := range changed {
+			obj.Refresh()
+		}
+		p.cursor.Refresh()
+		p.canvasImage.Refresh()
+	})
 }
 
-func (p *Plotter) refreshImage(goroutine bool) {
-	img := image.NewRGBA(image.Rect(0, 0, int(p.plotResolution.Width), int(p.plotResolution.Height)))
+// drawImage renders the enabled time series into the (reused) plot buffer and
+// points canvasImage at it. It does not trigger a Refresh.
+func (p *Plotter) drawImage() {
+	w, h := int(p.plotResolution.Width), int(p.plotResolution.Height)
+	if w <= 0 || h <= 0 {
+		return
+	}
+
+	// Ping-pong between the two buffers; reuse if the resolution is unchanged,
+	// otherwise (re)allocate for the new size.
+	p.imgIndex ^= 1
+	img := p.imgBuffers[p.imgIndex]
+	if img == nil || img.Rect.Dx() != w || img.Rect.Dy() != h {
+		img = image.NewRGBA(image.Rect(0, 0, w, h))
+		p.imgBuffers[p.imgIndex] = img
+	} else {
+		clear(img.Pix) // reset to transparent before redrawing
+	}
+
 	for n := range len(p.ts) {
 		if !p.ts[n].Enabled {
 			continue
@@ -276,6 +309,10 @@ func (p *Plotter) refreshImage(goroutine bool) {
 	}
 
 	p.canvasImage.Image = img
+}
+
+func (p *Plotter) refreshImage(goroutine bool) {
+	p.drawImage()
 	if goroutine {
 		fyne.Do(p.canvasImage.Refresh)
 	} else {
@@ -375,8 +412,9 @@ func (ts *TimeSeries) PlotImage(img *image.RGBA, values map[string][]float64, st
 	}
 }
 
-// Updated cursor positioning method
-func (p *Plotter) updateCursor(goroutine bool) {
+// layoutCursor recomputes the cursor line position for the current view. It
+// does not trigger a Refresh.
+func (p *Plotter) layoutCursor() {
 	var x float32
 	halfDataPointsToShow := int(float64(p.dataPointsToShow) * .5)
 	plotSize := p.canvasImage.Size()
@@ -397,7 +435,11 @@ func (p *Plotter) updateCursor(goroutine bool) {
 
 	p.cursor.Position1 = fyne.NewPos(xOffset, 0)
 	p.cursor.Position2 = fyne.NewPos(xOffset+1, plotSize.Height)
+}
 
+// Updated cursor positioning method
+func (p *Plotter) updateCursor(goroutine bool) {
+	p.layoutCursor()
 	if goroutine {
 		fyne.Do(p.cursor.Refresh)
 	} else {
