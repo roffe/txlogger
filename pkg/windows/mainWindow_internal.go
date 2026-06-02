@@ -77,7 +77,7 @@ func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
 			if err := mw.LoadSymbolsFromFile(filename); err != nil {
 				mw.Error(err)
 			}
-		case ".t5l", ".t7l", ".t8l", ".csv":
+		case ".t5l", ".t7l", ".t8l", ".csv", ".bpl":
 			f, err := os.Open(filename)
 			if err != nil {
 				mw.Error(err)
