@@ -495,7 +495,7 @@ func (sw *Widget) GetMeshView() bool {
 }
 
 func (sw *Widget) GetLogFormat() string {
-	return fyne.CurrentApp().Preferences().String(prefsLogFormat)
+	return fyne.CurrentApp().Preferences().StringWithFallback(prefsLogFormat, "CSV")
 }
 
 func (sw *Widget) GetLogPath() string {

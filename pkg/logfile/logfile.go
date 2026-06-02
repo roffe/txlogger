@@ -49,6 +49,8 @@ func Open(filename string, reader io.Reader) (Logfile, error) {
 		return NewFromCSVLogfile(reader)
 	case ".t5l", ".t7l", ".t8l":
 		return NewFromTxLogfile(reader)
+	case ".bpl":
+		return NewFromBPLLogfile(reader)
 	default:
 		return nil, fmt.Errorf("Unsupported filetype")
 	}

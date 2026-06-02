@@ -58,8 +58,10 @@ func newImageFromResource(name string) *canvas.Image {
 	return img
 }
 
+var logFormats = []string{"CSV", "BPL" /*"TXL"*/}
+
 func (sw *Widget) newLogFormat() *widget.Select {
-	return widget.NewSelect([]string{"CSV", "TXL"}, func(s string) {
+	return widget.NewSelect(logFormats, func(s string) {
 		fyne.CurrentApp().Preferences().SetString(prefsLogFormat, s)
 	})
 }
@@ -293,7 +295,7 @@ func (sw *Widget) loadPreferences() {
 	loadPrefsCheck(sw.livePreview, prefsLivePreview, true)
 	loadPrefsCheck(sw.meshView, prefsMeshView, true)
 	loadPrefsCheck(sw.realtimeBars, prefsRealtimeBars, true)
-	loadPrefsSelect(sw.logFormat, prefsLogFormat, "TXL")
+	loadPrefsSelect(sw.logFormat, prefsLogFormat, "CSV")
 	logPath, err := common.GetLogPath()
 	if err != nil {
 		fyne.LogError("Could not get log path", err)

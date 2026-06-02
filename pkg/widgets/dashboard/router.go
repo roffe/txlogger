@@ -108,7 +108,9 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		"LIMP":   showHider(db.image.limpMode),
 
 		"Knock_offset1234": knkDetSetter(db.image.knockIcon),
-		"KnkDet.KnockCyl":  knkDetSetter(db.image.knockIcon),
+		"KnkDet.KnockCyl":  knkDetSetter(db.image.knockIcon), // t7 & t8
+
+		//"IgnKnk.fi_Offset": knkIoffSetter(, db.image.knockIcon), // t7
 
 		"Myrtilos.InjectorDutyCycle": idcSetter(db.text.idc, "Idc"),   // t7
 		"Insptid_ms10":               idcSetterT5(db.text.idc, "Idc"), // t5
@@ -129,3 +131,16 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 
 	return router
 }
+
+/*
+func knkIoffSetter(obj *canvas.Text) func(float64) {
+	return func(value float64) {
+		cyl1 := int16(value) >> 48
+		cyl2 := int16(value>>32) & 0xFFFF
+		cyl3 := int16(value>>16) & 0xFFFF
+		cyl4 := int16(value) & 0xFFFF
+		obj.Text = fmt.Sprintf("Knk Ioff: %d %d %d %d", cyl1, cyl2, cyl3, cyl4)
+		obj.Refresh()
+	}
+}
+*/

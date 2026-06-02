@@ -25,6 +25,12 @@ func NewWriter(cfg Config) (string, LogWriter, error) {
 			return "", nil, err
 		}
 		return filename, NewTXLWriter(file), nil
+	case "BPL":
+		file, filename, err := createLog(cfg.LogPath, cfg.FilenamePrefix, "bpl")
+		if err != nil {
+			return "", nil, err
+		}
+		return filename, NewBPLWriter(file), nil
 	}
 	return "unknown", nil, fmt.Errorf("unknown format: %s", cfg.LogFormat)
 }
