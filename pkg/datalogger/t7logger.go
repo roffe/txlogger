@@ -122,12 +122,9 @@ func (c *T7Client) Start() error {
 
 	if c.lamb != nil {
 		defer c.lamb.Stop()
-		sysvarOrder = append(sysvarOrder, EXTERNALWBLSYM)
 	}
 
-	if c.WidebandConfig.ADScanner && c.WidebandConfig.Name == "ECU" {
-		sysvarOrder = append(sysvarOrder, LAMBDAADSCANNER)
-	}
+	sysvarOrder = c.appendExtraSysvars(sysvarOrder)
 
 	for _, sym := range c.Symbols {
 		if c.sysvars.Exists(sym.Name) {
@@ -136,6 +133,19 @@ func (c *T7Client) Start() error {
 			continue
 		}
 	}
+
+	// Broadcast/derived values resolved above become async sysvar channels;
+	// the remaining symbols (Number >= 0) are polled each tick.
+	channels := c.buildChannels(sysvarOrder)
+	/*
+		if c.lamb != nil {
+			channels = append(channels, newFunctionChannel(EXTERNALWBLSYM, func() float64 {
+				lamb := c.lamb.GetLambda()
+				ebus.Publish(EXTERNALWBLSYM, lamb)
+				return lamb
+			}))
+		}
+	*/
 
 	kwp := kwp2000.New(cl)
 
@@ -333,31 +343,7 @@ func (c *T7Client) Start() error {
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				/*
-					// New shit -----
-					if c.r != nil {
-						var values relayserver.LogValues
-						for _, name := range sysvarOrder {
-							val := c.sysvars.Get(name)
-							values = append(values, relayserver.LogValue{Name: name, Value: val})
-						}
-						for _, va := range c.Symbols {
-							if va.Number < 0 {
-								continue
-							}
-							values = append(values, relayserver.LogValue{Name: va.Name, Value: va.Float64()})
-						}
-						if err := c.r.Send(relayserver.Message{
-							Kind: relayserver.MsgTypeData,
-							Body: values,
-						}); err != nil {
-							c.onError()
-							c.OnMessage("failed to send relay message: " + err.Error())
-						}
-					}
-				*/
-
-				if err := c.lw.Write(c.sysvars, sysvarOrder, c.Symbols, timeStamp); err != nil {
+				if err := c.lw.Write(timeStamp, channels); err != nil {
 					c.onError()
 					c.OnMessage("failed to write log: " + err.Error())
 				}
@@ -380,7 +366,7 @@ func initT7logging(ctx context.Context, kwp *kwp2000.Client, symbols []*symbol.S
 	}
 
 	if !granted {
-		onMessage("Security access not granted!")
+		return errors.New("security access not granted")
 	} else {
 		onMessage("Security access granted")
 	}

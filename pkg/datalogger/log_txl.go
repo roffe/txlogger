@@ -1,12 +1,8 @@
 package datalogger
 
 import (
-	"math"
 	"os"
-	"strconv"
 	"time"
-
-	symbol "github.com/roffe/ecusymbol"
 )
 
 func NewTXLWriter(f *os.File) *TXWriter {
@@ -16,33 +12,16 @@ func NewTXLWriter(f *os.File) *TXWriter {
 }
 
 type TXWriter struct {
-	file       *os.File
-	precission int
+	file *os.File
 }
 
-func (t *TXWriter) Write(sysvars *ThreadSafeMap, sysvarOrder []string, vars []*symbol.Symbol, ts time.Time) error {
+func (t *TXWriter) Write(ts time.Time, channels []Channel) error {
 	_, err := t.file.Write([]byte(ts.Format("02-01-2006 15:04:05.999") + "|"))
 	if err != nil {
 		return err
 	}
-	for _, k := range sysvarOrder {
-		val := sysvars.Get(k)
-		if val == math.Trunc(val) {
-			t.precission = 0
-		} else if k == "Lambda.External" {
-			t.precission = 3
-		} else {
-			t.precission = 2
-		}
-		if _, err := t.file.Write([]byte(k + "=" + replaceDot(strconv.FormatFloat(val, 'f', t.precission, 64)) + "|")); err != nil {
-			return err
-		}
-	}
-	for _, va := range vars {
-		if va.Number < 0 {
-			continue
-		}
-		if _, err := t.file.Write([]byte(va.Name + "=" + replaceDot(va.StringValue()) + "|")); err != nil {
+	for i := range channels {
+		if _, err := t.file.Write([]byte(channels[i].Name + "=" + replaceDot(channels[i].String()) + "|")); err != nil {
 			return err
 		}
 	}

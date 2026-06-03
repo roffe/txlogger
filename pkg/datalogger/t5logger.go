@@ -7,7 +7,6 @@ import (
 	"math"
 	"time"
 
-	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/t5can"
@@ -57,11 +56,14 @@ func (c *T5Client) Start() error {
 
 	if c.lamb != nil {
 		defer c.lamb.Stop()
-		sysvarOrder = append(sysvarOrder, EXTERNALWBLSYM)
 	}
+	sysvarOrder = c.appendExtraSysvars(sysvarOrder)
 
-	if c.WidebandConfig.ADScanner && c.WidebandConfig.Name == "ECU" {
-		sysvarOrder = append(sysvarOrder, LAMBDAADSCANNER)
+	// T5 decodes every value into sysvars (see newT5Converter), so all columns
+	// are sysvar channels.
+	channels := make([]Channel, len(sysvarOrder))
+	for i, name := range sysvarOrder {
+		channels[i] = newSysvarChannel(c.sysvars, name)
 	}
 
 	tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
@@ -131,7 +133,7 @@ func (c *T5Client) Start() error {
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				if err := c.lw.Write(c.sysvars, sysvarOrder, []*symbol.Symbol{}, ts); err != nil {
+				if err := c.lw.Write(ts, channels); err != nil {
 					c.OnMessage("failed to write log: " + err.Error())
 					return
 				}

@@ -17,7 +17,7 @@ const (
 )
 
 type LogWriter interface {
-	Write(sysvars *ThreadSafeMap, sysvarOrder []string, vars []*symbol.Symbol, ts time.Time) error
+	Write(ts time.Time, channels []Channel) error
 	Close() error
 }
 

@@ -6,8 +6,6 @@ import (
 	"math"
 	"os"
 	"time"
-
-	symbol "github.com/roffe/ecusymbol"
 )
 
 // BPL (Binary Packed Logfile) on-disk layout. All multi-byte integers are
@@ -48,9 +46,9 @@ type BPLWriter struct {
 	buf           []byte // reusable per-record encode buffer
 }
 
-func (b *BPLWriter) Write(sysvars *ThreadSafeMap, sysvarOrder []string, vars []*symbol.Symbol, ts time.Time) error {
+func (b *BPLWriter) Write(ts time.Time, channels []Channel) error {
 	if !b.headerWritten {
-		if err := b.writeHeader(vars, sysvarOrder); err != nil {
+		if err := b.writeHeader(channels); err != nil {
 			return err
 		}
 	}
@@ -59,15 +57,8 @@ func (b *BPLWriter) Write(sysvars *ThreadSafeMap, sysvarOrder []string, vars []*
 	binary.LittleEndian.PutUint64(b.buf[off:], uint64(ts.UnixNano()))
 	off += 8
 
-	for _, k := range sysvarOrder {
-		binary.LittleEndian.PutUint32(b.buf[off:], math.Float32bits(float32(sysvars.Get(k))))
-		off += 4
-	}
-	for _, va := range vars {
-		if va.Number < 0 {
-			continue
-		}
-		binary.LittleEndian.PutUint32(b.buf[off:], math.Float32bits(float32(va.Float64())))
+	for i := range channels {
+		binary.LittleEndian.PutUint32(b.buf[off:], math.Float32bits(float32(channels[i].Value())))
 		off += 4
 	}
 
@@ -75,14 +66,10 @@ func (b *BPLWriter) Write(sysvars *ThreadSafeMap, sysvarOrder []string, vars []*
 	return err
 }
 
-func (b *BPLWriter) writeHeader(vars []*symbol.Symbol, sysvarOrder []string) error {
-	cols := make([]string, 0, len(sysvarOrder)+len(vars))
-	cols = append(cols, sysvarOrder...)
-	for _, va := range vars {
-		if va.Number < 0 {
-			continue
-		}
-		cols = append(cols, va.Name)
+func (b *BPLWriter) writeHeader(channels []Channel) error {
+	cols := make([]string, 0, len(channels))
+	for i := range channels {
+		cols = append(cols, channels[i].Name)
 	}
 
 	if _, err := b.bw.WriteString(bplMagic); err != nil {

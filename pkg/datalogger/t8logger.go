@@ -67,15 +67,13 @@ func (c *T8Client) Start() error {
 
 	if c.lamb != nil {
 		defer c.lamb.Stop()
-		order = append(order, EXTERNALWBLSYM)
 	}
-
-	if c.WidebandConfig.ADScanner && c.WidebandConfig.Name == "ECU" {
-		order = append(order, LAMBDAADSCANNER)
-	}
+	order = c.appendExtraSysvars(order)
 
 	// sort order
 	sort.StringSlice(order).Sort()
+
+	channels := c.buildChannels(order)
 
 	opts := []gmlan.GMLanOption{gmlan.WithCanID(0x7E0), gmlan.WithRecvID(0x7E8)}
 	if cl.AdapterName() == "ELM327" {
@@ -88,12 +86,12 @@ func (c *T8Client) Start() error {
 		return fmt.Errorf("failed to init t8 logging: %w", err)
 	}
 
-	go c.run(ctx, cl, gm, order)
+	go c.run(ctx, cl, gm, channels)
 
 	return cl.Wait(ctx)
 }
 
-func (c *T8Client) run(ctx context.Context, cl *gocan.Client, gm *gmlan.Client, order []string) {
+func (c *T8Client) run(ctx context.Context, cl *gocan.Client, gm *gmlan.Client, channels []Channel) {
 	defer cl.Close()
 
 	var timeStamp time.Time
@@ -215,7 +213,7 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Client, gm *gmlan.Client, 
 				c.sysvars.Set(EXTERNALWBLSYM, c.lamb.GetLambda())
 			}
 
-			if err := c.lw.Write(c.sysvars, order, c.Symbols, timeStamp); err != nil {
+			if err := c.lw.Write(timeStamp, channels); err != nil {
 				c.onError()
 				c.OnMessage("failed to write log: " + err.Error())
 			}

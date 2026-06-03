@@ -9,6 +9,7 @@ import (
 	"sort"
 	"time"
 
+	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/pkg/serialcommand"
 	"github.com/roffe/txlogger/pkg/ebus"
@@ -35,12 +36,8 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 
 	if c.lamb != nil {
 		defer c.lamb.Stop()
-		sysvarOrder = append(sysvarOrder, EXTERNALWBLSYM)
 	}
-
-	if c.WidebandConfig.ADScanner && c.WidebandConfig.Name == "ECU" {
-		sysvarOrder = append(sysvarOrder, LAMBDAADSCANNER)
-	}
+	sysvarOrder = c.appendExtraSysvars(sysvarOrder)
 
 	for _, sym := range c.Symbols {
 		if c.sysvars.Exists(sym.Name) {
@@ -49,6 +46,8 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 			continue
 		}
 	}
+
+	channels := c.buildChannels(sysvarOrder)
 
 	kwp := kwp2000.New(cl)
 	if err := initT7logging(ctx, kwp, c.Symbols, c.OnMessage); err != nil {
@@ -71,6 +70,35 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 	}
 
 	adConverter := NewWBLInterpolator(c.WidebandConfig)
+
+	router := map[string]func(s *symbol.Symbol) bool{
+		"IgnKnk.fi_Offset": func(s *symbol.Symbol) bool {
+			data := s.Bytes()
+			if len(data) != 8 {
+				return false
+			}
+
+			ioffCyl1 := int16(binary.BigEndian.Uint16(data[0:2]))
+			ioffCyl2 := int16(binary.BigEndian.Uint16(data[2:4]))
+			ioffCyl3 := int16(binary.BigEndian.Uint16(data[4:6]))
+			ioffCyl4 := int16(binary.BigEndian.Uint16(data[6:8]))
+
+			ebus.Publish("IgnKnk.fi_Offset.Cyl1", float64(ioffCyl1)/10)
+			ebus.Publish("IgnKnk.fi_Offset.Cyl2", float64(ioffCyl2)/10)
+			ebus.Publish("IgnKnk.fi_Offset.Cyl3", float64(ioffCyl3)/10)
+			ebus.Publish("IgnKnk.fi_Offset.Cyl4", float64(ioffCyl4)/10)
+			return true
+		},
+	}
+
+	if c.WidebandConfig.ADScanner {
+		router[c.WidebandConfig.ADScannerSymbol] = func(s *symbol.Symbol) bool {
+			lambda := adConverter(s.Int())
+			c.sysvars.Set(LAMBDAADSCANNER, lambda)
+			ebus.Publish(LAMBDAADSCANNER, lambda)
+			return true
+		}
+	}
 
 	go func() {
 		defer cl.Close()
@@ -211,10 +239,9 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 						c.OnMessage(err.Error())
 						break
 					}
-					if c.WidebandConfig.ADScanner && va.Name == c.WidebandConfig.ADScannerSymbol {
-						lambda := adConverter(va.Int())
-						c.sysvars.Set(LAMBDAADSCANNER, lambda)
-						ebus.Publish(LAMBDAADSCANNER, lambda)
+
+					if fn, ok := router[va.Name]; ok && fn(va) {
+						continue
 					}
 
 					ebus.Publish(va.Name, va.Float64())
@@ -230,7 +257,7 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				if err := c.lw.Write(c.sysvars, sysvarOrder, c.Symbols, timeStamp); err != nil {
+				if err := c.lw.Write(timeStamp, channels); err != nil {
 					c.onError()
 					c.OnMessage("failed to write log: " + err.Error())
 				}

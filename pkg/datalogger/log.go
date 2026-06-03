@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/common"
 )
 
@@ -70,7 +69,6 @@ func NewTXBinWriter(f *os.File) *TXBinWriter {
 	}
 }
 
-func (t *TXBinWriter) Write(sysvars *ThreadSafeMap, sysvarOrder []string, vars []*symbol.Symbol, ts time.Time) error {
-
+func (t *TXBinWriter) Write(ts time.Time, channels []Channel) error {
 	return nil
 }

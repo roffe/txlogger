@@ -22,14 +22,12 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 	order := c.sysvars.Keys()
 	if c.lamb != nil {
 		defer c.lamb.Stop()
-		order = append(order, EXTERNALWBLSYM)
 	}
-
-	if c.WidebandConfig.ADScanner && c.WidebandConfig.Name == "ECU" {
-		order = append(order, LAMBDAADSCANNER)
-	}
+	order = c.appendExtraSysvars(order)
 
 	sort.StringSlice(order).Sort()
+
+	channels := c.buildChannels(order)
 
 	gm := gmlan.New(cl, 0x7e0, 0x7e8)
 
@@ -145,7 +143,7 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				if err := c.lw.Write(c.sysvars, order, c.Symbols, timeStamp); err != nil {
+				if err := c.lw.Write(timeStamp, channels); err != nil {
 					c.onError()
 					c.OnMessage("failed to write log: " + err.Error())
 				}
