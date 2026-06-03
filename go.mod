@@ -16,8 +16,8 @@ require (
 	github.com/lusingander/colorpicker v0.7.5
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.1.0
-	github.com/roffe/ecusymbol v1.1.5
-	github.com/roffe/gocan v1.3.9
+	github.com/roffe/ecusymbol v1.1.7
+	github.com/roffe/gocan v1.4.0
 	go.bug.st/serial v1.6.4
 	golang.org/x/image v0.40.0
 	golang.org/x/mod v0.36.0
@@ -46,7 +46,7 @@ require (
 	github.com/creack/goselect v0.1.3 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/ebitengine/purego v0.9.1 // indirect
-	github.com/fatih/color v1.18.0 // indirect
+	github.com/fatih/color v1.19.0 // indirect
 	github.com/fredbi/uri v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fyne-io/gl-js v0.2.1-0.20260315212741-029c47fd27e8 // indirect
@@ -66,7 +66,7 @@ require (
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/mattn/go-runewidth v0.0.17 // indirect
 	github.com/mdlayher/netlink v1.8.0 // indirect
 	github.com/mdlayher/socket v0.5.1 // indirect
