@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"sort"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
@@ -59,8 +58,6 @@ func (c *T8Client) Start() error {
 	}
 	defer cl.Close()
 
-	order := c.sysvars.Keys()
-
 	if err := c.setupWBL(ctx, cl); err != nil {
 		return err
 	}
@@ -68,12 +65,8 @@ func (c *T8Client) Start() error {
 	if c.lamb != nil {
 		defer c.lamb.Stop()
 	}
-	order = c.appendExtraSysvars(order)
 
-	// sort order
-	sort.StringSlice(order).Sort()
-
-	channels := c.buildChannels(order)
+	channels := c.buildChannels()
 
 	opts := []gmlan.GMLanOption{gmlan.WithCanID(0x7E0), gmlan.WithRecvID(0x7E8)}
 	if cl.AdapterName() == "ELM327" {

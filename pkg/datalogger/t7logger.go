@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"sort"
 	"strings"
 	"time"
 
@@ -97,7 +96,6 @@ func (c *T7Client) Start() error {
 		checkBroadcast = false
 	}
 
-	var sysvarOrder []string
 	if checkBroadcast {
 		bctx, bcancel := context.WithCancel(ctx)
 		defer bcancel()
@@ -105,13 +103,9 @@ func (c *T7Client) Start() error {
 
 		c.OnMessage("Watching for broadcast messages")
 		<-time.After(1550 * time.Millisecond)
-		sysvarOrder = c.sysvars.Keys()
-		sort.StringSlice(sysvarOrder).Sort()
-		if len(sysvarOrder) > 0 {
-			c.OnMessage(fmt.Sprintf("Found %s", sysvarOrder))
-		}
-
-		if len(sysvarOrder) == 0 {
+		if found := c.sysvars.Keys(); len(found) > 0 {
+			c.OnMessage(fmt.Sprintf("Found %s", found))
+		} else {
 			c.OnMessage("No broadcast messages found, stopping broadcast listener")
 			bcancel()
 		}
@@ -124,8 +118,6 @@ func (c *T7Client) Start() error {
 		defer c.lamb.Stop()
 	}
 
-	sysvarOrder = c.appendExtraSysvars(sysvarOrder)
-
 	for _, sym := range c.Symbols {
 		if c.sysvars.Exists(sym.Name) {
 			log.Println("Skipping", sym.Name, "in broadcast")
@@ -136,16 +128,7 @@ func (c *T7Client) Start() error {
 
 	// Broadcast/derived values resolved above become async sysvar channels;
 	// the remaining symbols (Number >= 0) are polled each tick.
-	channels := c.buildChannels(sysvarOrder)
-	/*
-		if c.lamb != nil {
-			channels = append(channels, newFunctionChannel(EXTERNALWBLSYM, func() float64 {
-				lamb := c.lamb.GetLambda()
-				ebus.Publish(EXTERNALWBLSYM, lamb)
-				return lamb
-			}))
-		}
-	*/
+	channels := c.buildChannels()
 
 	kwp := kwp2000.New(cl)
 

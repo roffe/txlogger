@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
-	"sort"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
@@ -26,18 +25,16 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 
 	c.OnMessage("Watching for broadcast messages")
 	<-time.After(1550 * time.Millisecond)
-	sysvarOrder := c.sysvars.Keys()
-	sort.StringSlice(sysvarOrder).Sort()
-	c.OnMessage(fmt.Sprintf("Found %s", sysvarOrder))
+	found := c.sysvars.Keys()
+	c.OnMessage(fmt.Sprintf("Found %s", found))
 
-	if len(sysvarOrder) == 0 {
+	if len(found) == 0 {
 		bcancel()
 	}
 
 	if c.lamb != nil {
 		defer c.lamb.Stop()
 	}
-	sysvarOrder = c.appendExtraSysvars(sysvarOrder)
 
 	for _, sym := range c.Symbols {
 		if c.sysvars.Exists(sym.Name) {
@@ -47,7 +44,7 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 		}
 	}
 
-	channels := c.buildChannels(sysvarOrder)
+	channels := c.buildChannels()
 
 	kwp := kwp2000.New(cl)
 	if err := initT7logging(ctx, kwp, c.Symbols, c.OnMessage); err != nil {

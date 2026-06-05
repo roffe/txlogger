@@ -17,22 +17,19 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
-	sysvarOrder := make([]string, len(c.Symbols))
-	for n, s := range c.Symbols {
-		sysvarOrder[n] = s.Name
+	// T5 decodes every value into sysvars (see newT5Converter), so all columns
+	// are sysvar channels.
+	channels := make([]Channel, 0, len(c.Symbols)+2)
+	for _, s := range c.Symbols {
 		s.Correctionfactor = 0.1
+		channels = append(channels, newSysvarChannel(c.sysvars, s.Name))
 	}
 
 	if c.lamb != nil {
 		defer c.lamb.Stop()
 	}
-	sysvarOrder = c.appendExtraSysvars(sysvarOrder)
-
-	// T5 decodes every value into sysvars (see newT5Converter), so all columns
-	// are sysvar channels.
-	channels := make([]Channel, len(sysvarOrder))
-	for i, name := range sysvarOrder {
-		channels[i] = newSysvarChannel(c.sysvars, name)
+	for _, name := range c.appendExtraSysvars(nil) {
+		channels = append(channels, newSysvarChannel(c.sysvars, name))
 	}
 
 	expectedPayloadSize, err := c.configureT5Symbols(cl)

@@ -127,11 +127,15 @@ func (bl *BaseLogger) appendExtraSysvars(order []string) []string {
 	return order
 }
 
-// buildChannels assembles the standard log layout: every name in order becomes
-// an asynchronous sysvar channel, followed by every polled symbol (Number >=
-// 0) as a symbol channel. Symbols with a negative number are either replaced by
-// a broadcast/derived sysvar or sourced elsewhere and are not log columns.
-func (bl *BaseLogger) buildChannels(order []string) []Channel {
+// buildChannels assembles the standard log layout: every current sysvar
+// (broadcast/derived values plus the active wideband / AD scanner pseudo-symbols)
+// becomes an asynchronous sysvar channel, followed by every polled symbol
+// (Number >= 0) as a symbol channel. Symbols with a negative number are either
+// replaced by a broadcast/derived sysvar or sourced elsewhere and are not log
+// columns. Column order is whatever the channel slice yields; the writer is
+// consistent across the header and every row because it iterates this slice.
+func (bl *BaseLogger) buildChannels() []Channel {
+	order := bl.appendExtraSysvars(bl.sysvars.Keys())
 	channels := make([]Channel, 0, len(order)+len(bl.Symbols))
 	for _, name := range order {
 		channels = append(channels, newSysvarChannel(bl.sysvars, name))

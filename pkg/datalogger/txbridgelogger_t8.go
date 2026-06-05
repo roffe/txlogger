@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
-	"sort"
 	"time"
 
 	"github.com/roffe/gocan"
@@ -19,15 +18,11 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
-	order := c.sysvars.Keys()
 	if c.lamb != nil {
 		defer c.lamb.Stop()
 	}
-	order = c.appendExtraSysvars(order)
 
-	sort.StringSlice(order).Sort()
-
-	channels := c.buildChannels(order)
+	channels := c.buildChannels()
 
 	gm := gmlan.New(cl, 0x7e0, 0x7e8)
 
