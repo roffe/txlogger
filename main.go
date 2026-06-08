@@ -20,7 +20,6 @@ import (
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/theme"
 	"github.com/roffe/txlogger/pkg/windows"
-	// _ "net/http/pprof"
 )
 
 var (
