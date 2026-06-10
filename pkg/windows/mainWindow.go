@@ -286,7 +286,6 @@ func (mw *MainWindow) render() {
 				mw.counters.errorCounterLabel,
 				mw.counters.fpsCounterLabel,
 			),
-			widget.NewButtonWithIcon("", theme.ComputerIcon(), mw.openEBUSMonitor),
 			mw.buttons.debugBtn,
 		),
 		mw.statusText,
