@@ -2,7 +2,11 @@
 - Performance optimization for the log plotter and meshgrid
 - force layouts to be loaded and saved in users home directory under the txlogger folder
 - update ecusymbol to be able to read T5 versions
-- Added new config widget for AD scanner WBL settings inspired by T7's DisplAdap.LamScannerTab
+- added new config widget for AD scanner WBL settings inspired by T7's DisplAdap.LamScannerTab
+- refactored the bus implementation to use less CPU and have less allocations
+- added support for BPL files ( binary packed logfile )
+- removed support for creating legacy TXL log files. (you can still load them but might cause crashes)
+- removed ebusmonitor, it has served it's purpose
 
 # 2.1.9
 - Updated default T7 preset to include MAF.m_AirFromp_AirInlet
