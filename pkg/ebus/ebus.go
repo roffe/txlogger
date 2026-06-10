@@ -1,16 +1,15 @@
 package ebus
 
 import (
-	"context"
 	"sync"
 
 	"fyne.io/fyne/v2"
-	"github.com/roffe/txlogger/pkg/eventbus"
+	"github.com/roffe/txlogger/pkg/bus"
 )
 
 var (
 	once       sync.Once
-	CONTROLLER *eventbus.Controller
+	CONTROLLER *bus.Controller[string, float64]
 )
 
 const (
@@ -20,7 +19,12 @@ const (
 
 func init() {
 	once.Do(func() {
-		CONTROLLER = eventbus.New(eventbus.DefaultConfig)
+		CONTROLLER = bus.NewBus[string, float64]()
+
+		// AirDIFF: m_AirInlet vs the requested air mass. Two instances cover the
+		// differing request topic names across ECU types; both publish AirDIFF.
+		bus.DIFFAggregator(CONTROLLER, "MAF.m_AirInlet", "m_Request", "AirDIFF")
+		bus.DIFFAggregator(CONTROLLER, "MAF.m_AirInlet", "AirMassMast.m_Request", "AirDIFF")
 	})
 }
 
@@ -28,19 +32,6 @@ func Publish(topic string, data float64) {
 	CONTROLLER.Publish(topic, data)
 }
 
-/*
-	 func SubscribeAll() chan eventbus.EBusMessage {
-		return eb.SubscribeAll()
-	}
-
-	func SubscribeAllFunc(f func(topic string, value float64)) func() {
-		return eb.SubscribeAllFunc(f)
-	}
-
-	func UnsubscribeAll(channel chan eventbus.EBusMessage) {
-		eb.UnsubscribeAll(channel)
-	}
-*/
 func SubscribeFunc(topic string, f func(float64)) func() {
 	wrapFN := func(v float64) {
 		fyne.Do(func() {
@@ -50,23 +41,7 @@ func SubscribeFunc(topic string, f func(float64)) func() {
 	return CONTROLLER.SubscribeFunc(topic, wrapFN)
 }
 
-func Subscribe(topic string) chan float64 {
-	return CONTROLLER.Subscribe(topic)
-}
-
-func SubscribeWithContext(ctx context.Context, topic string) (chan float64, error) {
-	ch := CONTROLLER.Subscribe(topic)
-	go func() {
-		<-ctx.Done()
-		CONTROLLER.Unsubscribe(ch)
-	}()
-	return ch, nil
-}
-
-func Unsubscribe(channel chan float64) {
-	CONTROLLER.Unsubscribe(channel)
-}
-
 func SetOnMessage(f func(string, float64)) {
-	CONTROLLER.SetOnMessage(f)
+	// CONTROLLER.SetOnMessage(f)
+	// noop for now, the bus doesn't support this and we don't need it yet. If we do, we can add it to the bus package and call it here.
 }
