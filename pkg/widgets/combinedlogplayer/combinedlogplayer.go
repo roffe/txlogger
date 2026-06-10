@@ -6,7 +6,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/txlogger/pkg/eventbus"
+	"github.com/roffe/txlogger/pkg/bus"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/logplayer"
@@ -36,12 +36,12 @@ func New(cfg *CombinedLogplayerConfig) *Widget {
 			return "Undefined"
 		}
 	}
-	bus := eventbus.New(eventbus.DefaultConfig)
+	buz := bus.NewBus[string, float64]()
 
 	db := dashboard.NewDashboard(cfg.DBcfg)
 
 	for _, name := range db.GetMetricNames() {
-		cancel := bus.SubscribeFunc(name, func(f float64) {
+		cancel := buz.SubscribeFunc(name, func(f float64) {
 			fyne.Do(func() {
 				db.SetValue(name, f)
 			})
@@ -51,7 +51,7 @@ func New(cfg *CombinedLogplayerConfig) *Widget {
 
 	cp.db = db
 	cp.lp = logplayer.New(&logplayer.Config{
-		EBus:       bus,
+		EBus:       buz,
 		Logfile:    cfg.Logfile,
 		TimeSetter: db.SetTime,
 	})

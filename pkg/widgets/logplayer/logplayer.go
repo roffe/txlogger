@@ -9,8 +9,8 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/bus"
 	"github.com/roffe/txlogger/pkg/capture"
-	"github.com/roffe/txlogger/pkg/eventbus"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/widgets/plotter"
@@ -73,7 +73,7 @@ type logplayerObjects struct {
 }
 
 type Config struct {
-	EBus       *eventbus.Controller
+	EBus       *bus.Controller[string, float64]
 	Logfile    logfile.Logfile
 	TimeSetter func(time.Time)
 }
