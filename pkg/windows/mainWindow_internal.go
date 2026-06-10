@@ -16,8 +16,6 @@ import (
 	xwidget "fyne.io/x/fyne/widget"
 	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/common"
-	"github.com/roffe/txlogger/pkg/ebus"
-	"github.com/roffe/txlogger/pkg/widgets/ebusmonitor"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
 
@@ -124,27 +122,6 @@ func listLayouts() []string {
 		opts = append(opts, strings.TrimSuffix(f.Name(), ".json"))
 	}
 	return opts
-}
-
-func (mw *MainWindow) openEBUSMonitor() {
-	if w := mw.wm.HasWindow("EBUS Monitor"); w != nil {
-		mw.wm.Raise(w)
-		return
-	}
-	mon := ebusmonitor.New()
-	eb := multiwindow.NewSystemWindow("EBUS Monitor", mon)
-	eb.Icon = theme.ComputerIcon()
-	ebus.SetOnMessage(
-		func(topic string, data float64) {
-			fyne.Do(func() {
-				mon.SetText(topic, data)
-			})
-		},
-	)
-	eb.OnClose = func() {
-		ebus.SetOnMessage(nil)
-	}
-	mw.wm.Add(eb)
 }
 
 func (mw *MainWindow) openSettings() {
