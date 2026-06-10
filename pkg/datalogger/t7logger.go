@@ -175,6 +175,9 @@ func (c *T7Client) Start() error {
 				}
 			}
 		}
+		// In.v_Vehicle Left front wheel speed
+		// In.v_Vehicle2 Vehicle speed, measured on the rear wheel
+		// In.v_Vehicle3 Right front wheel speed
 
 		specialFN := map[string]func(string, float64){
 			"In.v_Vehicle":  wheelSlipFN,
@@ -212,16 +215,23 @@ func (c *T7Client) Start() error {
 		}
 	}
 
+	/*
+		if c.lamb != nil {
+			lambdbaChan := newFunctionChannel(EXTERNALWBLSYM, func() float64 {
+				lambda := c.lamb.GetLambda()
+				ebus.Publish(EXTERNALWBLSYM, lambda)
+				return lambda
+			})
+			channels = append(channels, lambdbaChan)
+		}
+	*/
+
 	go func() {
 		defer cl.Close()
 		defer func() {
 			_ = kwp.StopSession(ctx)
 			time.Sleep(50 * time.Millisecond)
 		}()
-
-		// In.v_Vehicle Left front wheel speed
-		// In.v_Vehicle2 Vehicle speed, measured on the rear wheel
-		// In.v_Vehicle3 Right front wheel speed
 
 		for {
 			select {
