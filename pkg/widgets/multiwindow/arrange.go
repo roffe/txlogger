@@ -211,6 +211,9 @@ func (p *PackArranger) expandWindows(spaces []windowSpace, maxSize fyne.Size) {
 }
 
 func (p *PackArranger) findSpace(node *packNode, size fyne.Size) *packNode {
+	if node == nil {
+		return nil
+	}
 	if node.used {
 		if right := p.findSpace(node.right, size); right != nil {
 			return right

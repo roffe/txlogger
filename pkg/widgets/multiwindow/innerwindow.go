@@ -255,6 +255,7 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 		ShadowingRenderer: NewShadowingRenderer(objects, SubmergedContentLevel),
 		win:               w,
 		bar:               bar,
+		title:             title,
 		buttons:           []*borderButton{min, max, close},
 		bg:                w.bg,
 		topBorder:         topBorder,
@@ -299,6 +300,7 @@ var _ fyne.WidgetRenderer = (*innerWindowRenderer)(nil)
 type innerWindowRenderer struct {
 	win     *InnerWindow
 	bar     *fyne.Container
+	title   *draggableLabel
 	buttons []*borderButton
 
 	bg, contentBG *canvas.Rectangle
@@ -399,8 +401,9 @@ func (i *innerWindowRenderer) Refresh() {
 		b.setTheme(th, i.win.active)
 	}
 	i.bar.Refresh()
-	title := i.bar.Objects[0].(*fyne.Container).Objects[0].(*draggableLabel)
-	title.SetText(i.win.title)
+	if i.title.Text != i.win.title {
+		i.title.SetText(i.win.title)
+	}
 	i.ShadowingRenderer.RefreshShadow()
 }
 

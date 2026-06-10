@@ -2,6 +2,7 @@ package multiwindow
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -32,7 +33,8 @@ type MultipleWindows struct {
 
 	windows []*InnerWindow
 
-	content *fyne.Container
+	content  *fyne.Container
+	childBuf []fyne.CanvasObject // reused backing slice for content.Objects
 
 	openOffset fyne.Position
 
@@ -193,11 +195,15 @@ func (m *MultipleWindows) refreshChildren() {
 	if m.content == nil {
 		return
 	}
-	objs := make([]fyne.CanvasObject, len(m.windows))
-	for i, w := range m.windows {
-		objs[i] = w
+	if cap(m.childBuf) < len(m.windows) {
+		m.childBuf = make([]fyne.CanvasObject, len(m.windows))
+	} else {
+		m.childBuf = m.childBuf[:len(m.windows)]
 	}
-	m.content.Objects = objs
+	for i, w := range m.windows {
+		m.childBuf[i] = w
+	}
+	m.content.Objects = m.childBuf
 	m.content.Refresh()
 }
 
@@ -205,8 +211,13 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 	w.OnDragged = func(ev *fyne.DragEvent) {
 		if w.maximized {
 			w.maximized = false
-			w.Move(ev.AbsolutePosition.SubtractXY(w.preMaximizedSize.Width*0.5, 78))
 			w.Resize(w.preMaximizedSize)
+			// Convert the cursor's canvas-relative position into a position
+			// relative to our container, so this works regardless of where the
+			// container sits on the canvas (e.g. below a toolbar/menu).
+			local := ev.AbsolutePosition.Subtract(fyne.CurrentApp().Driver().AbsolutePositionForObject(m.content))
+			barHeight := w.Theme().Size(theme.SizeNameWindowTitleBarHeight)
+			w.Move(local.SubtractXY(w.preMaximizedSize.Width*0.5, barHeight*0.5))
 			return
 		}
 
@@ -354,6 +365,10 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 
 func (m *MultipleWindows) LoadLayout(windows []WindowProperties) error {
 	viewportSize := m.Size()
+	if viewportSize.Width == 0 || viewportSize.Height == 0 {
+		// Viewport not laid out yet; positions/sizes would all collapse to zero.
+		return nil
+	}
 	for _, h := range windows {
 		for _, w := range m.windows {
 			if w.Title() == h.Title {
@@ -388,6 +403,10 @@ func (m *MultipleWindows) LoadLayout(windows []WindowProperties) error {
 func (wm *MultipleWindows) JsonLayout() ([]byte, error) {
 	var history []WindowProperties
 	viewportSize := wm.Size()
+	if viewportSize.Width == 0 || viewportSize.Height == 0 {
+		// Avoid Inf/NaN ratios (which json.Marshal rejects) when not yet sized.
+		return nil, errors.New("multiwindow: cannot save layout before viewport is sized")
+	}
 
 	for _, w := range wm.windows {
 		if w.IgnoreSave {
