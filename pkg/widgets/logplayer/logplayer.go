@@ -300,7 +300,8 @@ func (l *Logplayer) CreateRenderer() fyne.WidgetRenderer {
 }
 
 type LogplayerRenderer struct {
-	l *Logplayer
+	l       *Logplayer
+	objects []fyne.CanvasObject
 }
 
 func (lr *LogplayerRenderer) Layout(space fyne.Size) {
@@ -315,7 +316,10 @@ func (lr *LogplayerRenderer) Refresh() {
 }
 
 func (lr *LogplayerRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{lr.l.container}
+	if lr.objects == nil {
+		lr.objects = []fyne.CanvasObject{lr.l.container}
+	}
+	return lr.objects
 }
 
 func (lr *LogplayerRenderer) Destroy() {

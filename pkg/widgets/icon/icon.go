@@ -76,5 +76,4 @@ func (ic *IconRenderer) Objects() []fyne.CanvasObject {
 		ic.objects = []fyne.CanvasObject{ic.IC.cfg.Image, ic.IC.text}
 	}
 	return ic.objects
-	// return []fyne.CanvasObject{ic.IC.cfg.Image, ic.IC.text} --- IGNORE ---
 }

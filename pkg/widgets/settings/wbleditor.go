@@ -515,6 +515,8 @@ type graphRenderer struct {
 	x0, y0, x1, y1 float32
 	minYv, maxYv   int
 	minZv, maxZv   float64
+
+	objects []fyne.CanvasObject
 }
 
 func (r *graphRenderer) rebuild() {
@@ -667,21 +669,24 @@ func (r *graphRenderer) Refresh() {
 }
 
 func (r *graphRenderer) Objects() []fyne.CanvasObject {
-	objs := make([]fyne.CanvasObject, 0, 1+len(r.gridLines)+len(r.axes)+len(r.dataLines)+len(r.points))
-	objs = append(objs, r.bg)
-	for _, l := range r.gridLines {
-		objs = append(objs, l)
+	if r.objects == nil {
+
+		r.objects = make([]fyne.CanvasObject, 0, 1+len(r.gridLines)+len(r.axes)+len(r.dataLines)+len(r.points))
+		r.objects = append(r.objects, r.bg)
+		for _, l := range r.gridLines {
+			r.objects = append(r.objects, l)
+		}
+		for _, l := range r.axes {
+			r.objects = append(r.objects, l)
+		}
+		for _, l := range r.dataLines {
+			r.objects = append(r.objects, l)
+		}
+		for _, p := range r.points {
+			r.objects = append(r.objects, p)
+		}
 	}
-	for _, l := range r.axes {
-		objs = append(objs, l)
-	}
-	for _, l := range r.dataLines {
-		objs = append(objs, l)
-	}
-	for _, p := range r.points {
-		objs = append(objs, p)
-	}
-	return objs
+	return r.objects
 }
 
 func (r *graphRenderer) MinSize() fyne.Size {

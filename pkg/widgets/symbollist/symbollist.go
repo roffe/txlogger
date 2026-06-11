@@ -386,12 +386,13 @@ func (sw *SymbolWidgetEntry) SetCorrectionFactor(f float64) {
 */
 
 func (sw *SymbolWidgetEntry) CreateRenderer() fyne.WidgetRenderer {
-	return &symbolWidgetEntryRenderer{sw}
+	return &symbolWidgetEntryRenderer{e: sw}
 	// return widget.NewSimpleRenderer(sw.container)
 }
 
 type symbolWidgetEntryRenderer struct {
-	e *SymbolWidgetEntry
+	e       *SymbolWidgetEntry
+	objects []fyne.CanvasObject
 }
 
 func (s *symbolWidgetEntryRenderer) Destroy() {
@@ -420,5 +421,8 @@ func (s *symbolWidgetEntryRenderer) Refresh() {
 }
 
 func (s *symbolWidgetEntryRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{s.e.container}
+	if s.objects == nil {
+		s.objects = []fyne.CanvasObject{s.e.container}
+	}
+	return s.objects
 }

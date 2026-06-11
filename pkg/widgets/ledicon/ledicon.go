@@ -53,13 +53,13 @@ func (w *Widget) SetState(state bool) {
 
 func (w *Widget) CreateRenderer() fyne.WidgetRenderer {
 	return &iconRenderer{w: w}
-
 }
 
 var _ fyne.WidgetRenderer = (*iconRenderer)(nil)
 
 type iconRenderer struct {
-	w *Widget
+	w       *Widget
+	objects []fyne.CanvasObject
 }
 
 func (r *iconRenderer) MinSize() fyne.Size {
@@ -82,5 +82,8 @@ func (r *iconRenderer) Destroy() {
 }
 
 func (r *iconRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.w.ledicon, r.w.label}
+	if r.objects == nil {
+		r.objects = []fyne.CanvasObject{r.w.ledicon, r.w.label}
+	}
+	return r.objects
 }
