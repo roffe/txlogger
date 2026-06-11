@@ -9,25 +9,6 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-// Add new struct for axis indicator
-type AxisIndicator struct {
-	origin    Vertex
-	xAxis     Vertex
-	yAxis     Vertex
-	zAxis     Vertex
-	axisScale float64
-}
-
-func NewAxisIndicator(scale float64) AxisIndicator {
-	return AxisIndicator{
-		origin:    Vertex{X: 0, Y: 0, Z: 0},
-		xAxis:     Vertex{X: scale, Y: 0, Z: 0},
-		yAxis:     Vertex{X: 0, Y: scale, Z: 0},
-		zAxis:     Vertex{X: 0, Y: 0, Z: scale},
-		axisScale: scale,
-	}
-}
-
 func (m *Meshgrid) drawAxisIndicator(img *image.RGBA) {
 	cornerOffset := 60.0
 	indicatorScale := 60.0

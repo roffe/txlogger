@@ -33,7 +33,7 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 		img = image.NewRGBA(image.Rect(0, 0, w, h))
 		m.scratchImg = img
 	} else {
-		clearPix(img.Pix)
+		clear(img.Pix)
 	}
 
 	// Find min/max of the view-space Z for depth shading.
@@ -143,12 +143,6 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 	return img
 }
 
-func clearPix(p []uint8) {
-	for i := range p {
-		p[i] = 0
-	}
-}
-
 // getColorWithDepth combines color interpolation and depth enhancement in one step
 func (m *Meshgrid) getColorWithDepth(value, depthFactor float64) color.RGBA {
 	// Get base color from value
@@ -184,13 +178,15 @@ func (m *Meshgrid) getColorWithDepth(value, depthFactor float64) color.RGBA {
 	}
 }
 
-// Fade a color by a factor (used for diagonals)
+// Fade a color by a factor (used for diagonals). Alpha is left untouched:
+// the buffer uses straight alpha, so dimming RGB and A together would fade
+// the line twice over once composited.
 func fadeColor(c color.RGBA, factor float64) color.RGBA {
 	return color.RGBA{
 		R: uint8(float64(c.R) * factor),
 		G: uint8(float64(c.G) * factor),
 		B: uint8(float64(c.B) * factor),
-		A: uint8(float64(c.A) * factor),
+		A: c.A,
 	}
 }
 
@@ -201,8 +197,11 @@ func drawBresenhamLine(img *image.RGBA, x0, y0, x1, y1 int, c1, c2 color.RGBA) {
 		return // fully outside
 	}
 
-	// Translate to image origin for indexing
-	ox, oy := r.Min.X, r.Min.Y
+	// Translate to image origin once so the pixel loop indexes directly.
+	x0 -= r.Min.X
+	x1 -= r.Min.X
+	y0 -= r.Min.Y
+	y1 -= r.Min.Y
 	stride := img.Stride
 	pix := img.Pix
 
@@ -225,7 +224,7 @@ func drawBresenhamLine(img *image.RGBA, x0, y0, x1, y1 int, c1, c2 color.RGBA) {
 		total = -dy
 	}
 	if total == 0 {
-		setPix(pix, stride, x0-ox, y0-oy, c1)
+		setPix(pix, stride, x0, y0, c1)
 		return
 	}
 
@@ -242,7 +241,7 @@ func drawBresenhamLine(img *image.RGBA, x0, y0, x1, y1 int, c1, c2 color.RGBA) {
 
 	// Draw
 	for i := 0; ; i++ {
-		setPixRGBAFixed(pix, stride, x0-ox, y0-oy, accR, accG, accB, accA)
+		setPixRGBAFixed(pix, stride, x0, y0, accR, accG, accB, accA)
 
 		if x0 == x1 && y0 == y1 {
 			break

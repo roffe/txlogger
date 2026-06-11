@@ -230,19 +230,12 @@ func (m *Meshgrid) updateVertexPositions() {
 	}
 }
 
+// SetFloat64 updates a single cell value. The whole mesh is rebuilt since a
+// new value can shift zmin/zmax and with it every vertex's normalized height.
 func (m *Meshgrid) SetFloat64(idx int, value float64) {
-	log.Println("SetFloat64", idx, value)
-	m.values[idx] = value
-	m.zmin, m.zmax, m.zrange = findMinMaxRange(m.values)
-	zrange := m.zrange
-	if zrange == 0 {
-		zrange = 1
+	if idx < 0 || idx >= len(m.values) {
+		return
 	}
-	m.vertices[idx/m.cols][idx%m.cols].Z = ((value - m.zmin) / zrange) * m.depth
-	m.refresh()
-}
-
-func (m *Meshgrid) SetFloat642(idx int, value float64) {
 	m.values[idx] = value
 	m.zmin, m.zmax, m.zrange = findMinMaxRange(m.values)
 	m.createVertices(fyne.Max(float32(m.cols), 1), fyne.Max(float32(m.rows), 1))
@@ -252,14 +245,15 @@ func (m *Meshgrid) SetFloat642(idx int, value float64) {
 
 // Update LoadFloat64s to use the new vertex position update method
 func (m *Meshgrid) LoadFloat64s(min, max float64, floats []float64) {
+	if len(floats) != m.rows*m.cols {
+		log.Printf("meshgrid: LoadFloat64s got %d values, want %d (%dx%d)", len(floats), m.rows*m.cols, m.cols, m.rows)
+		return
+	}
 	m.zmin = min
 	m.zmax = max
 	m.zrange = m.zmax - m.zmin
 
 	m.values = floats
-	if len(floats) == 0 {
-		return
-	}
 
 	m.createVertices(fyne.Max(float32(m.cols), 1), fyne.Max(float32(m.rows), 1))
 	m.updateVertexPositions()
@@ -280,14 +274,6 @@ func findMinMaxRange(values []float64) (float64, float64, float64) {
 	return minZ, maxZ, maxZ - minZ
 }
 
-func (m *Meshgrid) project(v Vertex) (int, int) {
-	centerX := float64(m.size.Width) * 0.5
-	centerY := float64(m.size.Height) * 0.5
-	screenX := centerX + v.X
-	screenY := centerY + v.Y
-	return int(screenX), int(screenY)
-}
-
 func (m *Meshgrid) Refresh() {
 	m.refresh()
 }
@@ -304,24 +290,31 @@ func (m *Meshgrid) throttledRefresh() {
 	}
 	m.refreshPending = true
 	time.AfterFunc(10*time.Millisecond, func() { // ~100fps
-		m.refresh()
-		m.refreshPending = false
+		// AfterFunc fires on a timer goroutine; hop back to the fyne thread.
+		// refreshPending is then only ever touched on the fyne thread.
+		fyne.Do(func() {
+			m.refresh()
+			m.refreshPending = false
+		})
 	})
 }
+
 func (m *Meshgrid) CreateRenderer() fyne.WidgetRenderer {
-	return &meshgridRenderer{m}
+	return &meshgridRenderer{MG: m}
 }
 
 type meshgridRenderer struct {
-	*Meshgrid
+	MG      *Meshgrid
+	objects []fyne.CanvasObject
 }
 
 func (m *meshgridRenderer) Layout(size fyne.Size) {
-	if size == m.size {
+	if size == m.MG.size {
 		return
 	}
-	m.size = size
-	m.throttledRefresh()
+	m.MG.size = size
+	m.MG.image.Resize(size)
+	m.MG.throttledRefresh()
 }
 
 func (m *meshgridRenderer) MinSize() fyne.Size {
@@ -329,12 +322,15 @@ func (m *meshgridRenderer) MinSize() fyne.Size {
 }
 
 func (m *meshgridRenderer) Refresh() {
-	m.Meshgrid.refresh()
+	m.MG.refresh()
 }
 
 func (m *meshgridRenderer) Destroy() {
 }
 
 func (m *meshgridRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{m.image}
+	if m.objects == nil {
+		m.objects = []fyne.CanvasObject{m.MG.image}
+	}
+	return m.objects
 }
