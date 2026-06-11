@@ -7,12 +7,17 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.bug.st/serial"
 )
 
 const ProductString = "AEM Uego"
+
+// reconnectDelay is how long run() waits between reconnect attempts after the
+// serial port drops (a common occurrence on Windows).
+const reconnectDelay = time.Second
 
 type AEMuego struct {
 	port string
@@ -25,6 +30,8 @@ type AEMuego struct {
 	log func(string)
 
 	closeOnce sync.Once
+	closed    atomic.Bool
+	done      chan struct{}
 	mu        sync.Mutex
 
 	dataBuff []byte
@@ -41,13 +48,26 @@ func NewAEMuegoClient(port string, logFunc func(string)) (*AEMuego, error) {
 	return &AEMuego{
 		port:     port,
 		log:      logFunc,
+		done:     make(chan struct{}),
 		dataBuff: make([]byte, 8),
 		//debugLog: f,
 	}, nil
 }
 
 func (a *AEMuego) Start(ctx context.Context) error {
+	// Fail fast if we can't open the port at all on the initial attempt so the
+	// caller gets immediate feedback. Later drops are handled by run().
+	if err := a.openPort(); err != nil {
+		return err
+	}
 
+	go a.run(ctx)
+
+	return nil
+}
+
+// openPort opens the serial port and stores it on the client.
+func (a *AEMuego) openPort() error {
 	mode := &serial.Mode{
 		BaudRate: 9600,
 	}
@@ -55,13 +75,59 @@ func (a *AEMuego) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	sp.SetReadTimeout(5 * time.Millisecond)
+
+	a.mu.Lock()
 	a.sp = sp
-
-	a.sp.SetReadTimeout(5 * time.Millisecond)
-
-	go a.run(ctx)
-
+	a.mu.Unlock()
 	return nil
+}
+
+// getPort returns the current serial port, or nil if none is open.
+func (a *AEMuego) getPort() serial.Port {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.sp
+}
+
+// closePort closes the current serial port if open. It is safe to call
+// multiple times.
+func (a *AEMuego) closePort() {
+	a.mu.Lock()
+	sp := a.sp
+	a.sp = nil
+	a.mu.Unlock()
+	if sp != nil {
+		if err := sp.Close(); err != nil {
+			a.log("AEM: " + err.Error())
+		}
+	}
+}
+
+// reconnect keeps trying to reopen the serial port until it succeeds or the
+// client is stopped. It returns true when the port was reopened, false when
+// the client is shutting down.
+func (a *AEMuego) reconnect(ctx context.Context) bool {
+	for {
+		if ctx.Err() != nil || a.closed.Load() {
+			return false
+		}
+		a.log("AEM: reconnecting to " + a.port)
+		if err := a.openPort(); err != nil {
+			a.log("AEM: reconnect failed: " + err.Error())
+			select {
+			case <-ctx.Done():
+				return false
+			case <-a.done:
+				return false
+			case <-time.After(reconnectDelay):
+			}
+			continue
+		}
+		a.log("AEM: reconnected to " + a.port)
+		a.dataPos = 0
+		return true
+	}
 }
 
 func (a *AEMuego) GetLambda() float64 {
@@ -77,16 +143,35 @@ func (a *AEMuego) SetLambda(value float64) {
 }
 
 func (a *AEMuego) run(ctx context.Context) {
+	// Make sure any port we (re)opened gets cleaned up when run() exits.
+	defer a.closePort()
+
 	buf := make([]byte, 8)
 	for {
+		if ctx.Err() != nil || a.closed.Load() {
+			return
+		}
+
+		sp := a.getPort()
+		if sp == nil {
+			if !a.reconnect(ctx) {
+				return
+			}
+			continue
+		}
+
 		// read from serial
-		n, err := a.sp.Read(buf)
-		if ctx.Err() != nil {
+		n, err := sp.Read(buf)
+		if ctx.Err() != nil || a.closed.Load() {
 			return
 		}
 		if err != nil {
 			a.log("AEM: " + err.Error())
-			return
+			a.closePort()
+			if !a.reconnect(ctx) {
+				return
+			}
+			continue
 		}
 		if n == 0 {
 			continue
@@ -126,12 +211,12 @@ func (a *AEMuego) run(ctx context.Context) {
 
 func (a *AEMuego) Stop() {
 	a.closeOnce.Do(func() {
-		if a.sp != nil {
-			a.log("Stopping AEM serial client")
-			if err := a.sp.Close(); err != nil {
-				a.log(err.Error())
-			}
-		}
+		a.log("Stopping AEM serial client")
+		// Signal run()/reconnect() to stop before closing the port so a port
+		// drop isn't mistaken for a reconnect opportunity.
+		a.closed.Store(true)
+		close(a.done)
+		a.closePort()
 		//if a.debugLog != nil {
 		//	a.debugLog.Sync()
 		//	a.debugLog.Close()
