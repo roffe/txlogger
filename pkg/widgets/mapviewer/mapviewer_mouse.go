@@ -206,16 +206,17 @@ func (mv *MapViewer) finalizeSelection(eventPos fyne.Position) {
 	nselectedX, nSelectedY := mv.calculateSelectionBounds(eventPos)
 	mv.updateSelection(nselectedX, nSelectedY)
 
-	// For Ctrl selections, we don't want to clear existing selections
-	if mv.lastModifier != fyne.KeyModifierControl {
-		mv.selectedCells = make([]int, 0)
-	}
-
 	topLeftX := min(mv.selectedX, nselectedX)
 	bottomRightX := max(mv.selectedX, nselectedX)
 	topLeftY := min(mv.SelectedY, nSelectedY)
 	bottomRightY := max(mv.SelectedY, nSelectedY)
 
+	// For Ctrl selections, we don't want to clear existing selections
+	if mv.lastModifier != fyne.KeyModifierControl {
+		mv.selectedCells = make([]int, 0, (bottomRightX-topLeftX+1)*(bottomRightY-topLeftY+1))
+	}
+
+	selectedColor := theme.Color(theme.ColorNameForegroundOnPrimary)
 	for y := topLeftY; y <= bottomRightY; y++ {
 		for x := topLeftX; x <= bottomRightX; x++ {
 			zIndex := y*mv.numColumns + x
@@ -226,11 +227,11 @@ func (mv *MapViewer) finalizeSelection(eventPos fyne.Position) {
 					mv.zDataRects[zIndex].FillColor = mv.zDataRects[zIndex].StrokeColor
 				} else {
 					mv.selectedCells = append(mv.selectedCells, zIndex)
-					mv.zDataRects[zIndex].FillColor = theme.Color(theme.ColorNameForegroundOnPrimary)
+					mv.zDataRects[zIndex].FillColor = selectedColor
 				}
 			} else {
 				mv.selectedCells = append(mv.selectedCells, zIndex)
-				mv.zDataRects[zIndex].FillColor = theme.Color(theme.ColorNameForegroundOnPrimary)
+				mv.zDataRects[zIndex].FillColor = selectedColor
 			}
 			mv.zDataRects[zIndex].Refresh()
 		}

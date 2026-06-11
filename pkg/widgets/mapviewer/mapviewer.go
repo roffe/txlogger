@@ -75,6 +75,9 @@ type MapViewer struct {
 	inputBuffer   strings.Builder
 	restoreValues bool
 
+	// scratch buffer for formatting cell values without allocating
+	scratch []byte
+
 	popup *widget.PopUpMenu
 
 	widthFactor  float32
@@ -272,10 +275,11 @@ func (mv *MapViewer) SetY(yValue float64) {
 }
 
 func (mv *MapViewer) setCellText(idx int, value float64) {
-	textValue := strconv.FormatFloat(value, 'f', mv.cfg.ZPrecision, 64)
-	if mv.textValues[idx].Text != textValue {
-		mv.textValues[idx].Text = textValue
-		mv.textValues[idx].Refresh()
+	mv.scratch = strconv.AppendFloat(mv.scratch[:0], value, 'f', mv.cfg.ZPrecision, 64)
+	text := mv.textValues[idx]
+	if string(mv.scratch) != text.Text {
+		text.Text = string(mv.scratch)
+		text.Refresh()
 	}
 }
 
@@ -312,39 +316,38 @@ func (mv *MapViewer) Refresh() {
 }
 
 func (mv *MapViewer) createYAxis() {
-	mv.yAxisLabelContainer = container.New(&layout.Vertical{})
-	if mv.numRows >= 1 {
-		for i := mv.numRows - 1; i >= 0; i-- {
-			text := &canvas.Text{
-				Alignment: fyne.TextAlignCenter,
-				Text:      strconv.FormatFloat(mv.cfg.YData[i], 'f', mv.cfg.YPrecision, 64),
-				TextSize:  minTextSize + 2,
-			}
-			mv.yAxisTexts = append(mv.yAxisTexts, text)
-			mv.yAxisLabelContainer.Add(text)
+	mv.yAxisTexts = make([]*canvas.Text, 0, mv.numRows)
+	objs := make([]fyne.CanvasObject, 0, mv.numRows)
+	for i := mv.numRows - 1; i >= 0; i-- {
+		text := &canvas.Text{
+			Alignment: fyne.TextAlignCenter,
+			Text:      strconv.FormatFloat(mv.cfg.YData[i], 'f', mv.cfg.YPrecision, 64),
+			TextSize:  minTextSize + 2,
 		}
-		return
+		mv.yAxisTexts = append(mv.yAxisTexts, text)
+		objs = append(objs, text)
 	}
+	mv.yAxisLabelContainer = container.New(&layout.Vertical{}, objs...)
 }
 
 func (mv *MapViewer) createXAxis() {
-	mv.xAxisLabelContainer = container.New(&layout.Horizontal{Offset: mv.yAxisLabelContainer})
-	if mv.numColumns >= 1 {
-		for i := 0; i < mv.numColumns; i++ {
-			text := &canvas.Text{
-				Alignment: fyne.TextAlignCenter,
-				Text:      strconv.FormatFloat(mv.cfg.XData[i], 'f', mv.cfg.XPrecision, 64),
-				TextSize:  minTextSize + 2,
-			}
-			mv.xAxisTexts = append(mv.xAxisTexts, text)
-			mv.xAxisLabelContainer.Add(text)
+	mv.xAxisTexts = make([]*canvas.Text, 0, mv.numColumns)
+	objs := make([]fyne.CanvasObject, 0, mv.numColumns)
+	for i := 0; i < mv.numColumns; i++ {
+		text := &canvas.Text{
+			Alignment: fyne.TextAlignCenter,
+			Text:      strconv.FormatFloat(mv.cfg.XData[i], 'f', mv.cfg.XPrecision, 64),
+			TextSize:  minTextSize + 2,
 		}
-		return
+		mv.xAxisTexts = append(mv.xAxisTexts, text)
+		objs = append(objs, text)
 	}
+	mv.xAxisLabelContainer = container.New(&layout.Horizontal{Offset: mv.yAxisLabelContainer}, objs...)
 }
 
 func (mv *MapViewer) createTextValues() {
-	mv.valueTexts = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.32))
+	mv.textValues = make([]*canvas.Text, 0, mv.numData)
+	objs := make([]fyne.CanvasObject, 0, mv.numData)
 	for _, v := range mv.cfg.ZData {
 		text := &canvas.Text{
 			Text:      strconv.FormatFloat(v, 'f', mv.cfg.ZPrecision, 64),
@@ -353,19 +356,22 @@ func (mv *MapViewer) createTextValues() {
 			Alignment: fyne.TextAlignCenter,
 		}
 		mv.textValues = append(mv.textValues, text)
-		mv.valueTexts.Add(text)
+		objs = append(objs, text)
 	}
+	mv.valueTexts = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.32), objs...)
 }
 
 func (mv *MapViewer) createZdata() {
-	mv.valueRects = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.32))
+	mv.zDataRects = make([]*canvas.Rectangle, 0, mv.numData)
+	objs := make([]fyne.CanvasObject, 0, mv.numData)
 	for _, value := range mv.cfg.ZData {
 		color := colors.GetColorInterpolation(mv.zMin, mv.zMax, value, mv.colorMode)
 		rect := &canvas.Rectangle{FillColor: color, StrokeColor: color, StrokeWidth: 0}
 		rect.SetMinSize(fyne.NewSize(34, 14))
 		mv.zDataRects = append(mv.zDataRects, rect)
-		mv.valueRects.Add(rect)
+		objs = append(objs, rect)
 	}
+	mv.valueRects = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.32), objs...)
 }
 
 func (mv *MapViewer) setXY() error {
@@ -426,21 +432,18 @@ func (mv *MapViewer) resizeSelectionRect() {
 
 	// Handle multiple cell selection
 	if len(mv.selectedCells) > 1 {
-		// Pre-calculate divisor to avoid repeated division operations
-		colDivisor := float32(mv.numColumns)
-
 		// Initialize bounds using first cell to avoid unnecessary comparisons
 		firstCell := mv.selectedCells[0]
 		minX := firstCell % mv.numColumns
 		maxX := minX
-		minY := int(float32(firstCell) / colDivisor)
+		minY := firstCell / mv.numColumns
 		maxY := minY
 
 		// Find bounds in a single pass
 		for i := 1; i < len(mv.selectedCells); i++ {
 			cell := mv.selectedCells[i]
 			x := cell % mv.numColumns
-			y := int(float32(cell) / colDivisor)
+			y := cell / mv.numColumns
 
 			if x < minX {
 				minX = x

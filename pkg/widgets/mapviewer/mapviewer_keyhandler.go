@@ -137,19 +137,27 @@ func (mv *MapViewer) smooth() {
 }
 
 func (mv *MapViewer) updateCursor(goroutine bool) {
-	mv.selectedCells = []int{mv.SelectedY*mv.numColumns + mv.selectedX}
+	cell := mv.SelectedY*mv.numColumns + mv.selectedX
+	if len(mv.selectedCells) != 1 || mv.selectedCells[0] != cell {
+		mv.selectedCells = append(mv.selectedCells[:0], cell)
+	}
 	xPosFactor := float32(mv.selectedX)
 	yPosFactor := float32(float64(mv.numRows-1) - float64(mv.SelectedY))
 	xPos := xPosFactor * mv.widthFactor
 	yPos := yPosFactor * mv.heightFactor
+	size := fyne.Size{Width: mv.widthFactor + 1, Height: mv.heightFactor + 1}
+	pos := fyne.Position{X: xPos - 1, Y: yPos - 1}
+	if mv.selectionRect.Size() == size && mv.selectionRect.Position() == pos {
+		return
+	}
 	if goroutine {
 		fyne.Do(func() {
-			mv.selectionRect.Resize(fyne.Size{Width: mv.widthFactor + 1, Height: mv.heightFactor + 1})
-			mv.selectionRect.Move(fyne.Position{X: xPos - 1, Y: yPos - 1})
+			mv.selectionRect.Resize(size)
+			mv.selectionRect.Move(pos)
 		})
 	} else {
-		mv.selectionRect.Resize(fyne.Size{Width: mv.widthFactor + 1, Height: mv.heightFactor + 1})
-		mv.selectionRect.Move(fyne.Position{X: xPos - 1, Y: yPos - 1})
+		mv.selectionRect.Resize(size)
+		mv.selectionRect.Move(pos)
 	}
 }
 
