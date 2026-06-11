@@ -91,6 +91,31 @@ func bresenhamCore(pix []uint8, stride, w, h, x1, y1, x2, y2 int, col color.RGBA
 	}
 }
 
+// fillVRun draws a vertical run of pixels in column x from y0 to y1 (inclusive,
+// in either order), clipped to the image, with the same max-blend as
+// bresenhamCore.
+func fillVRun(pix []uint8, stride, w, h, x, y0, y1 int, col color.RGBA) {
+	if uint(x) >= uint(w) {
+		return
+	}
+	if y0 > y1 {
+		y0, y1 = y1, y0
+	}
+	if y1 < 0 || y0 >= h {
+		return
+	}
+	y0 = max(y0, 0)
+	y1 = min(y1, h-1)
+	i := y0*stride + x*4
+	for y := y0; y <= y1; y++ {
+		pix[i+0] = max(pix[i+0], col.R)
+		pix[i+1] = max(pix[i+1], col.G)
+		pix[i+2] = max(pix[i+2], col.B)
+		pix[i+3] = max(pix[i+3], col.A)
+		i += stride
+	}
+}
+
 func fillCircle(pix []uint8, stride, w, h, centerX, centerY, radius int, col color.RGBA) {
 	rr := radius * radius
 	for y := -radius; y <= radius; y++ {

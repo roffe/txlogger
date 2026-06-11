@@ -6,6 +6,8 @@ import (
 	"image/color"
 	"log"
 	"sort"
+	"sync"
+	"sync/atomic"
 	"unicode"
 	"unicode/utf8"
 
@@ -59,6 +61,12 @@ type Plotter struct {
 	size fyne.Size
 
 	hilightLine int
+
+	// seekPos is the latest position requested via Seek, which is called from
+	// the playback goroutine; the pending UI refresh reads it back out.
+	seekMu         sync.Mutex
+	seekPos        int
+	refreshPending atomic.Bool
 
 	OnDragged func(event *fyne.DragEvent)
 	OnTapped  func(event *fyne.PointEvent)
@@ -232,10 +240,38 @@ func lessCaseInsensitive(s, t string) bool {
 }
 
 func (p *Plotter) CreateRenderer() fyne.WidgetRenderer {
-	return &plotterRenderer{p}
+	return &plotterRenderer{PL: p}
 }
 
+// Seek records the new playback position and schedules a redraw on the UI
+// goroutine. Calls are coalesced: while a refresh is pending, further Seeks
+// only overwrite seekPos and the pending refresh renders the latest position.
+// This bounds drawing to the rate the UI goroutine can keep up with instead of
+// the log record rate, so a fast log can never back up the event queue.
 func (p *Plotter) Seek(pos int) {
+	p.seekMu.Lock()
+	p.seekPos = pos
+	p.seekMu.Unlock()
+
+	if !p.refreshPending.CompareAndSwap(false, true) {
+		return
+	}
+	fyne.Do(func() {
+		// Clear the flag before reading seekPos: a Seek arriving mid-draw then
+		// queues a new refresh rather than being dropped, so the final
+		// position is always rendered.
+		p.refreshPending.Store(false)
+		p.seekMu.Lock()
+		pos := p.seekPos
+		p.seekMu.Unlock()
+		p.seekTo(pos)
+	})
+}
+
+// seekTo applies a seek on the UI goroutine: it recomputes the view window,
+// updates the legend values, redraws the plot and refreshes the changed
+// canvas objects.
+func (p *Plotter) seekTo(pos int) {
 	halfDataPointsToShow := int(float64(p.dataPointsToShow) * .5)
 	offsetPosition := pos - halfDataPointsToShow
 	if pos <= p.dataLength-halfDataPointsToShow {
@@ -246,10 +282,7 @@ func (p *Plotter) Seek(pos int) {
 	}
 	p.cursorPos = pos
 
-	// Update legend values, collecting the ones that actually changed so we
-	// can refresh them together in a single fyne.Do below.
 	valueIndex := min(p.dataLength, p.cursorPos)
-	var changed []*TappableText
 	for i, v := range p.valueOrder {
 		obj := p.legendTexts[i]
 		newValue := fmt.Sprintf("%.4g", p.values[v][valueIndex])
@@ -258,21 +291,13 @@ func (p *Plotter) Seek(pos int) {
 			continue
 		}
 		obj.value.Text = newValue
-		changed = append(changed, obj)
+		obj.Refresh()
 	}
 
 	p.drawImage()
 	p.layoutCursor()
-
-	// Collapse all refreshes for this frame into one dispatch onto the main
-	// goroutine instead of one per changed legend item plus cursor plus image.
-	fyne.Do(func() {
-		for _, obj := range changed {
-			obj.Refresh()
-		}
-		p.cursor.Refresh()
-		p.canvasImage.Refresh()
-	})
+	p.cursor.Refresh()
+	p.canvasImage.Refresh()
 }
 
 // drawImage renders the enabled time series into the (reused) plot buffer and
@@ -395,10 +420,16 @@ func (ts *TimeSeries) PlotImage(img *image.RGBA, values map[string][]float64, st
 	heightFactor := float64(hh) / ts.valueRange
 	widthFactor := float64(w) / float64(dataLen)
 
-	// start at 1 since we need to draw a line from the previous point
 	data := values[ts.Name][startN:endN]
+
+	if dataLen > w {
+		ts.plotImageDecimated(img, data, thickness)
+		return
+	}
+
 	dle := dataLen - 1
 
+	// start at 1 since we need to draw a line from the previous point
 	for x := 1; x < dataLen; x++ {
 		fx := float64(x)
 		x0 := int(((fx - 1) * widthFactor))
@@ -409,6 +440,50 @@ func (ts *TimeSeries) PlotImage(img *image.RGBA, values map[string][]float64, st
 		}
 		y1 := int(float64(hh) - (data[x]-ts.Min)*heightFactor)
 		BresenhamThick(img, x0, y0, x1, y1, thickness, ts.Color)
+	}
+}
+
+// plotImageDecimated renders the series when there are more visible points
+// than pixel columns. Connecting consecutive points with Bresenham lines would
+// overdraw each column once per point landing on it; instead each column gets
+// a single vertical run spanning the min/max of its points, capping the work
+// at O(width) regardless of how far out the view is zoomed.
+func (ts *TimeSeries) plotImageDecimated(img *image.RGBA, data []float64, thickness int) {
+	pix := img.Pix
+	stride := img.Stride
+	s := img.Bounds().Size()
+	w := s.X
+	h := s.Y
+	hh := h - 1
+	heightFactor := float64(hh) / ts.valueRange
+	dataLen := len(data)
+
+	halfThick := 0
+	if thickness > 1 {
+		halfThick = thickness / 2
+	}
+
+	lo := 0
+	for x := 0; x < w; x++ {
+		hi := (x + 1) * dataLen / w
+		// Re-scan the previous column's last point so adjacent runs always
+		// overlap vertically and the plot stays gap-free.
+		scanFrom := max(lo-1, 0)
+		minV, maxV := data[scanFrom], data[scanFrom]
+		for _, v := range data[scanFrom+1 : hi] {
+			if v < minV {
+				minV = v
+			}
+			if v > maxV {
+				maxV = v
+			}
+		}
+		y0 := int(float64(hh) - (maxV-ts.Min)*heightFactor)
+		y1 := int(float64(hh) - (minV-ts.Min)*heightFactor)
+		for t := -halfThick; t <= halfThick; t++ {
+			fillVRun(pix, stride, w, h, x+t, y0-halfThick, y1+halfThick, ts.Color)
+		}
+		lo = hi
 	}
 }
 
