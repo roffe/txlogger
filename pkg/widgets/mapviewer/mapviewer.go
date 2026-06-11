@@ -14,6 +14,8 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
+	fynelayout "fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/interpolate"
@@ -114,7 +116,9 @@ func (mv *MapViewer) SetColorBlindMode(mode colors.ColorBlindMode) {
 	if mv.colorMode != mode {
 		mv.colorMode = mode
 		mv.Refresh()
-		mv.mesh.SetColorBlindMode(mode)
+		if mv.mesh != nil {
+			mv.mesh.SetColorBlindMode(mode)
+		}
 	}
 }
 
@@ -229,6 +233,8 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		}
 
 		if err == nil {
+			meshModeBtn := widget.NewButtonWithIcon("", theme.GridIcon(), mv.mesh.CycleRenderMode)
+			meshModeBtn.Importance = widget.LowImportance
 			split := container.NewVSplit(
 				mapview,
 				container.NewBorder(
@@ -236,7 +242,12 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 					buttons,
 					nil,
 					nil,
-					mv.mesh,
+					container.NewStack(
+						mv.mesh,
+						container.NewVBox(
+							container.NewHBox(fynelayout.NewSpacer(), meshModeBtn),
+						),
+					),
 				),
 			)
 			split.Offset = 0.2
@@ -295,6 +306,11 @@ func (mv *MapViewer) SetZData(zData []float64) error {
 
 func (mv *MapViewer) Refresh() {
 	mv.zMin, mv.zMax = widgets.FindMinMax(mv.cfg.ZData)
+	if len(mv.textValues) == 0 {
+		// renderer not created yet; createTextValues/createZdata pick up
+		// the current ZData and color mode when it is
+		return
+	}
 	for idx, value := range mv.cfg.ZData {
 		mv.setCellText(idx, value)
 		col := colors.GetColorInterpolation(

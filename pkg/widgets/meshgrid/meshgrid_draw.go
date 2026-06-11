@@ -81,6 +81,18 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 		}
 	}
 
+	mode := m.renderMode
+	if m.rows < 2 || m.cols < 2 {
+		// A 1D mesh has no cells to fill; lines are all we can draw.
+		mode = RenderModeWireframe
+	}
+
+	if mode != RenderModeWireframe {
+		m.drawSurface(img, projX, projY, vertCol, mode == RenderModeSolidWireframe)
+		m.drawAxisIndicator(img)
+		return img
+	}
+
 	// Collect line segments using cached projections.
 	segs := m.scratchLines[:0]
 	for i := 0; i < m.rows; i++ {
@@ -105,7 +117,7 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 					y1:       y1,
 					x2:       x2,
 					y2:       y2,
-					depth:    -(m.vertices[i][j].Z + m.vertices[ni][nj].Z) * 0.5,
+					depth:    (m.vertices[i][j].Z + m.vertices[ni][nj].Z) * 0.5,
 					diagonal: x1 != x2 && y1 != y2,
 				})
 			}

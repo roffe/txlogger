@@ -40,6 +40,9 @@ type Meshgrid struct {
 	scratchProjY  []int
 	scratchColors []color.RGBA
 	scratchLines  []lineSegment
+	scratchQuads  []quadRef
+
+	renderMode RenderMode
 
 	lastMouseX, lastMouseY float32
 
@@ -119,6 +122,25 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 	m.image.ScaleMode = canvas.ImageScaleFastest
 
 	return m, nil
+}
+
+// SetRenderMode switches between solid surface, solid+wireframe and pure
+// wireframe rendering.
+func (m *Meshgrid) SetRenderMode(mode RenderMode) {
+	if m.renderMode != mode {
+		m.renderMode = mode
+		m.refresh()
+	}
+}
+
+func (m *Meshgrid) RenderMode() RenderMode {
+	return m.renderMode
+}
+
+// CycleRenderMode steps to the next render mode (surface → solid → wireframe).
+func (m *Meshgrid) CycleRenderMode() {
+	m.renderMode = (m.renderMode + 1) % renderModeCount
+	m.refresh()
 }
 
 func (m *Meshgrid) SetColorBlindMode(mode colors.ColorBlindMode) {
