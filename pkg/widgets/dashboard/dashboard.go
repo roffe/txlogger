@@ -6,8 +6,6 @@ import (
 	"log"
 	"time"
 
-	_ "embed"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/theme"
@@ -80,11 +78,11 @@ type Config struct {
 	AirDemToString  func(float64) string
 	UseMPH          bool
 	SwapRPMandSpeed bool
-	Low             float64
-	High            float64
-	WidebandSymbol  string
-	MetricRouter    map[string]func(float64)
-	FullscreenFunc  func(bool)
+	// Low/High set the wideband lambda bar display range (defaults 0.5–1.5).
+	Low            float64
+	High           float64
+	WidebandSymbol string
+	FullscreenFunc func(bool)
 }
 
 func NewDashboard(cfg *Config) *Dashboard {
@@ -97,6 +95,11 @@ func NewDashboard(cfg *Config) *Dashboard {
 	speedometerText := "km/h"
 	if cfg.UseMPH {
 		speedometerText = "mph"
+	}
+
+	wbLow, wbHigh := cfg.Low, cfg.High
+	if wbLow >= wbHigh {
+		wbLow, wbHigh = 0.5, 1.5
 	}
 
 	db := &Dashboard{
@@ -167,9 +170,9 @@ func NewDashboard(cfg *Config) *Dashboard {
 			}),
 			wblambda: cbar.New(&widgets.GaugeConfig{
 				Title:           "",
-				Min:             0.50,
-				Center:          1,
-				Max:             1.50,
+				Min:             wbLow,
+				Center:          (wbLow + wbHigh) * 0.5,
+				Max:             wbHigh,
 				Steps:           20,
 				MinSize:         fyne.NewSize(50, 35),
 				DisplayString:   "λ %.2f",
@@ -241,10 +244,6 @@ func NewDashboard(cfg *Config) *Dashboard {
 		},
 	}
 	db.ExtendBaseWidget(db)
-
-	db.text.cruise.Hide()
-	db.image.checkEngine.Hide()
-	db.image.limpMode.Hide()
 
 	db.metricRouter = db.createRouter()
 
@@ -414,10 +413,8 @@ type dims struct {
 	sixthWidth    float32
 	thirdHeight   float32
 	tenthHeight   float32
-	halfHeight    float32
 	centerX       float32
 	centerY       float32
-	bottomY       float32
 	textSize      float32
 	smallTextSize float32
 }
@@ -642,12 +639,8 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 		sixthWidth:  space.Width * common.OneSixth,
 		thirdHeight: (space.Height - 50) * .33,
 		tenthHeight: (space.Height - 50) * .1,
-		halfHeight:  (space.Height - 50) * .5,
 		centerX:     space.Width * 0.5,
 		centerY:     space.Height * 0.5,
-		bottomY:     space.Height - 55,
-
-		// textSize: max(min(space.Height, space.Width)*0.07, 20),
 	}
 	// Layout horizontal bars
 	dr.db.layoutBars(dims)
@@ -661,10 +654,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 	dr.db.fullscreenBtn.Resize(fyne.NewSize(btnWidth, btnHeigh))
 	dr.db.fullscreenBtn.Move(fyne.NewPos(space.Width-btnWidth, space.Height-btnHeigh))
 
-	dims.textSize = dr.db.gauges.nblambda.Size().Height - 2
-	dims.smallTextSize = dims.textSize * 0.5
-
-	// Layout text elements
+	// Layout text elements (computes its own textSize/smallTextSize)
 	dr.db.layoutTexts(dims)
 
 	// Layout icons

@@ -43,6 +43,9 @@ type CBar struct {
 	// Fast float formatting
 	fmtPrec int
 	buf     []byte
+
+	// Cached monospace glyph width for the current display TextSize
+	charWidth float32
 }
 
 func New(cfg *widgets.GaugeConfig) *CBar {
@@ -122,10 +125,11 @@ func (s *CBar) initializeVisualElements() {
 }
 
 func (s *CBar) SetValue(value float64) {
+	value = max(s.cfg.Min, min(s.cfg.Max, value))
 	if value == s.value {
 		return
 	}
-	s.value = max(s.cfg.Min, min(s.cfg.Max, value))
+	s.value = value
 
 	barPosition := s.center
 	var pxWidth float32
@@ -170,7 +174,6 @@ func (s *CBar) updateDisplayTextPosition() {
 	if len(text) == 0 {
 		return
 	}
-	minSize := s.displayText.MinSize()
 
 	dotIdx := -1
 	for i := 0; i < len(text); i++ {
@@ -182,10 +185,9 @@ func (s *CBar) updateDisplayTextPosition() {
 
 	var x float32
 	if dotIdx >= 0 {
-		charWidth := minSize.Width / float32(len(text))
-		x = s.lastSize.Width*0.5 - charWidth*(float32(dotIdx)+0.5)
+		x = s.lastSize.Width*0.5 - s.charWidth*(float32(dotIdx)+0.5)
 	} else {
-		x = s.lastSize.Width*0.5 - minSize.Width*0.5
+		x = s.lastSize.Width*0.5 - s.charWidth*float32(len(text))*0.5
 	}
 
 	s.displayText.Move(fyne.Position{X: x, Y: s.displayY})
@@ -198,11 +200,12 @@ func (s *CBar) SetValue2(value float64) {
 func (s *CBar) CreateRenderer() fyne.WidgetRenderer {
 	// Initialize visual elements
 	s.initializeVisualElements()
-	return &CBarRenderer{s}
+	return &CBarRenderer{CBar: s}
 }
 
 type CBarRenderer struct {
 	*CBar
+	objects []fyne.CanvasObject
 }
 
 func (r *CBarRenderer) MinSize() fyne.Size {
@@ -265,6 +268,7 @@ func (r *CBarRenderer) Layout(space fyne.Size) {
 	r.bar.Resize(fyne.Size{Width: r.barWidth * r.widthFactor, Height: r.barHeight})
 
 	r.displayText.TextSize = r.bar.Size().Height - 8
+	r.charWidth = fyne.MeasureText("0", r.displayText.TextSize, r.displayText.TextStyle).Width
 
 	var y float32
 	switch r.cfg.TextPosition {
@@ -282,11 +286,13 @@ func (r *CBarRenderer) Layout(space fyne.Size) {
 }
 
 func (r *CBarRenderer) Objects() []fyne.CanvasObject {
-	objs := []fyne.CanvasObject{}
-	for _, line := range r.bars {
-		objs = append(objs, line)
+	if r.objects == nil {
+		objs := make([]fyne.CanvasObject, 0, len(r.bars)+4)
+		for _, line := range r.bars {
+			objs = append(objs, line)
+		}
+		objs = append(objs, r.bar, r.face, r.titleText, r.displayText)
+		r.objects = objs
 	}
-
-	objs = append(objs, r.bar, r.face, r.titleText, r.displayText)
-	return objs
+	return r.objects
 }

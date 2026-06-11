@@ -2,9 +2,9 @@ package symbollist
 
 import (
 	"image/color"
-	"sort"
+	"math"
+	"slices"
 	"strconv"
-	"strings"
 	"sync"
 
 	"fyne.io/fyne/v2"
@@ -65,22 +65,50 @@ func (s *Widget) SetColorBlindMode(mode colors.ColorBlindMode) {
 }
 
 func (s *Widget) UpdateBars(enabled bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.updateBars = enabled
 }
 
 func (s *Widget) Names() []string {
-	names := make([]string, len(s.cfg.Symbols)+1)
-	for i, s := range s.cfg.Symbols {
-		names[i] = s.Name
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	names := make([]string, 0, len(s.cfg.Symbols)+1)
+	hasWBL := false
+	for _, sym := range s.cfg.Symbols {
+		if sym.Name == datalogger.EXTERNALWBLSYM {
+			hasWBL = true
+		}
+		names = append(names, sym.Name)
 	}
-	names[len(names)-1] = datalogger.EXTERNALWBLSYM
-	sort.Slice(names, func(i, j int) bool {
-		return strings.ToLower(names[i]) < strings.ToLower(names[j])
-	})
+	if !hasWBL {
+		names = append(names, datalogger.EXTERNALWBLSYM)
+	}
+	slices.SortFunc(names, compareFold)
 	return names
 }
 
+// compareFold orders ASCII strings case-insensitively without the per-comparison
+// allocations of strings.ToLower.
+func compareFold(a, b string) int {
+	for i := 0; i < len(a) && i < len(b); i++ {
+		ca, cb := a[i], b[i]
+		if 'A' <= ca && ca <= 'Z' {
+			ca += 'a' - 'A'
+		}
+		if 'A' <= cb && cb <= 'Z' {
+			cb += 'a' - 'A'
+		}
+		if ca != cb {
+			return int(ca) - int(cb)
+		}
+	}
+	return len(a) - len(b)
+}
+
 func (s *Widget) SetValue(name string, value float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	val, found := s.entryMap[name]
 	if found {
 		if value == val.value {
@@ -93,22 +121,28 @@ func (s *Widget) SetValue(name string, value float64) {
 			val.max = value
 		}
 		if s.updateBars {
-			val.valueBarFactor = float32((value - val.min) / (val.max - val.min))
+			if span := val.max - val.min; span > 0 {
+				val.valueBarFactor = float32((value - val.min) / span)
+			} else {
+				val.valueBarFactor = 0
+			}
 			col := colors.GetColorInterpolation(val.min, val.max, value, s.cfg.ColorBlindMode)
 			col.A = barAlpha
 			val.valueBar.FillColor = col
 			totalWidth := val.symbolName.Size().Width
 			val.valueBar.Resize(fyne.Size{Width: val.valueBarFactor * totalWidth, Height: 26})
 		}
-		textValue := strconv.FormatFloat(value, 'f', val.prec, 64)
-		if textValue != val.lastText {
-			val.lastText = textValue
-			val.symbolValue.SetText(textValue)
+		val.buf = strconv.AppendFloat(val.buf[:0], value, 'f', val.prec, 64)
+		if string(val.buf) != val.lastText {
+			val.lastText = string(val.buf)
+			val.symbolValue.SetText(val.lastText)
 		}
 	}
 }
 
 func (s *Widget) Disable() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for _, e := range s.entries {
 		// e.symbolCorrectionfactor.Disable()
 		e.deleteBTN.Disable()
@@ -116,6 +150,8 @@ func (s *Widget) Disable() {
 }
 
 func (s *Widget) Enable() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for _, e := range s.entries {
 		// e.symbolCorrectionfactor.Enable()
 		e.deleteBTN.Enable()
@@ -126,6 +162,7 @@ func (s *Widget) Add(symbols ...*symbol.Symbol) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	added := false
 	for _, sym := range symbols {
 		if _, found := s.entryMap[sym.Name]; found {
 			continue
@@ -156,13 +193,26 @@ func (s *Widget) Add(symbols ...*symbol.Symbol) {
 		entry := s.newSymbolWidgetEntry(sym, deleteFunc)
 		s.cfg.Symbols = append(s.cfg.Symbols, sym)
 		s.entries = append(s.entries, entry)
-		s.container.Add(entry)
+		// append directly instead of container.Add to avoid a layout+refresh per entry
+		s.container.Objects = append(s.container.Objects, entry)
 		s.entryMap[sym.Name] = entry
+		added = true
+	}
+	if added {
+		s.container.Refresh()
 	}
 }
 
 func (s *Widget) Clear() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for _, e := range s.entries {
+		// NaN sentinel so the next sample always renders, even if it equals
+		// the last value seen before the clear
+		e.value = math.NaN()
+		e.min = 0
+		e.max = 0
+		e.valueBarFactor = 0
 		e.lastText = "---"
 		e.symbolValue.SetText("---")
 	}
@@ -241,6 +291,9 @@ func (s *Widget) newSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*Symbo
 		symbol:     sym,
 		prec:       symbol.GetPrecision(sym.Correctionfactor),
 		deleteFunc: deleteFunc,
+		// NaN compares unequal to everything, so the first sample always
+		// renders — including an initial value of exactly 0
+		value: math.NaN(),
 	}
 	sw.ExtendBaseWidget(sw)
 	sw.symbolName = widget.NewLabel(sw.symbol.Name)
@@ -306,6 +359,7 @@ type SymbolWidgetEntry struct {
 	min, max float64
 	prec     int
 	lastText string
+	buf      []byte // scratch for AppendFloat, avoids an allocation per update
 
 	oldSize fyne.Size
 
@@ -357,15 +411,12 @@ func (s *symbolWidgetEntryRenderer) MinSize() fyne.Size {
 }
 
 func (s *symbolWidgetEntryRenderer) Refresh() {
-	s.e.symbolName.Refresh()
-	s.e.symbolValue.Refresh()
-	// s.e.symbolNumber.Refresh()
-	// s.e.symbolCorrectionfactor.Refresh()
 	col := colors.GetColorInterpolation(s.e.min, s.e.max, s.e.value, s.e.w.cfg.ColorBlindMode)
 	col.A = barAlpha
 	s.e.valueBar.FillColor = col
 	s.e.valueBar.StrokeColor = col
-	s.e.valueBar.Refresh()
+	// cascades to the labels, delete button and value bar
+	s.e.container.Refresh()
 }
 
 func (s *symbolWidgetEntryRenderer) Objects() []fyne.CanvasObject {

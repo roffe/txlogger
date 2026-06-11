@@ -46,22 +46,23 @@ func (ic *Icon) SetText(text string) {
 }
 
 func (ic *Icon) CreateRenderer() fyne.WidgetRenderer {
-	return &IconRenderer{ic}
+	return &IconRenderer{IC: ic}
 }
 
 type IconRenderer struct {
-	*Icon
+	IC      *Icon
+	objects []fyne.CanvasObject
 }
 
 func (ic *IconRenderer) Layout(size fyne.Size) {
-	ic.cfg.Image.Move(fyne.NewPos(0, 0))
-	ic.cfg.Image.Resize(ic.cfg.Minsize)
-	ic.text.Resize(fyne.NewSize(size.Width, 30))
-	ic.text.Move(fyne.NewPos(14, 87))
+	ic.IC.cfg.Image.Move(fyne.NewPos(0, 0))
+	ic.IC.cfg.Image.Resize(ic.IC.cfg.Minsize)
+	ic.IC.text.Resize(fyne.NewSize(size.Width, 30))
+	ic.IC.text.Move(fyne.NewPos(14, 87))
 }
 
 func (ic *IconRenderer) MinSize() fyne.Size {
-	return ic.cfg.Minsize
+	return ic.IC.cfg.Minsize
 }
 
 func (ic *IconRenderer) Refresh() {
@@ -71,5 +72,9 @@ func (ic *IconRenderer) Destroy() {
 }
 
 func (ic *IconRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{ic.cfg.Image, ic.text}
+	if ic.objects == nil {
+		ic.objects = []fyne.CanvasObject{ic.IC.cfg.Image, ic.IC.text}
+	}
+	return ic.objects
+	// return []fyne.CanvasObject{ic.IC.cfg.Image, ic.IC.text} --- IGNORE ---
 }

@@ -313,8 +313,8 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 		Logplayer:       true,
 		UseMPH:          mw.settings.GetUseMPH(),
 		SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
-		High:            0.5,
-		Low:             1.5,
+		High:            1.5,
+		Low:             0.5,
 		WidebandSymbol:  mw.settings.GetWidebandSymbolName(),
 	}
 

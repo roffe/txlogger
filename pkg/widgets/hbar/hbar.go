@@ -188,7 +188,7 @@ func (s *HBar) CreateRenderer() fyne.WidgetRenderer {
 		s.lines[i] = line
 	}
 
-	return &HBarRenderer{s}
+	return &HBarRenderer{HBar: s}
 }
 
 // getColorForValue returns fill & stroke color for an arbitrary gauge value.
@@ -229,11 +229,12 @@ func (s *HBar) getColorForValue(value float64) (fillColor, strokeColor color.RGB
 }
 
 type HBarRenderer struct {
-	*HBar
+	HBar    *HBar
+	objects []fyne.CanvasObject
 }
 
 func (r *HBarRenderer) MinSize() fyne.Size {
-	return r.cfg.MinSize
+	return r.HBar.cfg.MinSize
 }
 
 func (r *HBarRenderer) Refresh() {
@@ -245,41 +246,41 @@ func (r *HBarRenderer) Destroy() {
 }
 
 func (r *HBarRenderer) Layout(space fyne.Size) {
-	if r.size == space {
+	if r.HBar.size == space {
 		return
 	}
-	r.size = space
+	r.HBar.size = space
 
-	r.layoutValues.middle = space.Height * 0.5
+	r.HBar.layoutValues.middle = space.Height * 0.5
 
-	stepFactor := float32(space.Width) / float32(r.cfg.Steps)
+	stepFactor := float32(space.Width) / float32(r.HBar.cfg.Steps)
 
 	// Face layout
-	r.face.Move(fyne.Position{X: -2, Y: 0})
-	r.face.Resize(space.AddWidthHeight(3, 1))
+	r.HBar.face.Move(fyne.Position{X: -2, Y: 0})
+	r.HBar.face.Resize(space.AddWidthHeight(3, 1))
 
 	// Title centered horizontally, just below bar
-	titleMinSize := r.titleText.MinSize()
-	r.titleText.Resize(fyne.Size{Width: space.Width, Height: titleMinSize.Height})
-	r.titleText.Move(fyne.Position{
+	titleMinSize := r.HBar.titleText.MinSize()
+	r.HBar.titleText.Resize(fyne.Size{Width: space.Width, Height: titleMinSize.Height})
+	r.HBar.titleText.Move(fyne.Position{
 		X: 0,
 		Y: space.Height - titleMinSize.Height,
 	})
 
 	// Display text in the middle, centered vertically
-	displayMinSize := r.displayText.MinSize()
-	r.displayText.Resize(fyne.Size{Width: space.Width, Height: displayMinSize.Height})
-	r.displayText.Move(fyne.Position{
+	displayMinSize := r.HBar.displayText.MinSize()
+	r.HBar.displayText.Resize(fyne.Size{Width: space.Width, Height: displayMinSize.Height})
+	r.HBar.displayText.Move(fyne.Position{
 		X: 0,
-		Y: r.layoutValues.middle - displayMinSize.Height*0.5,
+		Y: r.HBar.layoutValues.middle - displayMinSize.Height*0.5,
 	})
 
 	// Tick lines layout (vertical lines across width)
 	oneThird := space.Height * common.OneThird
 	oneSeventh := space.Height * common.OneSeventh
-	middle := r.layoutValues.middle
+	middle := r.HBar.layoutValues.middle
 
-	for i, line := range r.lines {
+	for i, line := range r.HBar.lines {
 		x := float32(i) * stepFactor
 		if i%2 == 0 {
 			line.Position1 = fyne.Position{X: x, Y: middle - oneThird}
@@ -291,19 +292,23 @@ func (r *HBarRenderer) Layout(space fyne.Size) {
 	}
 
 	// Bar position is fixed at origin; set once here so SetValue can skip it.
-	r.bar.Move(fyne.Position{X: 0, Y: 0})
+	r.HBar.bar.Move(fyne.Position{X: 0, Y: 0})
 
 	// Recompute bar geometry for current value using new size
-	norm := r.clampNorm(r.value)
-	barWidth := norm * float32(r.size.Width)
-	r.bar.Resize(fyne.Size{Width: barWidth, Height: r.size.Height})
+	norm := r.HBar.clampNorm(r.HBar.value)
+	barWidth := norm * float32(r.HBar.size.Width)
+	r.HBar.bar.Resize(fyne.Size{Width: barWidth, Height: r.HBar.size.Height})
 }
 
 func (r *HBarRenderer) Objects() []fyne.CanvasObject {
-	objs := make([]fyne.CanvasObject, 0, len(r.lines)+4)
-	for _, line := range r.lines {
-		objs = append(objs, line)
+	if r.objects == nil {
+
+		objs := make([]fyne.CanvasObject, 0, len(r.HBar.lines)+4)
+		for _, line := range r.HBar.lines {
+			objs = append(objs, line)
+		}
+		objs = append(objs, r.HBar.bar, r.HBar.face, r.HBar.titleText, r.HBar.displayText)
+		r.objects = objs
 	}
-	objs = append(objs, r.bar, r.face, r.titleText, r.displayText)
-	return objs
+	return r.objects
 }

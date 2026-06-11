@@ -195,7 +195,7 @@ func (s *VBar) CreateRenderer() fyne.WidgetRenderer {
 		s.lines[maxSteps-i] = line
 	}
 
-	return &VBarRenderer{s}
+	return &VBarRenderer{VBar: s}
 }
 
 // getColorForValue returns fill & stroke color for an arbitrary gauge value.
@@ -237,6 +237,7 @@ func (s *VBar) getColorForValue(value float64) (fillColor, strokeColor color.RGB
 
 type VBarRenderer struct {
 	*VBar
+	objects []fyne.CanvasObject
 }
 
 func (r *VBarRenderer) MinSize() fyne.Size {
@@ -302,10 +303,13 @@ func (r *VBarRenderer) Layout(space fyne.Size) {
 }
 
 func (r *VBarRenderer) Objects() []fyne.CanvasObject {
-	objs := make([]fyne.CanvasObject, 0, len(r.lines)+4)
-	for _, line := range r.lines {
-		objs = append(objs, line)
+	if r.objects == nil {
+		objs := make([]fyne.CanvasObject, 0, len(r.lines)+4)
+		for _, line := range r.lines {
+			objs = append(objs, line)
+		}
+		objs = append(objs, r.bar, r.face, r.titleText, r.displayText)
+		r.objects = objs
 	}
-	objs = append(objs, r.bar, r.face, r.titleText, r.displayText)
-	return objs
+	return r.objects
 }
