@@ -21,6 +21,7 @@ import (
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/widgets/graph2d"
 	"github.com/roffe/txlogger/pkg/widgets/meshgrid"
 )
 
@@ -65,7 +66,8 @@ type MapViewer struct {
 
 	selectedX, SelectedY int
 
-	mesh *meshgrid.Meshgrid
+	mesh  *meshgrid.Meshgrid
+	graph *graph2d.Graph
 
 	// Mouse
 	mousePos      fyne.Position
@@ -118,6 +120,9 @@ func (mv *MapViewer) SetColorBlindMode(mode colors.ColorBlindMode) {
 		mv.Refresh()
 		if mv.mesh != nil {
 			mv.mesh.SetColorBlindMode(mode)
+		}
+		if mv.graph != nil {
+			mv.graph.SetColorBlindMode(mode)
 		}
 	}
 }
@@ -192,22 +197,6 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 
 	buttons := mv.createButtons()
 
-	if mv.numColumns == 1 || mv.numRows == 1 {
-		return container.NewBorder(
-			nil,
-			buttons,
-			nil,
-			nil,
-			container.NewBorder(
-				mv.xAxisLabelContainer,
-				nil,
-				mv.yAxisLabelContainer,
-				nil,
-				mv.innerView,
-			),
-		)
-	}
-
 	mapview := container.NewBorder(
 		mv.xAxisLabelContainer,
 		nil,
@@ -215,6 +204,49 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		nil,
 		mv.innerView,
 	)
+
+	if mv.numColumns == 1 || mv.numRows == 1 {
+		if mv.cfg.MeshView && mv.numData > 1 {
+			axisData := mv.cfg.XData
+			axisPrecision := mv.cfg.XPrecision
+			axisLabel := mv.cfg.XLabel
+			if mv.numColumns == 1 {
+				axisData = mv.cfg.YData
+				axisPrecision = mv.cfg.YPrecision
+				axisLabel = mv.cfg.YLabel
+			}
+			mv.graph = graph2d.New(&graph2d.Config{
+				AxisData:       axisData,
+				Values:         mv.cfg.ZData,
+				AxisPrecision:  axisPrecision,
+				ValuePrecision: mv.cfg.ZPrecision,
+				AxisLabel:      axisLabel,
+				ColorblindMode: mv.colorMode,
+			})
+			if mv.cfg.OnMouseDown != nil {
+				mv.graph.OnMouseDown = mv.cfg.OnMouseDown
+			}
+			split := container.NewVSplit(
+				mapview,
+				container.NewBorder(
+					nil,
+					buttons,
+					nil,
+					nil,
+					mv.graph,
+				),
+			)
+			split.Offset = 0.2
+			return split
+		}
+		return container.NewBorder(
+			nil,
+			buttons,
+			nil,
+			nil,
+			mapview,
+		)
+	}
 
 	if mv.cfg.MeshView {
 		var err error
@@ -329,6 +361,9 @@ func (mv *MapViewer) Refresh() {
 	if mv.mesh != nil {
 		mv.mesh.LoadFloat64s(mv.zMin, mv.zMax, mv.cfg.ZData)
 	}
+	if mv.graph != nil {
+		mv.graph.SetValues(mv.zMin, mv.zMax, mv.cfg.ZData)
+	}
 }
 
 func (mv *MapViewer) createYAxis() {
@@ -414,6 +449,13 @@ func (mv *MapViewer) setXY() error {
 	}
 
 	mv.crosshair.Move(crosshairPos)
+	if mv.graph != nil {
+		if mv.numRows == 1 {
+			mv.graph.SetCursor(xIdx)
+		} else {
+			mv.graph.SetCursor(yIdx)
+		}
+	}
 	if mv.cfg.CursorFollowCrosshair {
 		mv.selectedX = int(math.Round(xIdx))
 		mv.SelectedY = int(math.Round(yIdx))

@@ -111,7 +111,12 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 	if cols == 1 {
 		m.rotateMeshgrid(0, 90, 0)
 	} else {
-		m.rotateMeshgrid(60, 0, -30)
+		// T7Suite-style starting view: ~30° elevation (pitch 60° from
+		// top-down) with the mesh spun 35° around its vertical axis. Starting
+		// from identity, the RotZ term is a model-space turntable spin (the
+		// same composition orbit() applies), not a camera roll.
+		m.cameraRotation = RotationMatrixX(60).Multiply(m.cameraRotation).Multiply(RotationMatrixZ(-35))
+		m.updateVertexPositions()
 	}
 
 	m.ExtendBaseWidget(m)
@@ -199,14 +204,15 @@ func (m *Meshgrid) scaleMeshgrid(factor float64) {
 	m.updateVertexPositions()
 }
 
-// orbit performs a Fusion 360-style "turntable" orbit. Yaw is applied around
-// the world Y axis (right-multiplied so it rotates the world before the
-// camera), pitch is applied around the camera-local X axis (left-multiplied).
-// Composing the two this way prevents roll from sneaking in on diagonal drags.
-func (m *Meshgrid) orbit(yawDelta, pitchDelta float64) {
+// orbit performs a Fusion 360-style "turntable" orbit. Spin is applied around
+// the mesh's own vertical axis — data Z, the height axis (right-multiplied so
+// it rotates the model before the camera) — pitch around the camera-local X
+// axis (left-multiplied). Composing the two this way prevents roll from
+// sneaking in on diagonal drags.
+func (m *Meshgrid) orbit(spinDelta, pitchDelta float64) {
 	pitchRot := RotationMatrixX(pitchDelta)
-	yawRot := RotationMatrixY(yawDelta)
-	m.cameraRotation = pitchRot.Multiply(m.cameraRotation).Multiply(yawRot)
+	spinRot := RotationMatrixZ(spinDelta)
+	m.cameraRotation = pitchRot.Multiply(m.cameraRotation).Multiply(spinRot)
 	m.updateVertexPositions()
 }
 
