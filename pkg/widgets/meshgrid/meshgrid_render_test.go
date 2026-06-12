@@ -92,12 +92,20 @@ func BenchmarkDrawSurface(b *testing.B) {
 	}
 }
 
+// usePolyBackend switches a test grid to the polygon renderer (the default
+// is the shader backend, whose per-frame work happens on the GPU).
+func usePolyBackend(m *Meshgrid) {
+	m.backend = backendPolygons
+	m.initPolygons()
+}
+
 // CPU-side cost of a polygon-renderer frame (projection, colors, painter's
 // sort, object updates). The GPU draw calls aren't measurable here; compare
 // against BenchmarkDrawSurface, which also excludes that path's per-frame
 // texture upload.
 func BenchmarkUpdatePolygons(b *testing.B) {
 	m := testGrid(b)
+	usePolyBackend(m)
 	m.renderMode = RenderModeSolidWireframe
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -126,6 +134,7 @@ func TestPolygonDegenerateQuads(t *testing.T) {
 		t.Fatal(err)
 	}
 	m.size = fyne.NewSize(800, 500)
+	usePolyBackend(m)
 	m.renderMode = RenderModeSolidWireframe
 
 	for pitch := 0; pitch < 180; pitch += 15 {
@@ -206,7 +215,7 @@ func TestPolygonRender(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := testGrid(t)
-			m.usePolygons = true
+			usePolyBackend(m)
 			m.renderMode = tc.mode
 			w := test.NewWindow(m)
 			defer w.Close()

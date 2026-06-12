@@ -28,27 +28,13 @@ import (
 // clamps points to the object's own size).
 const polyPad float32 = 1.5
 
-// initPolygons creates the reusable canvas objects: one polygon per data cell
-// plus the axis-indicator lines and labels. Geometry and colors are filled in
-// by updatePolygons; nothing here needs a driver, so it is safe to call from
-// the constructor (and from tests without an app).
+// initPolygons creates the reusable cell polygons. Geometry and colors are
+// filled in by updatePolygons; nothing here needs a driver, so it is safe to
+// call from the constructor (and from tests without an app).
 func (m *Meshgrid) initPolygons() {
 	m.polys = make([]*canvas.ArbitraryPolygon, m.rows*m.cols)
 	for i := range m.polys {
 		m.polys[i] = &canvas.ArbitraryPolygon{Points: make([]fyne.Position, 4)}
-	}
-
-	axisColors := [3]color.RGBA{
-		{R: 255, A: 255}, // X red
-		{G: 255, A: 255}, // Y green
-		{B: 255, A: 255}, // Z blue
-	}
-	labels := [3]string{m.xlabel, m.ylabel, m.zlabel}
-	for i := range m.axisLines {
-		m.axisLines[i] = &canvas.Line{StrokeColor: axisColors[i], StrokeWidth: 1}
-		t := canvas.NewText(labels[i], axisColors[i])
-		t.TextSize = 11
-		m.axisLabels[i] = t
 	}
 }
 
@@ -226,27 +212,6 @@ func (m *Meshgrid) updatePolygons() {
 	}
 	objs = append(objs, m.cursor)
 	m.polyObjects = objs
-}
-
-// updateAxisObjects mirrors drawAxisIndicator with canvas primitives.
-func (m *Meshgrid) updateAxisObjects() {
-	const indicatorScale = 60.0
-	origin := fyne.NewPos(60, m.size.Height-m.size.Height/4)
-
-	r := m.cameraRotation
-	ends := [3][3]float64{
-		r.MultiplyVector([3]float64{indicatorScale, 0, 0}),
-		r.MultiplyVector([3]float64{0, -indicatorScale, 0}),
-		r.MultiplyVector([3]float64{0, 0, indicatorScale}),
-	}
-	for i, e := range ends {
-		end := fyne.NewPos(origin.X+float32(e[0]), origin.Y+float32(e[1]))
-		m.axisLines[i].Position1 = origin
-		m.axisLines[i].Position2 = end
-		// Text positions by its top-left; the image path draws at the
-		// baseline, so nudge up to roughly match.
-		m.axisLabels[i].Move(fyne.NewPos(end.X+5, end.Y-8))
-	}
 }
 
 // minEdgeSq is the squared minimum polygon edge length below which two

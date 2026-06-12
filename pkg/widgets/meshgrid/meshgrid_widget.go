@@ -26,6 +26,33 @@ type Vertex struct {
 
 var _ fyne.Widget = (*Meshgrid)(nil)
 
+// renderBackend selects how the mesh is drawn. The GPU shader is the
+// default; TXLOGGER_MESH_RENDERER=poly|image selects the older paths.
+type renderBackend int
+
+const (
+	// backendShader ray-casts the whole mesh in one fragment shader
+	// (meshgrid_shader.go); per-frame CPU cost is a uniform update.
+	backendShader renderBackend = iota
+	// backendPolygons draws one canvas.ArbitraryPolygon per cell
+	// (meshgrid_poly.go).
+	backendPolygons
+	// backendImage rasterizes on the CPU into a canvas.Image
+	// (meshgrid_draw.go).
+	backendImage
+)
+
+func backendFromEnv() renderBackend {
+	switch os.Getenv("TXLOGGER_MESH_RENDERER") {
+	case "poly":
+		return backendPolygons
+	case "image":
+		return backendImage
+	default:
+		return backendShader
+	}
+}
+
 type Meshgrid struct {
 	widget.BaseWidget
 
@@ -48,15 +75,22 @@ type Meshgrid struct {
 	scratchLines  []lineSegment
 	scratchQuads  []quadRef
 
-	// Polygon-renderer experiment (see meshgrid_poly.go): one reusable
+	backend renderBackend
+
+	// Shader backend (meshgrid_shader.go): the whole mesh in one object.
+	shader *canvas.Shader
+
+	// Polygon backend (meshgrid_poly.go): one reusable
 	// canvas.ArbitraryPolygon per cell instead of rasterizing into an image.
-	usePolygons bool
 	polys       []*canvas.ArbitraryPolygon
 	polyObjects []fyne.CanvasObject
-	axisLines   [3]*canvas.Line
-	axisLabels  [3]*canvas.Text
 	scratchFX   []float32
 	scratchFY   []float32
+
+	// Axis-indicator overlay shared by the shader and polygon backends (the
+	// image backend draws its own into the raster).
+	axisLines  [3]*canvas.Line
+	axisLabels [3]*canvas.Text
 
 	renderMode RenderMode
 
@@ -138,9 +172,7 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 
 		colorMode: colorBlindMode,
 
-		// Polygon-renderer experiment toggle: set TXLOGGER_MESH_POLY=0 to
-		// fall back to the image rasterizer for comparison.
-		usePolygons: os.Getenv("TXLOGGER_MESH_POLY") != "0",
+		backend: backendFromEnv(),
 	}
 
 	m.createVertices()
@@ -175,7 +207,13 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 		Hidden:      true,
 	}
 
-	m.initPolygons()
+	m.initAxisObjects()
+	switch m.backend {
+	case backendShader:
+		m.initShader()
+	case backendPolygons:
+		m.initPolygons()
+	}
 
 	return m, nil
 }
@@ -202,6 +240,7 @@ func (m *Meshgrid) CycleRenderMode() {
 func (m *Meshgrid) SetColorBlindMode(mode colors.ColorBlindMode) {
 	if m.colorMode != mode {
 		m.colorMode = mode
+		m.updateShaderColormap()
 	}
 	m.refresh()
 }
@@ -345,6 +384,7 @@ func (m *Meshgrid) SetFloat64(idx int, value float64) {
 	m.zmin, m.zmax, m.zrange = findMinMaxRange(m.values)
 	m.createVertices()
 	m.updateVertexPositions()
+	m.updateShaderData()
 	m.refresh()
 }
 
@@ -362,6 +402,7 @@ func (m *Meshgrid) LoadFloat64s(min, max float64, floats []float64) {
 
 	m.createVertices()
 	m.updateVertexPositions()
+	m.updateShaderData()
 	m.refresh()
 }
 
@@ -421,20 +462,28 @@ func (m *Meshgrid) Refresh() {
 }
 
 func (m *Meshgrid) refresh() {
-	if m.usePolygons {
+	switch m.backend {
+	case backendShader:
+		// All per-frame state lives in shader uniforms; the GPU re-renders
+		// from them on the next paint. Only the overlays move on the CPU.
+		m.updateShaderUniforms()
+		m.updateAxisObjects()
+		m.moveCursor()
+		canvas.Refresh(m)
+	case backendPolygons:
 		// Geometry/color updates on the reusable polygons; the canvas.Refresh
 		// marks the scene dirty so color-only changes repaint too.
 		m.updatePolygons()
 		m.moveCursor()
 		canvas.Refresh(m)
-		return
+	default:
+		m.image.Image = m.drawMeshgridLines()
+		m.image.Resize(m.size)
+		m.image.Refresh()
+		// Rotation, scale, resize and data changes all move the projected
+		// surface point under the marker.
+		m.moveCursor()
 	}
-	m.image.Image = m.drawMeshgridLines()
-	m.image.Resize(m.size)
-	m.image.Refresh()
-	// Rotation, scale, resize and data changes all move the projected
-	// surface point under the marker.
-	m.moveCursor()
 }
 
 func (m *Meshgrid) throttledRefresh() {
@@ -453,7 +502,7 @@ func (m *Meshgrid) throttledRefresh() {
 }
 
 func (m *Meshgrid) CreateRenderer() fyne.WidgetRenderer {
-	if m.usePolygons {
+	if m.backend != backendImage {
 		// Text measuring needs a driver, so the labels can't be sized in the
 		// constructor (tests build widgets without an app).
 		for _, t := range m.axisLabels {
@@ -473,7 +522,12 @@ func (m *meshgridRenderer) Layout(size fyne.Size) {
 		return
 	}
 	m.MG.size = size
-	m.MG.image.Resize(size)
+	switch m.MG.backend {
+	case backendShader:
+		m.MG.shader.Resize(size)
+	case backendImage:
+		m.MG.image.Resize(size)
+	}
 	m.MG.throttledRefresh()
 }
 
@@ -489,16 +543,28 @@ func (m *meshgridRenderer) Destroy() {
 }
 
 func (m *meshgridRenderer) Objects() []fyne.CanvasObject {
-	if m.MG.usePolygons {
+	switch m.MG.backend {
+	case backendShader:
+		if m.objects == nil {
+			m.MG.updateAxisObjects()
+			objs := []fyne.CanvasObject{m.MG.shader}
+			for i := range m.MG.axisLines {
+				objs = append(objs, m.MG.axisLines[i], m.MG.axisLabels[i])
+			}
+			m.objects = append(objs, m.MG.cursor)
+		}
+		return m.objects
+	case backendPolygons:
 		// updatePolygons rebuilds the list in painter's order every frame;
 		// populate it here for the first paint.
 		if len(m.MG.polyObjects) == 0 {
 			m.MG.updatePolygons()
 		}
 		return m.MG.polyObjects
+	default:
+		if m.objects == nil {
+			m.objects = []fyne.CanvasObject{m.MG.image, m.MG.cursor}
+		}
+		return m.objects
 	}
-	if m.objects == nil {
-		m.objects = []fyne.CanvasObject{m.MG.image, m.MG.cursor}
-	}
-	return m.objects
 }
