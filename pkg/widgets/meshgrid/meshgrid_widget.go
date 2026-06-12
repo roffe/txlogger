@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"log"
+	"os"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -46,6 +47,16 @@ type Meshgrid struct {
 	scratchColors []color.RGBA
 	scratchLines  []lineSegment
 	scratchQuads  []quadRef
+
+	// Polygon-renderer experiment (see meshgrid_poly.go): one reusable
+	// canvas.ArbitraryPolygon per cell instead of rasterizing into an image.
+	usePolygons bool
+	polys       []*canvas.ArbitraryPolygon
+	polyObjects []fyne.CanvasObject
+	axisLines   [3]*canvas.Line
+	axisLabels  [3]*canvas.Text
+	scratchFX   []float32
+	scratchFY   []float32
 
 	renderMode RenderMode
 
@@ -126,6 +137,10 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 		zlabel: zlabel,
 
 		colorMode: colorBlindMode,
+
+		// Polygon-renderer experiment toggle: set TXLOGGER_MESH_POLY=0 to
+		// fall back to the image rasterizer for comparison.
+		usePolygons: os.Getenv("TXLOGGER_MESH_POLY") != "0",
 	}
 
 	m.createVertices()
@@ -159,6 +174,8 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 		StrokeWidth: 2,
 		Hidden:      true,
 	}
+
+	m.initPolygons()
 
 	return m, nil
 }
@@ -404,6 +421,14 @@ func (m *Meshgrid) Refresh() {
 }
 
 func (m *Meshgrid) refresh() {
+	if m.usePolygons {
+		// Geometry/color updates on the reusable polygons; the canvas.Refresh
+		// marks the scene dirty so color-only changes repaint too.
+		m.updatePolygons()
+		m.moveCursor()
+		canvas.Refresh(m)
+		return
+	}
 	m.image.Image = m.drawMeshgridLines()
 	m.image.Resize(m.size)
 	m.image.Refresh()
@@ -428,6 +453,13 @@ func (m *Meshgrid) throttledRefresh() {
 }
 
 func (m *Meshgrid) CreateRenderer() fyne.WidgetRenderer {
+	if m.usePolygons {
+		// Text measuring needs a driver, so the labels can't be sized in the
+		// constructor (tests build widgets without an app).
+		for _, t := range m.axisLabels {
+			t.Resize(t.MinSize())
+		}
+	}
 	return &meshgridRenderer{MG: m}
 }
 
@@ -457,6 +489,14 @@ func (m *meshgridRenderer) Destroy() {
 }
 
 func (m *meshgridRenderer) Objects() []fyne.CanvasObject {
+	if m.MG.usePolygons {
+		// updatePolygons rebuilds the list in painter's order every frame;
+		// populate it here for the first paint.
+		if len(m.MG.polyObjects) == 0 {
+			m.MG.updatePolygons()
+		}
+		return m.MG.polyObjects
+	}
 	if m.objects == nil {
 		m.objects = []fyne.CanvasObject{m.MG.image, m.MG.cursor}
 	}
