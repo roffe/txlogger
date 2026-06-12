@@ -23,29 +23,26 @@ type Dial struct {
 	value           float64
 	highestObserved float64
 
-	needle                *canvas.Line
-	highestObservedMarker *canvas.Line
-	lastHighestObserved   time.Time
+	lastHighestObserved time.Time
 
-	pips      []*canvas.Line
+	// All dial geometry (face, pips, needle, marker, center) in one object
+	shader *canvas.Shader
+
 	pipLabels []*canvas.Text
 
-	face        *canvas.Arc
-	center      *canvas.Circle
 	displayText *canvas.Text
 	titleText   *canvas.Text
 
 	size    fyne.Size
 	minsize fyne.Size
 
-	diameter                   float32
-	radius                     float32
-	middle                     fyne.Position
-	needleOffset, needleLength float32
-	needleRotConst             float64 // = common.Pi15/(Max-Min)
-	lineRotConst               float64 // = common.Pi15/steps
+	diameter       float32
+	radius         float32
+	middle         fyne.Position
+	needleRotConst float64 // = common.Pi15/(Max-Min)
+	lineRotConst   float64 // = common.Pi15/steps
 
-	// Precomputed trig for pips: angle_i = lineRotConst*float64(i) - common.Pi43
+	// Precomputed trig for pip labels: angle_i = lineRotConst*float64(i) - common.Pi43
 	pipSin []float32
 	pipCos []float32
 
@@ -95,10 +92,21 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 
 	c.factor = c.cfg.Max / steps
 
-	c.face = canvas.NewArc(-135.73, 135.8, 0.985, color.RGBA{0x80, 0x80, 0x80, 0xFF})
-	c.center = &canvas.Circle{FillColor: color.RGBA{R: 0x01, G: 0x0B, B: 0x13, A: 0xFF}}
-	c.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 3}
-	c.highestObservedMarker = &canvas.Line{StrokeColor: color.RGBA{R: 216, G: 250, B: 8, A: 0xFF}, StrokeWidth: 6}
+	// Constants
+	c.needleRotConst = common.Pi15 / totalRange
+	c.lineRotConst = common.Pi15 / steps
+
+	c.shader = canvas.NewShader(
+		"txlogger-dial",
+		[]byte(dialShaderPreludeGL+dialShaderBody),
+		[]byte(dialShaderPreludeES+dialShaderBody),
+	)
+	c.shader.Uniforms = map[string]float32{
+		"size_d":   100,
+		"steps":    float32(cfg.Steps),
+		"needle_a": c.needleAngle(0),
+		"marker_a": c.needleAngle(0),
+	}
 
 	c.titleText = &canvas.Text{Text: c.cfg.Title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
 	c.titleText.TextStyle.Monospace = true
@@ -107,27 +115,8 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 	c.displayText = &canvas.Text{Text: "0", Color: color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF}, TextSize: 52}
 	c.displayText.Alignment = fyne.TextAlignCenter
 
-	// Pip color gradient
-	// Green to Yellow to Red gradient
-	// 0% - 50% Green to Yellow
-	// 50% - 100% Yellow to Red
-	halfSteps := float64(c.cfg.Steps) / 2.0
-
-	// Build pips + labels once; also track the longest label length
-	var col color.RGBA
+	// Labels at every other pip; also track the longest label length
 	for i := 0; i < c.cfg.Steps+1; i++ {
-		if float64(i) <= halfSteps {
-			// Green to Yellow
-			ratio := float64(i) / halfSteps
-			col = color.RGBA{R: byte(255 * ratio), G: 255, B: 0, A: 255}
-		} else {
-			// Yellow to Red
-			ratio := (float64(i) - halfSteps) / halfSteps
-			col = color.RGBA{R: 255, G: byte(255 * (1 - ratio)), B: 0, A: 255}
-		}
-		pip := &canvas.Line{StrokeColor: col, StrokeWidth: 2}
-		c.pips = append(c.pips, pip)
-
 		if i%2 == 0 {
 			val := c.cfg.Min + (float64(i)/float64(c.cfg.Steps))*(c.cfg.Max-c.cfg.Min)*c.cfg.GaugeFactor
 			txt := strconv.FormatFloat(val, 'f', c.gaugePrec, 64)
@@ -137,7 +126,6 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 				Color:     color.RGBA{0xE0, 0xE0, 0xE0, 0xFF},
 				Alignment: fyne.TextAlignCenter,
 			}
-			// lbl.TextStyle.Monospace = true
 			if n := len(txt); n > c.maxLabelChars {
 				c.maxLabelChars = n
 			}
@@ -147,11 +135,7 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 		}
 	}
 
-	// Constants
-	c.needleRotConst = common.Pi15 / totalRange
-	c.lineRotConst = common.Pi15 / steps
-
-	// Precompute pip sin/cos (size-independent)
+	// Precompute pip sin/cos for label placement (size-independent)
 	c.pipSin = make([]float32, c.cfg.Steps+1)
 	c.pipCos = make([]float32, c.cfg.Steps+1)
 	for i := 0; i <= c.cfg.Steps; i++ {
@@ -166,29 +150,14 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 
 func (c *Dial) GetConfig() *widgets.GaugeConfig { return c.cfg }
 
-// rotate angle (in radians) without refreshing per-object
-func (c *Dial) rotateNoRefresh(hand *canvas.Line, rotation float64, offset, length float32) {
-	s, co := math.Sincos(rotation)
-	c.applySinCos(hand, float32(s), float32(co), offset, length)
-}
-
-func (c *Dial) applySinCos(hand *canvas.Line, sinRot, cosRot float32, offset, length float32) {
-	x2 := length * sinRot
-	y2 := -length * cosRot
-	offX := offset * sinRot
-	offY := -offset * cosRot
-	midxOffX := c.middle.X + offX
-	midY := c.middle.Y + offY
-	hand.Position1 = fyne.Position{X: midxOffX, Y: midY}
-	hand.Position2 = fyne.Position{X: midxOffX + x2, Y: midY + y2}
-}
-
-func (c *Dial) rotateNeedleNoRefresh(hand *canvas.Line, facePosition float64, offset, length float32) {
-	normalized := facePosition - c.cfg.Min
+// needle angle for a face value; clamped below Min like the CPU renderer,
+// free to overshoot above Max
+func (c *Dial) needleAngle(value float64) float32 {
+	normalized := value - c.cfg.Min
 	if normalized < 0 {
 		normalized = 0
 	}
-	c.rotateNoRefresh(hand, c.needleRotConst*normalized-common.Pi43, offset, length)
+	return float32(c.needleRotConst*normalized - common.Pi43)
 }
 
 func (c *Dial) SetValue(value float64) {
@@ -197,21 +166,13 @@ func (c *Dial) SetValue(value float64) {
 	}
 	c.value = value
 
-	// Update needle position (no immediate refresh)
-	c.rotateNeedleNoRefresh(c.needle, value, c.needleOffset, c.needleLength)
+	c.shader.Uniforms["needle_a"] = c.needleAngle(value)
 
-	// Highest observed marker with lazy reset; only refresh when it actually moves
-	markerMoved := false
-	if value > c.highestObserved {
+	// Highest observed marker with lazy reset
+	if value > c.highestObserved || time.Since(c.lastHighestObserved) > 10*time.Second {
 		c.highestObserved = value
 		c.lastHighestObserved = time.Now()
-		c.rotateNeedleNoRefresh(c.highestObservedMarker, value, c.radius-2, 6)
-		markerMoved = true
-	} else if time.Since(c.lastHighestObserved) > 10*time.Second {
-		c.highestObserved = value
-		c.lastHighestObserved = time.Now()
-		c.rotateNeedleNoRefresh(c.highestObservedMarker, value, c.radius-2, 6)
-		markerMoved = true
+		c.shader.Uniforms["marker_a"] = c.needleAngle(value)
 	}
 
 	// Update text with minimal allocs; skip refresh if formatted output is unchanged
@@ -221,18 +182,12 @@ func (c *Dial) SetValue(value float64) {
 	} else {
 		c.buf = common.AppendFormatFloat(c.buf, c.displayString, value)
 	}
-	textChanged := !common.SameTextBytes(c.displayText.Text, c.buf)
-	if textChanged {
+	if !common.SameTextBytes(c.displayText.Text, c.buf) {
 		c.displayText.Text = string(c.buf)
-	}
-
-	canvas.Refresh(c.needle)
-	if markerMoved {
-		canvas.Refresh(c.highestObservedMarker)
-	}
-	if textChanged {
 		canvas.Refresh(c.displayText)
 	}
+
+	canvas.Refresh(c.shader)
 }
 
 func (c *Dial) SetValue2(value float64) { c.SetValue(value) }
@@ -253,45 +208,26 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 	c.diameter = fyne.Min(space.Width, space.Height)
 	c.radius = c.diameter * common.OneHalf
 	c.middle = fyne.NewPos(space.Width*common.OneHalf, space.Height*common.OneHalf)
-	c.needleOffset = -c.radius * .15
-	c.needleLength = c.radius * 1.14
-
-	// Stroke sizes
-	stroke := c.diameter * common.OneSixthieth
-	midStroke := c.diameter * common.OneEighthieth
-	smallStroke := c.diameter * common.OneTwohundredth
 
 	size := fyne.Size{Width: c.diameter, Height: c.diameter}
 	topleft := fyne.NewPos(c.middle.X-c.radius, c.middle.Y-c.radius)
 
+	// Shader quad: the dial square padded so the marker overhang isn't clipped
+	c.shader.Move(topleft.SubtractXY(dialPad, dialPad))
+	c.shader.Resize(fyne.Size{Width: c.diameter + 2*dialPad, Height: c.diameter + 2*dialPad})
+	c.shader.Uniforms["size_d"] = c.diameter
+
 	// Title (no rounding needed)
 	c.titleText.TextSize = float32(int(c.radius * common.OneFourth))
 	c.titleText.Move(c.middle.Add(fyne.NewPos(0, c.diameter*common.OneFourth)))
-
-	// Center element
-	center := c.radius * common.OneFourth
-	c.center.Move(c.middle.SubtractXY(center*common.OneHalf, center*common.OneHalf))
-	c.center.Resize(fyne.Size{Width: center, Height: center})
 
 	// Display text
 	c.displayText.TextSize = float32(int(c.radius * common.OneThird))
 	c.displayText.Move(topleft.AddXY(0, c.diameter*common.OneFifth))
 	c.displayText.Resize(size)
 
-	// Face + needle
-	c.needle.StrokeWidth = stroke
-	c.rotateNeedleNoRefresh(c.needle, c.value, c.needleOffset, c.needleLength)
-
-	c.face.Move(c.middle.SubtractXY(c.radius, c.radius))
-	c.face.Resize(fyne.Size{Width: c.diameter, Height: c.diameter})
-
-	// Pips: reuse precomputed sin/cos, scale with current radii
-	fourthRadius := c.radius * common.OneFourth
-	eightRadius := c.radius * common.OneEight
+	// Labels: reuse precomputed sin/cos, scale with current radius
 	radius43 := c.radius * common.OneFourth * 3
-	radius87 := c.radius * common.OneEight * 7
-
-	// Label padding and cached box dims (avoid lbl.MinSize per label)
 	labelPad := max(float32(6.0), c.radius*0.14)
 
 	// Assume monospace, digits only: width ≈ chars * 0.62 * TextSize; height ≈ 1.15 * TextSize
@@ -303,35 +239,20 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 	c.labelBoxW = float32(c.maxLabelChars) * float32(charWidthFactor) * labelTextSize
 	c.labelBoxH = float32(heightFactor) * labelTextSize
 
-	for i, p := range c.pips {
-		if i%2 == 0 {
-			p.StrokeWidth = max(2.0, midStroke)
-			c.applySinCos(p, c.pipSin[i], c.pipCos[i], radius43, fourthRadius-1)
-
-			// Label for long pip
-			lbl := c.pipLabels[i]
-			if lbl != nil {
-				lbl.TextSize = labelTextSize
-
-				// Place label on the INSIDE of the gauge
-				labelRadius := radius43 - labelPad
-				cx := c.middle.X + c.pipSin[i]*labelRadius
-				cy := c.middle.Y - c.pipCos[i]*labelRadius
-
-				boxW := c.labelBoxW
-				boxH := c.labelBoxH
-				lbl.Resize(fyne.NewSize(boxW, boxH))
-				// lbl.Move(fyne.NewPos(cx-boxW/2, cy-boxH/2))
-				lbl.Move(fyne.Position{X: cx - boxW/2, Y: cy - boxH/2})
-			}
-		} else {
-			p.StrokeWidth = max(2.0, smallStroke)
-			c.applySinCos(p, c.pipSin[i], c.pipCos[i], radius87, eightRadius-1)
+	for i, lbl := range c.pipLabels {
+		if lbl == nil {
+			continue
 		}
-	}
+		lbl.TextSize = labelTextSize
 
-	c.highestObservedMarker.StrokeWidth = max(2.0, midStroke)
-	c.rotateNeedleNoRefresh(c.highestObservedMarker, c.highestObserved, c.radius-2, 6)
+		// Place label on the INSIDE of the gauge
+		labelRadius := radius43 - labelPad
+		cx := c.middle.X + c.pipSin[i]*labelRadius
+		cy := c.middle.Y - c.pipCos[i]*labelRadius
+
+		lbl.Resize(fyne.NewSize(c.labelBoxW, c.labelBoxH))
+		lbl.Move(fyne.Position{X: cx - c.labelBoxW/2, Y: cy - c.labelBoxH/2})
+	}
 }
 
 func (c *DialRenderer) MinSize() fyne.Size { return c.minsize }
@@ -340,17 +261,14 @@ func (c *DialRenderer) Destroy()           {}
 
 func (c *DialRenderer) Objects() []fyne.CanvasObject {
 	if c.objects == nil {
-		objs := make([]fyne.CanvasObject, 0, len(c.pips)+len(c.pipLabels)+7)
-		for _, v := range c.pips {
-			objs = append(objs, v)
-		}
+		objs := make([]fyne.CanvasObject, 0, len(c.pipLabels)+3)
+		objs = append(objs, c.shader)
 		for _, t := range c.pipLabels {
 			if t != nil {
 				objs = append(objs, t)
 			}
 		}
-		objs = append(objs, c.face, c.titleText, c.center,
-			c.highestObservedMarker, c.needle, c.displayText)
+		objs = append(objs, c.titleText, c.displayText)
 		c.objects = objs
 	}
 	return c.objects
@@ -365,4 +283,3 @@ func max(a, b float32) float32 {
 	}
 	return b
 }
-
