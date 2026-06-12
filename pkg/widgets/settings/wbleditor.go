@@ -555,6 +555,9 @@ func (r *graphRenderer) rebuild() {
 	for i, row := range rows {
 		r.points[i].row = row
 	}
+
+	// dataLines/points may have changed length; force Objects() to rebuild.
+	r.objects = nil
 }
 
 func (r *graphRenderer) Layout(size fyne.Size) {
