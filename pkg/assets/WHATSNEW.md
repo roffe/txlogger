@@ -17,6 +17,7 @@
 - Added 2d graph for viewing flat maps
 - Rewrote logplayer plotter to use about 50% less CPU on zoomed out views
 - Big refactor of the log writing logic to be simpler to maintain and be more performant
+- Dial and Dual Dial now uses shaders to draw the faces, dials and pips
 
 # 2.1.9
 - Updated default T7 preset to include MAF.m_AirFromp_AirInlet
