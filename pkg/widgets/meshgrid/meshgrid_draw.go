@@ -36,11 +36,15 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 		clear(img.Pix)
 	}
 
+	// Vertices sit on cell corners, so the grid is one larger than the data
+	// in each direction (one quad per table cell).
+	vRows, vCols := m.rows+1, m.cols+1
+
 	// Find min/max of the view-space Z for depth shading.
 	minZ, maxZ := math.Inf(1), math.Inf(-1)
-	for i := 0; i < m.rows; i++ {
+	for i := 0; i < vRows; i++ {
 		row := m.vertices[i]
-		for j := 0; j < m.cols; j++ {
+		for j := 0; j < vCols; j++ {
 			z := row[j].Z
 			if z < minZ {
 				minZ = z
@@ -56,7 +60,7 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 	}
 
 	// Precompute screen-space projection and color for each vertex once.
-	n := m.rows * m.cols
+	n := vRows * vCols
 	if cap(m.scratchProjX) < n {
 		m.scratchProjX = make([]int, n)
 		m.scratchProjY = make([]int, n)
@@ -68,24 +72,20 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 
 	cx := float64(m.size.Width) * 0.5
 	cy := float64(m.size.Height) * 0.5
-	for i := 0; i < m.rows; i++ {
+	for i := 0; i < vRows; i++ {
 		row := m.vertices[i]
-		base := i * m.cols
-		for j := 0; j < m.cols; j++ {
+		base := i * vCols
+		for j := 0; j < vCols; j++ {
 			v := row[j]
 			idx := base + j
 			projX[idx] = int(cx + v.X)
 			projY[idx] = int(cy + v.Y)
 			depth := (v.Z - minZ) / zRange
-			vertCol[idx] = m.getColorWithDepth(m.values[idx], depth)
+			vertCol[idx] = m.getColorWithDepth(v.V, depth)
 		}
 	}
 
 	mode := m.renderMode
-	if m.rows < 2 || m.cols < 2 {
-		// A 1D mesh has no cells to fill; lines are all we can draw.
-		mode = RenderModeWireframe
-	}
 
 	if mode != RenderModeWireframe {
 		m.drawSurface(img, projX, projY, vertCol, mode == RenderModeSolidWireframe)
@@ -95,16 +95,16 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 
 	// Collect line segments using cached projections.
 	segs := m.scratchLines[:0]
-	for i := 0; i < m.rows; i++ {
-		for j := 0; j < m.cols; j++ {
-			idx := i*m.cols + j
+	for i := 0; i < vRows; i++ {
+		for j := 0; j < vCols; j++ {
+			idx := i*vCols + j
 			x1, y1 := projX[idx], projY[idx]
 			// neighbors: (+1,0) down, (0,+1) right, (+1,-1) diagonal
 			tryAddSeg := func(ni, nj int) {
-				if ni >= m.rows || nj < 0 || nj >= m.cols {
+				if ni >= vRows || nj < 0 || nj >= vCols {
 					return
 				}
-				nidx := ni*m.cols + nj
+				nidx := ni*vCols + nj
 				x2, y2 := projX[nidx], projY[nidx]
 				dx, dy := x2-x1, y2-y1
 				if dx*dx+dy*dy < 4 {
@@ -155,10 +155,39 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 	return img
 }
 
+// cursorScreenPosition projects the tracking-marker cell position set by
+// SetCursor onto the screen. The camera transform is linear, so bilinearly
+// interpolating the transformed vertex coordinates lands on the same point
+// as transforming the interpolated one.
+func (m *Meshgrid) cursorScreenPosition() (float32, float32) {
+	// MapViewer indices are cell-centered while mesh vertices sit on cell
+	// corners; +0.5 lands the marker mid-cell on the corner grid. SetCursor
+	// clamps the indices, so sx/sy stay within [0.5, cols-0.5]/[0.5, rows-0.5].
+	sx := m.cursorX + 0.5
+	sy := m.cursorY + 0.5
+
+	x0 := int(sx)
+	y0 := int(sy)
+	x1 := min(x0+1, m.cols)
+	y1 := min(y0+1, m.rows)
+	fx := sx - float64(x0)
+	fy := sy - float64(y0)
+
+	v00 := m.vertices[y0][x0]
+	v01 := m.vertices[y0][x1]
+	v10 := m.vertices[y1][x0]
+	v11 := m.vertices[y1][x1]
+
+	vx := (1-fy)*((1-fx)*v00.X+fx*v01.X) + fy*((1-fx)*v10.X+fx*v11.X)
+	vy := (1-fy)*((1-fx)*v00.Y+fx*v01.Y) + fy*((1-fx)*v10.Y+fx*v11.Y)
+
+	return float32(float64(m.size.Width)*0.5 + vx), float32(float64(m.size.Height)*0.5 + vy)
+}
+
 // getColorWithDepth combines color interpolation and depth enhancement in one step
 func (m *Meshgrid) getColorWithDepth(value, depthFactor float64) color.RGBA {
 	// Get base color from value
-	//baseColor := m.getColorInterpolation(value)
+	// baseColor := m.getColorInterpolation(value)
 	baseColor := colors.GetColorInterpolation(
 		m.zmin,
 		m.zmax,

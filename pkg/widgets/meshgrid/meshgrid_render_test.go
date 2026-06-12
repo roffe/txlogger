@@ -63,6 +63,24 @@ func TestRenderRotated(t *testing.T) {
 	}
 }
 
+// the tracking marker overlay must land on the surface: a cursor centered on
+// a vertex (cell 7.5 + the 0.5 corner offset = vertex 8) must project to
+// exactly that vertex's screen position
+func TestCursorScreenPosition(t *testing.T) {
+	m := testGrid(t)
+	m.cursorX, m.cursorY, m.showCursor = 7.5, 7.5, true
+	px, py := m.cursorScreenPosition()
+	v := m.vertices[8][8]
+	wantX := float32(float64(m.size.Width)*0.5 + v.X)
+	wantY := float32(float64(m.size.Height)*0.5 + v.Y)
+	if px != wantX || py != wantY {
+		t.Fatalf("cursor at (%v, %v), want vertex projection (%v, %v)", px, py, wantX, wantY)
+	}
+	if px < 0 || px > m.size.Width || py < 0 || py > m.size.Height {
+		t.Fatalf("cursor (%v, %v) outside widget %v", px, py, m.size)
+	}
+}
+
 func BenchmarkDrawSurface(b *testing.B) {
 	m := testGrid(b)
 	m.renderMode = RenderModeSolidWireframe

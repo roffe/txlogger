@@ -1,5 +1,7 @@
 # 2.1.10
-- Performance optimization for the log plotter and meshgrid
+- Live tracking marker in the 3d mesh viewer showing where the ECU is reading from, mirroring the crosshair in the map above
+- Fixed the 3d mesh showing one cell less than the table in each direction; values are now cell-centered so an 18x16 map renders 18x16 cells
+- Performance optimization for the meshgrid
 - Force layouts to be loaded and saved in users home directory under the txlogger folder
 - Update ecusymbol to be able to read T5 versions
 - Added new config widget for AD scanner WBL settings inspired by T7's DisplAdap.LamScannerTab
@@ -10,7 +12,11 @@
 - Improved drag handler in logplayer, when zoomed in we drag fewer frames increasing as we zoom out
 - We now have 3 render modes for viewing 3d maps, Solid Wireframe, Solid & Wireframe. Press the little square icon in the mesh viewer to switch between them
 - WBL reconnect COM port while logging. If the COM port dies for a reason during logging it will try to re-connect
-- Many widget performance improvements to allow slower computers to run txlogger better
+- Performance improvements in many widget to allow slower computers to run txlogger better
+- Improved camera handling in the 3d mesh viewer - now behaves like the t5/7/8 suites
+- Added 2d graph for viewing flat maps
+- Rewrote logplayer plotter to use about 50% less CPU on zoomed out views
+- Big refactor of the log writing logic to be simpler to maintain and be more performant
 
 # 2.1.9
 - Updated default T7 preset to include MAF.m_AirFromp_AirInlet

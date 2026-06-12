@@ -37,9 +37,10 @@ const surfaceEdgeFade = 0.45
 // When edges is true the cell outline is drawn right after its fill, which
 // keeps lines on hidden faces correctly occluded by nearer quads.
 func (m *Meshgrid) drawSurface(img *image.RGBA, projX, projY []int, vertCol []color.RGBA, edges bool) {
+	// One quad per data cell; the corner-vertex grid is (rows+1) x (cols+1).
 	quads := m.scratchQuads[:0]
-	for i := 0; i < m.rows-1; i++ {
-		for j := 0; j < m.cols-1; j++ {
+	for i := 0; i < m.rows; i++ {
+		for j := 0; j < m.cols; j++ {
 			z := m.vertices[i][j].Z + m.vertices[i][j+1].Z + m.vertices[i+1][j].Z + m.vertices[i+1][j+1].Z
 			quads = append(quads, quadRef{i: i, j: j, depth: z * 0.25})
 		}
@@ -64,11 +65,12 @@ func (m *Meshgrid) drawSurface(img *image.RGBA, projX, projY []int, vertCol []co
 	il := 1 / math.Sqrt(lx*lx+ly*ly+lz*lz)
 	lx, ly, lz = lx*il, ly*il, lz*il
 
+	vCols := m.cols + 1
 	for _, q := range quads {
-		ai := q.i*m.cols + q.j // top-left
-		bi := ai + 1           // top-right
-		di := ai + m.cols      // bottom-left
-		ci := di + 1           // bottom-right
+		ai := q.i*vCols + q.j // top-left
+		bi := ai + 1          // top-right
+		di := ai + vCols      // bottom-left
+		ci := di + 1          // bottom-right
 
 		shade := m.quadShade(q.i, q.j, lx, ly, lz)
 		ca := fadeColor(vertCol[ai], shade)

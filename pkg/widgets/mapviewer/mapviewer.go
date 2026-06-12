@@ -456,6 +456,9 @@ func (mv *MapViewer) setXY() error {
 			mv.graph.SetCursor(yIdx)
 		}
 	}
+	if mv.mesh != nil {
+		mv.mesh.SetCursor(xIdx, yIdx)
+	}
 	if mv.cfg.CursorFollowCrosshair {
 		mv.selectedX = int(math.Round(xIdx))
 		mv.SelectedY = int(math.Round(yIdx))

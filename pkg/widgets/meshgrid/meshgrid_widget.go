@@ -13,9 +13,14 @@ import (
 	"github.com/roffe/txlogger/pkg/colors"
 )
 
+// Vertex is a corner of the mesh. Values are cell-centered (one per table
+// cell) while vertices sit on cell corners, so the vertex grid is one larger
+// than the data grid in each direction and V holds the average of the
+// adjacent cell values.
 type Vertex struct {
 	Ox, Oy, Oz float64 // Original coordinates
 	X, Y, Z    float64 // Transformed coordinates for rendering
+	V          float64 // Data value at this corner (average of adjacent cells)
 }
 
 var _ fyne.Widget = (*Meshgrid)(nil)
@@ -59,6 +64,14 @@ type Meshgrid struct {
 	cameraPosition [3]float64 // Camera's position in world space
 	mousePosition  image.Point
 
+	// Live tracking marker (fractional cell indices), mirroring the
+	// mapviewer crosshair. Hidden until SetCursor is first called. The marker
+	// is a canvas primitive overlaid on the mesh image so moving it only
+	// repaints the scene instead of re-rasterizing the whole mesh.
+	cursorX, cursorY float64
+	showCursor       bool
+	cursor           *canvas.Circle
+
 	xlabel, ylabel, zlabel string
 
 	refreshPending bool
@@ -70,10 +83,21 @@ type Meshgrid struct {
 	OnMouseDown func()
 }
 
+// Marker colors match the mapviewer crosshair so the two tracking
+// indicators read as the same thing.
+var (
+	cursorFillColor = color.RGBA{R: 165, G: 55, B: 253, A: 255}
+	cursorRingColor = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+)
+
+const cursorRadius = 6
+
 // NewMeshgrid creates a new Meshgrid given width, height, depth and spacing.
 func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int, colorBlindMode colors.ColorBlindMode) (*Meshgrid, error) {
+	cols = max(1, cols)
+	rows = max(1, rows)
 	// Check if the provided values slice has the correct number of elements
-	if len(values) != max(1, cols)*max(1, rows) {
+	if len(values) != cols*rows {
 		return nil, fmt.Errorf("the number of Z values does not match the meshgrid dimensions")
 	}
 	// Find min and max Z values for normalization
@@ -104,7 +128,7 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 		colorMode: colorBlindMode,
 	}
 
-	m.createVertices(fyne.Max(float32(m.cols), 1), fyne.Max(float32(m.rows), 1))
+	m.createVertices()
 
 	m.scaleMeshgrid(0.3)
 
@@ -125,6 +149,16 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 	m.image = canvas.NewImageFromImage(image.NewRGBA(image.Rect(0, 0, 0, 0)))
 	m.image.FillMode = canvas.ImageFillOriginal
 	m.image.ScaleMode = canvas.ImageScaleFastest
+
+	m.cursor = &canvas.Circle{
+		// Position2 sets the bounds directly; Resize would trigger a canvas
+		// refresh before the widget is even shown.
+		Position2:   fyne.NewPos(cursorRadius*2, cursorRadius*2),
+		FillColor:   cursorFillColor,
+		StrokeColor: cursorRingColor,
+		StrokeWidth: 2,
+		Hidden:      true,
+	}
 
 	return m, nil
 }
@@ -155,7 +189,11 @@ func (m *Meshgrid) SetColorBlindMode(mode colors.ColorBlindMode) {
 	m.refresh()
 }
 
-func (m *Meshgrid) createVertices(width, height float32) {
+// createVertices builds the corner-vertex grid: one quad per table cell, so
+// the mesh shows exactly cols x rows cells like the map above. The grid is
+// (rows+1) x (cols+1); each corner takes the average of the 1-4 cell values
+// touching it.
+func (m *Meshgrid) createVertices() {
 	// Guard against a zero range (e.g. all values identical / all zero) so we
 	// produce a flat mesh at Z=0 instead of NaN from a div-by-zero.
 	zrange := m.zrange
@@ -163,16 +201,19 @@ func (m *Meshgrid) createVertices(width, height float32) {
 		zrange = 1
 	}
 
-	vertices := make([][]Vertex, 0, m.rows)
-	valueIndex := 0
+	vRows, vCols := m.rows+1, m.cols+1
+	vertices := make([][]Vertex, 0, vRows)
 	var sumX, sumY, sumZ float64
 	var count int
-	for i := m.rows; i > 0; i-- {
-		row := make([]Vertex, 0, m.cols)
-		for j := 0; j < m.cols; j++ {
-			x := -float64(width)*.5 + float64(j)*float64(m.cellWidth)
-			y := -float64(height)*.5 + float64(i)*float64(m.cellHeight)
-			z := ((m.values[valueIndex] - m.zmin) / zrange) * m.depth
+	for i := 0; i < vRows; i++ {
+		row := make([]Vertex, 0, vCols)
+		for j := 0; j < vCols; j++ {
+			value := m.cornerValue(i, j)
+			x := float64(j) * float64(m.cellWidth)
+			// Data row 0 is the bottom row in the map; keep it at the high-Y
+			// end of the mesh like before, so the orientation is unchanged.
+			y := float64(vRows-i) * float64(m.cellHeight)
+			z := ((value - m.zmin) / zrange) * m.depth
 			row = append(row, Vertex{
 				Ox: x,
 				Oy: y,
@@ -180,12 +221,12 @@ func (m *Meshgrid) createVertices(width, height float32) {
 				X:  x,
 				Y:  y,
 				Z:  z,
+				V:  value,
 			})
 			sumX += x
 			sumY += y
 			sumZ += z
 			count++
-			valueIndex++
 		}
 		vertices = append(vertices, row)
 	}
@@ -197,6 +238,25 @@ func (m *Meshgrid) createVertices(width, height float32) {
 		m.centerY = sumY * inv
 		m.centerZ = sumZ * inv
 	}
+}
+
+// cornerValue averages the cell values adjacent to corner (vi, vj): four in
+// the interior, two along edges and one at the outer corners.
+func (m *Meshgrid) cornerValue(vi, vj int) float64 {
+	r0 := max(vi-1, 0)
+	r1 := min(vi, m.rows-1)
+	c0 := max(vj-1, 0)
+	c1 := min(vj, m.cols-1)
+
+	var sum float64
+	var n int
+	for r := r0; r <= r1; r++ {
+		for c := c0; c <= c1; c++ {
+			sum += m.values[r*m.cols+c]
+			n++
+		}
+	}
+	return sum / float64(n)
 }
 
 func (m *Meshgrid) scaleMeshgrid(factor float64) {
@@ -266,7 +326,7 @@ func (m *Meshgrid) SetFloat64(idx int, value float64) {
 	}
 	m.values[idx] = value
 	m.zmin, m.zmax, m.zrange = findMinMaxRange(m.values)
-	m.createVertices(fyne.Max(float32(m.cols), 1), fyne.Max(float32(m.rows), 1))
+	m.createVertices()
 	m.updateVertexPositions()
 	m.refresh()
 }
@@ -283,9 +343,46 @@ func (m *Meshgrid) LoadFloat64s(min, max float64, floats []float64) {
 
 	m.values = floats
 
-	m.createVertices(fyne.Max(float32(m.cols), 1), fyne.Max(float32(m.rows), 1))
+	m.createVertices()
 	m.updateVertexPositions()
 	m.refresh()
+}
+
+// SetCursor positions the tracking marker at the (fractional) cell index,
+// mirroring the crosshair in the map above. The marker rides on the mesh
+// surface, interpolated between the four surrounding vertices.
+func (m *Meshgrid) SetCursor(xIdx, yIdx float64) {
+	if xIdx < 0 {
+		xIdx = 0
+	} else if max := float64(m.cols - 1); xIdx > max {
+		xIdx = max
+	}
+	if yIdx < 0 {
+		yIdx = 0
+	} else if max := float64(m.rows - 1); yIdx > max {
+		yIdx = max
+	}
+	if m.showCursor && xIdx == m.cursorX && yIdx == m.cursorY {
+		return
+	}
+	m.cursorX = xIdx
+	m.cursorY = yIdx
+	m.showCursor = true
+	m.moveCursor()
+}
+
+// moveCursor repositions the overlay marker on the projected surface point.
+// Moving a canvas primitive only repaints the scene from cached textures,
+// so cursor updates don't re-rasterize the mesh.
+func (m *Meshgrid) moveCursor() {
+	if !m.showCursor {
+		return
+	}
+	px, py := m.cursorScreenPosition()
+	m.cursor.Move(fyne.NewPos(px-cursorRadius, py-cursorRadius))
+	if m.cursor.Hidden {
+		m.cursor.Show()
+	}
 }
 
 // returns the min, max and range across the data
@@ -310,6 +407,9 @@ func (m *Meshgrid) refresh() {
 	m.image.Image = m.drawMeshgridLines()
 	m.image.Resize(m.size)
 	m.image.Refresh()
+	// Rotation, scale, resize and data changes all move the projected
+	// surface point under the marker.
+	m.moveCursor()
 }
 
 func (m *Meshgrid) throttledRefresh() {
@@ -358,7 +458,7 @@ func (m *meshgridRenderer) Destroy() {
 
 func (m *meshgridRenderer) Objects() []fyne.CanvasObject {
 	if m.objects == nil {
-		m.objects = []fyne.CanvasObject{m.MG.image}
+		m.objects = []fyne.CanvasObject{m.MG.image, m.MG.cursor}
 	}
 	return m.objects
 }
