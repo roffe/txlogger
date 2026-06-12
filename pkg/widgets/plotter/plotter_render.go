@@ -52,7 +52,7 @@ func (t *plotLayout) Layout(_ []fyne.CanvasObject, plotSize fyne.Size) {
 
 	t.p.overlayText.Move(fyne.NewPos(t.p.zoom.Size().Width, 20))
 
-	t.p.canvasImage.Resize(plotSize) // Calculate new plot dimensions
+	t.p.plotObj.Resize(plotSize) // Calculate new plot dimensions
 	t.p.plotResolution = fyne.NewSize(plotSize.Width*t.p.plotResolutionFactor, plotSize.Height*t.p.plotResolutionFactor)
 	// Update width factor based on the new size
 	t.p.widthFactor = plotSize.Width / float32(t.p.dataPointsToShow)

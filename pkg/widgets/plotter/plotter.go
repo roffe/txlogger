@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"log"
+	"os"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -29,8 +30,24 @@ type PlotterControl interface {
 	Seek(int)
 }
 
+// plotBackend selects how the plot is drawn. The GPU shader is the default;
+// TXLOGGER_PLOT_RENDERER=image selects the CPU rasterizer, which is also the
+// automatic fallback when the log does not fit the shader's texture layout.
+type plotBackend int
+
+const (
+	plotBackendImage plotBackend = iota
+	plotBackendShader
+)
+
 type Plotter struct {
 	widget.BaseWidget
+
+	backend plotBackend
+	shader  *canvas.Shader
+	// plotObj is the canvas object showing the plot: shader on the GPU
+	// backend, canvasImage on the image backend.
+	plotObj fyne.CanvasObject
 
 	cursor      *canvas.Line
 	canvasImage *canvas.Image
@@ -182,12 +199,18 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 
 	p.dataPointsToShow = min(p.dataLength, 250.0)
 
+	p.plotObj = p.canvasImage
+	if os.Getenv("TXLOGGER_PLOT_RENDERER") != "image" && p.initShader() {
+		p.backend = plotBackendShader
+		p.plotObj = p.shader
+	}
+
 	leading := container.NewBorder(
 		nil,
 		nil,
 		p.zoom,
 		nil,
-		container.New(&plotLayout{p: p}, p.canvasImage),
+		container.New(&plotLayout{p: p}, p.plotObj),
 	)
 	p.split = container.NewHSplit(
 		leading,
@@ -294,6 +317,14 @@ func (p *Plotter) seekTo(pos int) {
 		obj.Refresh()
 	}
 
+	if p.backend == plotBackendShader {
+		// The view window moved; the GPU re-renders from two uniforms.
+		p.updateShaderView()
+		p.layoutCursor()
+		p.cursor.Refresh()
+		p.shader.Refresh()
+		return
+	}
 	p.drawImage()
 	p.layoutCursor()
 	p.cursor.Refresh()
@@ -337,6 +368,19 @@ func (p *Plotter) drawImage() {
 }
 
 func (p *Plotter) refreshImage(goroutine bool) {
+	if p.backend == plotBackendShader {
+		// Legend toggles/recolors, hover and zoom all funnel through here;
+		// the metadata texture is 4xN so rebuilding it unconditionally is
+		// cheap, and the painter uploads it only because it is a new image.
+		p.updateShaderMeta()
+		p.updateShaderView()
+		if goroutine {
+			fyne.Do(p.shader.Refresh)
+		} else {
+			p.shader.Refresh()
+		}
+		return
+	}
 	p.drawImage()
 	if goroutine {
 		fyne.Do(p.canvasImage.Refresh)
@@ -492,7 +536,7 @@ func (ts *TimeSeries) plotImageDecimated(img *image.RGBA, data []float64, thickn
 func (p *Plotter) layoutCursor() {
 	var x float32
 	halfDataPointsToShow := int(float64(p.dataPointsToShow) * .5)
-	plotSize := p.canvasImage.Size()
+	plotSize := p.plotObj.Size()
 
 	if p.cursorPos >= p.dataLength-halfDataPointsToShow {
 		// Handle cursor position near the end of data
