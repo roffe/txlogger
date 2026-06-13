@@ -68,9 +68,15 @@ func (m *Meshgrid) updatePolygons() {
 		zRange = 1
 	}
 
-	// Per-vertex screen projection and color. Float projection keeps subpixel
-	// precision, which the GPU edges make visible (the image path rounds to
-	// whole pixels).
+	// Per-vertex screen projection and color. Each vertex is snapped to a whole
+	// pixel: the GL painter renders a cell's corner at
+	// round(origin*scale) + round((corner-origin)*scale), and since every cell
+	// uses its own bounding-box origin, an un-snapped (fractional) corner rounds
+	// to a different device pixel for each of the two cells that share it - the
+	// gaps/overlaps that made cell spacing look uneven. Snapping the projection
+	// to integer pixels (as the image path also does) cancels the per-cell
+	// origin out at integer pixel-scales, so a shared corner lands identically
+	// for both cells and their edges line up.
 	n := vRows * vCols
 	if cap(m.scratchFX) < n {
 		m.scratchFX = make([]float32, n)
@@ -91,8 +97,8 @@ func (m *Meshgrid) updatePolygons() {
 		for j := 0; j < vCols; j++ {
 			v := row[j]
 			idx := base + j
-			fxs[idx] = float32(cx + v.X)
-			fys[idx] = float32(cy + v.Y)
+			fxs[idx] = float32(math.Round(cx + v.X))
+			fys[idx] = float32(math.Round(cy + v.Y))
 			depth := (v.Z - minZ) / zRange
 			vertCol[idx] = m.getColorWithDepth(v.V, depth)
 		}

@@ -234,7 +234,7 @@ func (sw *Widget) newPlotRendererSelect() *widget.Select {
 }
 
 func (sw *Widget) newMeshRendererSelect() *widget.Select {
-	return widget.NewSelect([]string{"Software", "Polygons", "Shader"}, func(s string) {
+	return widget.NewSelect([]string{"Shader", "Polygons", "Software"}, func(s string) {
 		var mode int
 		switch s {
 		case "Shader":

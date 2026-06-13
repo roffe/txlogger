@@ -151,10 +151,15 @@ vec3 height_color(float h, float view_z) {
     float df = clamp((view_z - view_zmin) / view_zrange, 0.0, 1.0);
     vec3 rgb = base.rgb * (0.6 + 0.4 * df);
     rgb.b = min(1.0, rgb.b + (1.0 - df) * 0.05882353);
-    if (base.r > 0.784 && base.g > 0.784 && base.b < 0.196) {
-        rgb.r = min(1.0, rgb.r * 1.1);
-        rgb.g = min(1.0, rgb.g * 1.1);
-    }
+    // Yellow emphasis from getColorWithDepth, but ramped smoothly: the CPU
+    // path applies the 10% boost per vertex and lets Gouraud blur its edge,
+    // while this shader runs per pixel, so a hard threshold would draw a
+    // visible band where the boost switches on. smoothstep fades it in around
+    // pure yellow so the mid-range stays a continuous gradient.
+    float yellow = smoothstep(0.6, 0.95, base.r) * smoothstep(0.6, 0.95, base.g) * (1.0 - smoothstep(0.2, 0.4, base.b));
+    float boost = 1.0 + 0.1 * yellow;
+    rgb.r = min(1.0, rgb.r * boost);
+    rgb.g = min(1.0, rgb.g * boost);
     return rgb;
 }
 
