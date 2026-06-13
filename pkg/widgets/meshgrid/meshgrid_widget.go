@@ -28,28 +28,28 @@ var _ fyne.Widget = (*Meshgrid)(nil)
 
 // renderBackend selects how the mesh is drawn. The GPU shader is the
 // default; TXLOGGER_MESH_RENDERER=poly|image selects the older paths.
-type renderBackend int
+type RenderBackend int
 
 const (
 	// backendShader ray-casts the whole mesh in one fragment shader
 	// (meshgrid_shader.go); per-frame CPU cost is a uniform update.
-	backendShader renderBackend = iota
+	BackendShader RenderBackend = iota
 	// backendPolygons draws one canvas.ArbitraryPolygon per cell
 	// (meshgrid_poly.go).
-	backendPolygons
+	BackendPolygons
 	// backendImage rasterizes on the CPU into a canvas.Image
 	// (meshgrid_draw.go).
-	backendImage
+	BackendImage
 )
 
-func backendFromEnv() renderBackend {
+func backendFromEnv() RenderBackend {
 	switch os.Getenv("TXLOGGER_MESH_RENDERER") {
 	case "poly":
-		return backendPolygons
+		return BackendPolygons
 	case "image":
-		return backendImage
+		return BackendImage
 	default:
-		return backendShader
+		return BackendShader
 	}
 }
 
@@ -75,7 +75,7 @@ type Meshgrid struct {
 	scratchLines  []lineSegment
 	scratchQuads  []quadRef
 
-	backend renderBackend
+	backend RenderBackend
 
 	// Shader backend (meshgrid_shader.go): the whole mesh in one object.
 	shader *canvas.Shader
@@ -138,7 +138,7 @@ var (
 const cursorRadius = 6
 
 // NewMeshgrid creates a new Meshgrid given width, height, depth and spacing.
-func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int, colorBlindMode colors.ColorBlindMode) (*Meshgrid, error) {
+func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int, colorBlindMode colors.ColorBlindMode, backend RenderBackend) (*Meshgrid, error) {
 	cols = max(1, cols)
 	rows = max(1, rows)
 	// Check if the provided values slice has the correct number of elements
@@ -172,7 +172,7 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 
 		colorMode: colorBlindMode,
 
-		backend: backendFromEnv(),
+		backend: backend,
 	}
 
 	m.createVertices()
@@ -209,9 +209,9 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 
 	m.initAxisObjects()
 	switch m.backend {
-	case backendShader:
+	case BackendShader:
 		m.initShader()
-	case backendPolygons:
+	case BackendPolygons:
 		m.initPolygons()
 	}
 
@@ -463,14 +463,14 @@ func (m *Meshgrid) Refresh() {
 
 func (m *Meshgrid) refresh() {
 	switch m.backend {
-	case backendShader:
+	case BackendShader:
 		// All per-frame state lives in shader uniforms; the GPU re-renders
 		// from them on the next paint. Only the overlays move on the CPU.
 		m.updateShaderUniforms()
 		m.updateAxisObjects()
 		m.moveCursor()
 		canvas.Refresh(m)
-	case backendPolygons:
+	case BackendPolygons:
 		// Geometry/color updates on the reusable polygons; the canvas.Refresh
 		// marks the scene dirty so color-only changes repaint too.
 		m.updatePolygons()
@@ -502,7 +502,7 @@ func (m *Meshgrid) throttledRefresh() {
 }
 
 func (m *Meshgrid) CreateRenderer() fyne.WidgetRenderer {
-	if m.backend != backendImage {
+	if m.backend != BackendImage {
 		// Text measuring needs a driver, so the labels can't be sized in the
 		// constructor (tests build widgets without an app).
 		for _, t := range m.axisLabels {
@@ -523,9 +523,9 @@ func (m *meshgridRenderer) Layout(size fyne.Size) {
 	}
 	m.MG.size = size
 	switch m.MG.backend {
-	case backendShader:
+	case BackendShader:
 		m.MG.shader.Resize(size)
-	case backendImage:
+	case BackendImage:
 		m.MG.image.Resize(size)
 	}
 	m.MG.throttledRefresh()
@@ -544,7 +544,7 @@ func (m *meshgridRenderer) Destroy() {
 
 func (m *meshgridRenderer) Objects() []fyne.CanvasObject {
 	switch m.MG.backend {
-	case backendShader:
+	case BackendShader:
 		if m.objects == nil {
 			m.MG.updateAxisObjects()
 			objs := []fyne.CanvasObject{m.MG.shader}
@@ -554,7 +554,7 @@ func (m *meshgridRenderer) Objects() []fyne.CanvasObject {
 			m.objects = append(objs, m.MG.cursor)
 		}
 		return m.objects
-	case backendPolygons:
+	case BackendPolygons:
 		// updatePolygons rebuilds the list in painter's order every frame;
 		// populate it here for the first paint.
 		if len(m.MG.polyObjects) == 0 {

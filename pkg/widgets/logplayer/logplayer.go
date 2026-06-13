@@ -73,9 +73,10 @@ type logplayerObjects struct {
 }
 
 type Config struct {
-	EBus       *bus.Controller[string, float64]
-	Logfile    logfile.Logfile
-	TimeSetter func(time.Time)
+	EBus            *bus.Controller[string, float64]
+	Logfile         logfile.Logfile
+	TimeSetter      func(time.Time)
+	PlotterRenderer plotter.PlotBackend
 }
 
 func New(cfg *Config) *Logplayer {
@@ -258,6 +259,7 @@ func (l *Logplayer) render() {
 			l.objs.positionSlider.Refresh()
 			l.control(&controlMsg{Op: OpSeek, Pos: int(pos)})
 		}),
+		plotter.WithRenderer(l.cfg.PlotterRenderer),
 	)
 }
 

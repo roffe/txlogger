@@ -258,6 +258,7 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 			mv.numColumns,
 			mv.numRows,
 			mv.colorMode,
+			mv.cfg.MeshRenderer,
 		)
 
 		if mv.cfg.OnMouseDown != nil {

@@ -220,6 +220,34 @@ func (sw *Widget) newColorBlindMode() *widget.Select {
 	})
 }
 
+func (sw *Widget) newPlotRendererSelect() *widget.Select {
+	return widget.NewSelect([]string{"Software", "Shader"}, func(s string) {
+		var mode int
+		switch s {
+		case "Software":
+			mode = 0
+		case "Shader":
+			mode = 1
+		}
+		fyne.CurrentApp().Preferences().SetInt(prefsPlotterRenderer, mode)
+	})
+}
+
+func (sw *Widget) newMeshRendererSelect() *widget.Select {
+	return widget.NewSelect([]string{"Software", "Polygons", "Shader"}, func(s string) {
+		var mode int
+		switch s {
+		case "Shader":
+			mode = 0
+		case "Polygons":
+			mode = 1
+		case "Software":
+			mode = 2
+		}
+		fyne.CurrentApp().Preferences().SetInt(prefsMeshRenderer, mode)
+	})
+}
+
 func (sw *Widget) newAdapterSelector() *widget.Select {
 	return widget.NewSelect(gocan.ListAdapterNames(), func(s string) {
 		if info, found := sw.adapters[s]; found {
@@ -319,6 +347,11 @@ func (sw *Widget) loadPreferences() {
 	loadPrefsSelect(sw.portSelector, prefsPort, "")
 	loadPrefsSelect(sw.speedSelector, prefsSpeed, "115200")
 	loadPrefsCheck(sw.debugCheckbox, prefsDebug, false)
+
+	// graphics settings
+
+	sw.plotRendererSelect.SetSelectedIndex(fyne.CurrentApp().Preferences().IntWithFallback(prefsPlotterRenderer, 0))
+	sw.meshRendererSelect.SetSelectedIndex(fyne.CurrentApp().Preferences().IntWithFallback(prefsMeshRenderer, 2))
 }
 
 func loadPrefsSelect(s *widget.Select, prefKey string, fallback string) {

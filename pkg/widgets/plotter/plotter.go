@@ -5,7 +5,6 @@ import (
 	"image"
 	"image/color"
 	"log"
-	"os"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -33,17 +32,17 @@ type PlotterControl interface {
 // plotBackend selects how the plot is drawn. The GPU shader is the default;
 // TXLOGGER_PLOT_RENDERER=image selects the CPU rasterizer, which is also the
 // automatic fallback when the log does not fit the shader's texture layout.
-type plotBackend int
+type PlotBackend int
 
 const (
-	plotBackendImage plotBackend = iota
-	plotBackendShader
+	PlotBackendImage PlotBackend = iota
+	PlotBackendShader
 )
 
 type Plotter struct {
 	widget.BaseWidget
 
-	backend plotBackend
+	backend PlotBackend
 	shader  *canvas.Shader
 	// plotObj is the canvas object showing the plot: shader on the GPU
 	// backend, canvasImage on the image backend.
@@ -106,6 +105,12 @@ func WithOnDragged(f func(event *fyne.DragEvent)) PlotterOpt {
 func WithOrder(order []string) PlotterOpt {
 	return func(p *Plotter) {
 		p.valueOrder = order
+	}
+}
+
+func WithRenderer(renderer PlotBackend) PlotterOpt {
+	return func(p *Plotter) {
+		p.backend = renderer
 	}
 }
 
@@ -200,8 +205,7 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 	p.dataPointsToShow = min(p.dataLength, 250.0)
 
 	p.plotObj = p.canvasImage
-	if os.Getenv("TXLOGGER_PLOT_RENDERER") != "image" && p.initShader() {
-		p.backend = plotBackendShader
+	if p.backend == PlotBackendShader && p.initShader() {
 		p.plotObj = p.shader
 	}
 
@@ -317,7 +321,7 @@ func (p *Plotter) seekTo(pos int) {
 		obj.Refresh()
 	}
 
-	if p.backend == plotBackendShader {
+	if p.backend == PlotBackendShader {
 		// The view window moved; the GPU re-renders from two uniforms.
 		p.updateShaderView()
 		p.layoutCursor()
@@ -368,7 +372,7 @@ func (p *Plotter) drawImage() {
 }
 
 func (p *Plotter) refreshImage(goroutine bool) {
-	if p.backend == plotBackendShader {
+	if p.backend == PlotBackendShader {
 		// Legend toggles/recolors, hover and zoom all funnel through here;
 		// the metadata texture is 4xN so rebuilding it unconditionally is
 		// cheap, and the painter uploads it only because it is a new image.

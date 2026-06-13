@@ -416,8 +416,9 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Positio
 	mw.Log("loaded log file " + filename)
 
 	lp := logplayer.New(&logplayer.Config{
-		EBus:    ebus.CONTROLLER,
-		Logfile: logz,
+		EBus:            ebus.CONTROLLER,
+		Logfile:         logz,
+		PlotterRenderer: mw.settings.GetPlotterRenderer(),
 	})
 	/*
 		content := container.NewBorder(

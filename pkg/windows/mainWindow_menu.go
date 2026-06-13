@@ -500,6 +500,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) 
 		OnUpdateCell: updateFunc,
 
 		MeshView:              mw.settings.GetMeshView(),
+		MeshRenderer:          mw.settings.GetMeshRenderer(),
 		Editable:              true,
 		CursorFollowCrosshair: mw.settings.GetCursorFollowCrosshair(),
 		ColorblindMode:        mw.settings.GetColorBlindMode(),

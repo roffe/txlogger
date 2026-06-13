@@ -3,6 +3,7 @@ package mapviewer
 import (
 	"fyne.io/fyne/v2"
 	"github.com/roffe/txlogger/pkg/colors"
+	"github.com/roffe/txlogger/pkg/widgets/meshgrid"
 )
 
 type Config struct {
@@ -27,7 +28,9 @@ type Config struct {
 	OnUpdateCell func(idx int, value []float64)
 	OnMouseDown  func()
 
-	MeshView              bool
+	MeshView     bool
+	MeshRenderer meshgrid.RenderBackend
+
 	Editable              bool
 	CursorFollowCrosshair bool
 

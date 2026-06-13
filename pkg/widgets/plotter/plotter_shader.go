@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"log"
 	"sync/atomic"
 
 	"fyne.io/fyne/v2/canvas"
@@ -230,6 +231,8 @@ void main() {
 // many series, or a log too long for the texture budget); the caller then
 // stays on the image backend.
 func (p *Plotter) initShader() bool {
+	log.Println("Init plotter shaders")
+
 	if len(p.ts) == 0 || len(p.ts) > plotMaxSeries {
 		return false
 	}

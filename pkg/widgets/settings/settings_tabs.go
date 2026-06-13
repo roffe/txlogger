@@ -68,6 +68,58 @@ func (sw *Widget) generalTab() *container.TabItem {
 	))
 }
 
+func (sw *Widget) graphicsTab() *container.TabItem {
+	return container.NewTabItem("Graphics", container.NewVBox(
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewLabel("Plot renderer"),
+			nil,
+			sw.plotRendererSelect,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			widget.NewLabel("Mesh renderer"),
+			nil,
+			sw.meshRendererSelect,
+		),
+	))
+}
+
+func (sw *Widget) canTab() *container.TabItem {
+	return container.NewTabItem("CAN", container.NewVBox(
+		container.NewBorder(
+			nil,
+			nil,
+			xlayout.NewFixedWidth(70, widget.NewLabel("Adapter")),
+			sw.debugCheckbox,
+			sw.adapterSelector,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			xlayout.NewFixedWidth(70, widget.NewLabel("Port")),
+			sw.refreshBtn,
+			sw.portSelector,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			xlayout.NewFixedWidth(70, widget.NewLabel("Info")),
+			nil,
+			sw.portDescription,
+		),
+		container.NewBorder(
+			nil,
+			nil,
+			xlayout.NewFixedWidth(70, widget.NewLabel("Speed")),
+			nil,
+			sw.speedSelector,
+		),
+	))
+}
+
 func (sw *Widget) loggingTab() *container.TabItem {
 	return container.NewTabItem("Logging", container.NewVBox(
 		container.NewBorder(
@@ -187,37 +239,4 @@ func (sw *Widget) adScannerTab() *container.TabItem {
 	sw.wbleditor = NewWBLEditor(sw.GetWBLSupportPoints(), sw.GetWBLLambdaValues())
 	sw.wbleditor.Hide()
 	return container.NewTabItem("AD Scanner", sw.wbleditor)
-}
-
-func (sw *Widget) canTab() *container.TabItem {
-	return container.NewTabItem("CAN", container.NewVBox(
-		container.NewBorder(
-			nil,
-			nil,
-			xlayout.NewFixedWidth(70, widget.NewLabel("Adapter")),
-			sw.debugCheckbox,
-			sw.adapterSelector,
-		),
-		container.NewBorder(
-			nil,
-			nil,
-			xlayout.NewFixedWidth(70, widget.NewLabel("Port")),
-			sw.refreshBtn,
-			sw.portSelector,
-		),
-		container.NewBorder(
-			nil,
-			nil,
-			xlayout.NewFixedWidth(70, widget.NewLabel("Info")),
-			nil,
-			sw.portDescription,
-		),
-		container.NewBorder(
-			nil,
-			nil,
-			xlayout.NewFixedWidth(70, widget.NewLabel("Speed")),
-			nil,
-			sw.speedSelector,
-		),
-	))
 }

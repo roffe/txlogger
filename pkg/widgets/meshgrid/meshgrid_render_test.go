@@ -21,7 +21,7 @@ func testGrid(t testing.TB) *Meshgrid {
 			values[i*cols+j] = 100 / (1 + x*x + y*y) // central hump
 		}
 	}
-	m, err := NewMeshgrid("RPM", "Load", "Fuel", values, cols, rows, colors.ModeNormal)
+	m, err := NewMeshgrid("RPM", "Load", "Fuel", values, cols, rows, colors.ModeNormal, backendFromEnv())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestRenderRotated(t *testing.T) {
 				values[i*cols+j] = 10 + 100/(1+x*x+y*y) // spike near one corner
 			}
 		}
-		m, err := NewMeshgrid("RPM", "Load", "Fuel", values, cols, rows, colors.ModeNormal)
+		m, err := NewMeshgrid("RPM", "Load", "Fuel", values, cols, rows, colors.ModeNormal, backendFromEnv())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -95,7 +95,7 @@ func BenchmarkDrawSurface(b *testing.B) {
 // usePolyBackend switches a test grid to the polygon renderer (the default
 // is the shader backend, whose per-frame work happens on the GPU).
 func usePolyBackend(m *Meshgrid) {
-	m.backend = backendPolygons
+	m.backend = BackendPolygons
 	m.initPolygons()
 }
 
@@ -129,7 +129,7 @@ func TestPolygonDegenerateQuads(t *testing.T) {
 			values[i*cols+j] = float64((i / 4) * 100)
 		}
 	}
-	m, err := NewMeshgrid("RPM", "Load", "Fuel", values, cols, rows, colors.ModeNormal)
+	m, err := NewMeshgrid("RPM", "Load", "Fuel", values, cols, rows, colors.ModeNormal, backendFromEnv())
 	if err != nil {
 		t.Fatal(err)
 	}

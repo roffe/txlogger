@@ -12,7 +12,7 @@ import (
 func shaderPlotter(t testing.TB, numSeries, numPoints int) *Plotter {
 	t.Helper()
 	p := NewPlotter(benchValues(numSeries, numPoints))
-	if p.backend != plotBackendShader {
+	if p.backend != PlotBackendShader {
 		t.Fatal("shader backend not selected")
 	}
 	return p
@@ -132,7 +132,7 @@ func TestPlotShaderMeta(t *testing.T) {
 // Logs that exceed the texture budget must fall back to the image backend.
 func TestPlotShaderFallback(t *testing.T) {
 	p := NewPlotter(benchValues(2, plotTexW*plotTexMaxH/2+1))
-	if p.backend != plotBackendImage {
+	if p.backend != PlotBackendImage {
 		t.Fatal("oversized log did not fall back to the image backend")
 	}
 	if p.plotObj != p.canvasImage {
