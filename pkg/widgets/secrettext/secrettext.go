@@ -3,17 +3,15 @@ package secrettext
 import (
 	"bytes"
 	"sync"
-	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 	"github.com/hajimehoshi/go-mp3"
 	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/sound"
+	"github.com/roffe/txlogger/pkg/widgets/tunnel"
 )
 
 var _ fyne.Tappable = (*SecretText)(nil)
@@ -37,10 +35,12 @@ func (s *SecretText) Tapped(*fyne.PointEvent) {
 	//	log.Println("tapped", s.tappedTimes)
 	if s.tappedTimes >= 10 {
 
-		t := fyne.NewStaticResource("taz.png", assets.Taz)
-		cv := canvas.NewImageFromResource(t)
-		cv.ScaleMode = canvas.ImageScaleFastest
-		cv.SetMinSize(fyne.NewSize(0, 0))
+		/*
+			t := fyne.NewStaticResource("taz.png", assets.Taz)
+			cv := canvas.NewImageFromResource(t)
+			cv.ScaleMode = canvas.ImageScaleFastest
+			cv.SetMinSize(fyne.NewSize(0, 0))
+		*/
 
 		fileBytesReader := bytes.NewReader(assets.Korvring)
 
@@ -59,17 +59,36 @@ func (s *SecretText) Tapped(*fyne.PointEvent) {
 			f()
 		}
 
-		cont := container.NewStack(cv)
-		d := dialog.NewCustom("You found the secret", "Leif", cont, fyne.CurrentApp().Driver().AllWindows()[0])
+		t := tunnel.New()
+		t.SetCredits([]string{
+			"SAAB",
+			"MattiasC",
+			"Dilemma",
+			"J.K Nilsson",
+			"Manick",
+			"Artursson",
+			"Schottis",
+			"Chriva",
+			"Myrtilos",
+			"Mackan",
+			"Kalej",
+			"Bojer",
+			"TrionicTuning",
+			"o2o Crew",
+		})
+
+		d := dialog.NewCustom("You found the secret", "Leif", t, fyne.CurrentApp().Driver().AllWindows()[0])
 		d.SetOnClosed(func() {
 			player.Pause()
 		})
 		d.Show()
-		an := canvas.NewSizeAnimation(fyne.NewSize(0, 0), fyne.NewSize(370, 386), time.Second, func(size fyne.Size) {
-			cv.Resize(size)
-		})
+		/*
+			an := canvas.NewSizeAnimation(fyne.NewSize(0, 0), fyne.NewSize(370, 386), time.Second, func(size fyne.Size) {
+				cv.Resize(size)
+			})
 
-		an.Start()
+			an.Start()
+		*/
 	}
 }
 
