@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/proto"
@@ -140,10 +141,9 @@ func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	tabs.Append(sw.graphicsTab())
 	tabs.Append(sw.canTab())
 	tabs.Append(sw.loggingTab())
-	tabs.Append(sw.dashboardTab())
 	tabs.Append(sw.wblTab())
 	tabs.Append(sw.adScannerTab())
-	tabs.Append(container.NewTabItem("txbridge", txconfigurator.NewConfigurator()))
+	tabs.Append(container.NewTabItemWithIcon("txbridge", theme.DownloadIcon(), txconfigurator.NewConfigurator()))
 
 	sw.loadPreferences()
 	return widget.NewSimpleRenderer(tabs)

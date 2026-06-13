@@ -58,17 +58,11 @@ func NewGaugeCreator(mw *MainWindow) *GaugeCreator {
 	g.entries.symbolNameSecondary = widget.NewSelect(symbols, func(s string) {})
 	g.entries.symbolNameSecondary.Disable()
 
-	g.entries.min = numericentry.New()
-	g.entries.min.SetText("0")
-	g.entries.max = numericentry.New()
-	g.entries.max.SetText("100")
-
-	g.entries.center = numericentry.New()
-	g.entries.center.SetText("50")
+	g.entries.min = numericentry.New("0")
+	g.entries.max = numericentry.New("100")
+	g.entries.center = numericentry.New("50")
 	g.entries.center.Disable()
-
-	g.entries.steps = numericentry.New()
-	g.entries.steps.SetText("10")
+	g.entries.steps = numericentry.New("10")
 
 	g.entries.typ = widget.NewSelect([]string{"Dial", "DualDial", "VBar", "HBar", "CBar"}, func(s string) {
 		switch s {

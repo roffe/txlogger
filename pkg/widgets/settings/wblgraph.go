@@ -21,9 +21,10 @@ var (
 )
 
 const (
-	graphMargin = 16
-	pointSize   = 12
-	minGraph    = 280
+	graphMargin    = 16
+	pointSize      = 12
+	minGraphWidth  = 360
+	minGraphHeight = 280
 
 	yMin = 0
 	yMax = 1023
@@ -242,7 +243,7 @@ func (r *graphRenderer) Objects() []fyne.CanvasObject {
 }
 
 func (r *graphRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(minGraph, minGraph)
+	return fyne.NewSize(minGraphWidth, minGraphHeight)
 }
 
 func (r *graphRenderer) Destroy() {}
