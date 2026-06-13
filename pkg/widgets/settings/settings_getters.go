@@ -247,5 +247,5 @@ func (sw *Widget) GetPlotterRenderer() plotter.PlotBackend {
 }
 
 func (sw *Widget) GetMeshRenderer() meshgrid.RenderBackend {
-	return meshgrid.RenderBackend(fyne.CurrentApp().Preferences().IntWithFallback(prefsMeshRenderer, 0))
+	return meshgrid.RenderBackend(fyne.CurrentApp().Preferences().IntWithFallback(prefsMeshRenderer, 2))
 }
