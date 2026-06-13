@@ -18,61 +18,15 @@ import (
 	"go.bug.st/serial/enumerator"
 )
 
-const (
-	prefsFreq                  = "freq"
-	prefsAutoUpdateLoadEcu     = "autoUpdateLoadEcu"
-	prefsAutoUpdateSaveEcu     = "autoUpdateSaveEcu"
-	prefsLivePreview           = "livePreview"
-	prefsMeshView              = "liveMeshView"
-	prefsRealtimeBars          = "realtimeBars"
-	prefsLogFormat             = "logFormat"
-	prefsLogPath               = "logPath"
-	prefsWblSource             = "wblSource"
-	prefsWidebandSymbolName    = "widebandSymbolName"
-	prefsUseMPH                = "useMPH"
-	prefsSwapRPMandSpeed       = "swapRPMandSpeed"
-	prefsCursorFollowCrosshair = "cursorFollowCrosshair"
-	prefsWBLPort               = "wblPort"
-
-	prefsLastADScannerPreset = "lastADScannerPreset"
-	prefsWBLSupportPoints    = "wblSupportPoints"
-	prefsWBLLambdaValues     = "wblLambdaValues"
-	prefsLastADScannerECU    = "lastADScannerECU"
-	prefsWBLADScannerSymbol  = "wblADScannerSymbol"
-
-	prefsUseADScanner   = "useADScanner"
-	prefsColorBlindMode = "colorBlindMode"
-
-	prefsPlotterRenderer = "plotterRenderer"
-	prefsMeshRenderer    = "meshRenderer"
-
-	// CAN
-	prefsAdapter = "adapter"
-	prefsPort    = "port"
-	prefsSpeed   = "speed"
-	prefsDebug   = "debug"
-
-	// Flash
-	PrefsNvdm = "nvdm"
-	PrefsBoot = "boot"
-)
-
-var portSpeeds = []string{"9600", "19200", "38400", "57600", "115200", "230400", "460800", "500000", "921600", "1mbit", "2mbit", "3mbit"}
-
-type SettingsWidgetInterface interface {
-	Get(key string) (string, error)
-	Widget() fyne.Widget
-}
-
-type SetText interface {
-	SetText(string)
-}
-
+// Config carries callbacks the settings widget needs from its host.
 type Config struct {
 	Logger          func(string)
 	SelectedEcuFunc func() string
 }
 
+// Widget is the settings panel. All persisted state lives in the application
+// preferences (see prefs.go); the fields below are just the UI controls bound
+// to those preferences.
 type Widget struct {
 	widget.BaseWidget
 
@@ -80,7 +34,7 @@ type Widget struct {
 
 	workDir *widget.Label
 
-	// CANSettings           *cansettings.Widget
+	// General
 	freqSlider            *widget.Slider
 	freqValue             *widget.Label
 	autoSave              *widget.Check
@@ -94,24 +48,22 @@ type Widget struct {
 	useMPH                *widget.Check
 	swapRPMandSpeed       *widget.Check
 	colorBlindMode        *widget.Select
+
 	// Graphics
 	plotRendererSelect *widget.Select
 	meshRendererSelect *widget.Select
 
-	// can settings
+	// CAN
 	debugCheckbox   *widget.Check
 	adapterSelector *widget.Select
 	refreshBtn      *widget.Button
 	portSelector    *widget.Select
 	portDescription *widget.Label
 	speedSelector   *widget.Select
+	adapters        map[string]*gocan.AdapterInfo
 
-	adapters map[string]*gocan.AdapterInfo
-
-	// WBL Specific
-
-	wbleditor *WBLEditor
-
+	// Wideband
+	wbleditor            *WBLEditor
 	wblADscanner         *widget.Check
 	wblADScannerSymbol   *widget.Select
 	wblSelectContainer   *fyne.Container
@@ -119,22 +71,7 @@ type Widget struct {
 	wblPortLabel         *widget.Label
 	wblPortSelect        *widget.Select
 	wblPortRefreshButton *widget.Button
-
-	images struct {
-		wblImage *canvas.Image
-
-		/*
-			mtxl        *canvas.Image
-			lc2         *canvas.Image
-			uego        *canvas.Image
-			lambdatocan *canvas.Image
-			t7          *canvas.Image
-			plx         *canvas.Image
-			combi       *canvas.Image
-			zeitronix   *canvas.Image
-			stagafr     *canvas.Image
-		*/
-	}
+	wblImage             *canvas.Image
 
 	mu sync.Mutex
 }
@@ -143,13 +80,12 @@ func New(cfg *Config) *Widget {
 	sw := &Widget{
 		cfg:      cfg,
 		adapters: make(map[string]*gocan.AdapterInfo),
+		wblImage: newImageFromResource("t7"),
 	}
 
 	for _, adapter := range gocan.ListAdapters() {
 		sw.adapters[adapter.Name] = &adapter
 	}
-
-	sw.images.wblImage = newImageFromResource("t7")
 
 	sw.ExtendBaseWidget(sw)
 	return sw
@@ -158,32 +94,32 @@ func New(cfg *Config) *Widget {
 func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	sw.workDir = widget.NewLabel("")
 	sw.workDir.Selectable = true
-	wd, err := os.Getwd()
-	if err != nil {
+	if wd, err := os.Getwd(); err != nil {
 		sw.workDir.SetText(fmt.Sprintf("Error getting working directory: %v", err))
 	} else {
 		sw.workDir.SetText(wd)
 	}
 
+	// General
 	sw.freqSlider = sw.newFreqSlider()
 	sw.freqValue = widget.NewLabel("")
-	sw.autoLoad = sw.newAutoUpdateLoad()
-	sw.autoSave = sw.newAutoUpdateSave()
-	sw.cursorFollowCrosshair = sw.newCursorFollowCrosshair()
-	sw.livePreview = sw.newLivePreview()
-	sw.meshView = sw.newMeshView()
-	sw.realtimeBars = sw.newRealtimeBars()
+	sw.autoLoad = checkBox("Load maps from ECU when connected", prefAutoLoad)
+	sw.autoSave = checkBox("Save changes automaticly if connected to ECU (requires open bin)", prefAutoSave)
+	sw.cursorFollowCrosshair = checkBox("Cursor follows crosshair in MapViewer (one hand mapping)", prefCursorFollowCrosshair)
+	sw.livePreview = checkBox("Live preview values in symbollist (uncheck if you have a slow pc)", prefLivePreview)
+	sw.meshView = checkBox("3D Mesh on map viewing", prefMeshView)
+	sw.realtimeBars = checkBox("Bars on live preview values (uncheck if you have a slow pc)", prefRealtimeBars)
 	sw.logFormat = sw.newLogFormat()
 	sw.logPath = widget.NewLabel("")
 	sw.logPath.Truncation = fyne.TextTruncateEllipsis
-	sw.useMPH = sw.newUserMPH()
-	sw.swapRPMandSpeed = sw.newSwapRPMandSpeed()
+	sw.useMPH = checkBox("Use mph instead of km/h", prefUseMPH)
+	sw.swapRPMandSpeed = checkBox("Swap RPM and speed gauge position", prefSwapRPMandSpeed)
 	sw.colorBlindMode = sw.newColorBlindMode()
 	sw.wblSelectContainer = sw.newWBLSelector()
 
 	// Graphics
-	sw.plotRendererSelect = sw.newPlotRendererSelect()
-	sw.meshRendererSelect = sw.newMeshRendererSelect()
+	sw.plotRendererSelect = indexSelect([]string{"Software", "Shader"}, prefPlotterRenderer)
+	sw.meshRendererSelect = indexSelect([]string{"Shader", "Polygons", "Software"}, prefMeshRenderer)
 
 	// CAN
 	sw.adapterSelector = sw.newAdapterSelector()
@@ -191,18 +127,11 @@ func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	sw.portDescription = widget.NewLabel("")
 	sw.portDescription.Importance = widget.LowImportance
 	sw.speedSelector = sw.newSpeedSelector()
-	sw.debugCheckbox = sw.newDebugCheckbox()
+	sw.debugCheckbox = checkBox("Debug", prefDebug)
 	sw.refreshBtn = sw.newPortRefreshButton()
 
-	names := make([]string, 0, len(sw.adapters))
-	for name := range sw.adapters {
-		names = append(names, name)
-	}
-	slices.SortFunc(names, func(i, j string) int {
-		return strings.Compare(strings.ToLower(i), strings.ToLower(j))
-	})
-	sw.adapterSelector.SetOptions(names)
-	if ad := fyne.CurrentApp().Preferences().String(prefsAdapter); ad != "" {
+	sw.adapterSelector.SetOptions(sw.sortedAdapterNames())
+	if ad := prefAdapter.get(); ad != "" {
 		sw.adapterSelector.SetSelected(ad)
 	}
 
@@ -216,34 +145,32 @@ func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	tabs.Append(sw.adScannerTab())
 	tabs.Append(container.NewTabItem("txbridge", txconfigurator.NewConfigurator()))
 
-	for _, adapter := range gocan.ListAdapters() {
-		sw.adapters[adapter.Name] = &adapter
-	}
-
 	sw.loadPreferences()
 	return widget.NewSimpleRenderer(tabs)
 }
 
-// Public API
+func (sw *Widget) sortedAdapterNames() []string {
+	names := make([]string, 0, len(sw.adapters))
+	for name := range sw.adapters {
+		names = append(names, name)
+	}
+	slices.SortFunc(names, func(i, j string) int {
+		return strings.Compare(strings.ToLower(i), strings.ToLower(j))
+	})
+	return names
+}
+
+// --- public API ------------------------------------------------------------
 
 var portCache = make(map[string]*enumerator.PortDetails)
 
 func (sw *Widget) ListPorts() []string {
-	var portsList []string
 	ports, err := enumerator.GetDetailedPortsList()
-	if err != nil {
-		// m.output(err.Error())
+	if err != nil || len(ports) == 0 {
 		return []string{}
 	}
-	if len(ports) == 0 {
-		// m.output("No serial ports found!")
-		return []string{}
-	}
+	portsList := make([]string, 0, len(ports))
 	for _, port := range ports {
-		// m.output(fmt.Sprintf("Found port: %s", port.Name))
-		// if port.IsUSB {
-		// m.output(fmt.Sprintf("  USB ID     %s:%s", port.VID, port.PID))
-		// m.output(fmt.Sprintf("  USB serial %s", port.SerialNumber))
 		portsList = append(portsList, port.Name)
 		portCache[port.Name] = port
 	}
@@ -258,7 +185,7 @@ func (sw *Widget) AddAdapters(adapters []*proto.AdapterInfo) {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
 	for _, adapter := range adapters {
-		adapter := &gocan.AdapterInfo{
+		info := &gocan.AdapterInfo{
 			Name:        adapter.GetName(),
 			Description: adapter.GetDescription(),
 			Capabilities: gocan.AdapterCapabilities{
@@ -268,36 +195,35 @@ func (sw *Widget) AddAdapters(adapters []*proto.AdapterInfo) {
 			},
 			RequiresSerialPort: adapter.GetRequireSerialPort(),
 		}
-
-		if _, found := sw.adapters[adapter.Name]; found {
+		if _, found := sw.adapters[info.Name]; found {
 			continue
 		}
-		sw.adapters[adapter.Name] = adapter
+		sw.adapters[info.Name] = info
 	}
 }
 
-func (c *Widget) Disable() {
-	c.adapterSelector.Disable()
-	c.portSelector.Disable()
-	c.speedSelector.Disable()
-	c.debugCheckbox.Disable()
-	c.refreshBtn.Disable()
+func (sw *Widget) Disable() {
+	sw.adapterSelector.Disable()
+	sw.portSelector.Disable()
+	sw.speedSelector.Disable()
+	sw.debugCheckbox.Disable()
+	sw.refreshBtn.Disable()
 }
 
-func (c *Widget) Enable() {
-	c.adapterSelector.Enable()
-	c.portSelector.Enable()
-	c.speedSelector.Enable()
-	c.debugCheckbox.Enable()
-	c.refreshBtn.Enable()
+func (sw *Widget) Enable() {
+	sw.adapterSelector.Enable()
+	sw.portSelector.Enable()
+	sw.speedSelector.Enable()
+	sw.debugCheckbox.Enable()
+	sw.refreshBtn.Enable()
 
-	if info, found := c.adapters[c.adapterSelector.Selected]; found {
+	if info, found := sw.adapters[sw.adapterSelector.Selected]; found {
 		if info.RequiresSerialPort {
-			c.portSelector.Enable()
-			c.speedSelector.Enable()
+			sw.portSelector.Enable()
+			sw.speedSelector.Enable()
 		} else {
-			c.portSelector.Disable()
-			c.speedSelector.Disable()
+			sw.portSelector.Disable()
+			sw.speedSelector.Disable()
 		}
 	}
 }
