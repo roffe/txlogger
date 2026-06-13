@@ -204,6 +204,41 @@ void edge_check(vec2 p_dev, vec3 pa, vec3 pb, float ha, float hb, inout float be
     }
 }
 
+// fake ambient occlusion: darken concave cells (valleys, creases) using the
+// height-field Laplacian sampled at the cell centre and its four neighbours.
+// A positive Laplacian means the centre sits below its surroundings, so it
+// would be shadowed by them; convex ridges (negative) are left untouched.
+float cell_ao(float cx, float cy) {
+    float cxm = max(cx - 0.5, 0.0);
+    float cxp = min(cx + 1.5, grid_cols);
+    float cym = max(cy - 0.5, 0.0);
+    float cyp = min(cy + 1.5, grid_rows);
+    float hc = corner_height(cx + 0.5, cy + 0.5);
+    float lap = corner_height(cxp, cy + 0.5) + corner_height(cxm, cy + 0.5)
+              + corner_height(cx + 0.5, cyp) + corner_height(cx + 0.5, cym) - 4.0 * hc;
+    float c = clamp(lap / max(height_units, 0.0001), 0.0, 1.0);
+    return 1.0 - 0.4 * c;
+}
+
+// Blinn-Phong shading with an ambient floor and fake AO. n is the raw cell
+// normal from cross(C-A, D-B), which points along -Z for a flat cell, so it is
+// flipped to face up. light and view_dir are unit vectors in grid space; the
+// specular term is gated to the lit side and the ambient term keeps shadowed
+// faces readable instead of black.
+vec3 shade_surface(vec3 base, vec3 n, vec3 light, vec3 view_dir, float ao) {
+    float nl = length(n);
+    if (nl <= 0.0) {
+        return base * ao;
+    }
+    vec3 N = -n / nl;
+    float diff = max(dot(N, light), 0.0);
+    vec3 H = normalize(light + view_dir);
+    float spec = (diff > 0.0) ? pow(max(dot(N, H), 0.0), 32.0) : 0.0;
+    vec3 col = base * ((0.32 + 0.68 * diff) * ao);
+    col += vec3(0.25 * spec);
+    return col;
+}
+
 void main() {
     mat3 rot = mat3(r0, r3, r6, r1, r4, r7, r2, r5, r8);
 
@@ -256,6 +291,10 @@ void main() {
     int mode = int(render_mode + 0.5);
     float half_w = 0.5 * pix_scale;
     vec3 light = vec3(light_x, light_y, light_z);
+    // grid-space direction from the surface toward the camera: the view ray
+    // marches from near to far along rd = -(r6,r7,r8), so the viewer lies along
+    // +(r6,r7,r8), already unit length since the rotation is orthonormal
+    vec3 view_dir = vec3(r6, r7, r8);
 
     vec3 acc = vec3(0.0);
     float acc_a = 0.0;
@@ -304,10 +343,8 @@ void main() {
                 vec3 rgb = height_color(hit_h, view_z);
 
                 vec3 n = cross(C - A, D - B);
-                float nl = length(n);
-                if (nl > 0.0) {
-                    rgb *= 0.6 + 0.4 * abs(dot(n / nl, light));
-                }
+                float ao = cell_ao(cx, cy);
+                rgb = shade_surface(rgb, n, light, view_dir, ao);
 
                 if (mode == 0) {
                     vec3 pa = project_grid(rot, A, pix_scale);

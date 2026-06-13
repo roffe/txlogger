@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"log"
+	"math"
 	"os"
 	"time"
 
@@ -104,6 +105,11 @@ type Meshgrid struct {
 
 	rotationMatrix Matrix3x3
 	scale          float64
+
+	// fitted is set once the widget has received its first real size and the
+	// mesh has been auto-scaled to fit. Subsequent resizes scale relative to
+	// the size change so the user's manual zoom is preserved.
+	fitted bool
 
 	cameraRotation Matrix3x3  // Camera's rotation matrix
 	cameraPosition [3]float64 // Camera's position in world space
@@ -320,6 +326,118 @@ func (m *Meshgrid) scaleMeshgrid(factor float64) {
 	m.updateVertexPositions()
 }
 
+// fitMargin leaves a border around the mesh so it isn't drawn flush to the
+// widget edges (and so the axis indicator, which extends past the mesh, has
+// some room).
+const fitMargin = 0.85
+
+// projectedBounds returns the min/max of the mesh's current projected
+// (orthographic) screen positions. Both reflect the current scale, rotation
+// and pan.
+func (m *Meshgrid) projectedBounds() (minX, maxX, minY, maxY float64) {
+	minX, maxX = math.Inf(1), math.Inf(-1)
+	minY, maxY = math.Inf(1), math.Inf(-1)
+	for i := range m.vertices {
+		row := m.vertices[i]
+		for j := range row {
+			v := &row[j]
+			if v.X < minX {
+				minX = v.X
+			}
+			if v.X > maxX {
+				maxX = v.X
+			}
+			if v.Y < minY {
+				minY = v.Y
+			}
+			if v.Y > maxY {
+				maxY = v.Y
+			}
+		}
+	}
+	return
+}
+
+// projectedExtent returns the width and height, in logical pixels, of the
+// mesh's current projected bounding box. It reflects the current scale and
+// rotation; panning shifts every vertex equally so the extent is
+// pan-invariant.
+func (m *Meshgrid) projectedExtent() (w, h float64) {
+	minX, maxX, minY, maxY := m.projectedBounds()
+	if math.IsInf(minX, 0) || math.IsInf(minY, 0) {
+		return 0, 0
+	}
+	return maxX - minX, maxY - minY
+}
+
+// centerInView pans the camera so the mesh's projected bounding box is
+// centered in the widget. Used on the initial fit only; the camera offset it
+// produces scales with the mesh on later resizes, so the centering (and any
+// user pan applied on top) is preserved.
+func (m *Meshgrid) centerInView() {
+	minX, maxX, minY, maxY := m.projectedBounds()
+	if math.IsInf(minX, 0) || math.IsInf(minY, 0) {
+		return
+	}
+	// v.{X,Y} = base - cam, so adding the current box center to the camera
+	// moves the box center to the view origin (which maps to screen center).
+	m.cameraPosition[0] += (minX + maxX) / 2
+	m.cameraPosition[1] += (minY + maxY) / 2
+	m.updateVertexPositions()
+}
+
+// fitScaleForSize returns the m.scale value that makes the mesh's projected
+// bounding box fill the given widget size (minus fitMargin) at the current
+// rotation. The bounding box is linear in m.scale, so it is normalized to a
+// unit scale first.
+func (m *Meshgrid) fitScaleForSize(size fyne.Size) float64 {
+	w, h := m.projectedExtent()
+	if w <= 0 || h <= 0 || m.scale == 0 {
+		return m.scale
+	}
+	wPer := w / m.scale
+	hPer := h / m.scale
+	sx := float64(size.Width) * fitMargin / wPer
+	sy := float64(size.Height) * fitMargin / hPer
+	return math.Min(sx, sy)
+}
+
+// adaptZoom keeps the mesh sized to the widget across layout changes. The
+// first real layout fits the mesh to the view and centers it; later resizes
+// scale the mesh (and the camera pan) by the ratio of the new fit-scale to
+// the old. This grows and shrinks the mesh with the window while preserving
+// whatever zoom and pan the user has applied — it adjusts the existing scale
+// and pan multiplicatively rather than resetting them.
+func (m *Meshgrid) adaptZoom(oldSize, newSize fyne.Size) {
+	if newSize.Width <= 0 || newSize.Height <= 0 {
+		return
+	}
+	if !m.fitted {
+		m.scale = m.fitScaleForSize(newSize)
+		m.fitted = true
+		m.updateVertexPositions()
+		m.centerInView()
+		return
+	}
+	if oldSize.Width <= 0 || oldSize.Height <= 0 {
+		return
+	}
+	oldFit := m.fitScaleForSize(oldSize)
+	if oldFit == 0 {
+		return
+	}
+	ratio := m.fitScaleForSize(newSize) / oldFit
+	if ratio <= 0 || math.IsInf(ratio, 0) || math.IsNaN(ratio) {
+		return
+	}
+	m.scale *= ratio
+	// Pan lives in the same scaled view space, so scale it alongside the mesh
+	// to keep the centering and any user pan in the same relative spot.
+	m.cameraPosition[0] *= ratio
+	m.cameraPosition[1] *= ratio
+	m.updateVertexPositions()
+}
+
 // orbit performs a Fusion 360-style "turntable" orbit. Spin is applied around
 // the mesh's own vertical axis — data Z, the height axis (right-multiplied so
 // it rotates the model before the camera) — pitch around the camera-local X
@@ -521,7 +639,11 @@ func (m *meshgridRenderer) Layout(size fyne.Size) {
 	if size == m.MG.size {
 		return
 	}
+	oldSize := m.MG.size
 	m.MG.size = size
+	// Auto-fit on the first real size and scale with the window thereafter,
+	// preserving any zoom the user has applied.
+	m.MG.adaptZoom(oldSize, size)
 	switch m.MG.backend {
 	case BackendShader:
 		m.MG.shader.Resize(size)
