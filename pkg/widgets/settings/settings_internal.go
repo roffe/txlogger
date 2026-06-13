@@ -221,9 +221,9 @@ func (sw *Widget) newColorBlindMode() *widget.Select {
 }
 
 func (sw *Widget) newPlotRendererSelect() *widget.Select {
-	return widget.NewSelect([]string{"Software", "Shader"}, func(s string) {
+	return widget.NewSelect([]string{"Software", "Shader"}, func(selection string) {
 		var mode int
-		switch s {
+		switch selection {
 		case "Software":
 			mode = 0
 		case "Shader":
@@ -234,9 +234,9 @@ func (sw *Widget) newPlotRendererSelect() *widget.Select {
 }
 
 func (sw *Widget) newMeshRendererSelect() *widget.Select {
-	return widget.NewSelect([]string{"Shader", "Polygons", "Software"}, func(s string) {
+	return widget.NewSelect([]string{"Shader", "Polygons", "Software"}, func(selection string) {
 		var mode int
-		switch s {
+		switch selection {
 		case "Shader":
 			mode = 0
 		case "Polygons":
