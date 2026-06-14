@@ -96,13 +96,16 @@ func (c *ISP2Client) Start(ctx context.Context) error {
 // openPort opens the serial port and stores it on the client.
 func (c *ISP2Client) openPort() error {
 	mode := &serial.Mode{
-		BaudRate: 9600,
+		BaudRate: 19200,
 	}
 	sp, err := serial.Open(c.port, mode)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open serial port: %w", err)
 	}
-	sp.SetReadTimeout(20 * time.Millisecond)
+	if err := sp.SetReadTimeout(5 * time.Millisecond); err != nil {
+		sp.Close()
+		return fmt.Errorf("failed to set read timeout: %w", err)
+	}
 
 	c.mu.Lock()
 	c.sp = sp
@@ -126,7 +129,7 @@ func (c *ISP2Client) closePort() {
 	c.mu.Unlock()
 	if sp != nil {
 		if err := sp.Close(); err != nil {
-			c.log("isp2: " + err.Error())
+			c.log("isp2: failed to close serial port: " + err.Error())
 		}
 	}
 }
