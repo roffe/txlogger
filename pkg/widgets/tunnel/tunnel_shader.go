@@ -96,9 +96,13 @@ void main() {
     vec2 uv = sc;
 
     // rollercoaster: drift the vanishing point along a couple of detuned
-    // sinusoids so the track appears to bank and weave
-    uv -= vec2(sin(time * 0.7) * 0.34 + sin(time * 1.31) * 0.11,
-               cos(time * 0.53) * 0.30 + cos(time * 1.79) * 0.09);
+    // sinusoids so the track appears to bank and weave. vp is the hole's
+    // position in screen (sc) space; the bank below rotates around it, so the
+    // tunnel mouth always sits at sc == vp. The crawl reuses vp as the far
+    // point its text converges into.
+    vec2 vp = vec2(sin(time * 0.7) * 0.34 + sin(time * 1.31) * 0.11,
+                   cos(time * 0.53) * 0.30 + cos(time * 1.79) * 0.09);
+    uv -= vp;
 
     // bank the whole frame into the curves
     float bank = sin(time * 0.61) * 0.55;
@@ -142,23 +146,40 @@ void main() {
     // vignette toward the outer edge
     col *= 1.0 - 0.40 * smoothstep(0.7, 1.5, r);
 
-    // --- Star Wars credits crawl: rises from the bottom into the tunnel centre ---
-    // A floor plane recedes from the bottom edge (sc.y ~ 1, near) toward the
-    // tunnel mouth (sc.y -> 0, far). z = persp/sc.y is the depth along it; the
-    // text narrows with depth (s uses sc.x*z) and scrolls in line units that
-    // wrap with fract, so a blank first/last line hides the loop seam.
-    if (crawl_lines > 0.5 && sc.y > 0.045) {
+    // --- Star Wars credits crawl: flows up the floor into the moving hole ---
+    // A floor plane recedes from the bottom edge (near) toward the tunnel
+    // mouth (far), but its far end now converges on the drifting hole vp
+    // instead of the screen centre. yh is depth below the moving horizon
+    // (the floor lives where sc.y > vp.y); z = persp/yh is depth along it.
+    // The lane centre slides from x = 0 at the bottom to vp.x at the horizon,
+    // so the text stays anchored where it emerges yet leans and sways toward
+    // the wandering hole. s narrows the text with depth, and lf scrolls in
+    // line units that wrap with fract (a blank first/last line hides the loop
+    // seam) while staying < 0 on the first pass so the strip rises in from the
+    // bottom.
+    float yh = sc.y - vp.y;
+    if (crawl_lines > 0.5 && yh > 0.045) {
         float cw = crawl_width > 0.0 ? crawl_width : 0.9;
         float cz = crawl_zlines > 0.0 ? crawl_zlines : 3.0;
         float cp = crawl_persp > 0.0 ? crawl_persp : 0.45;
         float cs = crawl_speed > 0.0 ? crawl_speed : 0.8;
 
-        float z = cp / sc.y;
-        float s = sc.x * z / cw + 0.5;
-        if (s >= 0.0 && s <= 1.0) {
-            float t = fract((time * cs - z * cz) / crawl_lines);
+        float z = cp / yh;
+        // g runs 0 at the bottom anchor to 1 at the horizon. The lane centre
+        // first leans on a straight line from x = 0 to the hole (vp.x)...
+        float g = clamp((1.0 - sc.y) / (1.0 - vp.y), 0.0, 1.0);
+        float centerX = vp.x * g;
+        // ...then bows sideways so the path curves into the mouth along with
+        // the tunnel. g*(1-g) pins both ends (bottom anchor and hole) while the
+        // shared bank phase, plus a depth twist, make deeper sections lead the
+        // curve the same way the rings bank and spiral.
+        centerX += 0.9 * g * (1.0 - g) * sin(bank * 2.0 - g * 2.5);
+        float s = (sc.x - centerX) * z / cw + 0.5;
+        float lf = (time * cs - z * cz) / crawl_lines;
+        if (s >= 0.0 && s <= 1.0 && lf >= 0.0) {
+            float t = fract(lf);
             float a = texture2D(crawl_tex, vec2(s, t)).a;
-            a *= smoothstep(0.045, 0.18, sc.y) * smoothstep(1.5, 1.0, sc.y);
+            a *= smoothstep(0.045, 0.18, yh) * smoothstep(1.5, 1.0, sc.y);
             vec3 crawlCol = vec3(1.0, 0.85, 0.2); // classic crawl yellow
             col = mix(col, crawlCol, a);
             col += crawlCol * a * 0.25;           // soft neon glow
