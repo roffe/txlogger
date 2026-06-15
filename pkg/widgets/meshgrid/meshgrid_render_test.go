@@ -21,12 +21,26 @@ func testGrid(t testing.TB) *Meshgrid {
 			values[i*cols+j] = 100 / (1 + x*x + y*y) // central hump
 		}
 	}
-	m, err := NewMeshgrid("RPM", "Load", "Fuel", values, cols, rows, colors.ModeNormal, backendFromEnv())
+	xData, yData := axisValues(cols, rows)
+	m, err := NewMeshgrid("RPM", "Load", "Fuel", values, cols, rows, xData, yData, 0, 0, 0, colors.ModeNormal, backendFromEnv())
 	if err != nil {
 		t.Fatal(err)
 	}
 	m.size = fyne.NewSize(800, 500)
 	return m
+}
+
+// axisValues builds simple monotonic column/row axis ticks for tests.
+func axisValues(cols, rows int) (xData, yData []float64) {
+	xData = make([]float64, cols)
+	for j := range xData {
+		xData[j] = float64(j * 500)
+	}
+	yData = make([]float64, rows)
+	for i := range yData {
+		yData[i] = float64(i * 10)
+	}
+	return xData, yData
 }
 
 // TestRenderRotated renders an asymmetric surface (tall corner spike) from
@@ -46,7 +60,8 @@ func TestRenderRotated(t *testing.T) {
 				values[i*cols+j] = 10 + 100/(1+x*x+y*y) // spike near one corner
 			}
 		}
-		m, err := NewMeshgrid("RPM", "Load", "Fuel", values, cols, rows, colors.ModeNormal, backendFromEnv())
+		xData, yData := axisValues(cols, rows)
+		m, err := NewMeshgrid("RPM", "Load", "Fuel", values, cols, rows, xData, yData, 0, 0, 0, colors.ModeNormal, backendFromEnv())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -79,6 +94,65 @@ func TestCursorScreenPosition(t *testing.T) {
 	}
 	if px < 0 || px > m.size.Width || py < 0 || py > m.size.Height {
 		t.Fatalf("cursor (%v, %v) outside widget %v", px, py, m.size)
+	}
+}
+
+// the axis-scale geometry must contain the three labeled box edges, the axis
+// names and the real first/last tick values for each axis, all projected inside
+// a sane neighborhood of the widget.
+func TestAxisGeometry(t *testing.T) {
+	m := testGrid(t) // 16x16, xData[j]=j*500, yData[i]=i*10, "RPM"/"Load"/"Fuel"
+	segs, labels := m.computeAxisGeometry()
+
+	if len(segs) < 3 {
+		t.Fatalf("got %d axis segments, want at least the 3 box edges", len(segs))
+	}
+
+	have := make(map[string]bool, len(labels))
+	for _, l := range labels {
+		have[l.text] = true
+	}
+	// axis names plus the first/last X and Y tick values, which appendAxis
+	// always labels regardless of thinning
+	for _, want := range []string{"RPM", "Load", "Fuel", "7500", "150"} {
+		if !have[want] {
+			t.Errorf("axis labels missing %q; have %v", want, have)
+		}
+	}
+
+	// every label and tick endpoint must land near the widget (a broad sanity
+	// bound: outward-offset labels may sit a little outside the frame)
+	const margin = 200
+	for _, l := range labels {
+		if l.x < -margin || l.x > m.size.Width+margin || l.y < -margin || l.y > m.size.Height+margin {
+			t.Errorf("label %q at (%v,%v) far outside widget %v", l.text, l.x, l.y, m.size)
+		}
+	}
+}
+
+// updateAxisObjects must drive the canvas pools without a driver panic and
+// leave at least the three edges and three axis names visible.
+func TestUpdateAxisObjectsOverlay(t *testing.T) {
+	test.NewApp() // canvas.Text.MinSize needs a (test) driver
+	m := testGrid(t)
+	m.updateAxisObjects()
+
+	visibleLines, visibleTexts := 0, 0
+	for _, l := range m.axisLinePool {
+		if !l.Hidden {
+			visibleLines++
+		}
+	}
+	for _, tx := range m.axisTextPool {
+		if !tx.Hidden {
+			visibleTexts++
+		}
+	}
+	if visibleLines < 3 {
+		t.Errorf("want at least the 3 box-edge lines visible, got %d", visibleLines)
+	}
+	if visibleTexts < 3 {
+		t.Errorf("want at least the 3 axis-name labels visible, got %d", visibleTexts)
 	}
 }
 
@@ -129,7 +203,8 @@ func TestPolygonDegenerateQuads(t *testing.T) {
 			values[i*cols+j] = float64((i / 4) * 100)
 		}
 	}
-	m, err := NewMeshgrid("RPM", "Load", "Fuel", values, cols, rows, colors.ModeNormal, backendFromEnv())
+	xData, yData := axisValues(cols, rows)
+	m, err := NewMeshgrid("RPM", "Load", "Fuel", values, cols, rows, xData, yData, 0, 0, 0, colors.ModeNormal, backendFromEnv())
 	if err != nil {
 		t.Fatal(err)
 	}

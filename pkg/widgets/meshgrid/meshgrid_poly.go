@@ -213,8 +213,11 @@ func (m *Meshgrid) updatePolygons() {
 		objs = append(objs, m.polys[q.i*m.cols+q.j])
 	}
 	m.updateAxisObjects()
-	for i := range m.axisLines {
-		objs = append(objs, m.axisLines[i], m.axisLabels[i])
+	for _, l := range m.axisLinePool {
+		objs = append(objs, l)
+	}
+	for _, t := range m.axisTextPool {
+		objs = append(objs, t)
 	}
 	objs = append(objs, m.cursor)
 	m.polyObjects = objs

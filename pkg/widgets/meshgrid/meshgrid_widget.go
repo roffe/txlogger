@@ -76,6 +76,11 @@ type Meshgrid struct {
 	scratchLines  []lineSegment
 	scratchQuads  []quadRef
 
+	// Scratch geometry for the axis-scale overlay, rebuilt each refresh by
+	// computeAxisGeometry and consumed by either the canvas pools or the raster.
+	scratchAxisSegs   []axisSeg
+	scratchAxisLabels []axisLabel
+
 	backend RenderBackend
 
 	// Shader backend (meshgrid_shader.go): the whole mesh in one object.
@@ -88,10 +93,13 @@ type Meshgrid struct {
 	scratchFX   []float32
 	scratchFY   []float32
 
-	// Axis-indicator overlay shared by the shader and polygon backends (the
-	// image backend draws its own into the raster).
-	axisLines  [3]*canvas.Line
-	axisLabels [3]*canvas.Text
+	// Axis-scale overlay shared by the shader and polygon backends (the image
+	// backend draws the same geometry into the raster). The line pool holds the
+	// three labeled box edges plus a tick mark per visible tick; the text pool
+	// holds a value label per visible tick plus the three axis-name labels.
+	// Both pools are sized to the worst case at init and Show/Hide per frame.
+	axisLinePool []*canvas.Line
+	axisTextPool []*canvas.Text
 
 	renderMode RenderMode
 
@@ -125,6 +133,14 @@ type Meshgrid struct {
 
 	xlabel, ylabel, zlabel string
 
+	// Axis tick values (one per column / row) and their display precision,
+	// used to draw the T7Suite-style scales along the mesh edges. xData has
+	// cols entries, yData has rows; either may be nil/short, in which case that
+	// axis' value labels are skipped. zPrec formats the height (Z) scale, whose
+	// values run from zmin to zmax.
+	xData, yData        []float64
+	xPrec, yPrec, zPrec int
+
 	refreshPending bool
 
 	colorMode colors.ColorBlindMode
@@ -144,7 +160,10 @@ var (
 const cursorRadius = 6
 
 // NewMeshgrid creates a new Meshgrid given width, height, depth and spacing.
-func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int, colorBlindMode colors.ColorBlindMode, backend RenderBackend) (*Meshgrid, error) {
+// xData/yData carry the per-column/row axis tick values (with xPrec/yPrec/zPrec
+// display precision) used to draw the axis scales along the mesh edges; either
+// may be nil to skip that axis' value labels.
+func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int, xData, yData []float64, xPrec, yPrec, zPrec int, colorBlindMode colors.ColorBlindMode, backend RenderBackend) (*Meshgrid, error) {
 	cols = max(1, cols)
 	rows = max(1, rows)
 	// Check if the provided values slice has the correct number of elements
@@ -175,6 +194,12 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 		xlabel: xlabel,
 		ylabel: ylabel,
 		zlabel: zlabel,
+
+		xData: xData,
+		yData: yData,
+		xPrec: xPrec,
+		yPrec: yPrec,
+		zPrec: zPrec,
 
 		colorMode: colorBlindMode,
 
@@ -492,6 +517,23 @@ func (m *Meshgrid) updateVertexPositions() {
 	}
 }
 
+// projectOriginal maps a point in the mesh's original (untransformed) coordinate
+// space to screen pixels, applying the same camera transform as
+// updateVertexPositions and the same screen mapping as cursorScreenPosition /
+// updatePolygons. It returns the screen x/y and the view-space depth (z), where
+// a larger z is nearer the viewer. This lets the axis overlay project arbitrary
+// box-edge points, not just stored vertices.
+func (m *Meshgrid) projectOriginal(ox, oy, oz float64) (sx, sy, vz float32) {
+	vx := (ox - m.centerX) * m.scale
+	vy := (oy - m.centerY) * m.scale
+	vz3 := (oz - m.centerZ) * m.scale
+	r := m.cameraRotation
+	x := r[0][0]*vx + r[0][1]*vy + r[0][2]*vz3 - m.cameraPosition[0]
+	y := r[1][0]*vx + r[1][1]*vy + r[1][2]*vz3 - m.cameraPosition[1]
+	z := r[2][0]*vx + r[2][1]*vy + r[2][2]*vz3 - m.cameraPosition[2]
+	return float32(float64(m.size.Width)*0.5 + x), float32(float64(m.size.Height)*0.5 + y), float32(z)
+}
+
 // SetFloat64 updates a single cell value. The whole mesh is rebuilt since a
 // new value can shift zmin/zmax and with it every vertex's normalized height.
 func (m *Meshgrid) SetFloat64(idx int, value float64) {
@@ -620,13 +662,6 @@ func (m *Meshgrid) throttledRefresh() {
 }
 
 func (m *Meshgrid) CreateRenderer() fyne.WidgetRenderer {
-	if m.backend != BackendImage {
-		// Text measuring needs a driver, so the labels can't be sized in the
-		// constructor (tests build widgets without an app).
-		for _, t := range m.axisLabels {
-			t.Resize(t.MinSize())
-		}
-	}
 	return &meshgridRenderer{MG: m}
 }
 
@@ -670,8 +705,11 @@ func (m *meshgridRenderer) Objects() []fyne.CanvasObject {
 		if m.objects == nil {
 			m.MG.updateAxisObjects()
 			objs := []fyne.CanvasObject{m.MG.shader}
-			for i := range m.MG.axisLines {
-				objs = append(objs, m.MG.axisLines[i], m.MG.axisLabels[i])
+			for _, l := range m.MG.axisLinePool {
+				objs = append(objs, l)
+			}
+			for _, t := range m.MG.axisTextPool {
+				objs = append(objs, t)
 			}
 			m.objects = append(objs, m.MG.cursor)
 		}

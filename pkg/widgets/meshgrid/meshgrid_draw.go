@@ -89,7 +89,7 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 
 	if mode != RenderModeWireframe {
 		m.drawSurface(img, projX, projY, vertCol, mode == RenderModeSolidWireframe)
-		m.drawAxisIndicator(img)
+		m.drawAxisScales(img)
 		return img
 	}
 
@@ -150,7 +150,7 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 		drawBresenhamLine(img, s.x1, s.y1, s.x2, s.y2, c1, c2)
 	}
 
-	m.drawAxisIndicator(img)
+	m.drawAxisScales(img)
 
 	return img
 }
