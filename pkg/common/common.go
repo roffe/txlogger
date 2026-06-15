@@ -89,6 +89,15 @@ func GetLayoutPath() (string, error) {
 	return layoutPath, createDirIfNotExists(layoutPath)
 }
 
+func GetMatrixBuilderPath() (string, error) {
+	dir, err := GetUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	matrixBuilderPath := GetComponentPath(dir, "matrixbuilder")
+	return matrixBuilderPath, createDirIfNotExists(matrixBuilderPath)
+}
+
 func GetBinPath() (string, error) {
 	dir, err := GetUserHomeDir()
 	if err != nil {

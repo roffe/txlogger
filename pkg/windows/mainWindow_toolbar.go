@@ -6,8 +6,22 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/widgets/canflasher"
+	"github.com/roffe/txlogger/pkg/widgets/matrixbuilder"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
+
+// openMatrixBuilder opens (or raises) the matrix builder window. The builder
+// loads its own log files, so it is independent of any open log player.
+func (mw *MainWindow) openMatrixBuilder() {
+	if w := mw.wm.HasWindow("Matrix builder"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	inner := multiwindow.NewInnerWindow("Matrix builder", matrixbuilder.New())
+	inner.Icon = theme.GridIcon()
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(1000, 720))
+}
 
 func (mw *MainWindow) newToolbar() *fyne.Container {
 	toolbar := container.NewHBox(
@@ -22,6 +36,7 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 		mw.buttons.symbolListBtn,
 		mw.buttons.logBtn,
 		mw.buttons.dashboardBtn,
+		widget.NewButtonWithIcon("Matrix", theme.GridIcon(), mw.openMatrixBuilder),
 		widget.NewButtonWithIcon("", theme.GridIcon(), func() {
 			mw.wm.Arrange(&multiwindow.GridArranger{})
 		}),

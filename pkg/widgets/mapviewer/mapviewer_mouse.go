@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 )
@@ -104,6 +105,12 @@ func (mv *MapViewer) handlePrimaryCtrlClick(event *desktop.MouseEvent) {
 		mv.selectedCells = append(mv.selectedCells, newCell)
 		mv.selectionRects[newCell].Show()
 	}
+	// Show()/Hide() only flip the Hidden flag, and canvas.Refresh on a rect
+	// that has never been painted (a hidden overlay cell) is a no-op because the
+	// object isn't in the canvas cache. Refresh the always-visible value rect for
+	// this cell instead to dirty the canvas and force an immediate repaint that
+	// draws the toggled highlight.
+	canvas.Refresh(mv.zDataRects[newCell])
 }
 
 // handlePrimaryClickWithShift extends the selection from the current anchor to

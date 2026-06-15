@@ -174,6 +174,44 @@ func (mw *MainWindow) setupMenu() {
 		},
 	}
 
+	openItem := fyne.NewMenuItemWithIcon("Open", theme.FolderIcon(), nil)
+	openItem.ChildMenu = fyne.NewMenu("File",
+		fyne.NewMenuItemWithIcon("Open binary", theme.DocumentIcon(), mw.loadBinary),
+		fyne.NewMenuItemWithIcon("Open log", theme.DocumentIcon(), func() {
+			cb := func(r fyne.URIReadCloser) {
+				defer r.Close()
+				filename := r.URI().Name()
+				mw.Log("opening logfile " + filename)
+				sz := mw.Window.Content().Size()
+				p := fyne.NewPos(sz.Width/2, sz.Height/2)
+				mw.LoadLogfile(filename, r, p)
+			}
+			widgets.SelectFile(cb, "Log file", "csv", "bpl", "t5l", "t7l", "t8l")
+		}),
+		fyne.NewMenuItemWithIcon("Open log in new window", theme.DocumentIcon(), func() {
+			cb := func(r fyne.URIReadCloser) {
+				defer r.Close()
+				filename := r.URI().Path()
+				mw.LoadLogfileCombined(filename, r, fyne.Position{}, true)
+			}
+			widgets.SelectFile(cb, "logfile", "t5l", "t7l", "t8l", "csv", "bpl")
+		}),
+		fyne.NewMenuItemWithIcon("Open log folder", theme.FolderIcon(), func() {
+			var cmd *exec.Cmd
+			switch runtime.GOOS {
+			case "windows":
+				cmd = exec.Command("explorer", mw.settings.GetLogPath())
+			case "darwin":
+				cmd = exec.Command("open", mw.settings.GetLogPath())
+			default:
+				cmd = exec.Command("xdg-open", mw.settings.GetLogPath())
+			}
+			if err := cmd.Start(); err != nil {
+				mw.Error(err)
+			}
+		}),
+	)
+
 	leading := []*fyne.Menu{
 		fyne.NewMenu("File",
 			fyne.NewMenuItemWithIcon("About", theme.HelpIcon(), func() {
@@ -185,40 +223,7 @@ func (mw *MainWindow) setupMenu() {
 				inner.Icon = theme.HelpIcon()
 				mw.wm.Add(inner)
 			}),
-			fyne.NewMenuItemWithIcon("Open binary", theme.DocumentIcon(), mw.loadBinary),
-			fyne.NewMenuItemWithIcon("Open log", theme.DocumentIcon(), func() {
-				cb := func(r fyne.URIReadCloser) {
-					defer r.Close()
-					filename := r.URI().Name()
-					mw.Log("opening logfile " + filename)
-					sz := mw.Window.Content().Size()
-					p := fyne.NewPos(sz.Width/2, sz.Height/2)
-					mw.LoadLogfile(filename, r, p)
-				}
-				widgets.SelectFile(cb, "Log file", "csv", "t5l", "t7l", "t8l")
-			}),
-			fyne.NewMenuItemWithIcon("Open log in new window", theme.DocumentIcon(), func() {
-				cb := func(r fyne.URIReadCloser) {
-					defer r.Close()
-					filename := r.URI().Path()
-					mw.LoadLogfileCombined(filename, r, fyne.Position{}, true)
-				}
-				widgets.SelectFile(cb, "logfile", "t5l", "t7l", "t8l", "csv")
-			}),
-			fyne.NewMenuItemWithIcon("Open log folder", theme.FolderIcon(), func() {
-				var cmd *exec.Cmd
-				switch runtime.GOOS {
-				case "windows":
-					cmd = exec.Command("explorer", mw.settings.GetLogPath())
-				case "darwin":
-					cmd = exec.Command("open", mw.settings.GetLogPath())
-				default:
-					cmd = exec.Command("xdg-open", mw.settings.GetLogPath())
-				}
-				if err := cmd.Start(); err != nil {
-					mw.Error(err)
-				}
-			}),
+			openItem,
 			fyne.NewMenuItemWithIcon("Settings", theme.SettingsIcon(), func() {
 				mw.openSettings()
 			}),

@@ -220,13 +220,11 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		leading,
 		container.NewBorder(
 			nil,
-			container.NewGridWithColumns(1,
-				widget.NewButton("Toggle visible", func() {
-					for _, ts := range p.legendTexts {
-						ts.Tapped(&fyne.PointEvent{})
-					}
-				}),
-			),
+			widget.NewButton("Toggle visible", func() {
+				for _, ts := range p.legendTexts {
+					ts.Tapped(&fyne.PointEvent{})
+				}
+			}),
 			nil,
 			nil,
 			container.NewVScroll(p.legend),

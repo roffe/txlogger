@@ -14,6 +14,14 @@ func selectFile(desc string, exts ...string) (string, error) {
 	return runChild("open_file", "Open "+desc, desc, exts...)
 }
 
+func selectFiles(desc string, exts ...string) ([]string, error) {
+	resp, err := runChildResp("open_files", "Open "+desc, desc, exts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Paths, nil
+}
+
 func saveFile(desc string, ext string) (string, error) {
 	return runChild("save_file", "Save "+desc, desc, ext)
 }
@@ -23,6 +31,14 @@ func selectFolder() (string, error) {
 }
 
 func runChild(op, title, desc string, exts ...string) (string, error) {
+	resp, err := runChildResp(op, title, desc, exts...)
+	if err != nil {
+		return resp.Path, err
+	}
+	return resp.Path, nil
+}
+
+func runChildResp(op, title, desc string, exts ...string) (native.FileResponse, error) {
 	child := exec.Command("/proc/self/exe") // re-exec self
 	child.Env = append(os.Environ(), "FP=1")
 	childIn, _ := child.StdinPipe()
@@ -31,7 +47,7 @@ func runChild(op, title, desc string, exts ...string) (string, error) {
 	defer childIn.Close()
 
 	if err := child.Start(); err != nil {
-		return "", fmt.Errorf("failed to start child: %w\n", err)
+		return native.FileResponse{}, fmt.Errorf("failed to start child: %w\n", err)
 	}
 
 	enc := json.NewEncoder(childIn)
@@ -44,7 +60,7 @@ func runChild(op, title, desc string, exts ...string) (string, error) {
 		Exts:  exts,
 	}
 	if err := enc.Encode(req); err != nil {
-		return "", fmt.Errorf("error decoding response: %w", err)
+		return native.FileResponse{}, fmt.Errorf("error decoding response: %w", err)
 	}
 
 	var resp native.FileResponse
@@ -53,12 +69,12 @@ func runChild(op, title, desc string, exts ...string) (string, error) {
 	waitErr := child.Wait()
 
 	if decodeErr != nil {
-		return "", decodeErr
+		return native.FileResponse{}, decodeErr
 	}
 
 	if resp.Err != "" {
-		return resp.Path, errors.New(resp.Err)
+		return resp, errors.New(resp.Err)
 	}
 
-	return resp.Path, waitErr
+	return resp, waitErr
 }

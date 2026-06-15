@@ -48,6 +48,33 @@ func SelectFile(callback func(r fyne.URIReadCloser), desc string, exts ...string
 	}()
 }
 
+func SelectFiles(callback func(rc []fyne.URIReadCloser), desc string, exts ...string) {
+	go func() {
+		filenames, err := selectFiles(desc, exts...)
+		if err != nil {
+			if errors.Is(err, native.ErrCancelled) || err.Error() == "Cancelled" {
+				return
+			}
+			log.Println("Error selecting files:", err)
+			return
+		}
+		readers := make([]fyne.URIReadCloser, 0, len(filenames))
+		for _, filename := range filenames {
+			uri := storage.NewFileURI(filename)
+			r, err := storage.Reader(uri)
+			if err != nil {
+				log.Println("Error reading file:", err)
+				continue
+			}
+			readers = append(readers, r)
+		}
+		if len(readers) == 0 {
+			return
+		}
+		fyne.Do(func() { callback(readers) })
+	}()
+}
+
 func SaveFile(callback func(str string), desc string, ext string) {
 	go func() {
 		//filter := native.FileFilter{Description: desc, Extensions: []string{ext}}

@@ -20,6 +20,7 @@
 - Dial and Dual Dial now uses shaders to draw the faces, dials and pips
 - Improved cell selection in mapviewer
 - Improved copy paste in mapviewer, added paste here function
+- Added a Matrix builder from logfiles
 
 # 2.1.9
 - Updated default T7 preset to include MAF.m_AirFromp_AirInlet
