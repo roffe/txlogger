@@ -121,14 +121,6 @@ func main() {
 	mw.ShowAndRun()
 }
 
-/*
-func startpprof() {
-	go func() {
-		debug.Log(http.ListenAndServe("localhost:6060", nil))
-	}()
-}
-*/
-
 func killProcess(p *os.Process) {
 	if p != nil {
 		p.Kill()
