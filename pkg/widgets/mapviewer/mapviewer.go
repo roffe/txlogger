@@ -55,14 +55,15 @@ type MapViewer struct {
 
 	content fyne.CanvasObject
 
-	innerView  *fyne.Container
-	valueRects *fyne.Container
-	valueTexts *fyne.Container
+	innerView        *fyne.Container
+	valueRects       *fyne.Container
+	valueTexts       *fyne.Container
+	selectionOverlay *fyne.Container
 
-	selectionRect *canvas.Rectangle
-	crosshair     *canvas.Rectangle
+	crosshair *canvas.Rectangle
 
-	zDataRects []*canvas.Rectangle
+	zDataRects     []*canvas.Rectangle
+	selectionRects []*canvas.Rectangle
 
 	selectedX, SelectedY int
 
@@ -70,10 +71,11 @@ type MapViewer struct {
 	graph *graph2d.Graph
 
 	// Mouse
-	mousePos      fyne.Position
-	selecting     bool
-	lastModifier  fyne.KeyModifier
-	selectedCells []int
+	mousePos                 fyne.Position
+	selecting                bool
+	dragCornerX, dragCornerY int
+	lastModifier             fyne.KeyModifier
+	selectedCells            []int
 
 	// Keyboard
 	inputBuffer   strings.Builder
@@ -92,13 +94,12 @@ type MapViewer struct {
 
 func New(config *Config) (*MapViewer, error) {
 	mv := &MapViewer{
-		cfg:           config,
-		crosshair:     NewCrosshair(color.RGBA{165, 55, 253, 180}, 3),
-		selectionRect: NewRectangle(color.RGBA{0x30, 0x70, 0xFF, 0xFF}, 3),
-		numColumns:    len(config.XData),
-		numRows:       len(config.YData),
-		numData:       len(config.ZData),
-		colorMode:     config.ColorblindMode,
+		cfg:        config,
+		crosshair:  NewCrosshair(color.RGBA{165, 55, 253, 180}, 3),
+		numColumns: len(config.XData),
+		numRows:    len(config.YData),
+		numData:    len(config.ZData),
+		colorMode:  config.ColorblindMode,
 	}
 	mv.ExtendBaseWidget(mv)
 
@@ -131,7 +132,11 @@ func (mv *MapViewer) CreateRenderer() fyne.WidgetRenderer {
 	mv.createYAxis()
 	mv.createXAxis()
 	mv.createZdata()
+	mv.createSelectionOverlay()
 	mv.createTextValues()
+	// Start with cell 0,0 selected so keyboard editing works before any click.
+	mv.selectedCells = []int{0}
+	mv.drawSelectionVisual()
 	mv.content = mv.render()
 	return widget.NewSimpleRenderer(mv.content)
 	// return &mapViewerRenderer{mv: mv}
@@ -173,8 +178,9 @@ func (mr *movingRectsLayout) Layout(_ []fyne.CanvasObject, size fyne.Size) {
 			float32(float64(mr.mv.numRows)-1-mr.mv.yIndex)*mr.mv.heightFactor,
 		),
 	)
-	mr.mv.resizeSelectionRect()
-	mr.mv.updateCursor(false)
+	// The selection lives in selectionOverlay, which shares the cell grid and is
+	// repositioned automatically by the layout, so there is nothing to recompute
+	// for it here.
 }
 
 func (mv *MapViewer) render() fyne.CanvasObject {
@@ -182,15 +188,11 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 	mv.crosshair.Resize(fyne.NewSize(34, 14))
 	mv.crosshair.Hide()
 
-	// mv.selectionRect.CornerRadius = 4
-	mv.selectionRect.Resize(fyne.NewSize(34, 14))
-	// mv.selectionRect.Hide()
-
 	mv.innerView = container.NewStack(
 		mv.valueRects,
+		mv.selectionOverlay,
 		container.New(&movingRectsLayout{mv: mv},
 			mv.crosshair,
-			mv.selectionRect,
 		),
 		mv.valueTexts,
 	)
@@ -426,6 +428,42 @@ func (mv *MapViewer) createZdata() {
 	mv.valueRects = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.32), objs...)
 }
 
+// createSelectionOverlay builds a dedicated highlight layer with one
+// translucent rectangle per cell. The rectangles are hidden by default and
+// only shown for cells present in mv.selectedCells. Keeping selection in its
+// own layer decouples it from the value rects, so editing a cell's value never
+// clears the selection visual and vice versa.
+func (mv *MapViewer) createSelectionOverlay() {
+	mv.selectionRects = make([]*canvas.Rectangle, mv.numData)
+	objs := make([]fyne.CanvasObject, mv.numData)
+	for i := range mv.selectionRects {
+		rect := canvas.NewRectangle(color.RGBA{0xDE, 0xDF, 0xE4, 0xFF})
+		rect.Hide()
+		mv.selectionRects[i] = rect
+		objs[i] = rect
+	}
+	mv.selectionOverlay = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.32), objs...)
+}
+
+// clearSelectionVisual hides the highlight for every currently selected cell.
+// Call it before mutating mv.selectedCells, then call drawSelectionVisual after.
+func (mv *MapViewer) clearSelectionVisual() {
+	for _, cell := range mv.selectedCells {
+		if cell >= 0 && cell < len(mv.selectionRects) {
+			mv.selectionRects[cell].Hide()
+		}
+	}
+}
+
+// drawSelectionVisual shows the highlight for every currently selected cell.
+func (mv *MapViewer) drawSelectionVisual() {
+	for _, cell := range mv.selectedCells {
+		if cell >= 0 && cell < len(mv.selectionRects) {
+			mv.selectionRects[cell].Show()
+		}
+	}
+}
+
 func (mv *MapViewer) setXY() error {
 	xIdx, yIdx, err := interpolate.Interpolate64S(mv.cfg.XData, mv.cfg.YData, mv.cfg.ZData, mv.xValue, mv.yValue)
 	if err != nil {
@@ -483,66 +521,6 @@ func (mv *MapViewer) createButtons() *fyne.Container {
 	}
 }
 
-func (mv *MapViewer) resizeSelectionRect() {
-	// Early return if no selection
-	if mv.selectedX < 0 {
-		return
-	}
-
-	var pos fyne.Position
-	var size fyne.Size
-
-	// Handle multiple cell selection
-	if len(mv.selectedCells) > 1 {
-		// Initialize bounds using first cell to avoid unnecessary comparisons
-		firstCell := mv.selectedCells[0]
-		minX := firstCell % mv.numColumns
-		maxX := minX
-		minY := firstCell / mv.numColumns
-		maxY := minY
-
-		// Find bounds in a single pass
-		for i := 1; i < len(mv.selectedCells); i++ {
-			cell := mv.selectedCells[i]
-			x := cell % mv.numColumns
-			y := cell / mv.numColumns
-
-			if x < minX {
-				minX = x
-			} else if x > maxX {
-				maxX = x
-			}
-
-			if y < minY {
-				minY = y
-			} else if y > maxY {
-				maxY = y
-			}
-		}
-
-		// Calculate position and size once
-		topLeftX := float32(minX) * mv.widthFactor
-		topLeftY := float32(mv.numRows-1-maxY) * mv.heightFactor
-		width := float32(maxX-minX+1) * mv.widthFactor
-		height := float32(maxY-minY+1) * mv.heightFactor
-
-		pos = fyne.NewPos(topLeftX-1, topLeftY)
-		size = fyne.NewSize(width+1, height+1)
-	} else {
-		// Single cell selection
-		pos = fyne.NewPos(
-			(float32(mv.selectedX)*mv.widthFactor)-1,
-			(float32(mv.numRows-1-mv.SelectedY) * mv.heightFactor),
-		)
-		size = fyne.NewSize(mv.widthFactor+1, mv.heightFactor+1)
-	}
-
-	// Batch UI updates
-	mv.selectionRect.Move(pos)
-	mv.selectionRect.Resize(size)
-	// mv.selectionRect.MoveAndResize(pos, size)
-}
-
 /*
 var _ fyne.WidgetRenderer = (*mapViewerRenderer)(nil)
 
@@ -593,15 +571,6 @@ func calculateTextSize(widthFactor, heightFactor float32) float32 {
 func NewCrosshair(strokeColor color.RGBA, strokeWidth float32) *canvas.Rectangle {
 	return &canvas.Rectangle{
 		FillColor:    strokeColor,
-		StrokeColor:  strokeColor,
-		StrokeWidth:  strokeWidth,
-		CornerRadius: 4,
-	}
-}
-
-func NewRectangle(strokeColor color.RGBA, strokeWidth float32) *canvas.Rectangle {
-	return &canvas.Rectangle{
-		FillColor:    color.RGBA{0, 0, 0, 0},
 		StrokeColor:  strokeColor,
 		StrokeWidth:  strokeWidth,
 		CornerRadius: 4,
