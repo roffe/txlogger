@@ -25,7 +25,9 @@ func (mv *MapViewer) TypedShortcut(shortcut fyne.Shortcut) {
 	case "Copy":
 		mv.copy()
 	case "Paste":
-		mv.paste()
+		// Ctrl+V pastes at the current cursor/selection position rather than
+		// the coordinates the data was originally copied from.
+		mv.pasteHere()
 	}
 }
 
@@ -99,8 +101,10 @@ func (mv *MapViewer) parseClipboardCells(cb string) []clipboardCell {
 }
 
 // applyPaste writes the parsed cells into ZData, offset by shiftX/shiftY. Cells
-// that fall outside the map bounds are skipped.
-func (mv *MapViewer) applyPaste(cells []clipboardCell, shiftX, shiftY int) {
+// that fall outside the map bounds are skipped. When bounds is non-nil, only
+// destination cells present in the set are written, so the paste stays inside
+// the current selection.
+func (mv *MapViewer) applyPaste(cells []clipboardCell, shiftX, shiftY int, bounds map[int]struct{}) {
 	changed := false
 	for _, c := range cells {
 		x := c.x + shiftX
@@ -111,6 +115,11 @@ func (mv *MapViewer) applyPaste(cells []clipboardCell, shiftX, shiftY int) {
 		index := y*mv.numColumns + x
 		if index < 0 || index >= len(mv.cfg.ZData) {
 			continue
+		}
+		if bounds != nil {
+			if _, ok := bounds[index]; !ok {
+				continue
+			}
 		}
 		mv.cfg.ZData[index] = c.value
 		changed = true
@@ -126,7 +135,7 @@ func (mv *MapViewer) paste() {
 		return
 	}
 	cells := mv.parseClipboardCells(fyne.CurrentApp().Clipboard().Content())
-	mv.applyPaste(cells, 0, 0)
+	mv.applyPaste(cells, 0, 0, nil)
 }
 
 // pasteHere writes the clipboard with its anchor cell landing on the currently
@@ -152,7 +161,16 @@ func (mv *MapViewer) pasteHere() {
 			maxY = c.y
 		}
 	}
-	mv.applyPaste(cells, mv.selectedX-minX, mv.SelectedY-maxY)
+	// When more than a single cell is selected, confine the paste to that
+	// selection so values can't spill outside the highlighted block.
+	var bounds map[int]struct{}
+	if len(mv.selectedCells) > 1 {
+		bounds = make(map[int]struct{}, len(mv.selectedCells))
+		for _, cell := range mv.selectedCells {
+			bounds[cell] = struct{}{}
+		}
+	}
+	mv.applyPaste(cells, mv.selectedX-minX, mv.SelectedY-maxY, bounds)
 }
 
 func (mv *MapViewer) smooth() {

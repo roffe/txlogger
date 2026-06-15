@@ -259,6 +259,11 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 			mv.cfg.ZData,
 			mv.numColumns,
 			mv.numRows,
+			mv.cfg.XData,
+			mv.cfg.YData,
+			mv.cfg.XPrecision,
+			mv.cfg.YPrecision,
+			mv.cfg.ZPrecision,
 			mv.colorMode,
 			mv.cfg.MeshRenderer,
 		)

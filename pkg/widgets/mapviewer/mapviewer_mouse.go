@@ -26,7 +26,7 @@ func (mv *MapViewer) MouseOut()                     {}
 
 // MouseMoved is called when the mouse is moved over the map viewer.
 func (mv *MapViewer) MouseMoved(event *desktop.MouseEvent) {
-	//log.Println("MouseMoved", event)
+	// log.Println("MouseMoved", event)
 	if !mv.selecting {
 		return
 	}
@@ -47,7 +47,7 @@ func (mv *MapViewer) MouseMoved(event *desktop.MouseEvent) {
 
 // MouseDown is called when a mouse button is pressed.
 func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
-	//log.Println("MouseDown")
+	// log.Println("MouseDown")
 	mv.lastModifier = event.Modifier
 	if mv.cfg.OnMouseDown != nil {
 		mv.cfg.OnMouseDown()
@@ -161,8 +161,8 @@ func (mv *MapViewer) calculateCellDimensions() (float32, float32) {
 // calculateSelectionBounds computes the bounding box of the selection area.
 func (mv *MapViewer) calculateSelectionBounds(eventPos fyne.Position) (int, int) {
 	cellWidth, cellHeight := mv.calculateCellDimensions()
-	//xAxisOffset := mv.yAxisLabelContainer.Size().Width
-	//yAxisOffset := mv.xAxisLabelContainer.Size().Height
+	// xAxisOffset := mv.yAxisLabelContainer.Size().Width
+	// yAxisOffset := mv.xAxisLabelContainer.Size().Height
 
 	// Adjust for inner view position relative to the parent container
 	// This accounts for any extra padding or layout adjustments
@@ -199,13 +199,19 @@ func (mv *MapViewer) showPopupMenu(pos fyne.Position) {
 			}),
 		)
 		if mv.cfg.Editable {
-			menu.Items = append(menu.Items,
-				fyne.NewMenuItem("Paste", func() {
+
+			pasteMenu := fyne.NewMenuItem("Paste", nil)
+			pasteMenu.ChildMenu = fyne.NewMenu("Paste Options",
+				fyne.NewMenuItem("At original position", func() {
 					mv.paste()
 				}),
-				fyne.NewMenuItem("Paste here", func() {
+				fyne.NewMenuItem("At currently selected location", func() {
 					mv.pasteHere()
 				}),
+			)
+
+			menu.Items = append(menu.Items,
+				pasteMenu,
 				fyne.NewMenuItem("Smooth", func() {
 					mv.smooth()
 				}),
