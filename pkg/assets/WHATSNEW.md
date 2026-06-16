@@ -20,7 +20,14 @@
 - Dial and Dual Dial now uses shaders to draw the faces, dials and pips
 - Improved cell selection in mapviewer
 - Improved copy paste in mapviewer, added paste here function
-- Added a Matrix builder from logfiles
+- Added a Matrix builder from logfiles. It learns a 2D map from one or more logs: pick which series drives the X axis, the Y axis and supplies the Z value, and every sample that lands on a cell is averaged into it. The result is shown live in a mapviewer (colored grid + 3D mesh) and the cells can be edited by hand
+  - Load and merge multiple log files at once (t5l, t7l, t8l, csv, bpl); series are row-aligned across files
+  - Pick X/Y/Z from a dropdown of the loaded series or type a name by hand
+  - Adjustable column/row counts and fully editable axis breakpoints, with an "Auto" button that spreads a series' min..max evenly across an axis
+  - Per-axis Z-hit tolerance sliders: reject samples that sit too far from a breakpoint so only values close to a cell count toward it
+  - Visual filter / query builder: add rules like "if <series> <op> <value>" and a sample only counts as a hit when it satisfies every rule. Operators: >, >=, <, <=, ==, != and ~ (approximately equal)
+  - Filter query language: instead of the visual rules you can type a full query with and/or, () grouping and the same operators, e.g. "if (ActualIn.n_Engine > 3000 and Out.X_AccPedal > 50) or boost ~ 1.2". Series can be compared to numbers, to each other or to arithmetic of them; a non-empty query overrides the rules
+  - Save and load configurations as presets (series, dimensions, axis breakpoints, tolerances and filter rules)
 
 # 2.1.9
 - Updated default T7 preset to include MAF.m_AirFromp_AirInlet

@@ -11,32 +11,35 @@ import (
 	"github.com/roffe/txlogger/pkg/colors"
 )
 
-// The mesh data texture plus z_off/z_gain must reproduce every corner height
-// (Oz in grid units) and the colormap index the CPU renderer would use.
+// In dataVertexMode the data texture plus z_off/z_gain must reproduce every
+// cell's flat-top height (V - zmin)/zrange * depth in grid units. Data cell
+// (r, c) is stored at texel (c, rows-1-r) so grid Y runs with the data rows.
 func TestShaderDataEncoding(t *testing.T) {
 	m := testGrid(t)
+	if !m.dataVertexMode() {
+		t.Fatalf("testGrid is %dx%d, expected dataVertexMode", m.cols, m.rows)
+	}
 	tex, ok := m.shader.Textures["mesh_tex"].(*image.RGBA)
 	if !ok {
 		t.Fatal("mesh_tex missing or not RGBA")
 	}
-	if tex.Bounds().Dx() != m.cols+1 || tex.Bounds().Dy() != m.rows+1 {
-		t.Fatalf("mesh_tex is %v, want %dx%d", tex.Bounds(), m.cols+1, m.rows+1)
+	if tex.Bounds().Dx() != m.cols || tex.Bounds().Dy() != m.rows {
+		t.Fatalf("mesh_tex is %v, want %dx%d", tex.Bounds(), m.cols, m.rows)
 	}
 
 	zOff := float64(m.shader.Uniforms["z_off"])
 	zGain := float64(m.shader.Uniforms["z_gain"])
-	cw := float64(m.cellWidth)
+	hmax := m.depth / float64(m.cellWidth)
 
-	for i := 0; i <= m.rows; i++ {
-		for j := 0; j <= m.cols; j++ {
-			// vertex row i lives at texture row rows-i (grid Y up)
-			c := tex.RGBAAt(j, m.rows-i)
-			norm := (float64(c.R)*256 + float64(c.G)) / 65535
+	for r := 0; r < m.rows; r++ {
+		for c := 0; c < m.cols; c++ {
+			px := tex.RGBAAt(c, m.rows-1-r)
+			norm := (float64(px.R)*256 + float64(px.G)) / 65535
 			gotH := zOff + zGain*norm
-			wantH := m.vertices[i][j].Oz / cw
-			// 16-bit quantization of a ~12.5 unit range
+			wantH := (m.values[r*m.cols+c] - m.zmin) / m.zrange * hmax
+			// 16-bit quantization of the encoded value range
 			if math.Abs(gotH-wantH) > zGain/65535+1e-6 {
-				t.Fatalf("corner (%d,%d): height %v, want %v", i, j, gotH, wantH)
+				t.Fatalf("cell (%d,%d): height %v, want %v", r, c, gotH, wantH)
 			}
 		}
 	}
@@ -86,7 +89,10 @@ func TestShaderProjectionMatchesVertices(t *testing.T) {
 	for i := 0; i <= m.rows; i += 4 {
 		for j := 0; j <= m.cols; j += 4 {
 			v := m.vertices[i][j]
-			g := [3]float64{float64(j), float64(m.rows - i), v.Oz / cw}
+			// dataVertexMode shifts the grid half a cell: the averaged corner
+			// (i, j) maps to shader grid (j-0.5, rows-i-0.5), which projects to
+			// the same screen point as the CPU corner transform.
+			g := [3]float64{float64(j) - 0.5, float64(m.rows-i) - 0.5, v.Oz / cw}
 
 			var view [3]float64
 			for a := 0; a < 3; a++ {

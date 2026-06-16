@@ -31,6 +31,7 @@ import (
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
+	"github.com/roffe/txlogger/pkg/widgets/meshgrid"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
 )
 
@@ -53,6 +54,7 @@ var _ fyne.Widget = (*MatrixBuilder)(nil)
 
 type MatrixBuilder struct {
 	widget.BaseWidget
+	renderMode meshgrid.RenderBackend
 
 	// values holds every series merged across all loaded log files. All series
 	// share the same length (nrecords); gaps are padded with NaN so samples
@@ -91,7 +93,55 @@ type MatrixBuilder struct {
 	nameEntry              *widget.Entry
 	display                *fyne.Container
 
+	// Filter tree: a nested group/condition builder. rootGroup is the live editor
+	// state (read into a FilterNode tree on demand); filterHolder is the stable
+	// container the root group is swapped into when a preset is loaded.
+	rootGroup    *filterGroup
+	filterHolder *fyne.Container
+
+	// Filter query: an optional text query in the matrix builder query language.
+	// When non-empty it overrides the visual rules above (see currentFilter).
+	queryEntry  *widget.Entry
+	queryStatus *widget.Label
+
+	// controls is the scrolling left/right column that holds the rule editor.
+	// Adding or removing rule rows only re-lays-out the rules box itself, so we
+	// refresh this ancestor to reposition everything below it (see
+	// refreshControls).
+	controls *fyne.Container
+
 	content fyne.CanvasObject
+}
+
+// filterChild is one editable node in the visual filter tree: either a group or
+// a leaf condition. node reads the widgets into a FilterNode (returning nil for
+// an incomplete leaf); object is the canvas object the parent group lays out.
+type filterChild interface {
+	node() *FilterNode
+	object() fyne.CanvasObject
+}
+
+// filterGroup is a group node in the editor: a combinator (ALL/ANY), an optional
+// "not", and an ordered list of child conditions and sub-groups.
+type filterGroup struct {
+	mb         *MatrixBuilder
+	parent     *filterGroup // nil for the root group
+	combinator *widget.Select
+	negate     *widget.Check
+	children   []filterChild
+	inner      *fyne.Container // holds the children plus the add-buttons footer
+	footer     fyne.CanvasObject
+	container  *fyne.Container
+}
+
+// filterCond is a leaf condition in the editor: "<series> <op> <value>", where
+// <value> is a single number, or a comma-separated list when <op> is "in".
+type filterCond struct {
+	parent    *filterGroup
+	seriesSel *widget.SelectEntry
+	opSel     *widget.Select
+	value     *widget.Entry
+	container *fyne.Container
 }
 
 // Preset is the on-disk representation of a matrix builder configuration. It
@@ -109,17 +159,147 @@ type Preset struct {
 	// which decode to 0 and are treated as the default (no filtering) on load.
 	XTolerance float64 `json:"x_tolerance,omitempty"`
 	YTolerance float64 `json:"y_tolerance,omitempty"`
+	// Filter is the root of the visual builder's group/condition tree. Omitted in
+	// presets saved before the tree existed; those carry Rules instead.
+	Filter *FilterNode `json:"filter,omitempty"`
+	// Rules is the legacy flat filter list. Read-only now: still decoded for
+	// backward compatibility (migrated into an implicit ALL-of group on load), but
+	// no longer written. Older presets that predate filters decode to nil.
+	Rules []Rule `json:"rules,omitempty"`
+	// Query is an optional filter written in the query language. When non-empty
+	// it overrides the builder (matching the live behaviour). Omitted in older
+	// presets.
+	Query string `json:"query,omitempty"`
 }
+
+// FilterNode is one node of the visual builder's filter tree, persisted in a
+// preset. It is either a group (Series empty: combines Children with Combinator,
+// optionally negated) or a leaf condition (Series set: "<Series> <Operator>
+// <Value>", or "<Series> in <Values>" when Operator is "in").
+type FilterNode struct {
+	Combinator string        `json:"combinator,omitempty"` // group: "and" | "or"
+	Negate     bool          `json:"negate,omitempty"`     // wrap the node in not(...)
+	Children   []*FilterNode `json:"children,omitempty"`   // group members
+
+	Series   string    `json:"series,omitempty"`   // leaf series name
+	Operator string    `json:"operator,omitempty"` // leaf comparison operator
+	Value    float64   `json:"value,omitempty"`    // leaf threshold (non-"in" ops)
+	Values   []float64 `json:"values,omitempty"`   // leaf membership list ("in" op)
+}
+
+// isGroup reports whether n is a group rather than a leaf. A leaf always names a
+// series; a group never does.
+func (n *FilterNode) isGroup() bool { return n.Series == "" }
+
+// toQuery renders n as a query-language fragment, returning ok=false when the
+// node contributes nothing (an incomplete leaf, or a group with no usable
+// children). top suppresses the redundant outer parentheses on the root group.
+func (n *FilterNode) toQuery(top bool) (string, bool) {
+	if n.isGroup() {
+		parts := make([]string, 0, len(n.Children))
+		for _, c := range n.Children {
+			if s, ok := c.toQuery(false); ok {
+				parts = append(parts, s)
+			}
+		}
+		if len(parts) == 0 {
+			return "", false
+		}
+		joiner := " and "
+		if n.Combinator == "or" {
+			joiner = " or "
+		}
+		s := strings.Join(parts, joiner)
+		if (len(parts) > 1 && !top) || n.Negate {
+			s = "(" + s + ")"
+		}
+		if n.Negate {
+			s = "not " + s
+		}
+		return s, true
+	}
+
+	if strings.TrimSpace(n.Series) == "" {
+		return "", false
+	}
+	var s string
+	if n.Operator == "in" {
+		if len(n.Values) == 0 {
+			return "", false
+		}
+		members := make([]string, len(n.Values))
+		for i, v := range n.Values {
+			members[i] = formatFloat(v)
+		}
+		s = fmt.Sprintf("%s in [%s]", n.Series, strings.Join(members, ", "))
+	} else {
+		op := n.Operator
+		if op == "" {
+			op = condOperators[0]
+		}
+		s = fmt.Sprintf("%s %s %s", n.Series, op, formatFloat(n.Value))
+	}
+	if n.Negate {
+		s = "not (" + s + ")"
+	}
+	return s, true
+}
+
+// rulesToNode migrates a legacy flat rule list into an implicit ALL-of group.
+func rulesToNode(rules []Rule) *FilterNode {
+	root := &FilterNode{Combinator: "and"}
+	for _, r := range rules {
+		root.Children = append(root.Children, &FilterNode{
+			Series: r.Series, Operator: r.Operator, Value: r.Threshold,
+		})
+	}
+	return root
+}
+
+// Rule is a single filter condition. A sample is only counted as a Z-hit when it
+// satisfies every active rule: the named series' value at that sample, compared
+// against Threshold with Operator, must hold.
+type Rule struct {
+	Series    string  `json:"series"`
+	Operator  string  `json:"operator"` // one of ">", ">=", "<", "<=", "==", "!=", "~"
+	Threshold float64 `json:"threshold"`
+}
+
+// condOperators lists the operators offered in a condition row, in display
+// order. The first entry is the default for a new condition. "~" matches values
+// approximately equal to the value (see ruleEpsilonFrac); "in" tests membership
+// of a comma-separated list.
+var condOperators = []string{">", ">=", "<", "<=", "==", "!=", "~", "in"}
+
+// combinator labels for a group, mapping to the query language's and/or.
+const (
+	combinatorAll = "ALL of" // every child must hold -> "and"
+	combinatorAny = "ANY of" // any child may hold   -> "or"
+)
+
+var combinatorOptions = []string{combinatorAll, combinatorAny}
+
+const (
+	// ruleEpsilonFrac sets the half-width of the "~" (approximately-equal)
+	// operator as a fraction of the threshold's magnitude, so the window scales
+	// with the value being matched (e.g. 1% of an RPM target vs. 1% of a lambda
+	// target).
+	ruleEpsilonFrac = 0.01
+	// ruleEpsilonMin is a small absolute floor so "~" stays usable when the
+	// threshold is at or near zero (where a relative window would collapse to 0).
+	ruleEpsilonMin = 1e-6
+)
 
 // New creates an empty MatrixBuilder. Log files are loaded from within the
 // widget via a native file dialog.
-func New() *MatrixBuilder {
+func New(renderMode meshgrid.RenderBackend) *MatrixBuilder {
 	mb := &MatrixBuilder{
 		values:     make(map[string][]float64),
 		cols:       defaultCols,
 		rows:       defaultRows,
 		xTolerance: defaultTolerance,
 		yTolerance: defaultTolerance,
+		renderMode: renderMode,
 	}
 	mb.ExtendBaseWidget(mb)
 	mb.xAxis = make([]float64, mb.cols)
@@ -183,7 +363,7 @@ func (mb *MatrixBuilder) buildUI() {
 	mb.yBox = container.NewHBox()
 	mb.rebuildAxisEntries()
 
-	controls := container.NewVBox(
+	mb.controls = container.NewVBox(
 		// widget.NewLabelWithStyle("Series", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		colsRow,
 		rowsRow,
@@ -194,19 +374,24 @@ func (mb *MatrixBuilder) buildUI() {
 		widget.NewSeparator(),
 		mb.buildToleranceSection(),
 		widget.NewSeparator(),
-		buildBtn,
-		widget.NewSeparator(),
-		mb.status,
-		widget.NewSeparator(),
+		mb.buildFilterSection(),
 		xlayout.NewSpacer(),
-		mb.buildPresetSection(),
+		mb.status,
 	)
 
-	left := container.NewVScroll(controls)
-	left.SetMinSize(fyne.NewSize(240, 0))
+	controlScroll := container.NewVScroll(mb.controls)
+	controlScroll.SetMinSize(fyne.NewSize(240, 0))
 
-	right := container.NewVScroll(
-		mb.buildLogSection(),
+	logList := container.NewBorder(
+		nil,
+		container.NewVBox(
+			mb.buildPresetSection(),
+		),
+		nil,
+		nil,
+		container.NewVScroll(
+			mb.buildLogSection(),
+		),
 	)
 
 	mb.display = container.NewStack(mb.placeholder())
@@ -219,14 +404,33 @@ func (mb *MatrixBuilder) buildUI() {
 		container.NewHScroll(mb.yBox),
 	)
 
-	mb.content = container.NewBorder(
-		nil,
-		nil,
-		right,
-		left,
-		container.NewBorder(nil, yPanel, container.NewVBox(widget.NewLabelWithStyle("X axis values", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-			mb.xBox), nil, mb.display),
+	mainSplit := container.NewHSplit(
+		container.NewBorder(
+			yPanel,
+			buildBtn,
+			container.NewVBox(
+				widget.NewLabelWithStyle("X axis values", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+				mb.xBox,
+			),
+			nil,
+			mb.display,
+		),
+		logList,
 	)
+	mainSplit.Offset = 0.9
+
+	/*
+		mb.content = container.NewBorder(
+			nil,
+			nil,
+			controlScroll,
+			nil,
+			mainSplit,
+		)
+	*/
+	split := container.NewHSplit(controlScroll, mainSplit)
+	split.Offset = 0.25
+	mb.content = split
 }
 
 func (mb *MatrixBuilder) placeholder() fyne.CanvasObject {
@@ -282,6 +486,400 @@ func (mb *MatrixBuilder) newToleranceSlider(isX bool) *widget.Slider {
 	return s
 }
 
+// --- filter tree ---
+
+// buildFilterSection builds the visual query builder: a nestable tree of groups
+// (ALL-of / ANY-of, optionally negated) and leaf conditions, plus a free-text
+// query box that overrides the tree when non-empty.
+func (mb *MatrixBuilder) buildFilterSection() fyne.CanvasObject {
+	mb.rootGroup = mb.newFilterGroup(nil, &FilterNode{Combinator: "and"})
+	mb.filterHolder = container.NewVBox(mb.rootGroup.object())
+
+	// The query box accepts the matrix builder query language: comparisons
+	// (> >= < <= == != ~), the "in [...]" membership test, joined with and/or/not
+	// and grouped with (). A leading "if" is optional. When non-empty it overrides
+	// the visual builder above.
+	mb.queryEntry = widget.NewMultiLineEntry()
+	mb.queryEntry.SetMinRowsVisible(2)
+	mb.queryEntry.Wrapping = fyne.TextWrapWord
+	mb.queryEntry.SetPlaceHolder("e.g. (ActualIn.n_Engine > 3000 and Out.X_AccPedal > 50) or ECMStat.ST_ActiveAirDem in [10, 20]")
+	mb.queryEntry.OnChanged = func(string) { mb.validateQuery() }
+
+	mb.queryStatus = widget.NewLabel("")
+	mb.queryStatus.Wrapping = fyne.TextWrapWord
+
+	fromTreeBtn := widget.NewButton("Builder->Query", func() {
+		if s, ok := mb.filterTree().toQuery(true); ok {
+			mb.queryEntry.SetText(s)
+		} else {
+			mb.queryEntry.SetText("")
+		}
+	})
+	fromTreeBtn.Importance = widget.LowImportance
+
+	return container.NewVBox(
+		widget.NewLabelWithStyle("Filters (count a hit when…)", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		mb.filterHolder,
+		widget.NewSeparator(),
+		widget.NewLabel("…or a query (overrides the builder when not empty):"),
+		mb.queryEntry,
+		container.NewBorder(nil, nil, nil, fromTreeBtn, mb.queryStatus),
+	)
+}
+
+// validateQuery parses the query box live and reports its status: a syntax
+// error, any referenced series that aren't loaded, or "ok". An empty box defers
+// to the visual builder.
+func (mb *MatrixBuilder) validateQuery() {
+	src := strings.TrimSpace(mb.queryEntry.Text)
+	if src == "" {
+		mb.queryStatus.SetText("Empty — using the builder above")
+		return
+	}
+	q, err := compileQuery(src, mb.resolve)
+	if err != nil {
+		mb.queryStatus.SetText("⚠ " + err.Error())
+		return
+	}
+	// Only warn about unknown series once logs are loaded; before that every
+	// name is "unknown" and the noise isn't helpful.
+	if len(mb.values) > 0 {
+		var unknown []string
+		for _, s := range q.Series() {
+			if _, ok := mb.values[s]; !ok {
+				unknown = append(unknown, s)
+			}
+		}
+		if len(unknown) > 0 {
+			mb.queryStatus.SetText("⚠ unknown series: " + strings.Join(unknown, ", "))
+			return
+		}
+	}
+	mb.queryStatus.SetText("✓ query active")
+}
+
+// filterTree reads the live editor into a FilterNode tree (the root group).
+func (mb *MatrixBuilder) filterTree() *FilterNode { return mb.rootGroup.node() }
+
+// setFilterTree replaces the editor with a fresh tree built from model, swapping
+// the new root group into the stable holder. A nil or non-group model becomes an
+// empty (or single-condition) ALL-of root so there is always a group to edit.
+func (mb *MatrixBuilder) setFilterTree(model *FilterNode) {
+	switch {
+	case model == nil:
+		model = &FilterNode{Combinator: "and"}
+	case !model.isGroup():
+		model = &FilterNode{Combinator: "and", Children: []*FilterNode{model}}
+	}
+	mb.rootGroup = mb.newFilterGroup(nil, model)
+	mb.filterHolder.Objects = []fyne.CanvasObject{mb.rootGroup.object()}
+	mb.filterHolder.Refresh()
+	mb.refreshControls()
+}
+
+// refreshControls re-lays-out the scrolling controls column after the filter
+// tree changes shape. A nested Add/Remove only re-runs the affected group's own
+// layout, leaving its ancestors (and everything below the filter section) at
+// their old positions until the column is refreshed.
+func (mb *MatrixBuilder) refreshControls() {
+	if mb.controls != nil {
+		mb.controls.Refresh()
+	}
+}
+
+// indented wraps obj with a left margin so nested groups read as nested.
+func indented(obj fyne.CanvasObject) fyne.CanvasObject {
+	return container.NewBorder(nil, nil, layout.NewFixedWidth(14, xlayout.NewSpacer()), nil, obj)
+}
+
+// --- group node ---
+
+// newFilterGroup builds a group widget seeded from model, recursively creating
+// its child conditions and sub-groups. parent is nil for the root group.
+func (mb *MatrixBuilder) newFilterGroup(parent *filterGroup, model *FilterNode) *filterGroup {
+	g := &filterGroup{mb: mb, parent: parent}
+
+	g.combinator = widget.NewSelect(combinatorOptions, func(string) {})
+	if model != nil && model.Combinator == "or" {
+		g.combinator.SetSelected(combinatorAny)
+	} else {
+		g.combinator.SetSelected(combinatorAll)
+	}
+
+	g.negate = widget.NewCheck("not", nil)
+	if model != nil {
+		g.negate.SetChecked(model.Negate)
+	}
+
+	addCond := widget.NewButton("+ condition", func() { g.addChild(mb.newFilterCond(g, nil)) })
+	addCond.Importance = widget.LowImportance
+	addGroup := widget.NewButton("+ group", func() { g.addChild(mb.newFilterGroup(g, &FilterNode{Combinator: "and"})) })
+	addGroup.Importance = widget.LowImportance
+	g.footer = container.NewHBox(addCond, addGroup)
+
+	header := container.NewHBox(layout.NewFixedWidth(96, g.combinator), g.negate)
+	var headerRow fyne.CanvasObject = header
+	if parent != nil {
+		remove := widget.NewButtonWithIcon("", theme.DeleteIcon(), func() { parent.removeChild(g) })
+		remove.Importance = widget.LowImportance
+		headerRow = container.NewBorder(nil, nil, nil, remove, header)
+	}
+
+	g.inner = container.NewVBox()
+	g.container = container.NewVBox(headerRow, indented(g.inner))
+
+	if model != nil {
+		for _, ch := range model.Children {
+			if ch.isGroup() {
+				g.children = append(g.children, mb.newFilterGroup(g, ch))
+			} else {
+				g.children = append(g.children, mb.newFilterCond(g, ch))
+			}
+		}
+	}
+	g.rebuild()
+	return g
+}
+
+func (g *filterGroup) object() fyne.CanvasObject { return g.container }
+
+// node reads the group (and, recursively, its children) into a FilterNode,
+// dropping incomplete leaves. A group always yields a node, even when empty, so
+// the tree's shape survives a save/load round-trip.
+func (g *filterGroup) node() *FilterNode {
+	combinator := "and"
+	if g.combinator.Selected == combinatorAny {
+		combinator = "or"
+	}
+	n := &FilterNode{Combinator: combinator, Negate: g.negate.Checked}
+	for _, c := range g.children {
+		if cn := c.node(); cn != nil {
+			n.Children = append(n.Children, cn)
+		}
+	}
+	return n
+}
+
+// addChild appends a new condition or sub-group and re-lays-out the group.
+func (g *filterGroup) addChild(c filterChild) {
+	g.children = append(g.children, c)
+	g.rebuild()
+}
+
+// removeChild drops c from the group and re-lays-out.
+func (g *filterGroup) removeChild(c filterChild) {
+	for i, child := range g.children {
+		if child == c {
+			g.children = append(g.children[:i], g.children[i+1:]...)
+			break
+		}
+	}
+	g.rebuild()
+}
+
+// rebuild repopulates the group's inner box with its children followed by the
+// add-buttons footer, then refreshes the surrounding controls column.
+func (g *filterGroup) rebuild() {
+	g.inner.Objects = g.inner.Objects[:0]
+	for _, c := range g.children {
+		g.inner.Add(c.object())
+	}
+	g.inner.Add(g.footer)
+	g.inner.Refresh()
+	g.mb.refreshControls()
+}
+
+// eachCond visits every leaf condition in the group's subtree, in order.
+func (g *filterGroup) eachCond(fn func(*filterCond)) {
+	for _, c := range g.children {
+		switch v := c.(type) {
+		case *filterCond:
+			fn(v)
+		case *filterGroup:
+			v.eachCond(fn)
+		}
+	}
+}
+
+// --- condition node ---
+
+// newFilterCond builds a leaf-condition widget seeded from model (nil for a
+// fresh, empty condition).
+func (mb *MatrixBuilder) newFilterCond(parent *filterGroup, model *FilterNode) *filterCond {
+	c := &filterCond{parent: parent}
+
+	c.seriesSel = widget.NewSelectEntry(mb.order)
+	c.seriesSel.PlaceHolder = "Series"
+
+	c.value = widget.NewEntry()
+	// The value field doubles as a list when "in" is selected, so its hint tracks
+	// the operator.
+	c.opSel = widget.NewSelect(condOperators, func(op string) {
+		c.value.SetPlaceHolder(valuePlaceholder(op))
+	})
+
+	op := condOperators[0]
+	if model != nil && model.Operator != "" {
+		op = model.Operator
+	}
+	c.opSel.SetSelected(op)
+	c.value.SetPlaceHolder(valuePlaceholder(op))
+
+	if model != nil {
+		c.seriesSel.SetText(model.Series)
+		if model.Operator == "in" {
+			c.value.SetText(formatList(model.Values))
+		} else if model.Series != "" {
+			c.value.SetText(formatFloat(model.Value))
+		}
+	}
+
+	remove := widget.NewButtonWithIcon("", theme.DeleteIcon(), func() { parent.removeChild(c) })
+	remove.Importance = widget.LowImportance
+
+	// Series stretches to fill; operator/value/remove are pinned to the right at
+	// fixed widths so the narrow panel stays readable. The operator box must fit
+	// the two-char operators plus the dropdown arrow or the Select truncates to "…".
+	c.container = container.NewBorder(nil, nil, nil,
+		container.NewHBox(
+			layout.NewFixedWidth(72, c.opSel),
+			layout.NewFixedWidth(72, c.value),
+			remove,
+		),
+		c.seriesSel,
+	)
+	return c
+}
+
+func (c *filterCond) object() fyne.CanvasObject { return c.container }
+
+// node reads the condition into a FilterNode, returning nil when it is
+// incomplete: no series, an empty/invalid value for a comparison, or an empty
+// list for "in". Incomplete conditions are dropped rather than matched.
+func (c *filterCond) node() *FilterNode {
+	series := strings.TrimSpace(c.seriesSel.Text)
+	if series == "" {
+		return nil
+	}
+	op := c.opSel.Selected
+	if op == "" {
+		op = condOperators[0]
+	}
+	n := &FilterNode{Series: series, Operator: op}
+	if op == "in" {
+		n.Values = parseList(c.value.Text)
+		if len(n.Values) == 0 {
+			return nil
+		}
+		return n
+	}
+	v, ok := parseFloatLoose(c.value.Text)
+	if !ok {
+		return nil
+	}
+	n.Value = v
+	return n
+}
+
+// valuePlaceholder hints the value field's content for the selected operator.
+func valuePlaceholder(op string) string {
+	if op == "in" {
+		return "10, 20, …"
+	}
+	return "Value"
+}
+
+// formatList renders a membership list as comma-separated numbers.
+func formatList(values []float64) string {
+	parts := make([]string, len(values))
+	for i, v := range values {
+		parts[i] = formatFloat(v)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// parseFloatLoose parses a single value, accepting a comma as the decimal point
+// (European keyboards). It reports ok=false for blank or unparseable input.
+func parseFloatLoose(s string) (float64, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, false
+	}
+	v, err := strconv.ParseFloat(strings.ReplaceAll(s, ",", "."), 64)
+	if err != nil {
+		return 0, false
+	}
+	return v, true
+}
+
+// parseList parses a comma-separated membership list, skipping blank or
+// unparseable members. Here a comma separates values, so it is not treated as a
+// decimal point.
+func parseList(s string) []float64 {
+	var out []float64
+	for _, part := range strings.Split(s, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if v, err := strconv.ParseFloat(part, 64); err == nil {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// approxEqual reports whether v is approximately equal to threshold, using a
+// window that scales with the threshold's magnitude (see ruleEpsilonFrac) with a
+// small absolute floor (ruleEpsilonMin) so it stays usable near zero. Shared by
+// the per-row "~" rule and the query language's "~" operator.
+func approxEqual(v, threshold float64) bool {
+	eps := math.Abs(threshold) * ruleEpsilonFrac
+	if eps < ruleEpsilonMin {
+		eps = ruleEpsilonMin
+	}
+	return math.Abs(v-threshold) <= eps
+}
+
+// resolve returns series' value at sample i, reporting ok=false when the series
+// is absent or its reading is NaN. It is the bridge the compiled query uses to
+// read log data.
+func (mb *MatrixBuilder) resolve(series string, i int) (float64, bool) {
+	data, ok := mb.values[series]
+	if !ok || i < 0 || i >= len(data) {
+		return 0, false
+	}
+	v := data[i]
+	if math.IsNaN(v) {
+		return 0, false
+	}
+	return v, true
+}
+
+// currentFilter returns the predicate that decides whether a sample counts as a
+// hit. A non-empty query box takes precedence over the visual builder;
+// otherwise the builder's tree is compiled to a query (an empty tree accepts
+// every sample). A query that fails to compile is returned as an error so Build
+// surfaces it instead of silently filtering nothing.
+func (mb *MatrixBuilder) currentFilter() (func(i int) bool, error) {
+	src := strings.TrimSpace(mb.queryEntry.Text)
+	if src == "" {
+		// The builder is just a structured way to author a query, so compile it
+		// through the same path rather than maintaining a second evaluator.
+		if s, ok := mb.filterTree().toQuery(true); ok {
+			src = s
+		}
+	}
+	if src == "" {
+		return func(int) bool { return true }, nil
+	}
+	q, err := compileQuery(src, mb.resolve)
+	if err != nil {
+		return nil, fmt.Errorf("query: %w", err)
+	}
+	return q.Eval, nil
+}
+
 // rebuildAxisEntries regenerates the editable entry fields for the current
 // column/row counts, seeding them from the current axis values.
 func (mb *MatrixBuilder) rebuildAxisEntries() {
@@ -296,6 +894,7 @@ func (mb *MatrixBuilder) rebuildAxisEntries() {
 	mb.yBox.Objects = mb.yBox.Objects[:0]
 	for i := 0; i < mb.rows; i++ {
 		mb.yBox.Add(mb.makeAxisEntry(false, i))
+		// mb.yBox.Add(xlayout.NewSpacer())
 	}
 	mb.yBox.Refresh()
 }
@@ -334,7 +933,7 @@ func (mb *MatrixBuilder) makeAxisEntry(isX bool, idx int) fyne.CanvasObject {
 	mb.yEntries[idx] = e
 	// Y breakpoints run horizontally along the bottom: label above a
 	// fixed-width entry so the strip stays compact.
-	label := widget.NewLabelWithStyle(prefix+strconv.Itoa(idx), fyne.TextAlignCenter, fyne.TextStyle{})
+	label := widget.NewLabelWithStyle(prefix+strconv.Itoa(idx), fyne.TextAlignLeading, fyne.TextStyle{})
 	return container.NewVBox(label, layout.NewFixedWidth(64, e))
 }
 
@@ -375,6 +974,7 @@ func (mb *MatrixBuilder) autoFill(isX bool) {
 		series = mb.xSeries
 		axis = mb.xAxis
 	}
+
 	data, ok := mb.values[series]
 	if !ok || len(data) == 0 {
 		return
@@ -437,15 +1037,27 @@ func (mb *MatrixBuilder) analyze() error {
 	sort.Float64s(mb.yAxis)
 	mb.syncAxisEntries()
 
+	filter, err := mb.currentFilter()
+	if err != nil {
+		return err
+	}
+
 	size := mb.cols * mb.rows
 	sum := make([]float64, size)
 	cnt := make([]int, size)
 	used := 0
 	skipped := 0
+	filtered := 0
 	for i := 0; i < n; i++ {
 		// Skip rows where any of the three series is missing (NaN padding from
 		// merging logs with differing channel sets).
 		if math.IsNaN(xv[i]) || math.IsNaN(yv[i]) || math.IsNaN(zv[i]) {
+			continue
+		}
+		// Drop samples that fail any user-defined filter rule before they can
+		// contribute to a cell.
+		if !filter(i) {
+			filtered++
 			continue
 		}
 		c := nearestIndex(mb.xAxis, xv[i])
@@ -476,6 +1088,9 @@ func (mb *MatrixBuilder) analyze() error {
 	if skipped > 0 {
 		msg += fmt.Sprintf(" (%d skipped by tolerance)", skipped)
 	}
+	if filtered > 0 {
+		msg += fmt.Sprintf(" (%d filtered)", filtered)
+	}
 	mb.status.SetText(msg)
 	return nil
 }
@@ -503,6 +1118,7 @@ func (mb *MatrixBuilder) rebuildDisplay() {
 		YLabel:         mb.ySeries,
 		ZLabel:         mb.zSeries,
 		MeshView:       true,
+		MeshRenderer:   mb.renderMode,
 		Editable:       true,
 		ColorblindMode: colors.ModeNormal,
 		// The matrix is in-memory only; editing cells just mutates zData.
@@ -522,7 +1138,7 @@ func (mb *MatrixBuilder) rebuildDisplay() {
 
 func (mb *MatrixBuilder) buildLogSection() fyne.CanvasObject {
 	mb.logsLabel = widget.NewLabel("No log files loaded")
-	mb.logsLabel.Wrapping = fyne.TextWrapWord
+	mb.logsLabel.Truncation = fyne.TextTruncateEllipsis
 
 	addBtn := widget.NewButtonWithIcon("Add log files", theme.FolderOpenIcon(), mb.openLogDialog)
 	clearBtn := widget.NewButtonWithIcon("Clear", theme.ContentClearIcon(), mb.clearLogs)
@@ -679,6 +1295,13 @@ func (mb *MatrixBuilder) refreshSeriesOptions() {
 	mb.xSel.SetOptions(mb.order)
 	mb.ySel.SetOptions(mb.order)
 	mb.zSel.SetOptions(mb.order)
+	mb.rootGroup.eachCond(func(c *filterCond) {
+		c.seriesSel.SetOptions(mb.order)
+	})
+	// Loaded series changed, so the query's unknown-series check may now differ.
+	if mb.queryEntry != nil {
+		mb.validateQuery()
+	}
 }
 
 func (mb *MatrixBuilder) refreshLogList() {
@@ -687,7 +1310,25 @@ func (mb *MatrixBuilder) refreshLogList() {
 		return
 	}
 	mb.logsLabel.SetText(fmt.Sprintf("%d file(s), %d records:\n%s",
-		len(mb.loadedFiles), mb.nrecords, strings.Join(mb.loadedFiles, "\n")))
+		len(mb.loadedFiles), mb.nrecords, buildFilenamesList(mb.loadedFiles)))
+}
+
+func buildFilenamesList(files []string) string {
+	if len(files) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	for i, f := range files {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		base := filepath.Base(f)
+		//if len(base) > 25 {
+		//	base = base[:25] + "…"
+		//}
+		b.WriteString(base)
+	}
+	return b.String()
 }
 
 func nanSlice(n int) []float64 {
@@ -714,11 +1355,11 @@ func (mb *MatrixBuilder) buildPresetSection() fyne.CanvasObject {
 	refreshBtn := widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), mb.refreshPresets)
 
 	mb.nameEntry = widget.NewEntry()
-	mb.nameEntry.SetPlaceHolder("preset name")
+	mb.nameEntry.SetPlaceHolder("Preset name")
 	saveBtn := widget.NewButtonWithIcon("Save", theme.DocumentSaveIcon(), func() {
 		name := strings.TrimSpace(mb.nameEntry.Text)
 		if name == "" {
-			mb.status.SetText("enter a preset name to save")
+			mb.status.SetText("Enter a preset name to save")
 			return
 		}
 		saved, err := mb.savePreset(name)
@@ -780,6 +1421,8 @@ func (mb *MatrixBuilder) savePreset(name string) (string, error) {
 		YAxis:      mb.yAxis,
 		XTolerance: mb.xTolerance,
 		YTolerance: mb.yTolerance,
+		Filter:     mb.filterTree(),
+		Query:      strings.TrimSpace(mb.queryEntry.Text),
 	}
 	b, err := json.MarshalIndent(&p, "", "  ")
 	if err != nil {
@@ -838,6 +1481,16 @@ func (mb *MatrixBuilder) applyPreset(p *Preset) {
 	mb.xSel.SetText(p.XSeries)
 	mb.ySel.SetText(p.YSeries)
 	mb.zSel.SetText(p.ZSeries)
+
+	// Replace the filter tree with the preset's, falling back to the legacy flat
+	// rules for presets saved before the tree existed. Restoring the query box
+	// fires OnChanged, which re-runs validateQuery.
+	root := p.Filter
+	if root == nil && len(p.Rules) > 0 {
+		root = rulesToNode(p.Rules)
+	}
+	mb.setFilterTree(root)
+	mb.queryEntry.SetText(p.Query)
 
 	mb.colsLabel.SetText(strconv.Itoa(mb.cols))
 	mb.rowsLabel.SetText(strconv.Itoa(mb.rows))

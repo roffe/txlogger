@@ -32,10 +32,14 @@ type quadRef struct {
 const surfaceEdgeFade = 0.45
 
 // drawSurface fills each grid cell with two Gouraud-shaded triangles,
-// back-to-front. A fixed directional light flat-shades each quad so the
-// surface relief stays visible even where the value color barely changes.
-// When edges is true the cell outline is drawn right after its fill, which
-// keeps lines on hidden faces correctly occluded by nearer quads.
+// back-to-front. Like the shader backend, the split diagonal is chosen per cell
+// to fold between the two closest corners (by value, so it stays put as the
+// camera rotates): a lone peak or dip then lands on a single triangle and the
+// other stays a flat plateau, instead of the whole quad sagging toward it. Each
+// triangle is flat-shaded from its own normal so the plateau reads flat while
+// the slope catches the light. When edges is true the cell outline is drawn
+// right after its fill, which keeps lines on hidden faces correctly occluded by
+// nearer quads.
 func (m *Meshgrid) drawSurface(img *image.RGBA, projX, projY []int, vertCol []color.RGBA, edges bool) {
 	// One quad per data cell; the corner-vertex grid is (rows+1) x (cols+1).
 	quads := m.scratchQuads[:0]
@@ -67,19 +71,34 @@ func (m *Meshgrid) drawSurface(img *image.RGBA, projX, projY []int, vertCol []co
 
 	vCols := m.cols + 1
 	for _, q := range quads {
-		ai := q.i*vCols + q.j // top-left
-		bi := ai + 1          // top-right
-		di := ai + vCols      // bottom-left
-		ci := di + 1          // bottom-right
+		i, j := q.i, q.j
+		ai := i*vCols + j // top-left
+		bi := ai + 1      // top-right
+		di := ai + vCols  // bottom-left
+		ci := di + 1      // bottom-right
 
-		shade := m.quadShade(q.i, q.j, lx, ly, lz)
-		ca := fadeColor(vertCol[ai], shade)
-		cb := fadeColor(vertCol[bi], shade)
-		cc := fadeColor(vertCol[ci], shade)
-		cd := fadeColor(vertCol[di], shade)
+		a := &m.vertices[i][j]
+		b := &m.vertices[i][j+1]
+		c := &m.vertices[i+1][j+1]
+		d := &m.vertices[i+1][j]
 
-		fillTriangle(img, projX[ai], projY[ai], projX[bi], projY[bi], projX[ci], projY[ci], ca, cb, cc)
-		fillTriangle(img, projX[ai], projY[ai], projX[ci], projY[ci], projX[di], projY[di], ca, cc, cd)
+		// Fold along whichever diagonal has the smaller corner-value gap, so an
+		// outlier is isolated in one sloping triangle (see the doc comment).
+		if math.Abs(a.V-c.V) <= math.Abs(b.V-d.V) {
+			s1 := triShade(a, b, c, lx, ly, lz)
+			s2 := triShade(a, c, d, lx, ly, lz)
+			fillTriangle(img, projX[ai], projY[ai], projX[bi], projY[bi], projX[ci], projY[ci],
+				fadeColor(vertCol[ai], s1), fadeColor(vertCol[bi], s1), fadeColor(vertCol[ci], s1))
+			fillTriangle(img, projX[ai], projY[ai], projX[ci], projY[ci], projX[di], projY[di],
+				fadeColor(vertCol[ai], s2), fadeColor(vertCol[ci], s2), fadeColor(vertCol[di], s2))
+		} else {
+			s1 := triShade(a, b, d, lx, ly, lz)
+			s2 := triShade(b, c, d, lx, ly, lz)
+			fillTriangle(img, projX[ai], projY[ai], projX[bi], projY[bi], projX[di], projY[di],
+				fadeColor(vertCol[ai], s1), fadeColor(vertCol[bi], s1), fadeColor(vertCol[di], s1))
+			fillTriangle(img, projX[bi], projY[bi], projX[ci], projY[ci], projX[di], projY[di],
+				fadeColor(vertCol[bi], s2), fadeColor(vertCol[ci], s2), fadeColor(vertCol[di], s2))
+		}
 
 		if edges {
 			ea := fadeColor(vertCol[ai], surfaceEdgeFade)
@@ -106,6 +125,30 @@ func (m *Meshgrid) quadShade(i, j int, lx, ly, lz float64) float64 {
 
 	ux, uy, uz := c.X-a.X, c.Y-a.Y, c.Z-a.Z
 	vx, vy, vz := d.X-b.X, d.Y-b.Y, d.Z-b.Z
+
+	nx := uy*vz - uz*vy
+	ny := uz*vx - ux*vz
+	nz := ux*vy - uy*vx
+
+	nl := math.Sqrt(nx*nx + ny*ny + nz*nz)
+	if nl == 0 {
+		return 1
+	}
+	dot := (nx*lx + ny*ly + nz*lz) / nl
+	if dot < 0 {
+		dot = -dot
+	}
+	return 0.6 + 0.4*dot
+}
+
+// triShade computes a flat Lambert term for one triangle from its view-space
+// normal (cross of two edges). The absolute dot product is used since the
+// surface is single-sided and may be viewed from below. This is the per-cell
+// quadShade applied per triangle so each facet of the chosen split shades on
+// its own slope.
+func triShade(a, b, c *Vertex, lx, ly, lz float64) float64 {
+	ux, uy, uz := b.X-a.X, b.Y-a.Y, b.Z-a.Z
+	vx, vy, vz := c.X-a.X, c.Y-a.Y, c.Z-a.Z
 
 	nx := uy*vz - uz*vy
 	ny := uz*vx - ux*vz

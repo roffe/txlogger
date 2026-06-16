@@ -17,7 +17,7 @@ func (mw *MainWindow) openMatrixBuilder() {
 		mw.wm.Raise(w)
 		return
 	}
-	inner := multiwindow.NewInnerWindow("Matrix builder", matrixbuilder.New())
+	inner := multiwindow.NewInnerWindow("Matrix builder", matrixbuilder.New(mw.settings.GetMeshRenderer()))
 	inner.Icon = theme.GridIcon()
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(1000, 720))

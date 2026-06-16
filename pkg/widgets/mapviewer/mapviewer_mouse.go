@@ -183,6 +183,14 @@ func (mv *MapViewer) calculateSelectionBounds(eventPos fyne.Position) (int, int)
 
 // handleFocusAndInputBuffer focuses the MapViewer and clears the input buffer if necessary.
 func (mv *MapViewer) handleFocusAndInputBuffer() {
+	// Take keyboard focus so the key handler (cell editing, increment/decrement,
+	// arrow-key navigation) receives events. The multiwindow manager focuses a
+	// map when its inner window is raised, but a MapViewer placed directly in a
+	// container (e.g. the matrix builder) is never focused otherwise, so clicking
+	// a cell would leave key presses with nowhere to go.
+	if c := fyne.CurrentApp().Driver().CanvasForObject(mv); c != nil {
+		c.Focus(mv)
+	}
 	if mv.inputBuffer.Len() > 0 {
 		mv.inputBuffer.Reset()
 		mv.restoreSelectedValues()

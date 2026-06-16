@@ -11,20 +11,31 @@ import (
 	"github.com/roffe/txlogger/pkg/colors"
 )
 
-// GPU renderer: the whole mesh is drawn by a single canvas.Shader. The corner
+// GPU renderer: the whole mesh is drawn by a single canvas.Shader. The mesh
 // values live in a small data texture and the camera in a handful of float
 // uniforms; the fragment shader reconstructs each pixel's orthographic view
 // ray, walks the grid with a 2D DDA and intersects the two triangles of each
 // visited cell. Rotating, zooming and panning therefore cost the CPU nothing
 // but a uniform update - no projection, sorting or rasterization per frame -
-// and a data edit re-uploads only the (cols+1)x(rows+1) texture.
+// and a data edit re-uploads only the value texture.
+//
+// The vertices are the raw cell values (dataVertexMode): the texture is cols x
+// rows, the grid has (cols-1)x(rows-1) cells and each cell triangulates the
+// four data points around it, so the surface passes exactly through every value
+// the way T7Suite's mesh does - a low cell only drops the two triangles meeting
+// at that corner, never the wider neighbourhood that averaging values onto a
+// shared corner grid would. Degenerate 1xN / Nx1 maps fall back to a corner
+// grid (cols+1 x rows+1, value averaged per corner); the GLSL is identical, only
+// grid_cols/grid_rows, the texture and the centre uniforms differ.
 //
 // The grid-space conventions shared between the Go side and the GLSL below:
 //   - one grid unit = one cell = cellWidth (32) logical px before scaling
-//   - corner (vertex row i, col j) sits at (j, rows-i); +Y is the low-index
-//     data rows, exactly like the Oy = (vRows-i)*cellHeight CPU layout
-//   - corner height = z_off + z_gain * value16, reproducing
-//     Oz = (V - zmin)/zrange * depth in grid units
+//   - in dataVertexMode the vertex for data cell (r, c) sits at grid (c,
+//     rows-1-r); +Y is the low-index data rows. center_gx = (cols-1)/2 places
+//     it half a cell in from the corner grid, aligning the mesh with the axis
+//     ticks (drawn at cell centres) and with projectOriginal
+//   - vertex height = z_off + z_gain * value16, reproducing
+//     (V - zmin)/zrange * depth in grid units
 //   - view = R * ((grid - center) * scale_px) - cam; the viewer sits at +Z
 //     looking along -Z, so the nearest surface has the largest view Z
 
@@ -49,7 +60,7 @@ const meshShaderBody = `
 uniform vec2 frame_size;
 uniform vec4 rect_coords;
 
-uniform sampler2D mesh_tex;     // (cols+1)x(rows+1) corner values, 16 bit in RG
+uniform sampler2D mesh_tex;     // cols x rows cell values (or corner grid), 16 bit in RG
 uniform sampler2D colormap_tex; // 256x1 value -> base color lookup
 
 // camera rotation R, row major; view = R * model
@@ -305,7 +316,7 @@ void main() {
         float h_tl = corner_height(cx, cy + 1.0);
         float h_tr = corner_height(cx + 1.0, cy + 1.0);
 
-        // cell corners; the fill splits along A-C like the CPU rasterizer
+        // cell corners; the solid fill chooses its diagonal per cell (below)
         // while the wireframe diagonal runs B-D like the CPU line mesh
         vec3 A = vec3(cx, cy + 1.0, h_tl);
         vec3 B = vec3(cx + 1.0, cy + 1.0, h_tr);
@@ -322,29 +333,50 @@ void main() {
                 break;
             }
         } else {
-            float t1;
-            vec3 bc1;
-            float t2;
-            vec3 bc2;
-            bool hit1 = ray_tri(ro, rd, A, B, C, t1, bc1);
-            bool hit2 = ray_tri(ro, rd, A, C, D, t2, bc2);
+            // Two triangles per cell, but the diagonal is chosen per cell so the
+            // fold runs between the two closest corners (the smaller of the two
+            // diagonal height gaps). A lone outlier - a high peak or a low dip -
+            // then falls on a single triangle: the other triangle keeps its three
+            // similar corners as a near-flat plateau and only the outlier's
+            // triangle slopes. That is the "plateau triangle + sloping triangle"
+            // look of T7Suite, instead of the whole quad sagging toward the
+            // outlier. Per-triangle normals let the plateau read flat while the
+            // slope catches the light.
+            bool fold_ac = abs(h_tl - h_br) <= abs(h_tr - h_bl);
             float best_t = BIG;
             float hit_h = 0.0;
-            if (hit1) {
-                best_t = t1;
-                hit_h = bc1.x * A.z + bc1.y * B.z + bc1.z * C.z;
-            }
-            if (hit2 && t2 < best_t) {
-                best_t = t2;
-                hit_h = bc2.x * A.z + bc2.y * C.z + bc2.z * D.z;
+            vec3 hit_n = vec3(0.0, 0.0, -1.0);
+            float ts;
+            vec3 bcs;
+            if (fold_ac) {
+                if (ray_tri(ro, rd, A, B, C, ts, bcs) && ts < best_t) {
+                    best_t = ts;
+                    hit_h = bcs.x * A.z + bcs.y * B.z + bcs.z * C.z;
+                    hit_n = cross(B - A, C - A);
+                }
+                if (ray_tri(ro, rd, A, C, D, ts, bcs) && ts < best_t) {
+                    best_t = ts;
+                    hit_h = bcs.x * A.z + bcs.y * C.z + bcs.z * D.z;
+                    hit_n = cross(C - A, D - A);
+                }
+            } else {
+                if (ray_tri(ro, rd, A, B, D, ts, bcs) && ts < best_t) {
+                    best_t = ts;
+                    hit_h = bcs.x * A.z + bcs.y * B.z + bcs.z * D.z;
+                    hit_n = cross(B - A, D - A);
+                }
+                if (ray_tri(ro, rd, B, C, D, ts, bcs) && ts < best_t) {
+                    best_t = ts;
+                    hit_h = bcs.x * B.z + bcs.y * C.z + bcs.z * D.z;
+                    hit_n = cross(C - B, D - B);
+                }
             }
             if (best_t < BIG) {
                 float view_z = umax - best_t;
                 vec3 rgb = height_color(hit_h, view_z);
 
-                vec3 n = cross(C - A, D - B);
                 float ao = cell_ao(cx, cy);
-                rgb = shade_surface(rgb, n, light, view_dir, ao);
+                rgb = shade_surface(rgb, hit_n, light, view_dir, ao);
 
                 if (mode == 0) {
                     vec3 pa = project_grid(rot, A, pix_scale);
@@ -358,6 +390,8 @@ void main() {
                     edge_check(p_dev, pb, pc, B.z, C.z, best_d, line_h, line_z);
                     edge_check(p_dev, pc, pd, C.z, D.z, best_d, line_h, line_z);
                     edge_check(p_dev, pd, pa, D.z, A.z, best_d, line_h, line_z);
+                    // only the cell borders are drawn; the per-cell fold diagonal
+                    // is left in the cell colour so the two triangles blend
                     float lm = line_mask(best_d, half_w);
                     if (lm > 0.0) {
                         rgb = mix(rgb, height_color(line_h, line_z) * 0.45, lm);
@@ -405,52 +439,76 @@ func (m *Meshgrid) initShader() {
 	m.updateShaderUniforms()
 }
 
-// updateShaderData re-encodes the corner values into the mesh data texture
-// and the height-mapping uniforms. A fresh image is allocated on purpose:
-// the painter re-uploads a texture only when the map entry points at a new
-// image.
+// dataVertexMode reports whether the shader treats raw cell values as the mesh
+// vertices (the T7Suite-style triangulated surface) rather than averaging them
+// onto a corner grid. It needs at least 2x2 cells to span a quad between data
+// points; a 1xN / Nx1 map falls back to the corner-averaged path, which already
+// renders those degenerate "ribbons" sensibly.
+func (m *Meshgrid) dataVertexMode() bool {
+	return m.cols >= 2 && m.rows >= 2
+}
+
+// updateShaderData re-encodes the mesh values into the data texture and the
+// height-mapping uniforms. In dataVertexMode the texture holds the raw cell
+// values (one texel per data cell) so the shader's per-cell triangulation
+// passes exactly through each value: a low cell only pulls down the two
+// triangles touching that corner, never the wider neighbourhood that corner
+// averaging would. Otherwise it falls back to the (cols+1)x(rows+1) averaged
+// corner grid. A fresh image is allocated on purpose: the painter re-uploads a
+// texture only when the map entry points at a new image.
 func (m *Meshgrid) updateShaderData() {
 	if m.shader == nil {
 		return
 	}
-	vRows, vCols := m.rows+1, m.cols+1
 
 	// Values are normalized against the actual data extent so the 16-bit
 	// quantization keeps full resolution even when zmin/zmax (set by
 	// LoadFloat64s) span a wider range than the data.
 	dataMin, dataMax := math.Inf(1), math.Inf(-1)
-	for i := range m.vertices {
-		row := m.vertices[i]
-		for j := range row {
-			v := row[j].V
-			if v < dataMin {
-				dataMin = v
-			}
-			if v > dataMax {
-				dataMax = v
-			}
+	for _, v := range m.values {
+		if v < dataMin {
+			dataMin = v
+		}
+		if v > dataMax {
+			dataMax = v
 		}
 	}
 	dataRange := dataMax - dataMin
+	encode := func(v float64) color.RGBA {
+		norm := 0.0
+		if dataRange > 0 {
+			norm = (v - dataMin) / dataRange
+		}
+		q := uint16(norm*65535 + 0.5)
+		return color.RGBA{R: uint8(q >> 8), G: uint8(q), A: 0xff}
+	}
 
-	img := image.NewRGBA(image.Rect(0, 0, vCols, vRows))
-	for i := 0; i < vRows; i++ {
-		row := m.vertices[i]
-		for j := 0; j < vCols; j++ {
-			norm := 0.0
-			if dataRange > 0 {
-				norm = (row[j].V - dataMin) / dataRange
+	var img *image.RGBA
+	if m.dataVertexMode() {
+		// One texel per data cell; cell (r, c) is the vertex at grid (c,
+		// rows-1-r), so data row 0 stays at the far (high-Y) edge.
+		img = image.NewRGBA(image.Rect(0, 0, m.cols, m.rows))
+		for r := 0; r < m.rows; r++ {
+			for c := 0; c < m.cols; c++ {
+				img.SetRGBA(c, m.rows-1-r, encode(m.values[r*m.cols+c]))
 			}
-			q := uint16(norm*65535 + 0.5)
-			// vertex row i sits at grid Y rows-i (data row 0 is the far
-			// edge), which is also its texture row
-			img.SetRGBA(j, m.rows-i, color.RGBA{R: uint8(q >> 8), G: uint8(q), A: 0xff})
+		}
+	} else {
+		// Corner-averaged grid: vertex row i sits at grid Y rows-i, which is
+		// also its texture row.
+		vRows, vCols := m.rows+1, m.cols+1
+		img = image.NewRGBA(image.Rect(0, 0, vCols, vRows))
+		for i := 0; i < vRows; i++ {
+			row := m.vertices[i]
+			for j := 0; j < vCols; j++ {
+				img.SetRGBA(j, m.rows-i, encode(row[j].V))
+			}
 		}
 	}
 	m.shader.Textures["mesh_tex"] = img
 
-	// Heights in grid units: z_off + z_gain*norm reproduces the CPU
-	// Oz = (V - zmin)/zrange * depth, in units of one cell.
+	// Heights in grid units: z_off + z_gain*norm reproduces
+	// (V - zmin)/zrange * depth, in units of one cell.
 	zr := m.zrange
 	if zr == 0 {
 		zr = 1
@@ -515,16 +573,32 @@ func (m *Meshgrid) updateShaderUniforms() {
 	r := m.cameraRotation
 	cw := float64(m.cellWidth)
 
+	// Grid extent and centre depend on the surface model. In dataVertexMode the
+	// vertices are the cols x rows data points, so there are (cols-1)x(rows-1)
+	// cells and the data point for column c sits half a cell in from the corner
+	// grid (centre_gx = (cols-1)/2), which keeps the mesh aligned with the axis
+	// ticks (drawn at cell centres) and with projectOriginal. The corner-grid
+	// fallback keeps the old cols x rows cells and centre derived from the
+	// averaged vertices.
+	gridCols, gridRows := float32(m.cols), float32(m.rows)
+	centerGx := float32(m.centerX / cw)
+	centerGy := float32(m.centerY/cw - 1)
+	if m.dataVertexMode() {
+		gridCols, gridRows = float32(m.cols-1), float32(m.rows-1)
+		centerGx = float32(float64(m.cols-1) / 2)
+		centerGy = float32(float64(m.rows-1) / 2)
+	}
+
 	u := m.shader.Uniforms
 	u["r0"], u["r1"], u["r2"] = float32(r[0][0]), float32(r[0][1]), float32(r[0][2])
 	u["r3"], u["r4"], u["r5"] = float32(r[1][0]), float32(r[1][1]), float32(r[1][2])
 	u["r6"], u["r7"], u["r8"] = float32(r[2][0]), float32(r[2][1]), float32(r[2][2])
-	u["grid_cols"] = float32(m.cols)
-	u["grid_rows"] = float32(m.rows)
+	u["grid_cols"] = gridCols
+	u["grid_rows"] = gridRows
 	u["scale_px"] = float32(cw * m.scale)
 	u["height_units"] = float32(m.depth / cw)
-	u["center_gx"] = float32(m.centerX / cw)
-	u["center_gy"] = float32(m.centerY/cw - 1)
+	u["center_gx"] = centerGx
+	u["center_gy"] = centerGy
 	u["center_gz"] = float32(m.centerZ / cw)
 	u["cam_x"] = float32(m.cameraPosition[0])
 	u["cam_y"] = float32(m.cameraPosition[1])

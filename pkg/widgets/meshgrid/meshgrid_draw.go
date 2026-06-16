@@ -156,13 +156,30 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 }
 
 // cursorScreenPosition projects the tracking-marker cell position set by
-// SetCursor onto the screen. The camera transform is linear, so bilinearly
-// interpolating the transformed vertex coordinates lands on the same point
-// as transforming the interpolated one.
+// SetCursor onto the screen so the marker rides the surface the shader draws.
 func (m *Meshgrid) cursorScreenPosition() (float32, float32) {
-	// MapViewer indices are cell-centered while mesh vertices sit on cell
-	// corners; +0.5 lands the marker mid-cell on the corner grid. SetCursor
-	// clamps the indices, so sx/sy stay within [0.5, cols-0.5]/[0.5, rows-0.5].
+	if m.dataVertexMode() {
+		// The shader's vertices are the cell values themselves, so the marker
+		// rides the triangulated data surface: project the cell-centered data
+		// point at the (fractional) cursor, with the same Ox/Oy convention the
+		// axis uses. SetCursor clamps the indices to the data grid.
+		cw, ch := float64(m.cellWidth), float64(m.cellHeight)
+		ox := (m.cursorX + 0.5) * cw
+		oy := (float64(m.rows) + 0.5 - m.cursorY) * ch
+		zr := m.zrange
+		if zr == 0 {
+			zr = 1
+		}
+		oz := (m.sampleValue(m.cursorX, m.cursorY) - m.zmin) / zr * m.depth
+		sx, sy, _ := m.projectOriginal(ox, oy, oz)
+		return sx, sy
+	}
+
+	// Corner-averaged fallback: MapViewer indices are cell-centered while mesh
+	// vertices sit on cell corners; +0.5 lands the marker mid-cell on the corner
+	// grid. The camera transform is linear, so bilinearly interpolating the
+	// transformed corners lands on the same point as transforming the
+	// interpolated one.
 	sx := m.cursorX + 0.5
 	sy := m.cursorY + 0.5
 
@@ -182,6 +199,32 @@ func (m *Meshgrid) cursorScreenPosition() (float32, float32) {
 	vy := (1-fy)*((1-fx)*v00.Y+fx*v01.Y) + fy*((1-fx)*v10.Y+fx*v11.Y)
 
 	return float32(float64(m.size.Width)*0.5 + vx), float32(float64(m.size.Height)*0.5 + vy)
+}
+
+// sampleValue bilinearly interpolates the cell values at the fractional cell
+// index (fx = column, fy = row), clamped to the data grid.
+func (m *Meshgrid) sampleValue(fx, fy float64) float64 {
+	cx0 := min(max(int(math.Floor(fx)), 0), m.cols-1)
+	cy0 := min(max(int(math.Floor(fy)), 0), m.rows-1)
+	cx1 := min(cx0+1, m.cols-1)
+	cy1 := min(cy0+1, m.rows-1)
+	tx := fx - float64(cx0)
+	if tx < 0 {
+		tx = 0
+	} else if tx > 1 {
+		tx = 1
+	}
+	ty := fy - float64(cy0)
+	if ty < 0 {
+		ty = 0
+	} else if ty > 1 {
+		ty = 1
+	}
+	v00 := m.values[cy0*m.cols+cx0]
+	v01 := m.values[cy0*m.cols+cx1]
+	v10 := m.values[cy1*m.cols+cx0]
+	v11 := m.values[cy1*m.cols+cx1]
+	return (1-ty)*((1-tx)*v00+tx*v01) + ty*((1-tx)*v10+tx*v11)
 }
 
 // getColorWithDepth combines color interpolation and depth enhancement in one step
