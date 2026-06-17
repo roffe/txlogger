@@ -50,6 +50,13 @@ const (
 	defaultTolerance = 100
 )
 
+// Display views for the built matrix. viewMatrix shows the learned Z values;
+// viewCoverage shows how many samples landed in each cell.
+const (
+	viewMatrix   = "Matrix"
+	viewCoverage = "Coverage (hits)"
+)
+
 var _ fyne.Widget = (*MatrixBuilder)(nil)
 
 type MatrixBuilder struct {
@@ -71,6 +78,10 @@ type MatrixBuilder struct {
 	yAxis      []float64
 	zData      []float64
 
+	// counts holds the number of samples that landed in each cell during the
+	// last analyze, parallel to zData. It feeds the Coverage view.
+	counts []int
+
 	// xTolerance/yTolerance gate how close (as a percentage of the cell's
 	// half-spacing) a sample must be to its nearest breakpoint to count as a
 	// Z-hit on that axis. A sample is mapped only if it passes on both axes.
@@ -91,6 +102,7 @@ type MatrixBuilder struct {
 	xTolLabel, yTolLabel   *widget.Label
 	presetSelect           *widget.Select
 	nameEntry              *widget.Entry
+	viewSelect             *widget.Select
 	display                *fyne.Container
 
 	// Filter tree: a nested group/condition builder. rootGroup is the live editor
@@ -359,6 +371,19 @@ func (mb *MatrixBuilder) buildUI() {
 	})
 	buildBtn.Importance = widget.HighImportance
 
+	// View toggle: switch the display between the learned matrix and a coverage
+	// heatmap of how many samples landed in each cell.
+	mb.viewSelect = widget.NewSelect([]string{viewMatrix, viewCoverage}, func(string) {
+		mb.rebuildDisplay()
+	})
+	// Set the field directly rather than SetSelected: the latter fires OnChanged,
+	// which calls rebuildDisplay before mb.display exists (panic during buildUI).
+	mb.viewSelect.Selected = viewMatrix
+	bottomBar := container.NewBorder(nil, nil, nil,
+		container.NewHBox(widget.NewLabel("View"), mb.viewSelect),
+		buildBtn,
+	)
+
 	mb.xBox = container.NewVBox()
 	mb.yBox = container.NewHBox()
 	mb.rebuildAxisEntries()
@@ -407,7 +432,7 @@ func (mb *MatrixBuilder) buildUI() {
 	mainSplit := container.NewHSplit(
 		container.NewBorder(
 			yPanel,
-			buildBtn,
+			bottomBar,
 			container.NewVBox(
 				widget.NewLabelWithStyle("X axis values", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 				mb.xBox,
@@ -1076,6 +1101,7 @@ func (mb *MatrixBuilder) analyze() error {
 	}
 
 	mb.zData = make([]float64, size)
+	mb.counts = cnt
 	filled := 0
 	for i := range sum {
 		if cnt[i] > 0 {
@@ -1105,21 +1131,34 @@ func (mb *MatrixBuilder) rebuildDisplay() {
 		return
 	}
 
+	// Default to the learned matrix; the Coverage view swaps in the per-cell hit
+	// counts as a read-only heatmap.
+	zData := mb.zData
+	zLabel := mb.zSeries
+	zPrec := precisionFor(mb.zData)
+	editable := true
+	if mb.viewSelect != nil && mb.viewSelect.Selected == viewCoverage {
+		zData = countsToFloat(mb.counts)
+		zLabel = "Hits"
+		zPrec = 0
+		editable = false
+	}
+
 	noop := func([]float64) {}
 	mv, err := mapviewer.New(&mapviewer.Config{
-		Name:           mb.zSeries,
+		Name:           zLabel,
 		XData:          mb.xAxis,
 		YData:          mb.yAxis,
-		ZData:          mb.zData,
+		ZData:          zData,
 		XPrecision:     precisionFor(mb.xAxis),
 		YPrecision:     precisionFor(mb.yAxis),
-		ZPrecision:     precisionFor(mb.zData),
+		ZPrecision:     zPrec,
 		XLabel:         mb.xSeries,
 		YLabel:         mb.ySeries,
-		ZLabel:         mb.zSeries,
+		ZLabel:         zLabel,
 		MeshView:       true,
 		MeshRenderer:   mb.renderMode,
-		Editable:       true,
+		Editable:       editable,
 		ColorblindMode: colors.ModeNormal,
 		// The matrix is in-memory only; editing cells just mutates zData.
 		SaveECUFunc:  noop,
@@ -1589,6 +1628,16 @@ func nearestIndex(axis []float64, v float64) int {
 		}
 	}
 	return best
+}
+
+// countsToFloat converts per-cell hit counts to float64 Z data for the
+// mapviewer's Coverage view.
+func countsToFloat(counts []int) []float64 {
+	out := make([]float64, len(counts))
+	for i, c := range counts {
+		out[i] = float64(c)
+	}
+	return out
 }
 
 func minMax(data []float64) (float64, float64) {
