@@ -20,6 +20,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	xwidget "fyne.io/x/fyne/widget"
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/ecusymbol/as2"
 	"github.com/roffe/gocan"
 	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/colors"
@@ -61,16 +62,19 @@ func (s *SecretText) MouseUp(e *desktop.MouseEvent) {
 
 type MainWindow struct {
 	fyne.Window
-	app             fyne.App
-	menu            *MainMenu
-	outputData      binding.StringList
-	selects         *mainWindowSelects
-	buttons         *mainWindowButtons
-	counters        *mainWindowCounters
-	loggingRunning  bool
-	filename        string
-	symbolList      *symbollist.Widget
-	fw              symbol.SymbolCollection
+	app            fyne.App
+	menu           *MainMenu
+	outputData     binding.StringList
+	selects        *mainWindowSelects
+	buttons        *mainWindowButtons
+	counters       *mainWindowCounters
+	loggingRunning bool
+	filename       string
+	symbolList     *symbollist.Widget
+
+	as2 *as2.File
+	fw  symbol.SymbolCollection
+
 	dlc             datalogger.IClient
 	gwclient        proto.GocanClient
 	buttonsDisabled bool
@@ -396,6 +400,16 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 	// w.Show()
 	// mw.wm.Add(iw, p)
 	mw.Log("loaded log file " + filename + " in combined logplayer")
+}
+
+func (mw *MainWindow) LoadAS2File(filename string) error {
+	f, err := as2.Load(filename)
+	if err != nil {
+		return fmt.Errorf("failed to load AS2 file: %w", err)
+	}
+	mw.as2 = f
+	mw.Log("Loaded AS2 file " + filename)
+	return nil
 }
 
 func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Position) {

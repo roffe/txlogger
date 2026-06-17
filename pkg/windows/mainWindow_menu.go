@@ -210,6 +210,17 @@ func (mw *MainWindow) setupMenu() {
 				mw.Error(err)
 			}
 		}),
+		fyne.NewMenuItemWithIcon("Open AS2 file", theme.DocumentIcon(), func() {
+			cb := func(r fyne.URIReadCloser) {
+				defer r.Close()
+				filename := r.URI().Path()
+				mw.Log("Opening AS2 file " + filename)
+				if err := mw.LoadAS2File(filename); err != nil {
+					mw.Error(err)
+				}
+			}
+			widgets.SelectFile(cb, "AS2 file", "as2")
+		}),
 	)
 
 	leading := []*fyne.Menu{
@@ -280,7 +291,35 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) 
 		return
 	}
 
-	axis := symbol.GetInfo(typ, mapName)
+	var axis symbol.Axis
+	if mw.as2 != nil {
+		axis.Z = mapName
+		axes := mw.as2.Axes(mapName)
+		if len(axes) == 0 {
+			mw.Error(fmt.Errorf("map %q not found in as2 file", mapName))
+			return
+		}
+		if len(axes) == 1 {
+			axis.Y = axes[0].SupportPoints
+			axis.YFrom = axes[0].Signal
+		} else {
+			for i, a := range axes {
+				log.Printf("Axis %d: %+v", i, a)
+				if i == 0 {
+					axis.X = a.SupportPoints
+					axis.XFrom = a.Signal
+					continue
+				}
+				if i == 1 {
+					axis.Y = a.SupportPoints
+					axis.YFrom = a.Signal
+					continue
+				}
+			}
+		}
+	} else {
+		axis = symbol.GetInfo(typ, mapName)
+	}
 
 	windowName := axis.Z
 	if title != "" {
@@ -307,6 +346,12 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) 
 
 	symY := mw.fw.GetByName(axis.Y)
 	symZ := mw.fw.GetByName(axis.Z)
+
+	if mw.as2 != nil {
+		if symZ != nil {
+			symZ.Correctionfactor = mw.as2.GetCorrectionfactor(mapName)
+		}
+	}
 
 	if symZ == nil {
 		mw.Error(fmt.Errorf("failed to find symbol %s", axis.Z))
@@ -473,15 +518,39 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) 
 	}
 
 	var xPrecision, yPrecision, zPrecision int
-	if symX != nil {
-		xPrecision = symbol.GetPrecision(symX.Correctionfactor)
-	}
 
-	if symY != nil {
-		yPrecision = symbol.GetPrecision(symY.Correctionfactor)
+	if mw.as2 != nil {
+		if symX != nil {
+			xPrecision = mw.as2.Precision(axis.X)
+			log.Printf("Precision for %s: %d", axis.X, xPrecision)
+			//if xPrecision == 0 {
+			//	log.Printf("Warning: precision for %s is 0, defaulting to 2", axis.X)
+			//	xPrecision = 2
+			//}
+		}
+		if symY != nil {
+			yPrecision = mw.as2.Precision(axis.Y)
+			log.Printf("Precision for %s: %d", axis.Y, yPrecision)
+			//if yPrecision == 0 {
+			//	log.Printf("Warning: precision for %s is 0, defaulting to 2", axis.Y)
+			//	yPrecision = 2
+			//}
+		}
+		zPrecision = mw.as2.Precision(axis.Z)
+		log.Printf("Precision for %s: %d", axis.Z, zPrecision)
+		//if zPrecision == 0 {
+		//	log.Printf("Warning: precision for %s is 0, defaulting to 2", axis.Z)
+		//	zPrecision = 2
+		//}
+	} else {
+		if symX != nil {
+			xPrecision = symbol.GetPrecision(symX.Correctionfactor)
+		}
+		if symY != nil {
+			yPrecision = symbol.GetPrecision(symY.Correctionfactor)
+		}
+		zPrecision = symbol.GetPrecision(symZ.Correctionfactor)
 	}
-
-	zPrecision = symbol.GetPrecision(symZ.Correctionfactor)
 
 	cfg := &mapviewer.Config{
 		Name: symZ.Name,
@@ -556,7 +625,8 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) 
 		},
 	}
 
-	mv, err := mapviewer.New(cfg)
+	var err error
+	mv, err = mapviewer.New(cfg)
 	if err != nil {
 		mw.Error(err)
 		return

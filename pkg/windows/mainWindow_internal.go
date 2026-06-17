@@ -71,6 +71,10 @@ func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
 	for _, u := range uris {
 		filename := u.Path()
 		switch strings.ToLower(path.Ext(filename)) {
+		case ".as2":
+			if err := mw.LoadAS2File(filename); err != nil {
+				mw.Error(err)
+			}
 		case ".bin":
 			if err := mw.LoadSymbolsFromFile(filename); err != nil {
 				mw.Error(err)
