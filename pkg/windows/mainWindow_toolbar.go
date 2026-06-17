@@ -1,14 +1,64 @@
 package windows
 
 import (
+	"fmt"
+	"os"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/widgets/boosttuner"
 	"github.com/roffe/txlogger/pkg/widgets/canflasher"
 	"github.com/roffe/txlogger/pkg/widgets/matrixbuilder"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
+
+// openBoostTuner opens (or raises) the T7 boost auto-tuner. It reads the current
+// BoostCal maps from the loaded binary and writes tuned maps back through a save
+// closure that takes a one-time .bak of the file before the first write.
+func (mw *MainWindow) openBoostTuner() {
+	if mw.fw == nil {
+		mw.Error(fmt.Errorf("no binary loaded"))
+		return
+	}
+	if w := mw.wm.HasWindow("Boost Auto-Tuner"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	save := func(symbolName string, data []float64) error {
+		sym := mw.fw.GetByName(symbolName)
+		if sym == nil {
+			return fmt.Errorf("symbol %s not found", symbolName)
+		}
+		if err := sym.SetData(sym.EncodeFloat64s(data)); err != nil {
+			return err
+		}
+		if mw.filename != "" {
+			if bak := mw.filename + ".bak"; !fileExists(bak) {
+				if orig, err := os.ReadFile(mw.filename); err == nil {
+					_ = os.WriteFile(bak, orig, 0o644)
+				}
+			}
+		}
+		return mw.fw.Save(mw.filename)
+	}
+	bt := boosttuner.New(boosttuner.Config{
+		Symbols:      mw.fw,
+		Save:         save,
+		MeshRenderer: mw.settings.GetMeshRenderer(),
+		Colorblind:   mw.settings.GetColorBlindMode(),
+	})
+	inner := multiwindow.NewInnerWindow("Boost Auto-Tuner", bt)
+	inner.Icon = theme.GridIcon()
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(1100, 760))
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
 
 // openMatrixBuilder opens (or raises) the matrix builder window. The builder
 // loads its own log files, so it is independent of any open log player.
@@ -60,6 +110,7 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 		}),
 		)
 
+		toolbar.Add(widget.NewButtonWithIcon("Boost", theme.MediaFastForwardIcon(), mw.openBoostTuner))
 		/*
 			toolbar.Add(widget.NewButtonWithIcon("", theme.DocumentIcon(), func() {
 				if w := mw.wm.HasWindow("txweb"); w != nil {
