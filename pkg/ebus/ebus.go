@@ -2,6 +2,7 @@ package ebus
 
 import (
 	"sync"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"github.com/roffe/txlogger/pkg/bus"
@@ -15,6 +16,11 @@ var (
 const (
 	TOPIC_COLORBLINDMODE = "color_blind_mode"
 	TOPIC_ECU            = "selected_ecu"
+	// TOPIC_FRAME fires once per completed log frame, carrying the frame's
+	// timestamp as Unix milliseconds (float64). Subscribers use it as the frame
+	// boundary to sample the latest value of every symbol with a shared, real
+	// timestamp (see the live plotter).
+	TOPIC_FRAME = "__frame__"
 )
 
 func init() {
@@ -30,6 +36,12 @@ func init() {
 
 func Publish(topic string, data float64) {
 	CONTROLLER.Publish(topic, data)
+}
+
+// PublishFrame signals that a log frame completed at time t. The timestamp is
+// carried as Unix milliseconds, which fits exactly in a float64.
+func PublishFrame(t time.Time) {
+	CONTROLLER.Publish(TOPIC_FRAME, float64(t.UnixMilli()))
 }
 
 func SubscribeFunc(topic string, f func(float64)) func() {
