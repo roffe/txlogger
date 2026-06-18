@@ -86,6 +86,7 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 		mw.buttons.symbolListBtn,
 		mw.buttons.logBtn,
 		mw.buttons.dashboardBtn,
+		mw.buttons.livePlotBtn,
 		widget.NewButtonWithIcon("Matrix", theme.GridIcon(), mw.openMatrixBuilder),
 		widget.NewButtonWithIcon("", theme.GridIcon(), func() {
 			mw.wm.Arrange(&multiwindow.GridArranger{})

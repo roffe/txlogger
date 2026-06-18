@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -15,6 +16,7 @@ import (
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
+	"github.com/roffe/txlogger/pkg/widgets/liveplotter"
 	"github.com/roffe/txlogger/pkg/widgets/msglist"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
@@ -31,6 +33,33 @@ func (mw *MainWindow) createButtons() {
 	mw.buttons.debugBtn = mw.newDebugBtn()
 	mw.buttons.symbolListBtn = mw.newSymbolListBtn()
 	mw.buttons.addGaugeBtn = mw.newaddGaugeBtn()
+	mw.buttons.livePlotBtn = mw.newLivePlotBtn()
+}
+
+func (mw *MainWindow) newLivePlotBtn() *widget.Button {
+	return widget.NewButtonWithIcon("Live plot", theme.MediaSkipNextIcon(), func() {
+		if w := mw.wm.HasWindow("Live plot"); w != nil {
+			mw.wm.Raise(w)
+			return
+		}
+
+		names := mw.symbolList.Names()
+		if len(names) == 0 {
+			mw.Error(fmt.Errorf("no symbols selected to plot"))
+			return
+		}
+
+		lp := liveplotter.New(&liveplotter.Config{
+			Order:  names,
+			Window: 120 * time.Second,
+		})
+
+		lpw := multiwindow.NewInnerWindow("Live plot", lp)
+		lpw.Icon = theme.MediaSkipNextIcon()
+		lpw.OnClose = lp.Close
+		mw.wm.Add(lpw)
+		lpw.Resize(fyne.NewSize(900, 500))
+	})
 }
 
 func (mw *MainWindow) newaddGaugeBtn() *widget.Button {

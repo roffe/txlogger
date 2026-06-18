@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -109,6 +110,7 @@ type mainWindowButtons struct {
 	layoutRefreshBtn *widget.Button
 	symbolListBtn    *widget.Button
 	addGaugeBtn      *widget.Button
+	livePlotBtn      *widget.Button
 }
 
 type mainWindowCounters struct {
@@ -433,6 +435,22 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Positio
 		EBus:            ebus.CONTROLLER,
 		Logfile:         logz,
 		PlotterRenderer: mw.settings.GetPlotterRenderer(),
+		OnExport: func(records []logfile.Record) {
+			ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(fp)), ".")
+			prefix := strings.TrimSuffix(fp, filepath.Ext(fp)) + "-clip"
+			logPath := mw.settings.GetLogPath()
+			go func() {
+				path, err := datalogger.ExportRecords(logPath, prefix, ext, records)
+				fyne.Do(func() {
+					if err != nil {
+						mw.Error(fmt.Errorf("failed to export selection: %w", err))
+						return
+					}
+					mw.Log(fmt.Sprintf("exported %d samples to %s", len(records), path))
+					dialog.ShowInformation("Selection exported", fmt.Sprintf("Saved %d samples to\n%s", len(records), path), mw)
+				})
+			}()
+		},
 	})
 	/*
 		content := container.NewBorder(
