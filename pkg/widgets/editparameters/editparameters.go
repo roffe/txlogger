@@ -193,81 +193,74 @@ func (t *EditParameters) readParameters() {
 		t.err(err)
 		return
 	}
-	eventHandler := func(e gocan.Event) {
+	cl, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
 		log.Printf("EVENT: %v", e)
-	}
-
-	cl, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventHandler(eventHandler))
+	}))
 	if err != nil {
 		t.err(err)
 		return
 	}
+	defer cl.Close()
+
 	gm := gmlan.New(cl, 0x7e0, 0x5e8, 0x7e8)
 	t8c := &T8{gm: gm}
 
-	go func() {
-		defer cl.Close()
-
-		defer func() {
-			_ = gm.ReturnToNormalMode(ctx)
-			time.Sleep(75 * time.Millisecond)
-		}()
-
-		data, err := gm.ReadDataByIdentifier(ctx, 0x01)
-		if err != nil {
-			t.err(err)
-			return
-		}
-
-		status, err := t8.DecodePI01(data)
-		if err != nil {
-			t.err(err)
-			return
-		}
-
-		t.SetDiagnosticType(status.DiagnosticType.String())
-		t.SetTankType(status.TankType.String())
-		t.SetConvertible(status.Convertible)
-		t.SetSAI(status.SAI)
-		t.SetHighOutput(status.HighOutput)
-		t.SetBioPower(status.BioPower)
-		t.SetClutchStart(status.ClutchStart)
-
-		oilQuality, err := t8c.GetOilQuality(ctx)
-		if err != nil {
-			t.err(err)
-			return
-		}
-		t.SetOilQuality(strconv.FormatFloat(oilQuality, 'f', 2, 64))
-
-		vin, err := t8c.GetVehicleVIN(ctx)
-		if err != nil {
-			t.err(err)
-			return
-		}
-		t.SetVIN(vin)
-
-		topSpeed, err := t8c.GetTopSpeed(ctx)
-		if err != nil {
-			t.err(err)
-			return
-		}
-		t.SetTopSpeed(strconv.Itoa(int(topSpeed)))
-
-		time.Sleep(5 * time.Millisecond)
-
-		e85percentage, err := t8c.GetE85Percent(ctx)
-		if err != nil {
-			t.err(err)
-			return
-		}
-		t.SetE85Percent(strconv.FormatFloat(e85percentage, 'f', 0, 64))
+	defer func() {
+		_ = gm.ReturnToNormalMode(ctx)
+		time.Sleep(75 * time.Millisecond)
 	}()
 
-	if err := cl.Wait(ctx); err != nil {
+	// A fatal adapter failure aborts any of these calls with that error.
+	data, err := gm.ReadDataByIdentifier(ctx, 0x01)
+	if err != nil {
 		t.err(err)
 		return
 	}
+
+	status, err := t8.DecodePI01(data)
+	if err != nil {
+		t.err(err)
+		return
+	}
+
+	t.SetDiagnosticType(status.DiagnosticType.String())
+	t.SetTankType(status.TankType.String())
+	t.SetConvertible(status.Convertible)
+	t.SetSAI(status.SAI)
+	t.SetHighOutput(status.HighOutput)
+	t.SetBioPower(status.BioPower)
+	t.SetClutchStart(status.ClutchStart)
+
+	oilQuality, err := t8c.GetOilQuality(ctx)
+	if err != nil {
+		t.err(err)
+		return
+	}
+	t.SetOilQuality(strconv.FormatFloat(oilQuality, 'f', 2, 64))
+
+	vin, err := t8c.GetVehicleVIN(ctx)
+	if err != nil {
+		t.err(err)
+		return
+	}
+	t.SetVIN(vin)
+
+	topSpeed, err := t8c.GetTopSpeed(ctx)
+	if err != nil {
+		t.err(err)
+		return
+	}
+	t.SetTopSpeed(strconv.Itoa(int(topSpeed)))
+
+	time.Sleep(5 * time.Millisecond)
+
+	e85percentage, err := t8c.GetE85Percent(ctx)
+	if err != nil {
+		t.err(err)
+		return
+	}
+	t.SetE85Percent(strconv.FormatFloat(e85percentage, 'f', 0, 64))
+
 	t.hasBeenRead = true
 }
 
@@ -287,168 +280,162 @@ func (t *EditParameters) writeParameters() {
 		t.err(err)
 		return
 	}
-	eventHandler := func(e gocan.Event) {
+	cl, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
 		log.Printf("EVENT: %v", e)
-	}
-
-	cl, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventHandler(eventHandler))
+	}))
 	if err != nil {
 		t.err(err)
 		return
 	}
+	defer cl.Close()
+
 	gm := gmlan.New(cl, 0x7e0, 0x5e8, 0x7e8)
 	t8c := &T8{gm: gm}
 
-	go func() {
-		defer cl.Close()
+	//if err := gm.InitiateDiagnosticOperation(ctx, gmlan.LEV_EDDDC); err != nil {
+	//	log.Println(err)
+	//	return
+	//}
 
-		//if err := gm.InitiateDiagnosticOperation(ctx, gmlan.LEV_EDDDC); err != nil {
-		//	log.Println(err)
-		//	return
-		//}
-
-		defer func() {
-			_ = gm.ReturnToNormalMode(ctx)
-			time.Sleep(75 * time.Millisecond)
-		}()
-
-		if err := gm.RequestSecurityAccess(ctx, 0xFD, 1, t8sec.CalculateAccessKey); err != nil {
-			t.err(err)
-			return
-		}
-
-		vin, err := t.GetVIN()
-		if err != nil {
-			t.err(fmt.Errorf("Error getting VIN: %w", err))
-			return
-		}
-		if err := t8c.SetVehicleVIN(ctx, vin); err != nil {
-			t.err(fmt.Errorf("Error setting VIN: %w", err))
-		}
-
-		e85content, err := t.GetE85Percent()
-		if err != nil {
-			t.err(fmt.Errorf("Error getting E85 content: %w", err))
-			return
-		}
-		e85percent, err := strconv.ParseFloat(e85content, 64)
-		if err != nil {
-			t.err(fmt.Errorf("Error parsing E85 content: %w", err))
-			return
-		}
-		if err := t8c.SetE85Percent(ctx, e85percent); err != nil {
-			t.err(fmt.Errorf("Error setting E85 percent: %w", err))
-			return
-		}
-
-		topSpeed, err := t.GetTopSpeed()
-		if err != nil {
-			t.err(fmt.Errorf("Error getting Top Speed: %w", err))
-			return
-		}
-		topSpeedVal, err := strconv.Atoi(topSpeed)
-		if err != nil {
-			t.err(fmt.Errorf("Error parsing Top Speed: %w", err))
-			return
-		}
-		if err := t8c.SetTopSpeed(ctx, uint16(topSpeedVal)); err != nil {
-			t.err(fmt.Errorf("Error setting Top Speed: %w", err))
-			return
-		}
-
-		oilQuality, err := t.GetOilQuality()
-		if err != nil {
-			t.err(fmt.Errorf("Error getting oil quality: %w", err))
-			return
-		}
-		oilQualityVal, err := strconv.ParseFloat(oilQuality, 64)
-		if err != nil {
-			t.err(fmt.Errorf("Error parsing oil quality: %w", err))
-			return
-		}
-		if err := t8c.SetOilQuality(ctx, oilQualityVal); err != nil {
-			t.err(fmt.Errorf("Error setting oil quality: %w", err))
-			return
-		}
-
-		data, err := gm.ReadDataByIdentifier(ctx, 0x01)
-		if err != nil {
-			t.err(fmt.Errorf("Error reading PI01: %w", err))
-			return
-		}
-
-		pi01, err := t.GetPI01Data()
-		if err != nil {
-			t.err(fmt.Errorf("Error getting PI 0x01 data: %w", err))
-			return
-		}
-
-		// -------C
-		data[0] = setBit(data[0], 0, pi01.BioPower)
-
-		// -----C--
-		data[0] = setBit(data[0], 2, pi01.Convertible)
-
-		// ---01--- US
-		// ---10--- EU
-		// ---11--- AWD
-		switch pi01.TankType {
-		case t8.TankTypeUS:
-			data[0] = setBit(data[0], 3, true)
-			data[0] = setBit(data[0], 4, false)
-		case t8.TankTypeEU:
-			data[0] = setBit(data[0], 3, false)
-			data[0] = setBit(data[0], 4, true)
-		case t8.TankTypeAWD:
-			data[0] = setBit(data[0], 3, true)
-			data[0] = setBit(data[0], 4, true)
-		}
-
-		// -01----- OBD2
-		// -10----- EOBD
-		// -11----- LOBD
-		switch pi01.DiagnosticType {
-		case t8.DiagnosticTypeOBD2:
-			data[0] = setBit(data[0], 5, true)
-			data[0] = setBit(data[0], 6, false)
-		case t8.DiagnosticTypeEOBD:
-			data[0] = setBit(data[0], 5, false)
-			data[0] = setBit(data[0], 6, true)
-		case t8.DiagnosticTypeLOBD:
-			data[0] = setBit(data[0], 5, true)
-			data[0] = setBit(data[0], 6, true)
-		case t8.DiagnosticTypeNone:
-			data[0] = setBit(data[0], 5, false)
-			data[0] = setBit(data[0], 6, false)
-		}
-
-		// on = -----10-
-		// off= -----01-
-		data[1] = setBit(data[1], 1, !pi01.ClutchStart)
-		data[1] = setBit(data[1], 2, pi01.ClutchStart)
-
-		// on = ---10---
-		// off= ---01---
-		data[1] = setBit(data[1], 3, !pi01.SAI)
-		data[1] = setBit(data[1], 4, pi01.SAI)
-
-		// high= -01-----
-		// low = -10-----
-		data[1] = setBit(data[1], 5, pi01.HighOutput)
-		data[1] = setBit(data[1], 6, !pi01.HighOutput)
-
-		if err := gm.WriteDataByIdentifier(ctx, 0x01, data); err != nil {
-			t.err(fmt.Errorf("Error writing PI 0x01: %w", err))
-			return
-		}
-
-		if err := gm.DeviceControl(ctx, 0x16); err != nil {
-			t.err(fmt.Errorf("Error performing device control 0x16: %w", err))
-			return
-		}
+	defer func() {
+		_ = gm.ReturnToNormalMode(ctx)
+		time.Sleep(75 * time.Millisecond)
 	}()
-	if err := cl.Wait(ctx); err != nil {
+
+	// A fatal adapter failure aborts any of these calls with that error.
+	if err := gm.RequestSecurityAccess(ctx, 0xFD, 1, t8sec.CalculateAccessKey); err != nil {
 		t.err(err)
+		return
+	}
+
+	vin, err := t.GetVIN()
+	if err != nil {
+		t.err(fmt.Errorf("Error getting VIN: %w", err))
+		return
+	}
+	if err := t8c.SetVehicleVIN(ctx, vin); err != nil {
+		t.err(fmt.Errorf("Error setting VIN: %w", err))
+	}
+
+	e85content, err := t.GetE85Percent()
+	if err != nil {
+		t.err(fmt.Errorf("Error getting E85 content: %w", err))
+		return
+	}
+	e85percent, err := strconv.ParseFloat(e85content, 64)
+	if err != nil {
+		t.err(fmt.Errorf("Error parsing E85 content: %w", err))
+		return
+	}
+	if err := t8c.SetE85Percent(ctx, e85percent); err != nil {
+		t.err(fmt.Errorf("Error setting E85 percent: %w", err))
+		return
+	}
+
+	topSpeed, err := t.GetTopSpeed()
+	if err != nil {
+		t.err(fmt.Errorf("Error getting Top Speed: %w", err))
+		return
+	}
+	topSpeedVal, err := strconv.Atoi(topSpeed)
+	if err != nil {
+		t.err(fmt.Errorf("Error parsing Top Speed: %w", err))
+		return
+	}
+	if err := t8c.SetTopSpeed(ctx, uint16(topSpeedVal)); err != nil {
+		t.err(fmt.Errorf("Error setting Top Speed: %w", err))
+		return
+	}
+
+	oilQuality, err := t.GetOilQuality()
+	if err != nil {
+		t.err(fmt.Errorf("Error getting oil quality: %w", err))
+		return
+	}
+	oilQualityVal, err := strconv.ParseFloat(oilQuality, 64)
+	if err != nil {
+		t.err(fmt.Errorf("Error parsing oil quality: %w", err))
+		return
+	}
+	if err := t8c.SetOilQuality(ctx, oilQualityVal); err != nil {
+		t.err(fmt.Errorf("Error setting oil quality: %w", err))
+		return
+	}
+
+	data, err := gm.ReadDataByIdentifier(ctx, 0x01)
+	if err != nil {
+		t.err(fmt.Errorf("Error reading PI01: %w", err))
+		return
+	}
+
+	pi01, err := t.GetPI01Data()
+	if err != nil {
+		t.err(fmt.Errorf("Error getting PI 0x01 data: %w", err))
+		return
+	}
+
+	// -------C
+	data[0] = setBit(data[0], 0, pi01.BioPower)
+
+	// -----C--
+	data[0] = setBit(data[0], 2, pi01.Convertible)
+
+	// ---01--- US
+	// ---10--- EU
+	// ---11--- AWD
+	switch pi01.TankType {
+	case t8.TankTypeUS:
+		data[0] = setBit(data[0], 3, true)
+		data[0] = setBit(data[0], 4, false)
+	case t8.TankTypeEU:
+		data[0] = setBit(data[0], 3, false)
+		data[0] = setBit(data[0], 4, true)
+	case t8.TankTypeAWD:
+		data[0] = setBit(data[0], 3, true)
+		data[0] = setBit(data[0], 4, true)
+	}
+
+	// -01----- OBD2
+	// -10----- EOBD
+	// -11----- LOBD
+	switch pi01.DiagnosticType {
+	case t8.DiagnosticTypeOBD2:
+		data[0] = setBit(data[0], 5, true)
+		data[0] = setBit(data[0], 6, false)
+	case t8.DiagnosticTypeEOBD:
+		data[0] = setBit(data[0], 5, false)
+		data[0] = setBit(data[0], 6, true)
+	case t8.DiagnosticTypeLOBD:
+		data[0] = setBit(data[0], 5, true)
+		data[0] = setBit(data[0], 6, true)
+	case t8.DiagnosticTypeNone:
+		data[0] = setBit(data[0], 5, false)
+		data[0] = setBit(data[0], 6, false)
+	}
+
+	// on = -----10-
+	// off= -----01-
+	data[1] = setBit(data[1], 1, !pi01.ClutchStart)
+	data[1] = setBit(data[1], 2, pi01.ClutchStart)
+
+	// on = ---10---
+	// off= ---01---
+	data[1] = setBit(data[1], 3, !pi01.SAI)
+	data[1] = setBit(data[1], 4, pi01.SAI)
+
+	// high= -01-----
+	// low = -10-----
+	data[1] = setBit(data[1], 5, pi01.HighOutput)
+	data[1] = setBit(data[1], 6, !pi01.HighOutput)
+
+	if err := gm.WriteDataByIdentifier(ctx, 0x01, data); err != nil {
+		t.err(fmt.Errorf("Error writing PI 0x01: %w", err))
+		return
+	}
+
+	if err := gm.DeviceControl(ctx, 0x16); err != nil {
+		t.err(fmt.Errorf("Error performing device control 0x16: %w", err))
+		return
 	}
 }
 

@@ -148,25 +148,18 @@ func (d *DTCReader) ReadDTCS() error {
 			return
 		}
 
-		eventHandler := func(e gocan.Event) {
-			d.log(e.String())
-		}
-
 		d.log("Connecting to device " + dev.Name())
 
-		cl, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventHandler(eventHandler))
+		// Events (incl. the final fatal) stream to the log; a fatal adapter
+		// failure also aborts any in-flight call below with that error.
+		cl, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
+			d.log(e.String())
+		}))
 		if err != nil {
 			d.err(err)
 			return
 		}
 		defer cl.Close()
-
-		go func() {
-			if err := cl.Wait(ctx); err != nil {
-				d.err(err)
-				return
-			}
-		}()
 
 		readDTCSFunc(ctx, cl)
 	}()
@@ -198,25 +191,18 @@ func (d *DTCReader) ClearDTCS() error {
 			d.err(err)
 			return
 		}
-		eventHandler := func(e gocan.Event) {
-			d.log(e.String())
-		}
-
 		d.log("Connecting to device " + dev.Name())
 
-		cl, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventHandler(eventHandler))
+		// Events (incl. the final fatal) stream to the log; a fatal adapter
+		// failure also aborts any in-flight call below with that error.
+		cl, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
+			d.log(e.String())
+		}))
 		if err != nil {
 			d.err(err)
 			return
 		}
 		defer cl.Close()
-
-		go func() {
-			if err := cl.Wait(ctx); err != nil {
-				d.err(err)
-				return
-			}
-		}()
 
 		clearDTCSFunc(ctx, cl)
 	}()

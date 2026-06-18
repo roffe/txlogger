@@ -3,7 +3,6 @@ package canflasher
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -32,33 +31,18 @@ func (t *CanFlasherWidget) ecuDump(filename string) {
 	filename = addSuffix(filename, ".bin")
 	t.progressBar.SetValue(0)
 
-	done := make(chan struct{})
-
 	go func() {
-		for {
-			select {
-			case err := <-dev.Err():
-				if err == nil {
-					return
-				}
-				log.Println("Error:", err)
-			case <-done:
-				return
-			}
-		}
-	}()
-
-	go func() {
-		defer close(done)
 		ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Second)
 		defer cancel()
 
-		//defer dev.Close()
+		// defer dev.Close()
 
 		fyne.Do(t.Disable)
 		defer fyne.Do(t.Enable)
 
-		c, err := gocan.NewWithOpts(ctx, dev)
+		c, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
+			t.log(e.String())
+		}))
 		if err != nil {
 			t.logValues.Append(err.Error())
 			return
@@ -86,7 +70,7 @@ func (t *CanFlasherWidget) ecuDump(filename string) {
 			return
 		}
 
-		if err := os.WriteFile(filename, bin, 0644); err == nil {
+		if err := os.WriteFile(filename, bin, 0o644); err == nil {
 			t.log("Saved as " + filename)
 		} else {
 			t.log(err.Error())
@@ -97,8 +81,6 @@ func (t *CanFlasherWidget) ecuDump(filename string) {
 
 		time.Sleep(200 * time.Millisecond)
 
-		if err := tr.ResetECU(ctx); err != nil {
-			t.log(err.Error())
-		}
+		_ = tr.ResetECU(ctx)
 	}()
 }

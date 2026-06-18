@@ -35,11 +35,16 @@ func (c *TxBridge) Start() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventHandler(eventHandler))
+	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventFunc(eventHandler))
 	if err != nil {
 		return err
 	}
 	defer cl.Close()
+
+	// Drive everything below (incl. the per-ECU loops, which derive their ctx
+	// from this one) off the client's context so a fatal adapter error or Close
+	// cancels logging and aborts in-flight requests directly.
+	ctx = cl.Context()
 
 	if err := c.setupWBL(ctx, cl); err != nil {
 		return err

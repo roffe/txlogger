@@ -52,11 +52,15 @@ func (c *T8Client) Start() error {
 		}
 	}
 
-	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventHandler(eventHandler))
+	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventFunc(eventHandler))
 	if err != nil {
 		return err
 	}
 	defer cl.Close()
+
+	// Drive everything below off the client's context so a fatal adapter error
+	// (or Close) cancels the polling loop and aborts in-flight requests directly.
+	ctx = cl.Context()
 
 	if err := c.setupWBL(ctx, cl); err != nil {
 		return err

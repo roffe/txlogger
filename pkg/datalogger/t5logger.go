@@ -34,11 +34,15 @@ func (c *T5Client) Start() error {
 		}
 	}
 
-	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventHandler(eventHandler))
+	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventFunc(eventHandler))
 	if err != nil {
 		return err
 	}
 	defer cl.Close()
+
+	// Drive everything below off the client's context so a fatal adapter error
+	// (or Close) cancels the polling loop and aborts in-flight requests directly.
+	ctx = cl.Context()
 
 	t := time.NewTicker(time.Second / time.Duration(c.Rate))
 	defer t.Stop()

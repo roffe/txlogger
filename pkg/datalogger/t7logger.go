@@ -85,11 +85,16 @@ func (c *T7Client) Start() error {
 		}
 	}
 
-	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventHandler(eventHandler))
+	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventFunc(eventHandler))
 	if err != nil {
 		return fmt.Errorf("failed to create t7 client: %w", err)
 	}
 	defer cl.Close()
+
+	// Drive everything below off the client's context so a fatal adapter error
+	// (or Close) cancels the polling loop and aborts in-flight requests directly,
+	// instead of relying on cl.Wait returning and the deferred cancel bouncing back.
+	ctx = cl.Context()
 
 	checkBroadcast := true
 	if strings.Contains(c.Device.Name(), "OBDLink") || strings.Contains(c.Device.Name(), "STN") || strings.Contains(c.Device.Name(), "ELM") {

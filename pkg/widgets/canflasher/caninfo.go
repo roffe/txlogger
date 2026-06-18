@@ -21,7 +21,6 @@ func (t *CanFlasherWidget) ecuInfo() {
 	}
 
 	go func() {
-
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 

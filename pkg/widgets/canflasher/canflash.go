@@ -3,7 +3,6 @@ package canflasher
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -37,21 +36,7 @@ func (t *CanFlasherWidget) ecuFlash(filename string) {
 
 	t.progressBar.SetValue(0)
 
-	done := make(chan struct{})
-
 	go func() {
-		for {
-			select {
-			case err := <-dev.Err():
-				log.Println("Error:", err)
-			case <-done:
-				return
-			}
-		}
-	}()
-
-	go func() {
-		defer close(done)
 		ctx, cancel := context.WithTimeout(context.Background(), 1800*time.Second)
 		defer cancel()
 
@@ -60,7 +45,9 @@ func (t *CanFlasherWidget) ecuFlash(filename string) {
 		fyne.Do(t.Disable)
 		defer fyne.Do(t.Enable)
 
-		c, err := gocan.NewWithOpts(ctx, dev)
+		c, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
+			t.log(e.String())
+		}))
 		if err != nil {
 			t.logValues.Append(err.Error())
 			return
