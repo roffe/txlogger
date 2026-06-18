@@ -258,7 +258,7 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 					c.onError()
 					c.OnMessage("failed to write log: " + err.Error())
 				}
-				c.onCapture()
+				c.onCapture(timeStamp)
 			}
 		}
 	}()

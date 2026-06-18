@@ -138,7 +138,7 @@ func (c *T5Client) Start() error {
 					c.OnMessage("failed to write log: " + err.Error())
 					return
 				}
-				c.onCapture()
+				c.onCapture(ts)
 			}
 		}
 	}()

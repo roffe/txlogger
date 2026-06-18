@@ -215,7 +215,7 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Client, gm *gmlan.Client, 
 				c.OnMessage("failed to write log: " + err.Error())
 			}
 			testerPresent()
-			c.onCapture()
+			c.onCapture(timeStamp)
 		}
 	}
 }

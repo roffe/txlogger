@@ -345,7 +345,7 @@ func (c *T7Client) Start() error {
 					c.onError()
 					c.OnMessage("failed to write log: " + err.Error())
 				}
-				c.onCapture()
+				c.onCapture(timeStamp)
 			}
 		}
 	}()

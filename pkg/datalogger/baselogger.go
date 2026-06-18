@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/roffe/gocan"
+	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/wbl"
 	"github.com/roffe/txlogger/relayserver"
 )
@@ -90,13 +91,15 @@ func (bl *BaseLogger) GetRAM(address uint32, length uint32) ([]byte, error) {
 	return req.Data, req.Wait()
 }
 
-// update capture counters
-func (bl *BaseLogger) onCapture() {
+// update capture counters and emit the per-frame tick so live consumers can
+// sample every symbol with this frame's real timestamp.
+func (bl *BaseLogger) onCapture(t time.Time) {
 	bl.captureCount++
 	bl.capturePerSecond++
 	if bl.captureCount%15 == 0 {
 		bl.CaptureCounter(bl.captureCount)
 	}
+	ebus.PublishFrame(t)
 }
 
 func (bl *BaseLogger) onError() {
