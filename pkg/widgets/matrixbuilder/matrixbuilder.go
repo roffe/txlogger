@@ -384,8 +384,8 @@ func (mb *MatrixBuilder) buildUI() {
 		buildBtn,
 	)
 
-	mb.xBox = container.NewVBox()
-	mb.yBox = container.NewHBox()
+	mb.xBox = container.NewHBox()
+	mb.yBox = container.NewVBox()
 	mb.rebuildAxisEntries()
 
 	mb.controls = container.NewVBox(
@@ -421,21 +421,21 @@ func (mb *MatrixBuilder) buildUI() {
 
 	mb.display = container.NewStack(mb.placeholder())
 
-	// The Y scale runs along the vertical axis of the map; its editor sits as a
-	// horizontal strip beneath the display.
-	yPanel := container.NewBorder(nil, nil,
-		widget.NewLabelWithStyle("Y axis values", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+	// The X scale runs along the horizontal axis of the map; its editor sits as a
+	// horizontal strip above the display.
+	xPanel := container.NewBorder(nil, nil,
+		widget.NewLabelWithStyle("X axis values", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		nil,
-		container.NewHScroll(mb.yBox),
+		container.NewHScroll(mb.xBox),
 	)
 
 	mainSplit := container.NewHSplit(
 		container.NewBorder(
-			yPanel,
+			xPanel,
 			bottomBar,
 			container.NewVBox(
-				widget.NewLabelWithStyle("X axis values", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-				mb.xBox,
+				widget.NewLabelWithStyle("Y axis values", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+				mb.yBox,
 			),
 			nil,
 			mb.display,
@@ -917,9 +917,10 @@ func (mb *MatrixBuilder) rebuildAxisEntries() {
 
 	mb.yEntries = make([]*widget.Entry, mb.rows)
 	mb.yBox.Objects = mb.yBox.Objects[:0]
-	for i := 0; i < mb.rows; i++ {
+	// Y runs highest-at-top to match the mapviewer, so add breakpoints in
+	// descending index order (the axis itself stays sorted ascending).
+	for i := mb.rows - 1; i >= 0; i-- {
 		mb.yBox.Add(mb.makeAxisEntry(false, i))
-		// mb.yBox.Add(xlayout.NewSpacer())
 	}
 	mb.yBox.Refresh()
 }
@@ -952,14 +953,14 @@ func (mb *MatrixBuilder) makeAxisEntry(isX bool, idx int) fyne.CanvasObject {
 	}
 	if isX {
 		mb.xEntries[idx] = e
-		// X breakpoints stack vertically in the side panel: label beside entry.
-		return container.NewBorder(nil, nil, widget.NewLabel(prefix+strconv.Itoa(idx)), nil, e)
+		// X breakpoints run horizontally along the top: label above a
+		// fixed-width entry so the strip stays compact.
+		label := widget.NewLabelWithStyle(prefix+strconv.Itoa(idx), fyne.TextAlignLeading, fyne.TextStyle{})
+		return container.NewVBox(label, layout.NewFixedWidth(64, e))
 	}
 	mb.yEntries[idx] = e
-	// Y breakpoints run horizontally along the bottom: label above a
-	// fixed-width entry so the strip stays compact.
-	label := widget.NewLabelWithStyle(prefix+strconv.Itoa(idx), fyne.TextAlignLeading, fyne.TextStyle{})
-	return container.NewVBox(label, layout.NewFixedWidth(64, e))
+	// Y breakpoints stack vertically in the side panel: label beside entry.
+	return container.NewBorder(nil, nil, widget.NewLabel(prefix+strconv.Itoa(idx)), nil, e)
 }
 
 func (mb *MatrixBuilder) setCols(n int) {
