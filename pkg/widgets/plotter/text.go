@@ -74,6 +74,17 @@ func (tt *TappableText) Refresh() {
 	tt.text.Refresh()
 }
 
+// Value returns the currently displayed value text.
+func (tt *TappableText) Value() string {
+	return tt.value.Text
+}
+
+// SetValue updates the displayed value text and refreshes it.
+func (tt *TappableText) SetValue(s string) {
+	tt.value.Text = s
+	tt.value.Refresh()
+}
+
 func (tt *TappableText) MouseIn(e *desktop.MouseEvent) {
 	tt.onHover(true)
 }
