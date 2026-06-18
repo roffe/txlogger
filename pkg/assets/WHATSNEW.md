@@ -1,4 +1,5 @@
 # 2.1.10
+- Cut a new logfile from a selection in the logplayer: scrub to a spot and press "In" (or the `i` key) to mark the start, scrub again and press "Out" (or `o`) to mark the end, then press the save button to write just that range to a new log next to your other logs. The clip keeps the same format as the source log (csv/bpl/t5l/t7l/t8l). Leaving the In or Out point unset selects from the start or to the end of the log
 - Live tracking marker in the 3d mesh viewer showing where the ECU is reading from, mirroring the crosshair in the map above
 - Fixed the 3d mesh showing one cell less than the table in each direction; values are now cell-centered so an 18x16 map renders 18x16 cells
 - Performance optimization for the meshgrid
