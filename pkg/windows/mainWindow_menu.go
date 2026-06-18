@@ -26,6 +26,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
+	"github.com/roffe/txlogger/pkg/widgets/symbolbrowser"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmmod"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmstatus"
 	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7esp"
@@ -235,6 +236,20 @@ func (mw *MainWindow) setupMenu() {
 				mw.wm.Add(inner)
 			}),
 			openItem,
+			fyne.NewMenuItemWithIcon("Symbol Browser", theme.ListIcon(), func() {
+				if w := mw.wm.HasWindow("Symbol Browser"); w != nil {
+					mw.wm.Raise(w)
+					return
+				}
+				getECU := func() symbol.ECUType {
+					return symbol.ECUTypeFromString(mw.selects.ecuSelect.Selected)
+				}
+				browser := symbolbrowser.New(getFW, getECU, mw.openMap, mw.Error)
+				inner := multiwindow.NewInnerWindow("Symbol Browser", browser)
+				inner.Icon = theme.ListIcon()
+				mw.wm.Add(inner)
+				inner.Resize(fyne.Size{Width: 760, Height: 520})
+			}),
 			fyne.NewMenuItemWithIcon("Settings", theme.SettingsIcon(), func() {
 				mw.openSettings()
 			}),
