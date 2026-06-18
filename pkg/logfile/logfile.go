@@ -20,6 +20,7 @@ type Logfile interface {
 	Seek(int)
 	Pos() int
 	Len() int
+	RecordAt(int) Record
 	Start() time.Time
 	End() time.Time
 	Close()

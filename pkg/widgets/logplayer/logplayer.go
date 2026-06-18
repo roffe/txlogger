@@ -1,6 +1,7 @@
 package logplayer
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -57,6 +58,11 @@ type Logplayer struct {
 
 	OnMouseDown func()
 
+	// selStart and selEnd mark the in/out points of the export selection.
+	// A value of -1 means the point has not been set yet.
+	selStart int
+	selEnd   int
+
 	focused bool
 	closed  bool
 }
@@ -70,6 +76,10 @@ type logplayerObjects struct {
 	positionSlider    *slider
 	timeLabel         *widget.Label
 	speedSelect       *widget.Select
+	setInBtn          *widget.Button
+	setOutBtn         *widget.Button
+	exportBtn         *widget.Button
+	selectionLabel    *widget.Label
 }
 
 type Config struct {
@@ -77,6 +87,9 @@ type Config struct {
 	Logfile         logfile.Logfile
 	TimeSetter      func(time.Time)
 	PlotterRenderer plotter.PlotBackend
+	// OnExport, when set, is called with the records of the selected range when
+	// the user exports a selection. When nil the selection controls are hidden.
+	OnExport func(records []logfile.Record)
 }
 
 func New(cfg *Config) *Logplayer {
@@ -89,7 +102,9 @@ func New(cfg *Config) *Logplayer {
 		objs: &logplayerObjects{
 			positionSlider: NewSlider(),
 		},
-		logFile: cfg.Logfile,
+		logFile:  cfg.Logfile,
+		selStart: -1,
+		selEnd:   -1,
 	}
 	lp.ExtendBaseWidget(lp)
 
@@ -169,7 +184,16 @@ func (l *Logplayer) TypedKey(ev *fyne.KeyEvent) {
 	}
 }
 
-func (l *Logplayer) TypedRune(_ rune) {
+func (l *Logplayer) TypedRune(r rune) {
+	if l.closed {
+		return
+	}
+	switch r {
+	case 'i', 'I':
+		l.setSelectionStart()
+	case 'o', 'O':
+		l.setSelectionEnd()
+	}
 }
 
 func (l *Logplayer) control(op *controlMsg) {
@@ -230,6 +254,13 @@ func (l *Logplayer) render() {
 		l.control(&controlMsg{Op: OpNext})
 	})
 
+	l.objs.setInBtn = widget.NewButton("In", l.setSelectionStart)
+	l.objs.setOutBtn = widget.NewButton("Out", l.setSelectionEnd)
+	l.objs.exportBtn = widget.NewButtonWithIcon("Save selection", theme.DocumentSaveIcon(), l.exportSelection)
+	l.objs.exportBtn.Disable()
+	l.objs.selectionLabel = widget.NewLabel("")
+	l.updateSelectionLabel()
+
 	values := make(map[string][]float64)
 	for {
 		if rec := l.logFile.Next(); !rec.EOF {
@@ -264,29 +295,47 @@ func (l *Logplayer) render() {
 }
 
 func (l *Logplayer) CreateRenderer() fyne.WidgetRenderer {
-	l.container = container.NewBorder(
+	controls := container.NewBorder(
+		nil,
+		nil,
+		container.NewGridWithColumns(4,
+			l.objs.rewindBtn,
+			l.objs.playbackToggleBtn,
+			l.objs.forwardBtn,
+			l.objs.restartBtn,
+		),
 		nil,
 		container.NewBorder(
 			nil,
 			nil,
-			container.NewGridWithColumns(4,
-				l.objs.rewindBtn,
-				l.objs.playbackToggleBtn,
-				l.objs.forwardBtn,
-				l.objs.restartBtn,
+			nil,
+			container.NewHBox(
+				layout.NewFixedWidth(85, l.objs.timeLabel),
+				layout.NewFixedWidth(75, l.objs.speedSelect),
+			),
+			l.objs.positionSlider,
+		),
+	)
+
+	var bottom fyne.CanvasObject = controls
+	if l.cfg.OnExport != nil {
+		selection := container.NewBorder(
+			nil,
+			nil,
+			container.NewHBox(
+				l.objs.setInBtn,
+				l.objs.setOutBtn,
+				l.objs.exportBtn,
 			),
 			nil,
-			container.NewBorder(
-				nil,
-				nil,
-				nil,
-				container.NewHBox(
-					layout.NewFixedWidth(85, l.objs.timeLabel),
-					layout.NewFixedWidth(75, l.objs.speedSelect),
-				),
-				l.objs.positionSlider,
-			),
-		),
+			l.objs.selectionLabel,
+		)
+		bottom = container.NewVBox(selection)
+	}
+
+	l.container = container.NewBorder(
+		bottom,
+		controls,
 		nil,
 		nil,
 		l.objs.plotter,
@@ -367,6 +416,82 @@ func (l *Logplayer) togglePlayback() {
 	}
 }
 
+// setSelectionStart marks the in point of the export selection at the current
+// playback position.
+func (l *Logplayer) setSelectionStart() {
+	l.selStart = int(l.objs.positionSlider.Value)
+	l.updateSelectionLabel()
+}
+
+// setSelectionEnd marks the out point of the export selection at the current
+// playback position.
+func (l *Logplayer) setSelectionEnd() {
+	l.selEnd = int(l.objs.positionSlider.Value)
+	l.updateSelectionLabel()
+}
+
+// selectionRange returns the normalized [lo, hi] record indices of the current
+// selection. An unset in point defaults to the start of the log and an unset
+// out point to the end. The bounds are clamped to the log and swapped if the
+// out point was set before the in point.
+func (l *Logplayer) selectionRange() (int, int) {
+	last := l.logFile.Len() - 1
+	lo, hi := l.selStart, l.selEnd
+	if lo == -1 {
+		lo = 0
+	}
+	if hi == -1 {
+		hi = last
+	}
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+	if lo < 0 {
+		lo = 0
+	}
+	if hi > last {
+		hi = last
+	}
+	return lo, hi
+}
+
+func (l *Logplayer) updateSelectionLabel() {
+	if l.objs.selectionLabel == nil {
+		return
+	}
+	inTxt, outTxt := "—", "—"
+	if l.selStart != -1 {
+		inTxt = l.logFile.RecordAt(l.selStart).Time.Format("15:04:05.00")
+	}
+	if l.selEnd != -1 {
+		outTxt = l.logFile.RecordAt(l.selEnd).Time.Format("15:04:05.00")
+	}
+
+	if l.selStart == -1 && l.selEnd == -1 {
+		l.objs.selectionLabel.SetText("In —  Out —")
+		l.objs.exportBtn.Disable()
+		return
+	}
+
+	lo, hi := l.selectionRange()
+	l.objs.selectionLabel.SetText(fmt.Sprintf("In %s  Out %s  (%d samples)", inTxt, outTxt, hi-lo+1))
+	l.objs.exportBtn.Enable()
+}
+
+// exportSelection collects the records of the current selection and hands them
+// to the OnExport callback so they can be written to a new logfile.
+func (l *Logplayer) exportSelection() {
+	if l.cfg.OnExport == nil || l.logFile.Len() == 0 {
+		return
+	}
+	lo, hi := l.selectionRange()
+	records := make([]logfile.Record, 0, hi-lo+1)
+	for i := lo; i <= hi; i++ {
+		records = append(records, l.logFile.RecordAt(i))
+	}
+	l.cfg.OnExport(records)
+}
+
 func (l *Logplayer) playLog() {
 	speedMultiplier := 1.0
 	timer := time.NewTimer(0)
@@ -405,6 +530,7 @@ func (l *Logplayer) playLog() {
 							l.cfg.EBus.Publish(k, v)
 						}
 						timeSetter(rec.Time)
+						l.cfg.EBus.Publish("__frame__", float64(rec.Time.UnixMilli()))
 						timer.Stop()
 					}
 					l.objs.plotter.Seek(op.Pos)
@@ -424,6 +550,7 @@ func (l *Logplayer) playLog() {
 						for k, v := range rec.Values {
 							l.cfg.EBus.Publish(k, v)
 						}
+						l.cfg.EBus.Publish("__frame__", float64(rec.Time.UnixMilli()))
 					}
 
 					l.objs.plotter.Seek(pos)
@@ -443,6 +570,7 @@ func (l *Logplayer) playLog() {
 						for k, v := range rec.Values {
 							l.cfg.EBus.Publish(k, v)
 						}
+						l.cfg.EBus.Publish("__frame__", float64(rec.Time.UnixMilli()))
 					}
 					if f := l.cfg.TimeSetter; f != nil {
 						f(rec.Time)
@@ -475,6 +603,7 @@ func (l *Logplayer) playLog() {
 				for k, v := range rec.Values {
 					l.cfg.EBus.Publish(k, v)
 				}
+				l.cfg.EBus.Publish("__frame__", float64(rec.Time.UnixMilli()))
 				if f := l.cfg.TimeSetter; f != nil {
 					f(rec.Time)
 				}
