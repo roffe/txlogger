@@ -398,6 +398,37 @@ type TimeSeries struct {
 	valueRange float64
 	Color      color.RGBA
 	Enabled    bool
+	// Auto reports that the series has no known display range and should be
+	// auto-ranged from its data by the caller (used by the live plotter).
+	Auto bool
+}
+
+// defaultRange returns the fixed display range for the well-known symbols. ok is
+// false for symbols without a preset range; the caller derives one from the data.
+func defaultRange(name string) (min, max float64, ok bool) {
+	switch name {
+	case "Out.X_AccPedal", "Out.X_AccPos":
+		return 0, 100, true
+	case "ActualIn.T_Engine", "ActualIn.T_AirInlet":
+		return -20, 120, true
+	case "m_Request", "MAF.m_AirInlet", "AirMassMast.m_Request", "MAF.m_AirFromp_AirInlet":
+		return 0, 2200, true
+	case "ActualIn.p_AirInlet", "In.p_AirInlet", "ActualIn.p_AirBefThrottle", "In.p_AirBefThrottle":
+		return -1.0, 3.0, true
+	case "DisplProt.LambdaScanner", "Lambda.ADScanner", "LambdaScan.LambdaScanner", "LambdaScan.LambdaScanner2":
+		return 0.5, 1.5, true
+	case "IgnProt.fi_Offset":
+		return -30, 10, true
+	case "Lambda.LambdaInt":
+		return -25, 25, true
+	case "ECMStat.p_Diff":
+		return -1, 2, true
+	case "Lambda.External":
+		return 0.5, 1.5, true
+	case "P_medel", "Max_tryck", "Regl_tryck":
+		return -1, 3, true
+	}
+	return 0, 0, false
 }
 
 func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
@@ -413,44 +444,41 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 		return ts
 	}
 
-	switch name {
-	case "Out.X_AccPedal", "Out.X_AccPos":
-		ts.Min = 0
-		ts.Max = 100
-	case "ActualIn.T_Engine", "ActualIn.T_AirInlet":
-		ts.Min = -20
-		ts.Max = 120
-	case "m_Request", "MAF.m_AirInlet", "AirMassMast.m_Request", "MAF.m_AirFromp_AirInlet":
-		ts.Min = 0
-		ts.Max = 2200
-	case "ActualIn.p_AirInlet", "In.p_AirInlet", "ActualIn.p_AirBefThrottle", "In.p_AirBefThrottle":
-		ts.Min = -1.0
-		ts.Max = 3.0
-	case "DisplProt.LambdaScanner", "Lambda.ADScanner", "LambdaScan.LambdaScanner", "LambdaScan.LambdaScanner2":
-		ts.Min = 0.5
-		ts.Max = 1.5
-	case "IgnProt.fi_Offset":
-		ts.Min = -30
-		ts.Max = 10
-	case "Lambda.LambdaInt":
-		ts.Min = -25
-		ts.Max = 25
-	case "ECMStat.p_Diff":
-		ts.Min = -1
-		ts.Max = 2
-	case "Lambda.External":
-		ts.Min = 0.5
-		ts.Max = 1.5
-	case "P_medel", "Max_tryck", "Regl_tryck":
-		ts.Min = -1
-		ts.Max = 3
-	default:
+	if min, max, known := defaultRange(name); known {
+		ts.Min, ts.Max = min, max
+	} else {
 		ts.Min, ts.Max = findMinMaxFloat64(data)
 	}
 
 	ts.valueRange = ts.Max - ts.Min
 
 	return ts
+}
+
+// NewSeries builds a series with no data yet, for live plotting. Well-known
+// symbols get their fixed display range; the rest are flagged Auto so the
+// caller can range them from the live data via SetRange.
+func NewSeries(name string) *TimeSeries {
+	ts := &TimeSeries{
+		Name:    name,
+		Color:   colors.GetColor(name),
+		Enabled: true,
+	}
+	if min, max, known := defaultRange(name); known {
+		ts.SetRange(min, max)
+	} else {
+		ts.Auto = true
+		ts.SetRange(0, 1)
+	}
+	return ts
+}
+
+// SetRange updates the display range used by PlotImage. valueRange is kept in
+// sync so callers outside this package can re-range a series (e.g. auto-ranging
+// a live signal each refresh).
+func (ts *TimeSeries) SetRange(min, max float64) {
+	ts.Min, ts.Max = min, max
+	ts.valueRange = max - min
 }
 
 func (ts *TimeSeries) PlotImage(img *image.RGBA, values map[string][]float64, start, numPoints, thickness int) {
