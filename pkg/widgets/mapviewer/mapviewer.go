@@ -30,6 +30,10 @@ const (
 	maxTextSize = 28
 )
 
+// singleCellColor is used for 1x1 maps where value-based color interpolation
+// is meaningless (min == max yields a flat gray). ponytail: fixed accent.
+var singleCellColor = color.RGBA{0xFF, 0xFF, 0xFF, 0xFF} // white
+
 var (
 	//  _ fyne.Tappable = (*MapViewer)(nil)
 	_ fyne.Focusable    = (*MapViewer)(nil)
@@ -353,6 +357,9 @@ func (mv *MapViewer) Refresh() {
 	}
 	for idx, value := range mv.cfg.ZData {
 		mv.setCellText(idx, value)
+		if mv.numData == 1 {
+			continue // single cell keeps singleCellColor
+		}
 		col := colors.GetColorInterpolation(
 			mv.zMin,
 			mv.zMax,
@@ -423,10 +430,16 @@ func (mv *MapViewer) createTextValues() {
 func (mv *MapViewer) createZdata() {
 	mv.zDataRects = make([]*canvas.Rectangle, 0, mv.numData)
 	objs := make([]fyne.CanvasObject, 0, mv.numData)
+	singleCell := mv.numData == 1
 	for _, value := range mv.cfg.ZData {
-		color := colors.GetColorInterpolation(mv.zMin, mv.zMax, value, mv.colorMode)
-		rect := &canvas.Rectangle{FillColor: color, StrokeColor: color, StrokeWidth: 0}
-		rect.SetMinSize(fyne.NewSize(34, 14))
+		col := colors.GetColorInterpolation(mv.zMin, mv.zMax, value, mv.colorMode)
+		minHeight := float32(14)
+		if singleCell {
+			col = singleCellColor
+			minHeight = 28
+		}
+		rect := &canvas.Rectangle{FillColor: col, StrokeColor: col, StrokeWidth: 0}
+		rect.SetMinSize(fyne.NewSize(34, minHeight))
 		mv.zDataRects = append(mv.zDataRects, rect)
 		objs = append(objs, rect)
 	}
