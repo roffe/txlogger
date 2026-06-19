@@ -214,7 +214,6 @@ func (mv *MapViewer) showPopupMenu(pos fyne.Position) {
 			}),
 		)
 		if mv.cfg.Editable {
-
 			pasteMenu := fyne.NewMenuItem("Paste", nil)
 			pasteMenu.ChildMenu = fyne.NewMenu("Paste Options",
 				fyne.NewMenuItem("At original position", func() {
@@ -232,6 +231,11 @@ func (mv *MapViewer) showPopupMenu(pos fyne.Position) {
 				}),
 			)
 		}
+
+		if mv.mesh != nil {
+			menu.Items = append(menu.Items, fyne.NewMenuItem("Toggle 3D Mesh", mv.toggleMesh))
+		}
+
 		popupMenu := widget.NewPopUpMenu(menu,
 			fyne.CurrentApp().Driver().CanvasForObject(mv),
 		)

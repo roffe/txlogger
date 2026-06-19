@@ -71,8 +71,10 @@ type MapViewer struct {
 
 	selectedX, SelectedY int
 
-	mesh  *meshgrid.Meshgrid
-	graph *graph2d.Graph
+	mesh        *meshgrid.Meshgrid
+	meshSplit   *container.Split
+	meshModeBtn *widget.Button
+	graph       *graph2d.Graph
 
 	// Mouse
 	mousePos                 fyne.Position
@@ -119,6 +121,21 @@ func New(config *Config) (*MapViewer, error) {
 	return mv, nil
 }
 
+func (mv *MapViewer) toggleMesh() {
+	if mv.mesh == nil || mv.meshSplit == nil {
+		return
+	}
+	if mv.mesh.Visible() {
+		mv.mesh.Hide()
+		mv.meshModeBtn.Hide()
+		mv.meshSplit.SetOffset(1)
+	} else {
+		mv.mesh.Show()
+		mv.meshModeBtn.Show()
+		mv.meshSplit.SetOffset(0.2)
+	}
+}
+
 func (mv *MapViewer) SetColorBlindMode(mode colors.ColorBlindMode) {
 	if mv.colorMode != mode {
 		mv.colorMode = mode
@@ -138,9 +155,8 @@ func (mv *MapViewer) CreateRenderer() fyne.WidgetRenderer {
 	mv.createZdata()
 	mv.createSelectionOverlay()
 	mv.createTextValues()
-	// Start with cell 0,0 selected so keyboard editing works before any click.
-	mv.selectedCells = []int{0}
-	mv.drawSelectionVisual()
+	// Start with nothing selected; a cell is selected on first click/keypress.
+	mv.selectedCells = nil
 	mv.content = mv.render()
 	return widget.NewSimpleRenderer(mv.content)
 	// return &mapViewerRenderer{mv: mv}
@@ -284,23 +300,20 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 		if err == nil {
 			meshModeBtn := widget.NewButtonWithIcon("", theme.GridIcon(), mv.mesh.CycleRenderMode)
 			meshModeBtn.Importance = widget.LowImportance
+			mv.meshModeBtn = meshModeBtn
 			split := container.NewVSplit(
 				mapview,
-				container.NewBorder(
-					nil,
-					buttons,
-					nil,
-					nil,
-					container.NewStack(
-						mv.mesh,
-						container.NewVBox(
-							container.NewHBox(fynelayout.NewSpacer(), meshModeBtn),
-						),
+				container.NewStack(
+					mv.mesh,
+					container.NewVBox(
+						container.NewHBox(fynelayout.NewSpacer(), meshModeBtn),
 					),
 				),
 			)
 			split.Offset = 0.2
-			return split
+			mv.meshSplit = split
+			// buttons live outside the split so they stay visible when the mesh is toggled off.
+			return container.NewBorder(nil, buttons, nil, nil, split)
 		} else {
 			log.Println("MapViewer meshview failed:", err)
 		}
