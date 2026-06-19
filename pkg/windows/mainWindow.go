@@ -63,15 +63,15 @@ func (s *SecretText) MouseUp(e *desktop.MouseEvent) {
 
 type MainWindow struct {
 	fyne.Window
-	app            fyne.App
-	menu           *MainMenu
-	outputData     binding.StringList
-	selects        *mainWindowSelects
-	buttons        *mainWindowButtons
-	counters       *mainWindowCounters
-	loggingRunning bool
-	filename       string
-	symbolList     *symbollist.Widget
+	app                         fyne.App
+	leadingMenus, trailingMenus []*fyne.Menu
+	outputData                  binding.StringList
+	selects                     *mainWindowSelects
+	buttons                     *mainWindowButtons
+	counters                    *mainWindowCounters
+	loggingRunning              bool
+	filename                    string
+	symbolList                  *symbollist.Widget
 
 	as2 *as2.File
 	fw  symbol.SymbolCollection

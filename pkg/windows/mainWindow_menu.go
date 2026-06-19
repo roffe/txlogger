@@ -30,149 +30,11 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmmod"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmstatus"
 	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7esp"
-	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7fwinfo"
 )
 
 func (mw *MainWindow) setupMenu() {
-	getAdapter := func() (gocan.Adapter, error) {
-		device, err := mw.settings.GetAdapter(mw.selects.ecuSelect.Selected)
-		if err != nil {
-			mw.Error(err)
-			return nil, err
-		}
-		return device, nil
-	}
-
 	getFW := func() symbol.SymbolCollection {
 		return mw.fw
-	}
-
-	getECU := func() string {
-		return mw.selects.ecuSelect.Selected
-	}
-
-	funcMap := map[string]func(string){
-		"DTC Reader": func(str string) {
-			if w := mw.wm.HasWindow("DTC Reader"); w != nil {
-				mw.wm.Raise(w)
-				return
-			}
-			inner := multiwindow.NewInnerWindow("DTC Reader", dtcreader.New(getFW, getECU, getAdapter, mw.Log, mw.Error))
-			inner.Icon = theme.InfoIcon()
-			mw.wm.Add(inner)
-			inner.Resize(fyne.Size{Width: 600, Height: 400})
-		},
-		"Edit Parameters": func(str string) {
-			if w := mw.wm.HasWindow("Edit Parameters"); w != nil {
-				mw.wm.Raise(w)
-				return
-			}
-			param := editparameters.NewEditParameters(getAdapter, mw.Error, mw.Log)
-			inner := multiwindow.NewInnerWindow("Edit Parameters", param)
-			inner.Icon = theme.InfoIcon()
-			mw.wm.Add(inner)
-		},
-		"Register EU0D": func(str string) {
-			if w := mw.wm.HasWindow("Register EU0D"); w != nil {
-				mw.wm.Raise(w)
-				return
-			}
-			inner := multiwindow.NewInnerWindow("Register EU0D", NewMyrtilosRegistration(mw))
-			inner.Icon = theme.InfoIcon()
-			mw.wm.Add(inner)
-		},
-		"ESP Calibration": func(str string) {
-			if w := mw.wm.HasWindow("ESP Calibration selection"); w != nil {
-				mw.wm.Raise(w)
-				return
-			}
-			if t, ok := mw.fw.(*symbol.T7File); ok {
-				esp := t7esp.New(mw.filename, t)
-				inner := multiwindow.NewInnerWindow("ESP Calibration selection", esp)
-				inner.Icon = theme.InfoIcon()
-				inner.DisableResize = true
-				mw.wm.Add(inner)
-			} else {
-				mw.Error(errors.New("not a T7 file"))
-			}
-		},
-		"Firmware information": func(str string) {
-			if w := mw.wm.HasWindow("Firmware info"); w != nil {
-				mw.wm.Raise(w)
-				return
-			}
-			if t, ok := mw.fw.(*symbol.T7File); ok {
-				fwinfo := t7fwinfo.New(t)
-				inner := multiwindow.NewInnerWindow("Firmware info", fwinfo)
-				inner.Icon = theme.InfoIcon()
-				mw.wm.Add(inner)
-			}
-		},
-		"Firmware info edit": func(str string) {
-			if w := mw.wm.HasWindow("Firmware info edit"); w != nil {
-				mw.wm.Raise(w)
-				return
-			}
-			tf := new(t8file.T8File)
-			filename := fyne.CurrentApp().Preferences().String("lastBinFile")
-			tf.GetInfo(filename)
-			tf.ShowEditT8Dialog(mw)
-		},
-		"Pgm_mod!": func(str string) {
-			if w := mw.wm.HasWindow("Pgm_mod!"); w != nil {
-				mw.wm.Raise(w)
-				return
-			}
-			symZ := mw.fw.GetByName("Pgm_mod!")
-			pgm := pgmmod.New()
-			pgm.LoadFunc = func() ([]byte, error) {
-				if mw.dlc != nil {
-					log.Printf("Loading Pgm_mod! from ECU $%X", symZ.SramOffset)
-					data, err := mw.dlc.GetRAM(symZ.SramOffset, uint32(symZ.Length))
-					if err != nil {
-						return nil, err
-					}
-					return data, nil
-				}
-				log.Printf("Loading Pgm_mod! from Binary $%X", symZ.Address)
-				return symZ.Bytes(), nil
-			}
-
-			pgm.SaveFunc = func(data []byte) error {
-				if len(data) != int(symZ.Length) {
-					return fmt.Errorf("data length mismatch: got %d, want %d", len(data), symZ.Length)
-				}
-				if mw.dlc != nil {
-					log.Printf("Saving Pgm_mod! to ECU $%X", symZ.SramOffset)
-					if err := mw.dlc.SetRAM(symZ.SramOffset, data); err != nil {
-						return err
-					}
-					return nil
-				}
-				log.Printf("Saving Pgm_mod! to Binary $%X", symZ.Address)
-				return symZ.SetData(data)
-			}
-
-			pgm.Set(symZ.Bytes())
-			mapWindow := multiwindow.NewInnerWindow("Pgm_mod!", pgm)
-			mapWindow.Icon = theme.GridIcon()
-			mw.wm.Add(mapWindow)
-		},
-		"Pgm_status": func(str string) {
-			if w := mw.wm.HasWindow("Pgm_status"); w != nil {
-				return
-			}
-			pgs := pgmstatus.New()
-			cancel := ebus.SubscribeFunc("Pgm_status", pgs.Set)
-			iw := multiwindow.NewInnerWindow("Pgm_status", pgs)
-			iw.Icon = theme.InfoIcon()
-			iw.OnClose = func() {
-				if cancel != nil {
-					cancel()
-				}
-			}
-			mw.wm.Add(iw)
-		},
 	}
 
 	openItem := fyne.NewMenuItemWithIcon("Open", theme.FolderIcon(), nil)
@@ -279,7 +141,136 @@ func (mw *MainWindow) setupMenu() {
 		),
 	}
 
-	mw.menu = NewMenu(mw, leading, trailing, mw.openMap, funcMap)
+	mw.leadingMenus = leading
+	mw.trailingMenus = trailing
+}
+
+func (mw *MainWindow) getAdapter() (gocan.Adapter, error) {
+	device, err := mw.settings.GetAdapter(mw.selects.ecuSelect.Selected)
+	if err != nil {
+		mw.Error(err)
+		return nil, err
+	}
+	return device, nil
+}
+
+func (mw *MainWindow) openDTCReader() {
+	if w := mw.wm.HasWindow("DTC Reader"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	getFW := func() symbol.SymbolCollection { return mw.fw }
+	getECU := func() string { return mw.selects.ecuSelect.Selected }
+	inner := multiwindow.NewInnerWindow("DTC Reader", dtcreader.New(getFW, getECU, mw.getAdapter, mw.Log, mw.Error))
+	inner.Icon = theme.InfoIcon()
+	mw.wm.Add(inner)
+	inner.Resize(fyne.Size{Width: 600, Height: 400})
+}
+
+func (mw *MainWindow) openEditParameters() {
+	if w := mw.wm.HasWindow("Edit Parameters"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	param := editparameters.NewEditParameters(mw.getAdapter, mw.Error, mw.Log)
+	inner := multiwindow.NewInnerWindow("Edit Parameters", param)
+	inner.Icon = theme.InfoIcon()
+	mw.wm.Add(inner)
+}
+
+func (mw *MainWindow) openRegisterEU0D() {
+	if w := mw.wm.HasWindow("Register EU0D"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	inner := multiwindow.NewInnerWindow("Register EU0D", NewMyrtilosRegistration(mw))
+	inner.Icon = theme.InfoIcon()
+	mw.wm.Add(inner)
+}
+
+func (mw *MainWindow) openESPCalibration() {
+	if w := mw.wm.HasWindow("ESP Calibration selection"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	t, ok := mw.fw.(*symbol.T7File)
+	if !ok {
+		mw.Error(errors.New("not a T7 file"))
+		return
+	}
+	esp := t7esp.New(mw.filename, t)
+	inner := multiwindow.NewInnerWindow("ESP Calibration selection", esp)
+	inner.Icon = theme.InfoIcon()
+	inner.DisableResize = true
+	mw.wm.Add(inner)
+}
+
+func (mw *MainWindow) openFirmwareInfoEdit() {
+	if w := mw.wm.HasWindow("Firmware info edit"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	tf := new(t8file.T8File)
+	filename := fyne.CurrentApp().Preferences().String("lastBinFile")
+	tf.GetInfo(filename)
+	tf.ShowEditT8Dialog(mw)
+}
+
+func (mw *MainWindow) openPgmMod() {
+	if w := mw.wm.HasWindow("Pgm_mod!"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	symZ := mw.fw.GetByName("Pgm_mod!")
+	pgm := pgmmod.New()
+	pgm.LoadFunc = func() ([]byte, error) {
+		if mw.dlc != nil {
+			log.Printf("Loading Pgm_mod! from ECU $%X", symZ.SramOffset)
+			data, err := mw.dlc.GetRAM(symZ.SramOffset, uint32(symZ.Length))
+			if err != nil {
+				return nil, err
+			}
+			return data, nil
+		}
+		log.Printf("Loading Pgm_mod! from Binary $%X", symZ.Address)
+		return symZ.Bytes(), nil
+	}
+
+	pgm.SaveFunc = func(data []byte) error {
+		if len(data) != int(symZ.Length) {
+			return fmt.Errorf("data length mismatch: got %d, want %d", len(data), symZ.Length)
+		}
+		if mw.dlc != nil {
+			log.Printf("Saving Pgm_mod! to ECU $%X", symZ.SramOffset)
+			if err := mw.dlc.SetRAM(symZ.SramOffset, data); err != nil {
+				return err
+			}
+			return nil
+		}
+		log.Printf("Saving Pgm_mod! to Binary $%X", symZ.Address)
+		return symZ.SetData(data)
+	}
+
+	pgm.Set(symZ.Bytes())
+	mapWindow := multiwindow.NewInnerWindow("Pgm_mod!", pgm)
+	mapWindow.Icon = theme.GridIcon()
+	mw.wm.Add(mapWindow)
+}
+
+func (mw *MainWindow) openPgmStatus() {
+	if w := mw.wm.HasWindow("Pgm_status"); w != nil {
+		return
+	}
+	pgs := pgmstatus.New()
+	cancel := ebus.SubscribeFunc("Pgm_status", pgs.Set)
+	iw := multiwindow.NewInnerWindow("Pgm_status", pgs)
+	iw.Icon = theme.InfoIcon()
+	iw.OnClose = func() {
+		if cancel != nil {
+			cancel()
+		}
+	}
+	mw.wm.Add(iw)
 }
 
 func (mw *MainWindow) loadBinary() {

@@ -341,7 +341,7 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 				mw.Window.SetContent(db)
 				mw.SetFullScreen(true)
 			} else {
-				mw.SetMainMenu(mw.menu.GetMenu(mw.selects.ecuSelect.Selected))
+				mw.SetMainMenu(mw.GetMenu(mw.selects.ecuSelect.Selected))
 				mw.Window.SetContent(mw.content)
 				dbw.Close()
 				mw.buttons.dashboardBtn.OnTapped()
