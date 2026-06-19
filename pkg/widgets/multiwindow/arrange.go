@@ -75,6 +75,9 @@ func (f *FloatingArranger) Layout(maxSize fyne.Size, confined bool, windows []*I
 		(maxSize.Width-initOffset)/20,
 		(maxSize.Height-initOffset)/20,
 	))
+	if maxSteps < 1 {
+		maxSteps = 1 // ponytail: guard i%maxSteps panic when viewport is tiny/unsized
+	}
 
 	for i, window := range windows {
 		step := i % maxSteps
