@@ -52,7 +52,7 @@ func NewMultipleWindows(wins ...*InnerWindow) *MultipleWindows {
 }
 
 func (m *MultipleWindows) CreateRenderer() fyne.WidgetRenderer {
-	m.content = container.New(&multiWinLayout{})
+	m.content = container.New(&multiWinLayout{mw: m})
 	m.refreshChildren()
 	return widget.NewSimpleRenderer(m.content)
 }
@@ -191,6 +191,26 @@ func (m *MultipleWindows) raise(w *InnerWindow) {
 	m.refreshChildren()
 }
 
+// layoutTray docks every minimized window into a row along the bottom edge,
+// mimicking a taskbar/system tray.
+func (m *MultipleWindows) layoutTray() {
+	if m.content == nil {
+		return
+	}
+	const margin float32 = 5
+	x := margin
+	bottom := m.content.Size().Height
+	for _, w := range m.windows {
+		if !w.minimized {
+			continue
+		}
+		size := w.MinSize()
+		w.Resize(size)
+		w.Move(fyne.NewPos(x, bottom-size.Height-margin))
+		x += size.Width + margin
+	}
+}
+
 func (m *MultipleWindows) refreshChildren() {
 	if m.content == nil {
 		return
@@ -316,7 +336,23 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 	}
 
 	w.OnTappedBar = func() {
-		//m.Raise(w)
+		if w.minimized {
+			w.OnMinimized() // single click on a tray bar restores it
+		}
+	}
+
+	w.OnMinimized = func() {
+		w.minimized = !w.minimized
+		if w.minimized {
+			w.preMinimizedSize = w.Size()
+			w.preMinimizedPos = w.Position()
+		} else {
+			w.Resize(w.preMinimizedSize)
+			w.Move(w.preMinimizedPos)
+			m.Raise(w)
+		}
+		w.Refresh()
+		m.layoutTray()
 	}
 
 	w.OnMouseDown = func() {
@@ -330,6 +366,10 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 	}
 
 	w.OnMaximized = func() {
+		if w.minimized {
+			w.OnMinimized() // restore from tray instead of maximizing
+			return
+		}
 		if !w.maximized {
 			w.preMaximizedSize = w.Size()
 			w.preMaximizedPos = w.Position()
@@ -414,6 +454,10 @@ func (wm *MultipleWindows) JsonLayout() ([]byte, error) {
 		}
 		pos := w.Position()
 		size := w.Size()
+		if w.minimized { // save real geometry, not the tiny tray bar
+			pos = w.preMinimizedPos
+			size = w.preMinimizedSize
+		}
 		preMaxPos := w.PreMaximizedPos()
 		preMaxSize := w.PreMaximizedSize()
 

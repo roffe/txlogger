@@ -30,6 +30,9 @@ const (
 	modeIcon
 )
 
+// minimizedWidth is the fixed width of a window collapsed into the bottom tray.
+const minimizedWidth float32 = 200
+
 type resizeDirection int
 
 const (
@@ -72,10 +75,14 @@ type InnerWindow struct {
 	content     *fyne.Container
 
 	maximized bool
+	minimized bool
 	active    bool
 
 	preMaximizedSize fyne.Size
 	preMaximizedPos  fyne.Position
+
+	preMinimizedSize fyne.Size
+	preMinimizedPos  fyne.Position
 
 	onClose func() `json:"-"`
 }
@@ -336,6 +343,16 @@ func (i *innerWindowRenderer) Layout(size fyne.Size) {
 	i.bar.Move(fyne.NewPos(padding, 0))
 	i.bar.Resize(fyne.NewSize(size.Width-doublePadd, barHeight))
 
+	// When minimized only the title bar is shown (tray-style).
+	if i.win.minimized {
+		i.contentBG.Hide()
+		i.win.content.Hide()
+		i.setBordersVisible(false)
+		return
+	}
+	i.contentBG.Show()
+	i.win.content.Show()
+
 	// Layout main content area
 	contentPos := fyne.NewPos(padding, barHeight)
 	contentDimensions := fyne.NewSize(adjustedWidth, contentSize.Height-padding-barHeight)
@@ -347,7 +364,24 @@ func (i *innerWindowRenderer) Layout(size fyne.Size) {
 
 	// Layout corners
 	if !i.win.DisableResize {
+		i.setBordersVisible(true)
 		i.layoutCorners(size)
+	}
+}
+
+func (i *innerWindowRenderer) setBordersVisible(visible bool) {
+	if i.win.DisableResize {
+		return
+	}
+	for _, b := range []fyne.CanvasObject{
+		i.topBorder, i.bottomBorder, i.leftBorder, i.rightBorder,
+		i.leftTopCorner, i.rightTopCorner, i.leftBottomCorner, i.rightBottomCorner,
+	} {
+		if visible {
+			b.Show()
+		} else {
+			b.Hide()
+		}
 	}
 }
 
@@ -383,8 +417,11 @@ func (i *innerWindowRenderer) layoutCorners(size fyne.Size) {
 func (i *innerWindowRenderer) MinSize() fyne.Size {
 	th := i.win.Theme()
 	pad := th.Size(theme.SizeNamePadding)
-	contentMin := i.win.content.MinSize()
 	barHeight := th.Size(theme.SizeNameWindowTitleBarHeight)
+	if i.win.minimized {
+		return fyne.NewSize(minimizedWidth, barHeight+pad)
+	}
+	contentMin := i.win.content.MinSize()
 	innerWidth := fyne.Max(i.bar.MinSize().Width, contentMin.Width)
 	return fyne.NewSize(innerWidth+pad*2, contentMin.Height+pad+barHeight)
 }
