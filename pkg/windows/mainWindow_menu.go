@@ -13,7 +13,9 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
+	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/colors"
@@ -222,6 +224,10 @@ func (mw *MainWindow) openPgmMod() {
 		return
 	}
 	symZ := mw.fw.GetByName("Pgm_mod!")
+	if symZ == nil {
+		mw.Error(errors.New("Pgm_mod! symbol not found in loaded binary"))
+		return
+	}
 	pgm := pgmmod.New()
 	pgm.LoadFunc = func() ([]byte, error) {
 		if mw.dlc != nil {
@@ -291,19 +297,17 @@ func (mw *MainWindow) loadBinary() {
 
 var openMapLock sync.Mutex
 
-func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) {
-	if mw.fw == nil {
-		mw.Error(fmt.Errorf("no binary loaded"))
-		return
-	}
-
+// newMapViewer builds a fully wired MapViewer for a single symbol (file/ECU
+// load+save funcs, live X/Y crosshair subscriptions) but does not create a
+// window. openMap wraps one; openMultiMap arranges several in a grid. The
+// returned cancelFuncs must be called when the containing window closes.
+func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string) (*mapviewer.MapViewer, *mapviewer.Config, symbol.Axis, []func(), error) {
 	var axis symbol.Axis
 	if mw.as2 != nil {
 		axis.Z = mapName
 		axes := mw.as2.Axes(mapName)
 		if len(axes) == 0 {
-			mw.Error(fmt.Errorf("map %q not found in as2 file", mapName))
-			return
+			return nil, nil, axis, nil, fmt.Errorf("map %q not found in as2 file", mapName)
 		}
 		if len(axes) == 1 {
 			axis.Y = axes[0].SupportPoints
@@ -325,16 +329,6 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) 
 		}
 	} else {
 		axis = symbol.GetInfo(typ, mapName)
-	}
-
-	windowName := axis.Z
-	if title != "" {
-		windowName += " - " + title
-	}
-
-	if w := mw.wm.HasWindow(windowName); w != nil {
-		mw.wm.Raise(w)
-		return
 	}
 
 	symX := mw.fw.GetByName(axis.X)
@@ -360,8 +354,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) 
 	}
 
 	if symZ == nil {
-		mw.Error(fmt.Errorf("failed to find symbol %s", axis.Z))
-		return
+		return nil, nil, axis, nil, fmt.Errorf("failed to find symbol %s", axis.Z)
 	}
 
 	var xData, yData, zData []float64
@@ -381,8 +374,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) 
 				kyltempSteg := mw.fw.GetByName("Kyltemp_steg!")
 				kyltempTab := mw.fw.GetByName("Kyltemp_tab!")
 				if kyltempSteg == nil || kyltempTab == nil {
-					mw.Error(fmt.Errorf("missing coolant temperature symbols"))
-					return
+					return nil, nil, axis, nil, fmt.Errorf("missing coolant temperature symbols")
 				}
 				realTemp := LookupCoolantTemperature(val, kyltempSteg.Ints(), kyltempTab.Ints())
 				yData[idx] = float64(realTemp)
@@ -634,26 +626,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) 
 	var err error
 	mv, err = mapviewer.New(cfg)
 	if err != nil {
-		mw.Error(err)
-		return
-	}
-
-	if mw.settings.GetAutoLoad() && mw.dlc != nil {
-		go func() {
-			openMapLock.Lock()
-			defer openMapLock.Unlock()
-			p := progressmodal.New(mw.Window.Canvas(), "Loading "+axis.Z)
-			fyne.DoAndWait(p.Show)
-			loadRamFunc()
-			fyne.Do(p.Hide)
-		}()
-	}
-
-	mapWindow := multiwindow.NewInnerWindow(axis.Z+" - "+axis.ZDescription, mv)
-	mapWindow.Icon = theme.GridIcon()
-
-	cfg.OnMouseDown = func() {
-		mw.wm.Raise(mapWindow)
+		return nil, nil, axis, nil, err
 	}
 
 	var cancelFuncs []func()
@@ -663,10 +636,43 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) 
 	if axis.YFrom != "" {
 		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.YFrom, mv.SetY))
 	}
-
 	cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(ebus.TOPIC_COLORBLINDMODE, func(value float64) {
 		mv.SetColorBlindMode(colors.ColorBlindMode(int(value)))
 	}))
+
+	return mv, cfg, axis, cancelFuncs, nil
+}
+
+func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) {
+	if mw.fw == nil {
+		mw.Error(fmt.Errorf("no binary loaded"))
+		return
+	}
+
+	mv, cfg, axis, cancelFuncs, err := mw.newMapViewer(typ, mapName)
+	if err != nil {
+		mw.Error(err)
+		return
+	}
+
+	windowName := axis.Z
+	if title != "" {
+		windowName += " - " + title
+	}
+	if w := mw.wm.HasWindow(windowName); w != nil {
+		mw.wm.Raise(w)
+		for _, fn := range cancelFuncs {
+			fn()
+		}
+		return
+	}
+
+	mapWindow := multiwindow.NewInnerWindow(axis.Z+" - "+axis.ZDescription, mv)
+	mapWindow.Icon = theme.GridIcon()
+
+	cfg.OnMouseDown = func() {
+		mw.wm.Raise(mapWindow)
+	}
 
 	mapWindow.OnClose = func() {
 		for _, fn := range cancelFuncs {
@@ -674,7 +680,91 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) 
 		}
 	}
 
+	if mw.settings.GetAutoLoad() && mw.dlc != nil {
+		go func() {
+			openMapLock.Lock()
+			defer openMapLock.Unlock()
+			p := progressmodal.New(mw.Window.Canvas(), "Loading "+axis.Z)
+			fyne.DoAndWait(p.Show)
+			cfg.LoadECUFunc()
+			fyne.Do(p.Hide)
+		}()
+	}
+
 	mw.wm.Add(mapWindow)
+}
+
+// openMultiMap opens several maps (data = symbol names joined by "|") tightly
+// arranged in one window for an at-a-glance overview, e.g. boost RegMap plus
+// P/I/D factors. ponytail: plain 2-column grid of MapViewers, no dedicated
+// widget — add one only if these views ever need shared crosshair/selection.
+func (mw *MainWindow) openMultiMap(typ symbol.ECUType, title string, data string) {
+	if mw.fw == nil {
+		mw.Error(fmt.Errorf("no binary loaded"))
+		return
+	}
+	if w := mw.wm.HasWindow(title); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+
+	grid := container.NewGridWithColumns(2)
+	var cfgs []*mapviewer.Config
+	var loadFuncs []func()
+	var cancelFuncs []func()
+
+	for _, name := range strings.Split(data, "|") {
+		mv, cfg, axis, cancels, err := mw.newMapViewer(typ, strings.TrimSpace(name))
+		if err != nil {
+			mw.Error(err)
+			continue
+		}
+		cfgs = append(cfgs, cfg)
+		cancelFuncs = append(cancelFuncs, cancels...)
+		if cfg.LoadECUFunc != nil {
+			loadFuncs = append(loadFuncs, cfg.LoadECUFunc)
+		}
+		label := axis.Z
+		if axis.ZDescription != "" {
+			label += " - " + axis.ZDescription
+		}
+		grid.Add(container.NewBorder(widget.NewLabel(label), nil, nil, nil, mv))
+	}
+
+	if len(grid.Objects) == 0 {
+		return
+	}
+
+	mapWindow := multiwindow.NewInnerWindow(title, grid)
+	mapWindow.Icon = theme.GridIcon()
+
+	for _, cfg := range cfgs {
+		cfg.OnMouseDown = func() {
+			mw.wm.Raise(mapWindow)
+		}
+	}
+
+	mapWindow.OnClose = func() {
+		for _, fn := range cancelFuncs {
+			fn()
+		}
+	}
+
+	if mw.settings.GetAutoLoad() && mw.dlc != nil {
+		go func() {
+			openMapLock.Lock()
+			defer openMapLock.Unlock()
+			p := progressmodal.New(mw.Window.Canvas(), "Loading "+title)
+			fyne.DoAndWait(p.Show)
+			for _, fn := range loadFuncs {
+				fn()
+			}
+			fyne.Do(p.Hide)
+		}()
+	}
+
+	mw.wm.Add(mapWindow)
+	mapWindow.Resize(fyne.NewSize(1000, 750))
 }
 
 func LookupCoolantTemperature(axisvalue int, kyltempSteg, kyltempTab []int) int {

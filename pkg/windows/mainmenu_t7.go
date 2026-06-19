@@ -49,14 +49,13 @@ func (mw *MainWindow) t7Menu() []MenuItem {
 				{Name: "TransCal.AccMulConst"},
 				{Name: "TransCal.Delay1"},
 				{Name: "TransCal.Delay2"},
-
-				// {Name: "TransCal."},
 			}},
 			{Name: "VE map", Data: "BFuelCal.Map"},
 			{Name: "Startup VE map / E85 VE map", Data: "BFuelCal.StartMap"},
 			{Name: "Gas VE map", Data: "BFuelCal.GasMap"},
 			{Name: "Enrichment factor during starting", Data: "StartCal.EnrFacTab"},
 			{Name: "Enrichment factor during starting E85", Data: "StartCal.EnrFacE85Tab"},
+			{Name: "Enable cloosed loop regulation", Data: "LambdaCal.ST_Enable"},
 		}},
 		{Name: "Ignition", Children: []MenuItem{
 			{Name: "Ignition map", Data: "IgnNormCal.Map"},
@@ -68,6 +67,7 @@ func (mw *MainWindow) t7Menu() []MenuItem {
 			{Name: "Max knock pull", Data: "KnkFuelCal.fi_MapMaxOff"},
 		}},
 		{Name: "Boost", Children: []MenuItem{
+			{Name: "Boost regulation overview", Data: "BoostCal.RegMap|BoostCal.PMap|BoostCal.IMap|BoostCal.DMap"},
 			{Name: "Boost calibration", Data: "BoostCal.RegMap"},
 			{Name: "P factor", Data: "BoostCal.PMap"},
 			{Name: "I factor", Data: "BoostCal.IMap"},

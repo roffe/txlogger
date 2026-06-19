@@ -1,6 +1,8 @@
 package windows
 
 import (
+	"strings"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
 	symbol "github.com/roffe/ecusymbol"
@@ -54,6 +56,11 @@ func (mw *MainWindow) buildItem(typ symbol.ECUType, item MenuItem) *fyne.MenuIte
 		return itm
 	case item.Func != nil:
 		return fyne.NewMenuItemWithIcon(item.Name, theme.ComputerIcon(), item.Func)
+	case strings.Contains(item.Data, "|"):
+		// title + multiple symbols joined by "|": open tightly arranged together
+		return fyne.NewMenuItemWithIcon(item.Name, theme.GridIcon(), func() {
+			mw.openMultiMap(typ, item.Name, item.Data)
+		})
 	case item.Data != "":
 		// title + symbol: open as a map
 		return fyne.NewMenuItemWithIcon(item.Name, theme.GridIcon(), func() {
