@@ -241,6 +241,7 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 
 	var leftTopCorner, rightTopCorner, leftBottomCorner, rightBottomCorner *draggableCorner
 	var topBorder, bottomBorder, leftBorder, rightBorder *draggableBorder
+	var borders []fyne.CanvasObject
 
 	objects := []fyne.CanvasObject{w.bg, contentBG, bar, w.content}
 
@@ -254,8 +255,8 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 		leftBottomCorner = newDraggableCorner(w, resizeDownLeft)
 		rightBottomCorner = newDraggableCorner(w, resizeDownRight)
 
-		// objects = append(objects, leftCorner, rightCorner)
-		objects = append(objects, topBorder, bottomBorder, leftBorder, rightBorder, leftTopCorner, rightTopCorner, leftBottomCorner, rightBottomCorner)
+		borders = []fyne.CanvasObject{topBorder, bottomBorder, leftBorder, rightBorder, leftTopCorner, rightTopCorner, leftBottomCorner, rightBottomCorner}
+		objects = append(objects, borders...)
 	}
 
 	r := &innerWindowRenderer{
@@ -273,6 +274,7 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 		rightTopCorner:    rightTopCorner,
 		leftBottomCorner:  leftBottomCorner,
 		rightBottomCorner: rightBottomCorner,
+		borders:           borders,
 		contentBG:         contentBG}
 	r.Layout(w.Size())
 	return r
@@ -322,6 +324,8 @@ type innerWindowRenderer struct {
 	leftBottomCorner  fyne.CanvasObject
 	rightBottomCorner fyne.CanvasObject
 
+	borders []fyne.CanvasObject // all border/corner handles, for show/hide
+
 	*ShadowingRenderer
 }
 
@@ -370,13 +374,7 @@ func (i *innerWindowRenderer) Layout(size fyne.Size) {
 }
 
 func (i *innerWindowRenderer) setBordersVisible(visible bool) {
-	if i.win.DisableResize {
-		return
-	}
-	for _, b := range []fyne.CanvasObject{
-		i.topBorder, i.bottomBorder, i.leftBorder, i.rightBorder,
-		i.leftTopCorner, i.rightTopCorner, i.leftBottomCorner, i.rightBottomCorner,
-	} {
+	for _, b := range i.borders { // empty when DisableResize
 		if visible {
 			b.Show()
 		} else {
