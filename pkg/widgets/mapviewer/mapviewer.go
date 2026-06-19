@@ -203,9 +203,14 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 
 	buttons := mv.createButtons()
 
+	var stepButtons fyne.CanvasObject
+	if mv.cfg.Editable {
+		stepButtons = mv.createStepButtons()
+	}
+
 	mapview := container.NewBorder(
 		mv.xAxisLabelContainer,
-		nil,
+		stepButtons,
 		mv.yAxisLabelContainer,
 		nil,
 		mv.innerView,
@@ -522,6 +527,25 @@ func (mv *MapViewer) setXY() error {
 		mv.updateCursor(true)
 	}
 	return nil
+}
+
+// stepSelected adjusts every selected cell by one ZPrecision step. sign is +1
+// (incr) or -1 (decr). Same behaviour as the +/- keyboard shortcut.
+func (mv *MapViewer) stepSelected(sign float64) {
+	increment := sign * math.Pow(10, -float64(mv.cfg.ZPrecision))
+	for _, cell := range mv.selectedCells {
+		mv.cfg.ZData[cell] += increment
+	}
+	mv.updateCells()
+	mv.Refresh()
+}
+
+func (mv *MapViewer) createStepButtons() *fyne.Container {
+	decr := widget.NewButtonWithIcon("Decr", theme.ContentRemoveIcon(), func() { mv.stepSelected(-1) })
+	incr := widget.NewButtonWithIcon("Incr", theme.ContentAddIcon(), func() { mv.stepSelected(1) })
+	decr.Importance = widget.LowImportance
+	incr.Importance = widget.LowImportance
+	return container.NewGridWithColumns(2, decr, incr)
 }
 
 func (mv *MapViewer) createButtons() *fyne.Container {
