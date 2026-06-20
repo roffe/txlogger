@@ -674,6 +674,12 @@ func (m *meshgridRenderer) Layout(size fyne.Size) {
 	if size == m.MG.size {
 		return
 	}
+	// A collapsed split pane (toggling the mesh off) lays us out at zero height.
+	// Letting that become the baseline breaks adaptZoom's reversible scaling and
+	// the mesh creeps more zoomed-in on every toggle, so keep the last good size.
+	if size.Width <= 0 || size.Height <= 0 {
+		return
+	}
 	oldSize := m.MG.size
 	m.MG.size = size
 	// Auto-fit on the first real size and scale with the window thereafter,

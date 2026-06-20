@@ -2,6 +2,7 @@ package meshgrid
 
 import (
 	"image/png"
+	"math"
 	"os"
 	"testing"
 
@@ -41,6 +42,32 @@ func axisValues(cols, rows int) (xData, yData []float64) {
 		yData[i] = float64(i * 10)
 	}
 	return xData, yData
+}
+
+// TestToggleZoomStable guards the regression where toggling the mesh off (the
+// split pane collapses to zero height) and back on made it creep more zoomed-in
+// each cycle: a degenerate size must not become the layout baseline.
+func TestToggleZoomStable(t *testing.T) {
+	m := testGrid(t)
+	m.size = fyne.Size{}    // force the first Layout to fit
+	m.refreshPending = true // suppress the async throttledRefresh in tests
+	r := &meshgridRenderer{MG: m}
+
+	full := fyne.NewSize(800, 500)
+	r.Layout(full) // initial auto-fit
+	want := m.scale
+
+	// One toggle cycle as Fyne actually lays it out: off collapses the pane to
+	// zero height, on restores it through a non-zero intermediate. The zero frame
+	// must not become the baseline, or the restore over-grows the scale.
+	for i := 0; i < 5; i++ {
+		r.Layout(fyne.NewSize(800, 0))   // off: pane collapses to zero
+		r.Layout(fyne.NewSize(800, 100)) // on: pane reappears small
+		r.Layout(full)                   // on: pane expands to full
+	}
+	if math.Abs(m.scale-want)/want > 1e-9 {
+		t.Fatalf("scale drifted after toggles: got %v want %v", m.scale, want)
+	}
 }
 
 // TestRenderRotated renders an asymmetric surface (tall corner spike) from
