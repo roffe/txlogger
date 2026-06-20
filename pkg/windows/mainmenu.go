@@ -13,6 +13,10 @@ type MenuItem struct {
 	Children []MenuItem
 	Func     func()
 	Data     string
+	// Region is an optional LambdaCal MaxLoad table whose per-rpm airmass limit
+	// outlines the closed-loop region on the opened map. Only used for single-map
+	// items (Data without "|").
+	Region string
 }
 
 func (mw *MainWindow) GetMenu(name string) *fyne.MainMenu {
@@ -64,12 +68,12 @@ func (mw *MainWindow) buildItem(typ symbol.ECUType, item MenuItem) *fyne.MenuIte
 	case item.Data != "":
 		// title + symbol: open as a map
 		return fyne.NewMenuItemWithIcon(item.Name, theme.GridIcon(), func() {
-			mw.openMap(typ, item.Name, item.Data)
+			mw.openMap(typ, item.Name, item.Data, item.Region)
 		})
 	default:
 		// Name is itself a symbol
 		return fyne.NewMenuItemWithIcon(item.Name, theme.GridIcon(), func() {
-			mw.openMap(typ, "", item.Name)
+			mw.openMap(typ, "", item.Name, "")
 		})
 	}
 }

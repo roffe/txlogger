@@ -101,6 +101,13 @@ func (mw *MainWindow) setupMenu() {
 				mw.wm.Add(inner)
 			}),
 			openItem,
+			fyne.NewMenuItemWithIcon("Settings", theme.SettingsIcon(), mw.openSettings),
+			fyne.NewMenuItemWithIcon("What's new", theme.InfoIcon(), mw.showWhatsNew),
+			fyne.NewMenuItemWithIcon("Check for updates", theme.ViewRefreshIcon(), func() {
+				update.UpdateCheck(mw.app, mw.Window)
+			}),
+		),
+		fyne.NewMenu("Tools",
 			fyne.NewMenuItemWithIcon("Symbol Browser", theme.ListIcon(), func() {
 				if w := mw.wm.HasWindow("Symbol Browser"); w != nil {
 					mw.wm.Raise(w)
@@ -109,23 +116,15 @@ func (mw *MainWindow) setupMenu() {
 				getECU := func() symbol.ECUType {
 					return symbol.ECUTypeFromString(mw.selects.ecuSelect.Selected)
 				}
-				browser := symbolbrowser.New(getFW, getECU, mw.openMap, mw.Error)
+				openMap := func(typ symbol.ECUType, title, mapName string) {
+					mw.openMap(typ, title, mapName, "")
+				}
+				browser := symbolbrowser.New(getFW, getECU, openMap, mw.Error)
 				inner := multiwindow.NewInnerWindow("Symbol Browser", browser)
 				inner.Icon = theme.ListIcon()
 				mw.wm.Add(inner)
 				inner.Resize(fyne.Size{Width: 760, Height: 520})
 			}),
-			fyne.NewMenuItemWithIcon("Settings", theme.SettingsIcon(), func() {
-				mw.openSettings()
-			}),
-			fyne.NewMenuItemWithIcon("What's new", theme.InfoIcon(), func() {
-				mw.showWhatsNew()
-			}),
-			fyne.NewMenuItemWithIcon("Check for updates", theme.ViewRefreshIcon(), func() {
-				update.UpdateCheck(mw.app, mw.Window)
-			}),
-		),
-		fyne.NewMenu("Tools",
 			fyne.NewMenuItemWithIcon("Compare symbols with other binary", theme.SearchReplaceIcon(), mw.openSymbolCompare),
 			fyne.NewMenuItemWithIcon("Matrix Builder", theme.InfoIcon(), mw.openMatrixBuilder),
 		),
@@ -325,7 +324,7 @@ var openMapLock sync.Mutex
 // load+save funcs, live X/Y crosshair subscriptions) but does not create a
 // window. openMap wraps one; openMultiMap arranges several in a grid. The
 // returned cancelFuncs must be called when the containing window closes.
-func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string) (*mapviewer.MapViewer, *mapviewer.Config, symbol.Axis, []func(), error) {
+func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap string) (*mapviewer.MapViewer, *mapviewer.Config, symbol.Axis, []func(), error) {
 	var axis symbol.Axis
 	if mw.as2 != nil {
 		axis.Z = mapName
@@ -574,12 +573,23 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string) (*mapview
 		zPrecision = symbol.GetPrecision(symZ.Correctionfactor)
 	}
 
+	if mapName == "TransCal.m_TriggMaxTab" {
+		yData = []float64{0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500}
+	}
+
+	var regionBorder []bool
+	if regionMap != "" {
+		regionBorder = mw.closedLoopRegion(typ, regionMap, xData, yData)
+	}
+
 	cfg := &mapviewer.Config{
 		Name: symZ.Name,
 
 		XData: xData,
 		YData: yData,
 		ZData: zData,
+
+		RegionBorder: regionBorder,
 
 		XPrecision: xPrecision,
 		YPrecision: yPrecision,
@@ -667,13 +677,13 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string) (*mapview
 	return mv, cfg, axis, cancelFuncs, nil
 }
 
-func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string) {
+func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string, regionMap string) {
 	if mw.fw == nil {
 		mw.Error(fmt.Errorf("no binary loaded"))
 		return
 	}
 
-	mv, cfg, axis, cancelFuncs, err := mw.newMapViewer(typ, mapName)
+	mv, cfg, axis, cancelFuncs, err := mw.newMapViewer(typ, mapName, regionMap)
 	if err != nil {
 		mw.Error(err)
 		return
@@ -738,7 +748,7 @@ func (mw *MainWindow) openMultiMap(typ symbol.ECUType, title string, data string
 	var cancelFuncs []func()
 
 	for _, name := range strings.Split(data, "|") {
-		mv, cfg, axis, cancels, err := mw.newMapViewer(typ, strings.TrimSpace(name))
+		mv, cfg, axis, cancels, err := mw.newMapViewer(typ, strings.TrimSpace(name), "")
 		if err != nil {
 			mw.Error(err)
 			continue
@@ -789,6 +799,55 @@ func (mw *MainWindow) openMultiMap(typ symbol.ECUType, title string, data string
 
 	mw.wm.Add(mapWindow)
 	mapWindow.Resize(fyne.NewSize(1000, 750))
+}
+
+// closedLoopRegion flags the cells of a fuel map (X = airmass, Y = rpm) that lie
+// in the closed-loop area: airmass <= the per-rpm max load read from a LambdaCal
+// MaxLoad table (regionMap). The table is indexed by its own rpm axis, so the
+// limit is linearly interpolated onto each map rpm row. Result is row-major
+// (rpmIdx*len(xData)+airIdx), matching ZData order. Returns nil if anything is
+// missing so the caller simply skips the outline.
+func (mw *MainWindow) closedLoopRegion(typ symbol.ECUType, regionMap string, xData, yData []float64) []bool {
+	sym := mw.fw.GetByName(regionMap)
+	if sym == nil {
+		return nil
+	}
+	rpmSym := mw.fw.GetByName(symbol.GetInfo(typ, regionMap).Y)
+	if rpmSym == nil {
+		return nil
+	}
+	limitRpm := rpmSym.Float64s()
+	limit := sym.Float64s()
+	if len(limitRpm) == 0 || len(limit) != len(limitRpm) {
+		return nil
+	}
+	region := make([]bool, len(xData)*len(yData))
+	for r, rpm := range yData {
+		maxAir := lookup1D(limitRpm, limit, rpm)
+		for c, air := range xData {
+			region[r*len(xData)+c] = air <= maxAir
+		}
+	}
+	return region
+}
+
+// lookup1D does a clamped linear interpolation of ys over the (ascending) xs
+// breakpoints. xs and ys must be the same non-zero length.
+func lookup1D(xs, ys []float64, x float64) float64 {
+	n := len(xs)
+	if x <= xs[0] {
+		return ys[0]
+	}
+	if x >= xs[n-1] {
+		return ys[n-1]
+	}
+	for i := 1; i < n; i++ {
+		if x <= xs[i] {
+			t := (x - xs[i-1]) / (xs[i] - xs[i-1])
+			return ys[i-1] + t*(ys[i]-ys[i-1])
+		}
+	}
+	return ys[n-1]
 }
 
 func LookupCoolantTemperature(axisvalue int, kyltempSteg, kyltempTab []int) int {

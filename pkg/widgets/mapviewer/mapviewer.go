@@ -63,6 +63,7 @@ type MapViewer struct {
 	valueRects       *fyne.Container
 	valueTexts       *fyne.Container
 	selectionOverlay *fyne.Container
+	regionOverlay    *fyne.Container
 
 	crosshair *canvas.Rectangle
 
@@ -154,6 +155,7 @@ func (mv *MapViewer) CreateRenderer() fyne.WidgetRenderer {
 	mv.createXAxis()
 	mv.createZdata()
 	mv.createSelectionOverlay()
+	mv.createRegionOverlay()
 	mv.createTextValues()
 	// Start with nothing selected; a cell is selected on first click/keypress.
 	mv.selectedCells = nil
@@ -208,14 +210,17 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 	mv.crosshair.Resize(fyne.NewSize(34, 14))
 	mv.crosshair.Hide()
 
-	mv.innerView = container.NewStack(
-		mv.valueRects,
-		mv.selectionOverlay,
+	layers := []fyne.CanvasObject{mv.valueRects, mv.selectionOverlay}
+	if mv.regionOverlay != nil {
+		layers = append(layers, mv.regionOverlay)
+	}
+	layers = append(layers,
 		container.New(&movingRectsLayout{mv: mv},
 			mv.crosshair,
 		),
 		mv.valueTexts,
 	)
+	mv.innerView = container.NewStack(layers...)
 
 	buttons := mv.createButtons()
 
@@ -402,7 +407,8 @@ func (mv *MapViewer) Refresh() {
 func (mv *MapViewer) createYAxis() {
 	mv.yAxisTexts = make([]*canvas.Text, 0, mv.numRows)
 	objs := make([]fyne.CanvasObject, 0, mv.numRows)
-	for i := mv.numRows - 1; i >= 0; i-- {
+	// ponytail: single value view has only a "0" axis label, skip it
+	for i := mv.numRows - 1; i >= 0 && mv.numData > 1; i-- {
 		text := &canvas.Text{
 			Alignment: fyne.TextAlignCenter,
 			Text:      strconv.FormatFloat(mv.cfg.YData[i], 'f', mv.cfg.YPrecision, 64),
@@ -417,7 +423,8 @@ func (mv *MapViewer) createYAxis() {
 func (mv *MapViewer) createXAxis() {
 	mv.xAxisTexts = make([]*canvas.Text, 0, mv.numColumns)
 	objs := make([]fyne.CanvasObject, 0, mv.numColumns)
-	for i := 0; i < mv.numColumns; i++ {
+	// ponytail: single value view has only a "0" axis label, skip it
+	for i := 0; i < mv.numColumns && mv.numData > 1; i++ {
 		text := &canvas.Text{
 			Alignment: fyne.TextAlignCenter,
 			Text:      strconv.FormatFloat(mv.cfg.XData[i], 'f', mv.cfg.XPrecision, 64),
@@ -479,6 +486,96 @@ func (mv *MapViewer) createSelectionOverlay() {
 		objs[i] = rect
 	}
 	mv.selectionOverlay = container.New(layout.NewGrid(mv.numColumns, mv.numRows, 1.32), objs...)
+}
+
+// createRegionOverlay builds a thin line layer that traces the boundary between
+// the cells flagged in cfg.RegionBorder and the rest — e.g. the closed-loop /
+// open-loop fuel transition — as a staircase that cuts through the map instead
+// of boxing each cell. Leaves regionOverlay nil when there is no region or the
+// region has no internal boundary (all cells in or all out).
+func (mv *MapViewer) createRegionOverlay() {
+	if len(mv.cfg.RegionBorder) != mv.numData || mv.numColumns <= 1 || mv.numRows <= 1 {
+		return
+	}
+	edges := mv.regionEdges()
+	if len(edges) == 0 {
+		return
+	}
+	borderCol := mv.cfg.RegionBorderColor
+	if borderCol.A == 0 {
+		borderCol = color.RGBA{0x70, 0x80, 0x90, 0xFF} // ponytail: default slate boundary
+	}
+	lines := make([]*canvas.Line, len(edges))
+	objs := make([]fyne.CanvasObject, len(edges))
+	for i := range edges {
+		ln := canvas.NewLine(borderCol)
+		ln.StrokeWidth = 4
+		lines[i] = ln
+		objs[i] = ln
+	}
+	mv.regionOverlay = container.New(&regionBorderLayout{mv: mv, edges: edges, lines: lines}, objs...)
+}
+
+// regionEdge marks one shared cell edge on the region boundary. vertical = the
+// edge to the right of cell (r,c); otherwise the edge on top of cell (r,c),
+// shared with row r+1. Indices use the same row-major order as ZData.
+type regionEdge struct {
+	r, c     int
+	vertical bool
+}
+
+// regionEdges collects every edge where a flagged cell touches an unflagged one.
+// Only internal transitions are returned, so the map's outer border is never
+// drawn — just the closed/open interface.
+func (mv *MapViewer) regionEdges() []regionEdge {
+	rb := mv.cfg.RegionBorder
+	var edges []regionEdge
+	for r := 0; r < mv.numRows; r++ {
+		for c := 0; c < mv.numColumns; c++ {
+			in := rb[r*mv.numColumns+c]
+			if c+1 < mv.numColumns && in != rb[r*mv.numColumns+c+1] {
+				edges = append(edges, regionEdge{r: r, c: c, vertical: true})
+			}
+			if r+1 < mv.numRows && in != rb[(r+1)*mv.numColumns+c] {
+				edges = append(edges, regionEdge{r: r, c: c, vertical: false})
+			}
+		}
+	}
+	return edges
+}
+
+// regionBorderLayout positions the boundary lines onto cell edges, recomputing
+// on resize. Cell slots are size/count (matching the value grid's slot pitch and
+// the crosshair layout), and row 0 sits at the bottom, so Y is flipped.
+type regionBorderLayout struct {
+	mv      *MapViewer
+	edges   []regionEdge
+	lines   []*canvas.Line
+	oldSize fyne.Size
+}
+
+func (l *regionBorderLayout) MinSize(_ []fyne.CanvasObject) fyne.Size { return fyne.Size{} }
+
+func (l *regionBorderLayout) Layout(_ []fyne.CanvasObject, size fyne.Size) {
+	if size == l.oldSize {
+		return
+	}
+	l.oldSize = size
+	cw := size.Width / float32(l.mv.numColumns)
+	ch := size.Height / float32(l.mv.numRows)
+	for i, e := range l.edges {
+		ln := l.lines[i]
+		if e.vertical {
+			x := float32(e.c+1) * cw
+			ln.Position1 = fyne.NewPos(x, size.Height-float32(e.r+1)*ch)
+			ln.Position2 = fyne.NewPos(x, size.Height-float32(e.r)*ch)
+		} else {
+			y := size.Height - float32(e.r+1)*ch
+			ln.Position1 = fyne.NewPos(float32(e.c)*cw, y)
+			ln.Position2 = fyne.NewPos(float32(e.c+1)*cw, y)
+		}
+		ln.Refresh()
+	}
 }
 
 // clearSelectionVisual hides the highlight for every currently selected cell.
