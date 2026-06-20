@@ -1,5 +1,5 @@
-fyne.io/fyne/v2 v2.7.5-0.20260614063241-4c0c29f7d5a7 h1:2auph/jcheGuecJjdA5JahXIFFeLjglROzorkhmLxiU=
-fyne.io/fyne/v2 v2.7.5-0.20260614063241-4c0c29f7d5a7/go.mod h1:+QHmxyt889RWLBt6HjSY04BmnO+IUQClMPkRVKltTyY=
+fyne.io/fyne/v2 v2.7.5-0.20260620165746-4a6045473bc5 h1:E/XnR1+hWNRnHoS1A9DK/JYFmCZ7GgE8L8NoRz3StQs=
+fyne.io/fyne/v2 v2.7.5-0.20260620165746-4a6045473bc5/go.mod h1:+QHmxyt889RWLBt6HjSY04BmnO+IUQClMPkRVKltTyY=
 fyne.io/systray v1.12.2 h1:Y8DZxgLHsVQt6rY9Zrkkg+j67S7vv/1F2viOWKPpVeA=
 fyne.io/systray v1.12.2/go.mod h1:RVwqP9nYMo7h5zViCBHri2FgjXF7H2cub7MAq4NSoLs=
 fyne.io/x/fyne v0.0.0-20260404122735-cbbdf562353e h1:O6Bll+49ZD/09VbG8mon6saRTIm7aqzzR+7a3548t7E=
@@ -136,8 +136,8 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
 github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
-github.com/roffe/ecusymbol v1.2.1 h1:qqeXLT9NX3ckTQneCg/JImQ/3QeBSX+1GtmZ3Y9e7Fw=
-github.com/roffe/ecusymbol v1.2.1/go.mod h1:exejs9+FhPTHhUe+ZKAezRIzjZWFyvrANzF6zZ8h7Y0=
+github.com/roffe/ecusymbol v1.2.3 h1:/Ng+yRyIaDRp72KpBOjwS+wa4mcKp83b2fBn2rY/DuE=
+github.com/roffe/ecusymbol v1.2.3/go.mod h1:exejs9+FhPTHhUe+ZKAezRIzjZWFyvrANzF6zZ8h7Y0=
 github.com/roffe/gocan v1.4.1 h1:T9aAHzTxS7oXwiOlMIM2TAf75aMHcEaWAi27nKwEFQk=
 github.com/roffe/gocan v1.4.1/go.mod h1:qGgFX3osetru/58avh4tQMwThQet+ckqdg0kGM3cG9o=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
