@@ -72,7 +72,6 @@ func (mw *MainWindow) showSymbolCompare(typ symbol.ECUType, otherName string, ot
 
 	cmp := symbolcompare.New(&symbolcompare.Config{
 		Diffs:            diffs,
-		OnShowDiff:       func(name string) { mw.openCompareDiff(typ, otherName, other, name) },
 		OnShowSideBySide: func(name string) { mw.openCompareTabs(typ, otherName, other, name) },
 	})
 	inner := multiwindow.NewInnerWindow("Compare with "+otherName, cmp)
@@ -81,37 +80,10 @@ func (mw *MainWindow) showSymbolCompare(typ symbol.ECUType, otherName string, ot
 	inner.Resize(fyne.NewSize(400, 600))
 }
 
-// openCompareTabs shows the current and other binary's version of a map in two
-// tabs. ponytail: native AppTabs, no custom multi-map wrapper widget.
+// openCompareTabs shows the current and other binary's version of a map plus a
+// per-cell diff in three tabs. ponytail: native AppTabs, no custom wrapper.
 func (mw *MainWindow) openCompareTabs(typ symbol.ECUType, otherName string, other symbol.SymbolCollection, mapName string) {
 	winName := mapName + " - compare"
-	if w := mw.wm.HasWindow(winName); w != nil {
-		mw.wm.Raise(w)
-		return
-	}
-	cur, err := mw.compareMapViewer(mw.fw, typ, mapName)
-	if err != nil {
-		mw.Error(err)
-		return
-	}
-	oth, err := mw.compareMapViewer(other, typ, mapName)
-	if err != nil {
-		mw.Error(err)
-		return
-	}
-	tabs := container.NewAppTabs(
-		container.NewTabItem("Current", cur),
-		container.NewTabItem(otherName, oth),
-	)
-	inner := multiwindow.NewInnerWindow(winName, tabs)
-	inner.Icon = theme.GridIcon()
-	mw.wm.Add(inner)
-	inner.Resize(fyne.NewSize(900, 700))
-}
-
-// openCompareDiff shows a single read-only map of (current - other) per cell.
-func (mw *MainWindow) openCompareDiff(typ symbol.ECUType, otherName string, other symbol.SymbolCollection, mapName string) {
-	winName := mapName + " - diff"
 	if w := mw.wm.HasWindow(winName); w != nil {
 		mw.wm.Raise(w)
 		return
@@ -130,29 +102,34 @@ func (mw *MainWindow) openCompareDiff(typ symbol.ECUType, otherName string, othe
 		mw.Error(fmt.Errorf("%s has different dimensions in the two binaries (%d vs %d)", mapName, len(curZ), len(othZ)))
 		return
 	}
-	diff := make([]float64, len(curZ))
-	for i := range curZ {
-		diff[i] = curZ[i] - othZ[i]
-	}
-	mv, err := mw.readonlyMapViewer(mapName, "Δ "+axis.ZDescription, axis, xData, yData, diff, xPrec, yPrec, zPrec)
+	cur, err := mw.readonlyMapViewer(mapName, axis.ZDescription, axis, xData, yData, curZ, xPrec, yPrec, zPrec)
 	if err != nil {
 		mw.Error(err)
 		return
 	}
-	inner := multiwindow.NewInnerWindow(winName+" (current - "+otherName+")", mv)
+	oth, err := mw.readonlyMapViewer(mapName, axis.ZDescription, axis, xData, yData, othZ, xPrec, yPrec, zPrec)
+	if err != nil {
+		mw.Error(err)
+		return
+	}
+	diff := make([]float64, len(curZ))
+	for i := range curZ {
+		diff[i] = curZ[i] - othZ[i]
+	}
+	diffMv, err := mw.readonlyMapViewer(mapName, "Δ "+axis.ZDescription, axis, xData, yData, diff, xPrec, yPrec, zPrec)
+	if err != nil {
+		mw.Error(err)
+		return
+	}
+	tabs := container.NewAppTabs(
+		container.NewTabItem("Diff", diffMv),
+		container.NewTabItem("Current", cur),
+		container.NewTabItem(otherName, oth),
+	)
+	inner := multiwindow.NewInnerWindow(winName, tabs)
 	inner.Icon = theme.GridIcon()
 	mw.wm.Add(inner)
-	inner.Resize(fyne.NewSize(800, 600))
-}
-
-// compareMapViewer builds a read-only MapViewer for mapName from an arbitrary
-// collection. Unlike newMapViewer it has no file/ECU load+save wiring.
-func (mw *MainWindow) compareMapViewer(coll symbol.SymbolCollection, typ symbol.ECUType, mapName string) (*mapviewer.MapViewer, error) {
-	axis, x, y, z, xp, yp, zp, err := compareMapData(coll, typ, mapName)
-	if err != nil {
-		return nil, err
-	}
-	return mw.readonlyMapViewer(mapName, axis.ZDescription, axis, x, y, z, xp, yp, zp)
+	inner.Resize(fyne.NewSize(900, 700))
 }
 
 func (mw *MainWindow) readonlyMapViewer(name, zLabel string, axis symbol.Axis, xData, yData, zData []float64, xPrec, yPrec, zPrec int) (*mapviewer.MapViewer, error) {

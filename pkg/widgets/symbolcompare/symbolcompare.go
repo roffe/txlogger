@@ -9,16 +9,15 @@ import (
 )
 
 // Config drives the compare list. Diffs is the (already sorted) list of symbol
-// names that differ between the two binaries. The callbacks open the actual
-// map views, which live in the windows package so they can reuse MapViewer.
+// names that differ between the two binaries. OnShowSideBySide opens the actual
+// map view, which lives in the windows package so it can reuse MapViewer.
 type Config struct {
 	Diffs            []string
-	OnShowDiff       func(name string)
 	OnShowSideBySide func(name string)
 }
 
 // New returns a list of differing symbols. Double-click a row to compare it side
-// by side; right-click for a context menu to show the differences map.
+// by side.
 func New(cfg *Config) fyne.CanvasObject {
 	list := widget.NewList(
 		func() int { return len(cfg.Diffs) },
@@ -32,9 +31,9 @@ func New(cfg *Config) fyne.CanvasObject {
 	return container.NewBorder(header, nil, nil, nil, list)
 }
 
-// compareRow is a list row that reacts to double-tap and right-click. It does
-// not implement Tapped, so single taps still propagate to the List for
-// selection highlighting.
+// compareRow is a list row that reacts to double-tap. It does not implement
+// Tapped, so single taps still propagate to the List for selection
+// highlighting.
 type compareRow struct {
 	widget.BaseWidget
 	label *widget.Label
@@ -61,18 +60,4 @@ func (r *compareRow) DoubleTapped(_ *fyne.PointEvent) {
 	if r.name != "" && r.cfg.OnShowSideBySide != nil {
 		r.cfg.OnShowSideBySide(r.name)
 	}
-}
-
-func (r *compareRow) TappedSecondary(e *fyne.PointEvent) {
-	if r.name == "" || r.cfg.OnShowDiff == nil {
-		return
-	}
-	c := fyne.CurrentApp().Driver().CanvasForObject(r)
-	if c == nil {
-		return
-	}
-	menu := fyne.NewMenu("", fyne.NewMenuItem("Show differences map", func() {
-		r.cfg.OnShowDiff(r.name)
-	}))
-	widget.NewPopUpMenu(menu, c).ShowAtPosition(e.AbsolutePosition)
 }

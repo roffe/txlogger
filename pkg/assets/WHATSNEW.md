@@ -1,4 +1,5 @@
 # 2.1.10
+- Added "Compare symbols with other binary" under the Tools menu. Pick a second binary of the same ECU type and get a list of every symbol whose data differs from the currently loaded one. Double-click a row to open that map in three tabs: Current, the other binary, and a Diff tab showing the per-cell difference (current - other). Logging must be stopped while comparing
 - Cut a new logfile from a selection in the logplayer: scrub to a spot and press "In" (or the `i` key) to mark the start, scrub again and press "Out" (or `o`) to mark the end, then press the save button to write just that range to a new log next to your other logs. The clip keeps the same format as the source log (csv/bpl/t5l/t7l/t8l). Leaving the In or Out point unset selects from the start or to the end of the log
 - Live tracking marker in the 3d mesh viewer showing where the ECU is reading from, mirroring the crosshair in the map above
 - Fixed the 3d mesh showing one cell less than the table in each direction; values are now cell-centered so an 18x16 map renders 18x16 cells
@@ -15,7 +16,7 @@
 - WBL reconnect COM port while logging. If the COM port dies for a reason during logging it will try to re-connect
 - Performance improvements in many widget to allow slower computers to run txlogger better
 - Improved camera handling in the 3d mesh viewer - now behaves like the t5/7/8 suites
-- Added 2d graph for viewing flat maps
+- Added 2D graph for viewing flat maps
 - Rewrote logplayer plotter to use about 50% less CPU on zoomed out views
 - Big refactor of the log writing logic to be simpler to maintain and be more performant
 - Improved cell selection in mapviewer
