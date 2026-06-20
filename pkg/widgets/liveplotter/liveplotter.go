@@ -477,9 +477,11 @@ func (p *Widget) CreateRenderer() fyne.WidgetRenderer {
 		p.setFollow(!p.follow)
 	})
 
-	p.windowSel = widget.NewSelect([]string{"30s", "60s", "120s", "300s"}, func(s string) {
+	p.windowSel = widget.NewSelect([]string{"15s", "30s", "60s", "120s", "300s"}, func(s string) {
 		var d time.Duration
 		switch s {
+		case "15s":
+			d = 15 * time.Second
 		case "30s":
 			d = 30 * time.Second
 		case "60s":
