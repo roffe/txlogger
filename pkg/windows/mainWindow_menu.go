@@ -23,6 +23,7 @@ import (
 	"github.com/roffe/txlogger/pkg/ecu/t8/t8file"
 	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/widgets/canflasher"
 	"github.com/roffe/txlogger/pkg/widgets/dtcreader"
 	"github.com/roffe/txlogger/pkg/widgets/editparameters"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
@@ -124,6 +125,9 @@ func (mw *MainWindow) setupMenu() {
 				update.UpdateCheck(mw.app, mw.Window)
 			}),
 		),
+		fyne.NewMenu("Tools",
+			fyne.NewMenuItemWithIcon("Matrix Builder", theme.InfoIcon(), mw.openMatrixBuilder),
+		),
 	}
 
 	trailing := []*fyne.Menu{
@@ -141,6 +145,25 @@ func (mw *MainWindow) setupMenu() {
 				mw.wm.Arrange(&multiwindow.PreservingArranger{})
 			}),
 		),
+	}
+
+	if mw.previewFeatures {
+		leading[len(leading)-1].Items = append(
+			leading[len(leading)-1].Items,
+			fyne.NewMenuItemWithIcon("Canflasher", theme.UploadIcon(), func() {
+				if w := mw.wm.HasWindow("Canflasher"); w != nil {
+					mw.wm.Raise(w)
+					return
+				}
+				inner := multiwindow.NewInnerWindow("Canflasher", canflasher.New(&canflasher.Config{
+					CSW: mw.settings,
+				}))
+				inner.Icon = theme.UploadIcon()
+				mw.wm.Add(inner)
+				inner.Resize(fyne.NewSize(450, 250))
+			}),
+			fyne.NewMenuItemWithIcon("Boost Auto-Tuner", theme.MediaFastForwardIcon(), mw.openBoostTuner),
+		)
 	}
 
 	mw.leadingMenus = leading

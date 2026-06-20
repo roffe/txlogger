@@ -277,13 +277,7 @@ func (mw *MainWindow) render() {
 	footer := container.NewBorder(
 		nil,
 		nil,
-		container.NewBorder(
-			nil,
-			nil,
-			nil,
-			mw.buttons.layoutRefreshBtn,
-			mw.selects.layoutSelect,
-		),
+		nil,
 		container.NewHBox(
 			container.NewHBox(
 				mw.gocanGatewayLED,
