@@ -126,6 +126,7 @@ func (mw *MainWindow) setupMenu() {
 			}),
 		),
 		fyne.NewMenu("Tools",
+			fyne.NewMenuItemWithIcon("Compare symbols with other binary", theme.SearchReplaceIcon(), mw.openSymbolCompare),
 			fyne.NewMenuItemWithIcon("Matrix Builder", theme.InfoIcon(), mw.openMatrixBuilder),
 		),
 	}
