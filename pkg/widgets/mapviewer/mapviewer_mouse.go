@@ -67,6 +67,9 @@ func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
 	case event.Button == desktop.MouseButtonPrimary && event.Modifier == fyne.KeyModifierShift:
 		mv.handlePrimaryClickWithShift(event)
 
+	case event.Button == desktop.MouseButtonPrimary && event.Modifier == fyne.KeyModifierControl|fyne.KeyModifierShift:
+		mv.handlePrimaryCtrlShiftClick(event)
+
 	case event.Button == desktop.MouseButtonPrimary && event.Modifier == fyne.KeyModifierControl:
 		mv.handlePrimaryCtrlClick(event)
 
@@ -111,6 +114,25 @@ func (mv *MapViewer) handlePrimaryCtrlClick(event *desktop.MouseEvent) {
 	// this cell instead to dirty the canvas and force an immediate repaint that
 	// draws the toggled highlight.
 	canvas.Refresh(mv.zDataRects[newCell])
+}
+
+// handlePrimaryCtrlShiftClick adds the rectangular block between the anchor cell
+// (selectedX/SelectedY, the last clicked cell) and the clicked corner to the
+// current selection without clearing it.
+func (mv *MapViewer) handlePrimaryCtrlShiftClick(event *desktop.MouseEvent) {
+	nx, ny := mv.calculateSelectionBounds(event.Position)
+	minX, maxX := min(mv.selectedX, nx), max(mv.selectedX, nx)
+	minY, maxY := min(mv.SelectedY, ny), max(mv.SelectedY, ny)
+	for y := minY; y <= maxY; y++ {
+		for x := minX; x <= maxX; x++ {
+			cell := y*mv.numColumns + x
+			if !slices.Contains(mv.selectedCells, cell) {
+				mv.selectedCells = append(mv.selectedCells, cell)
+			}
+		}
+	}
+	mv.dragCornerX, mv.dragCornerY = nx, ny
+	mv.drawSelectionVisual()
 }
 
 // handlePrimaryClickWithShift extends the selection from the current anchor to

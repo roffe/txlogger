@@ -595,6 +595,11 @@ func (mv *MapViewer) drawSelectionVisual() {
 			mv.selectionRects[cell].Show()
 		}
 	}
+	// Show() only flips the Hidden flag. On a freshly opened window nothing has
+	// dirtied the canvas yet, so the newly shown rects aren't painted until some
+	// unrelated event (resize, button hover) forces a repaint. Refresh the
+	// overlay container to repaint immediately. See handlePrimaryCtrlClick.
+	canvas.Refresh(mv.selectionOverlay)
 }
 
 func (mv *MapViewer) setXY() error {
