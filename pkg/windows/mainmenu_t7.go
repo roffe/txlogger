@@ -33,6 +33,11 @@ func (mw *MainWindow) t7Menu() []MenuItem {
 			{Name: "Nom. torque map (X)", Data: "TorqueCal.m_AirXSP"},
 		}},
 		{Name: "Fuel", Children: []MenuItem{
+			{Name: "Fuel cut", Children: []MenuItem{
+				{Name: "FCutCal.ST_Enable"},
+				{Name: "FCutCal.FuelFactor"},
+				{Name: "FCutCal.n_CombSP (Y)", Data: "FCutCal.n_CombSP"},
+			}},
 			{Name: "Closed Loop", Children: []MenuItem{
 				{Name: "Max load norm", Data: "LambdaCal.MaxLoadNormTab"},
 				{Name: "Max load E85", Data: "LambdaCal.MaxLoadE85Tab"},
