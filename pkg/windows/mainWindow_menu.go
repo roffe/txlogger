@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -23,12 +24,15 @@ import (
 	"github.com/roffe/txlogger/pkg/ecu/t8/t8file"
 	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/widgets/boosttuner"
 	"github.com/roffe/txlogger/pkg/widgets/canflasher"
 	"github.com/roffe/txlogger/pkg/widgets/dtcreader"
 	"github.com/roffe/txlogger/pkg/widgets/editparameters"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
+	"github.com/roffe/txlogger/pkg/widgets/matrixbuilder"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
+	"github.com/roffe/txlogger/pkg/widgets/rescaler"
 	"github.com/roffe/txlogger/pkg/widgets/symbolbrowser"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmmod"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmstatus"
@@ -127,6 +131,9 @@ func (mw *MainWindow) setupMenu() {
 			}),
 			fyne.NewMenuItemWithIcon("Compare symbols with other binary", theme.SearchReplaceIcon(), mw.openSymbolCompare),
 			fyne.NewMenuItemWithIcon("Matrix Builder", theme.InfoIcon(), mw.openMatrixBuilder),
+			//fyne.NewMenuItemWithIcon("Rescale AccPedalMap", theme.GridIcon(), func() {
+			//	mw.openRescaler(symbol.ECU_T8, "TrqMastCal.X_AccPedalMAP")
+			//}),
 		),
 	}
 
@@ -162,7 +169,7 @@ func (mw *MainWindow) setupMenu() {
 				mw.wm.Add(inner)
 				inner.Resize(fyne.NewSize(450, 250))
 			}),
-			fyne.NewMenuItemWithIcon("Boost Auto-Tuner", theme.MediaFastForwardIcon(), mw.openBoostTuner),
+			fyne.NewMenuItemWithIcon("T7 Boost Auto-Tuner", theme.MediaFastForwardIcon(), mw.openBoostTuner),
 		)
 	}
 
@@ -399,7 +406,7 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 				if kyltempSteg == nil || kyltempTab == nil {
 					return nil, nil, axis, nil, fmt.Errorf("missing coolant temperature symbols")
 				}
-				realTemp := LookupCoolantTemperature(val, kyltempSteg.Ints(), kyltempTab.Ints())
+				realTemp := lookupCoolantTemperature(val, kyltempSteg.Ints(), kyltempTab.Ints())
 				yData[idx] = float64(realTemp)
 			}
 		} else {
@@ -573,8 +580,11 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 		zPrecision = symbol.GetPrecision(symZ.Correctionfactor)
 	}
 
-	if mapName == "TransCal.m_TriggMaxTab" {
+	switch mapName {
+	case "TransCal.m_TriggMaxTab":
 		yData = []float64{0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500}
+	case "TransCal.FilterConstAir":
+		yData = []float64{899, 2499, 3499, 3500}
 	}
 
 	var regionBorder []bool
@@ -850,7 +860,7 @@ func lookup1D(xs, ys []float64, x float64) float64 {
 	return ys[n-1]
 }
 
-func LookupCoolantTemperature(axisvalue int, kyltempSteg, kyltempTab []int) int {
+func lookupCoolantTemperature(axisvalue int, kyltempSteg, kyltempTab []int) int {
 	index := -1
 	retval := -1
 	smallestDiff := 256
@@ -913,4 +923,138 @@ func LookupCoolantTemperature(axisvalue int, kyltempSteg, kyltempTab []int) int 
 	}
 
 	return retval
+}
+
+// openBoostTuner opens (or raises) the T7 boost auto-tuner. It reads the current
+// BoostCal maps from the loaded binary and writes tuned maps back through a save
+// closure that takes a one-time .bak of the file before the first write.
+func (mw *MainWindow) openBoostTuner() {
+	if mw.fw == nil {
+		mw.Error(fmt.Errorf("no binary loaded"))
+		return
+	}
+	if w := mw.wm.HasWindow("Boost Auto-Tuner"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	save := func(symbolName string, data []float64) error {
+		sym := mw.fw.GetByName(symbolName)
+		if sym == nil {
+			return fmt.Errorf("symbol %s not found", symbolName)
+		}
+		if err := sym.SetData(sym.EncodeFloat64s(data)); err != nil {
+			return err
+		}
+		if mw.filename != "" {
+			if bak := mw.filename + ".bak"; !fileExists(bak) {
+				if orig, err := os.ReadFile(mw.filename); err == nil {
+					_ = os.WriteFile(bak, orig, 0o644)
+				}
+			}
+		}
+		return mw.fw.Save(mw.filename)
+	}
+	bt := boosttuner.New(boosttuner.Config{
+		Symbols:      mw.fw,
+		Save:         save,
+		MeshRenderer: mw.settings.GetMeshRenderer(),
+		Colorblind:   mw.settings.GetColorBlindMode(),
+	})
+	inner := multiwindow.NewInnerWindow("Boost Auto-Tuner", bt)
+	inner.Icon = theme.GridIcon()
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(1100, 760))
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// openMatrixBuilder opens (or raises) the matrix builder window. The builder
+// loads its own log files, so it is independent of any open log player.
+func (mw *MainWindow) openMatrixBuilder() {
+	if w := mw.wm.HasWindow("Matrix builder"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	inner := multiwindow.NewInnerWindow("Matrix builder", matrixbuilder.New(mw.settings.GetMeshRenderer()))
+	inner.Icon = theme.GridIcon()
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(1000, 720))
+}
+
+// openRescaler opens (or raises) the map rescaler for a single map. It reads the
+// map and its X/Y axes from the loaded binary, lets the user edit the axis
+// support points, resamples the surface onto them, and writes the result back
+// through a save closure that takes a one-time .bak before the first write.
+func (mw *MainWindow) openRescaler(typ symbol.ECUType, mapName string) {
+	if mw.fw == nil {
+		mw.Error(fmt.Errorf("no binary loaded"))
+		return
+	}
+	winName := "Rescale " + mapName
+	if w := mw.wm.HasWindow(winName); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+
+	axis := symbol.GetInfo(typ, mapName)
+	symX := mw.fw.GetByName(axis.X)
+	symY := mw.fw.GetByName(axis.Y)
+	symZ := mw.fw.GetByName(axis.Z)
+	if symZ == nil || symY == nil {
+		mw.Error(fmt.Errorf("rescaler: missing symbol(s) for %s", mapName))
+		return
+	}
+
+	xData := []float64{0}
+	xPrecision := 0
+	if symX != nil {
+		xData = symX.Float64s()
+		xPrecision = symbol.GetPrecision(symX.Correctionfactor)
+	}
+
+	cfg := &rescaler.Config{
+		Name:       axis.Z,
+		XLabel:     axis.X,
+		YLabel:     axis.Y,
+		ZLabel:     axis.Z,
+		XData:      xData,
+		YData:      symY.Float64s(),
+		ZData:      symZ.Float64s(),
+		XPrecision: xPrecision,
+		YPrecision: symbol.GetPrecision(symY.Correctionfactor),
+		ZPrecision: symbol.GetPrecision(symZ.Correctionfactor),
+		Apply: func(newX, newY, newZ []float64) error {
+			if symX != nil {
+				if err := symX.SetData(symX.EncodeFloat64s(newX)); err != nil {
+					return err
+				}
+			}
+			if err := symY.SetData(symY.EncodeFloat64s(newY)); err != nil {
+				return err
+			}
+			if err := symZ.SetData(symZ.EncodeFloat64s(newZ)); err != nil {
+				return err
+			}
+			if mw.filename != "" {
+				if bak := mw.filename + ".bak"; !fileExists(bak) {
+					if orig, err := os.ReadFile(mw.filename); err == nil {
+						_ = os.WriteFile(bak, orig, 0o644)
+					}
+				}
+			}
+			if err := mw.fw.Save(mw.filename); err != nil {
+				return err
+			}
+			mw.Log("Rescaled and saved " + axis.Z)
+			return nil
+		},
+	}
+
+	inner := multiwindow.NewInnerWindow(winName, rescaler.New(cfg))
+	inner.Icon = theme.GridIcon()
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(900, 720))
 }

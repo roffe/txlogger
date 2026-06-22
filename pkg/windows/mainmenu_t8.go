@@ -1,5 +1,7 @@
 package windows
 
+import symbol "github.com/roffe/ecusymbol"
+
 func (mw *MainWindow) t8Menu() []MenuItem {
 	return []MenuItem{
 		{Name: "Diagnostics", Children: []MenuItem{
@@ -72,6 +74,9 @@ func (mw *MainWindow) t8Menu() []MenuItem {
 		{Name: "Pedal", Children: []MenuItem{
 			{Name: "Pedal position map", Data: "TrqMastCal.X_AccPedalMAP"},
 			{Name: "Torque request map", Data: "PedalMapCal.Trq_RequestMap"},
+			{Name: "Rescale AccPedalMap", Func: func() {
+				mw.openRescaler(symbol.ECU_T8, "TrqMastCal.X_AccPedalMAP")
+			}},
 		}},
 	}
 }
