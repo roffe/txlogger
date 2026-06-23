@@ -106,7 +106,7 @@ func (m *WBLEditor) buildRow(r *mapRow) {
 		if err != nil {
 			return
 		}
-		r.y = clampInt(m.yFromVolt(v), yMin, yMax)
+		r.y = common.Clamp(m.yFromVolt(v), yMin, yMax)
 		r.ye.Text = strconv.Itoa(r.y)
 		r.ye.Refresh()
 		m.refreshGraph()
@@ -120,7 +120,7 @@ func (m *WBLEditor) buildRow(r *mapRow) {
 		if err != nil {
 			return
 		}
-		r.y = clampInt(v, yMin, yMax)
+		r.y = common.Clamp(v, yMin, yMax)
 		r.vo.Text = fmt.Sprintf("%.2f", m.voltFromY(r.y))
 		r.vo.Refresh()
 		m.refreshGraph()
@@ -135,7 +135,7 @@ func (m *WBLEditor) buildRow(r *mapRow) {
 		if err != nil {
 			return
 		}
-		r.z = clampFloat(v, zMin, zMax)
+		r.z = common.Clamp(v, zMin, zMax)
 		m.refreshGraph()
 		m.save()
 	}

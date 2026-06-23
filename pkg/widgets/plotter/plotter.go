@@ -16,6 +16,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/colors"
+	"github.com/roffe/txlogger/pkg/common"
 )
 
 // var _ fyne.Focusable = (*Plotter)(nil)
@@ -24,10 +25,6 @@ var (
 	_ fyne.Draggable = (*Plotter)(nil)
 	_ fyne.Widget    = (*Plotter)(nil)
 )
-
-type PlotterControl interface {
-	Seek(int)
-}
 
 // plotBackend selects how the plot is drawn. The GPU shader is the default;
 // TXLOGGER_PLOT_RENDERER=image selects the CPU rasterizer, which is also the
@@ -447,7 +444,7 @@ func NewTimeSeries(name string, values map[string][]float64) *TimeSeries {
 	if min, max, known := defaultRange(name); known {
 		ts.Min, ts.Max = min, max
 	} else {
-		ts.Min, ts.Max = findMinMaxFloat64(data)
+		ts.Min, ts.Max = common.FindMinMaxFloat64(data)
 	}
 
 	ts.valueRange = ts.Max - ts.Min
@@ -579,8 +576,8 @@ func (p *Plotter) layoutCursor() {
 
 	// Account for zoom slider width and ensure cursor stays within plot bounds
 	xOffset := p.zoom.Size().Width + x
-	xOffset = min32(xOffset, plotSize.Width+p.zoom.Size().Width)
-	xOffset = max32(xOffset, p.zoom.Size().Width)
+	xOffset = min(xOffset, plotSize.Width+p.zoom.Size().Width)
+	xOffset = max(xOffset, p.zoom.Size().Width)
 
 	p.cursor.Position1 = fyne.NewPos(xOffset, 0)
 	p.cursor.Position2 = fyne.NewPos(xOffset+1, plotSize.Height)
@@ -594,19 +591,4 @@ func (p *Plotter) updateCursor(goroutine bool) {
 	} else {
 		p.cursor.Refresh()
 	}
-}
-
-// Helper functions
-func min32(a, b float32) float32 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max32(a, b float32) float32 {
-	if a > b {
-		return a
-	}
-	return b
 }

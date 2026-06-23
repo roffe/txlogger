@@ -4,6 +4,8 @@ import (
 	"image"
 	"image/color"
 	"math"
+
+	"github.com/roffe/txlogger/pkg/common"
 )
 
 // BresenhamThick draws a line of given thickness directly into img.Pix,
@@ -44,8 +46,8 @@ func BresenhamThick(img *image.RGBA, x1, y1, x2, y2 int, thickness int, col colo
 }
 
 func bresenhamCore(pix []uint8, stride, w, h, x1, y1, x2, y2 int, col color.RGBA) {
-	dx := abs(x2 - x1)
-	dy := abs(y2 - y1)
+	dx := common.Abs(x2 - x1)
+	dy := common.Abs(y2 - y1)
 	steep := dy > dx
 
 	if steep {
@@ -57,8 +59,8 @@ func bresenhamCore(pix []uint8, stride, w, h, x1, y1, x2, y2 int, col color.RGBA
 		y1, y2 = y2, y1
 	}
 
-	dx = abs(x2 - x1)
-	dy = abs(y2 - y1)
+	dx = common.Abs(x2 - x1)
+	dy = common.Abs(y2 - y1)
 	err := dx / 2
 	y := y1
 	ystep := 1
@@ -134,11 +136,4 @@ func fillCircle(pix []uint8, stride, w, h, centerX, centerY, radius int, col col
 			}
 		}
 	}
-}
-
-func abs(n int) int {
-	if n < 0 {
-		return -n
-	}
-	return n
 }

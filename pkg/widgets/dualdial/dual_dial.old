@@ -361,9 +361,3 @@ func appendFormatFloat(dst []byte, format string, v float64) []byte {
 	return strconv.AppendFloat(dst, v, 'f', 0, 64)
 }
 
-func max(a, b float32) float32 {
-	if a > b {
-		return a
-	}
-	return b
-}

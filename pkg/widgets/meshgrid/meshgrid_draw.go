@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/roffe/txlogger/pkg/colors"
+	"github.com/roffe/txlogger/pkg/common"
 )
 
 // lineSegment indexes into the precomputed projected/color slices so we don't
@@ -290,8 +291,8 @@ func drawBresenhamLine(img *image.RGBA, x0, y0, x1, y1 int, c1, c2 color.RGBA) {
 	pix := img.Pix
 
 	// Bresenham setup
-	dx := abs(x1 - x0)
-	dy := -abs(y1 - y0)
+	dx := common.Abs(x1 - x0)
+	dy := -common.Abs(y1 - y0)
 	sx := 1
 	if x0 > x1 {
 		sx = -1
@@ -432,11 +433,4 @@ func clipCohenSutherland(x0, y0, x1, y1 *int, xmin, ymin, xmax, ymax int) bool {
 	}
 	*x0, *y0, *x1, *y1 = x0i, y0i, x1i, y1i
 	return true
-}
-
-func abs(v int) int {
-	if v < 0 {
-		return -v
-	}
-	return v
 }

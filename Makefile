@@ -20,9 +20,14 @@ txlogger:
 release:
 	fyne package -tags=$(BUILDTAGS) --release
 
+debug: clean cangateway
+	@echo Using compiler "$(CC)"
+	-go run -tags=$(BUILDTAGS),debug . 2>&1 | tee run.log
+
+
 run: clean cangateway
 	@echo Using compiler "$(CC)"
-	-go run -tags=$(BUILDTAGS) . 2>&1 | tee run.log
+	-GOEXPERIMENT=simd go run -tags=$(BUILDTAGS) . 2>&1 | tee run.log
 
 clean:
 	rm -f cangateway

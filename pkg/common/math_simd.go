@@ -1,12 +1,12 @@
 //go:build goexperiment.simd && amd64
 
-package plotter
+package common
 
 import (
 	"simd/archsimd"
 )
 
-func findMinMaxFloat64(data []float64) (float64, float64) {
+func FindMinMaxFloat64(data []float64) (float64, float64) {
 	n := len(data)
 	if n == 0 {
 		return 0, 0

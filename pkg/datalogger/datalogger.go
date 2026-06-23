@@ -28,10 +28,6 @@ type IClient interface {
 	Close()
 }
 
-type Consumer interface {
-	SetValue(string, float64)
-}
-
 type Config struct {
 	FilenamePrefix string
 	ECU            string

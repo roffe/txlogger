@@ -14,6 +14,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/colors"
+	"github.com/roffe/txlogger/pkg/common"
 )
 
 const (
@@ -95,7 +96,7 @@ func New(cfg *Config) *Graph {
 			g.axis[i] = float64(i)
 		}
 	}
-	g.zMin, g.zMax = findMinMax(g.values)
+	g.zMin, g.zMax = common.FindMinMaxFloat64(g.values)
 	g.ExtendBaseWidget(g)
 	return g
 }
@@ -559,20 +560,4 @@ func niceStep(rng float64, maxTicks int) float64 {
 	default:
 		return 10 * mag
 	}
-}
-
-func findMinMax(values []float64) (float64, float64) {
-	if len(values) == 0 {
-		return 0, 0
-	}
-	min, max := values[0], values[0]
-	for _, v := range values {
-		if v < min {
-			min = v
-		}
-		if v > max {
-			max = v
-		}
-	}
-	return min, max
 }

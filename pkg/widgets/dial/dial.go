@@ -355,13 +355,3 @@ func (c *DialRenderer) Objects() []fyne.CanvasObject {
 	}
 	return c.objects
 }
-
-// --- helpers ---
-
-// max helper that matches your float32 usage
-func max(a, b float32) float32 {
-	if a > b {
-		return a
-	}
-	return b
-}

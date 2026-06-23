@@ -289,12 +289,3 @@ func (c *DualDialRenderer) Objects() []fyne.CanvasObject {
 	}
 	return c.objects
 }
-
-// --- helpers ---
-
-func max(a, b float32) float32 {
-	if a > b {
-		return a
-	}
-	return b
-}

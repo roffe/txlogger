@@ -1005,7 +1005,8 @@ func (mb *MatrixBuilder) autoFill(isX bool) {
 	if !ok || len(data) == 0 {
 		return
 	}
-	lo, hi := minMax(data)
+
+	lo, hi := common.FindMinMaxFloat64(data)
 	n := len(axis)
 	for i := 0; i < n; i++ {
 		if n == 1 {
@@ -1639,19 +1640,6 @@ func countsToFloat(counts []int) []float64 {
 		out[i] = float64(c)
 	}
 	return out
-}
-
-func minMax(data []float64) (float64, float64) {
-	lo, hi := data[0], data[0]
-	for _, v := range data[1:] {
-		if v < lo {
-			lo = v
-		}
-		if v > hi {
-			hi = v
-		}
-	}
-	return lo, hi
 }
 
 // precisionFor picks a sensible decimal precision: 0 for all-integer data,

@@ -10,6 +10,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/common"
 )
 
 type WindowRatio struct {
@@ -77,11 +78,11 @@ func (m *MultipleWindows) Add(w *InnerWindow, startPosition ...fyne.Position) bo
 		if m.LockViewport {
 			size := w.MinSize()
 			bounds := m.content.Size()
-			startPosition[0].X = clamp32(startPosition[0].X, 0, bounds.Width-size.Width)
-			startPosition[0].Y = clamp32(startPosition[0].Y, 0, bounds.Height-size.Height)
-			//bounds.Subtract(size).Max(startPosition[0])
+			startPosition[0].X = common.Clamp(startPosition[0].X, 0, bounds.Width-size.Width)
+			startPosition[0].Y = common.Clamp(startPosition[0].Y, 0, bounds.Height-size.Height)
+			// bounds.Subtract(size).Max(startPosition[0])
 		}
-		//w.Move(startPosition[0].SubtractXY(w.MinSize().Width*0.5, 80))
+		// w.Move(startPosition[0].SubtractXY(w.MinSize().Width*0.5, 80))
 		w.Move(startPosition[0])
 	}
 
@@ -245,8 +246,8 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 		if m.LockViewport {
 			size := w.Size()
 			bounds := m.content.Size()
-			newPos.X = clamp32(newPos.X, 0, bounds.Width-size.Width)
-			newPos.Y = clamp32(newPos.Y, 0, bounds.Height-size.Height)
+			newPos.X = common.Clamp(newPos.X, 0, bounds.Width-size.Width)
+			newPos.Y = common.Clamp(newPos.Y, 0, bounds.Height-size.Height)
 		}
 		w.Move(newPos)
 	}
@@ -360,7 +361,7 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 			if c := fyne.CurrentApp().Driver().CanvasForObject(w); c != nil {
 				c.Focus(f)
 			}
-			//c.SetOnTypedKey(f.TypedKey)
+			// c.SetOnTypedKey(f.TypedKey)
 		}
 		m.Raise(w)
 	}

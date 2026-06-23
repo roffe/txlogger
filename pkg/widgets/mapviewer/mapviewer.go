@@ -18,9 +18,9 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/colors"
+	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/interpolate"
 	"github.com/roffe/txlogger/pkg/layout"
-	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/graph2d"
 	"github.com/roffe/txlogger/pkg/widgets/meshgrid"
 )
@@ -115,7 +115,7 @@ func New(config *Config) (*MapViewer, error) {
 	if len(mv.cfg.ZData) == 0 {
 		return nil, fmt.Errorf("mapViewer zData is empty")
 	}
-	mv.zMin, mv.zMax = widgets.FindMinMax(mv.cfg.ZData)
+	mv.zMin, mv.zMax = common.FindMinMaxFloat64(mv.cfg.ZData)
 	if mv.numColumns*mv.numRows != mv.numData && mv.numColumns > 1 && mv.numRows > 1 {
 		return nil, fmt.Errorf("mapViewer columns * rows != data length")
 	}
@@ -372,7 +372,7 @@ func (mv *MapViewer) SetZData(zData []float64) error {
 }
 
 func (mv *MapViewer) Refresh() {
-	mv.zMin, mv.zMax = widgets.FindMinMax(mv.cfg.ZData)
+	mv.zMin, mv.zMax = common.FindMinMaxFloat64(mv.cfg.ZData)
 	if len(mv.textValues) == 0 {
 		// renderer not created yet; createTextValues/createZdata pick up
 		// the current ZData and color mode when it is

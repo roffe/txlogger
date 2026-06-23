@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/common"
 )
 
 // --- graph view (native fyne primitives) -----------------------------------
@@ -178,12 +179,12 @@ func (r *graphRenderer) layoutGraph() {
 	const minYSpan, minZSpan = 50, 0.2
 	if maxY-minY < minYSpan {
 		mid := (maxY + minY) / 2
-		minY = clampInt(mid-minYSpan/2, yMin, yMax-minYSpan)
+		minY = common.Clamp(mid-minYSpan/2, yMin, yMax-minYSpan)
 		maxY = minY + minYSpan
 	}
 	if maxZ-minZ < minZSpan {
 		mid := (maxZ + minZ) / 2
-		minZ = clampFloat(mid-minZSpan/2, zMin, zMax-minZSpan)
+		minZ = common.Clamp(mid-minZSpan/2, zMin, zMax-minZSpan)
 		maxZ = minZ + minZSpan
 	}
 	r.minYv, r.maxYv = minY, maxY
@@ -293,8 +294,8 @@ func (p *draggablePoint) Dragged(e *fyne.DragEvent) {
 	step := int(p.accY)
 	p.accY -= float64(step)
 
-	p.row.y = clampInt(p.row.y+step, yMin, yMax)
-	p.row.z = clampFloat(p.row.z+dZ, zMin, zMax)
+	p.row.y = common.Clamp(p.row.y+step, yMin, yMax)
+	p.row.z = common.Clamp(p.row.z+dZ, zMin, zMax)
 
 	p.g.editor.updateRowEntries(p.row)
 	p.g.Refresh()
@@ -303,24 +304,4 @@ func (p *draggablePoint) Dragged(e *fyne.DragEvent) {
 func (p *draggablePoint) DragEnd() {
 	p.accY = 0
 	p.g.editor.save()
-}
-
-func clampInt(v, lo, hi int) int {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
-}
-
-func clampFloat(v, lo, hi float64) float64 {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
 }
