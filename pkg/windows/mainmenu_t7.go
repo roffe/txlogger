@@ -12,6 +12,9 @@ func (mw *MainWindow) t7Menu() []MenuItem {
 		{Name: "Calibration", Children: []MenuItem{
 			{Name: "ESP Calibration", Func: mw.openESPCalibration},
 			{Name: "AirCompCal.PressMap"},
+			{Name: "AirCtrlCal.map"},
+			{Name: "AreaCal.Area"},
+			{Name: "AreaCal.Table"},
 			{Name: "Ethanol adaption value", Data: "E85.X_EthAct_Tech2"},
 			{Name: "MAFCal.m_RedundantAirMap"},
 			{Name: "TCompCal.EnrFacE85Tab"},
