@@ -4,7 +4,6 @@ import (
 	"image/color"
 	"math"
 	"strconv"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -19,13 +18,9 @@ type Dial struct {
 
 	cfg *widgets.GaugeConfig
 
-	factor          float64
-	value           float64
-	highestObserved float64
+	value float64
 
-	needle                *canvas.Line
-	highestObservedMarker *canvas.Line
-	lastHighestObserved   time.Time
+	needle *canvas.Line
 
 	pips      []*canvas.Line
 	pipLabels []*canvas.Text
@@ -93,12 +88,9 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 		totalRange = 1
 	}
 
-	c.factor = c.cfg.Max / steps
-
 	c.face = canvas.NewArc(-135.73, 135.8, 0.985, color.RGBA{0x80, 0x80, 0x80, 0xFF})
 	c.center = &canvas.Circle{FillColor: color.RGBA{R: 0x01, G: 0x0B, B: 0x13, A: 0xFF}}
 	c.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 3}
-	c.highestObservedMarker = &canvas.Line{StrokeColor: color.RGBA{R: 216, G: 250, B: 8, A: 0xFF}, StrokeWidth: 6}
 
 	c.titleText = &canvas.Text{Text: c.cfg.Title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
 	c.titleText.TextStyle.Monospace = true
@@ -137,7 +129,6 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 				Color:     color.RGBA{0xE0, 0xE0, 0xE0, 0xFF},
 				Alignment: fyne.TextAlignCenter,
 			}
-			// lbl.TextStyle.Monospace = true
 			if n := len(txt); n > c.maxLabelChars {
 				c.maxLabelChars = n
 			}
@@ -200,20 +191,6 @@ func (c *Dial) SetValue(value float64) {
 	// Update needle position (no immediate refresh)
 	c.rotateNeedleNoRefresh(c.needle, value, c.needleOffset, c.needleLength)
 
-	// Highest observed marker with lazy reset; only refresh when it actually moves
-	markerMoved := false
-	if value > c.highestObserved {
-		c.highestObserved = value
-		c.lastHighestObserved = time.Now()
-		c.rotateNeedleNoRefresh(c.highestObservedMarker, value, c.radius-2, 6)
-		markerMoved = true
-	} else if time.Since(c.lastHighestObserved) > 10*time.Second {
-		c.highestObserved = value
-		c.lastHighestObserved = time.Now()
-		c.rotateNeedleNoRefresh(c.highestObservedMarker, value, c.radius-2, 6)
-		markerMoved = true
-	}
-
 	// Update text with minimal allocs; skip refresh if formatted output is unchanged
 	c.buf = c.buf[:0]
 	if c.fmtPrec >= 0 {
@@ -227,30 +204,26 @@ func (c *Dial) SetValue(value float64) {
 	}
 
 	canvas.Refresh(c.needle)
-	if markerMoved {
-		canvas.Refresh(c.highestObservedMarker)
-	}
 	if textChanged {
 		canvas.Refresh(c.displayText)
 	}
 }
 
-func (c *Dial) SetValue2(value float64) { c.SetValue(value) }
-
-func (c *Dial) CreateRenderer() fyne.WidgetRenderer { return &DialRenderer{Dial: c} }
+func (c *Dial) CreateRenderer() fyne.WidgetRenderer { return &DialRenderer{d: c} }
 
 type DialRenderer struct {
-	*Dial
+	d       *Dial
 	objects []fyne.CanvasObject
 }
 
-func (c *DialRenderer) Layout(space fyne.Size) {
+func (r *DialRenderer) Layout(space fyne.Size) {
+	c := r.d
 	if c.size == space {
 		return
 	}
 	c.size = space
 
-	c.diameter = fyne.Min(space.Width, space.Height)
+	c.diameter = min(space.Width, space.Height)
 	c.radius = c.diameter * common.OneHalf
 	c.middle = fyne.NewPos(space.Width*common.OneHalf, space.Height*common.OneHalf)
 	c.needleOffset = -c.radius * .15
@@ -329,18 +302,16 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 			c.applySinCos(p, c.pipSin[i], c.pipCos[i], radius87, eightRadius-1)
 		}
 	}
-
-	c.highestObservedMarker.StrokeWidth = max(2.0, midStroke)
-	c.rotateNeedleNoRefresh(c.highestObservedMarker, c.highestObserved, c.radius-2, 6)
 }
 
-func (c *DialRenderer) MinSize() fyne.Size { return c.minsize }
-func (c *DialRenderer) Refresh()           {}
-func (c *DialRenderer) Destroy()           {}
+func (r *DialRenderer) MinSize() fyne.Size { return r.d.minsize }
+func (r *DialRenderer) Refresh()           {}
+func (r *DialRenderer) Destroy()           {}
 
-func (c *DialRenderer) Objects() []fyne.CanvasObject {
-	if c.objects == nil {
-		objs := make([]fyne.CanvasObject, 0, len(c.pips)+len(c.pipLabels)+7)
+func (r *DialRenderer) Objects() []fyne.CanvasObject {
+	if r.objects == nil {
+		c := r.d
+		objs := make([]fyne.CanvasObject, 0, len(c.pips)+len(c.pipLabels)+6)
 		for _, v := range c.pips {
 			objs = append(objs, v)
 		}
@@ -350,8 +321,8 @@ func (c *DialRenderer) Objects() []fyne.CanvasObject {
 			}
 		}
 		objs = append(objs, c.face, c.titleText, c.center,
-			c.highestObservedMarker, c.needle, c.displayText)
-		c.objects = objs
+			c.needle, c.displayText)
+		r.objects = objs
 	}
-	return c.objects
+	return r.objects
 }

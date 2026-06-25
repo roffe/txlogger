@@ -130,10 +130,6 @@ func (s *HBar) SetValue(value float64) {
 	}
 }
 
-func (s *HBar) SetValue2(value float64) {
-	s.SetValue(value)
-}
-
 func (s *HBar) Value() float64 {
 	return s.value
 }

@@ -46,7 +46,10 @@ func (ic *Icon) SetText(text string) {
 }
 
 func (ic *Icon) CreateRenderer() fyne.WidgetRenderer {
-	return &IconRenderer{IC: ic}
+	return &IconRenderer{
+		IC:      ic,
+		objects: []fyne.CanvasObject{ic.cfg.Image, ic.text},
+	}
 }
 
 type IconRenderer struct {
@@ -72,8 +75,5 @@ func (ic *IconRenderer) Destroy() {
 }
 
 func (ic *IconRenderer) Objects() []fyne.CanvasObject {
-	if ic.objects == nil {
-		ic.objects = []fyne.CanvasObject{ic.IC.cfg.Image, ic.IC.text}
-	}
 	return ic.objects
 }

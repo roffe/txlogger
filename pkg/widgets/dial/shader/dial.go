@@ -205,7 +205,7 @@ func (c *DialRenderer) Layout(space fyne.Size) {
 	}
 	c.size = space
 
-	c.diameter = fyne.Min(space.Width, space.Height)
+	c.diameter = min(space.Width, space.Height)
 	c.radius = c.diameter * common.OneHalf
 	c.middle = fyne.NewPos(space.Width*common.OneHalf, space.Height*common.OneHalf)
 

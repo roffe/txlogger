@@ -710,7 +710,7 @@ func (r *mapViewerRenderer) Destroy() {
 */
 
 func calculateTextSize(widthFactor, heightFactor float32) float32 {
-	cellSize := fyne.Min(widthFactor, heightFactor)
+	cellSize := min(widthFactor, heightFactor)
 
 	// Scale text size relative to cell size, but with a more conservative ratio
 	// Reduced from 0.6 to 0.4 to prevent overflow

@@ -134,10 +134,6 @@ func (s *VBar) SetValue(value float64) {
 	}
 }
 
-func (s *VBar) SetValue2(value float64) {
-	s.SetValue(value)
-}
-
 func (s *VBar) Value() float64 {
 	return s.value
 }

@@ -67,7 +67,7 @@ type InnerWindow struct {
 	Persist       bool // Persist through layout changes
 	IgnoreSave    bool // Ignore saving to layout
 
-	//minBtn, maxBtn, closeBtn *borderButton
+	// minBtn, maxBtn, closeBtn *borderButton
 
 	title       string
 	bg          *canvas.Rectangle
@@ -225,12 +225,12 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 	if isLeading {
 		// Left side (darwin default or explicit left alignment)
 		buttons = container.NewHBox(close, min, max)
-		//bar = container.NewBorder(nil, nil, buttons, borderIcon, title)
+		// bar = container.NewBorder(nil, nil, buttons, borderIcon, title)
 		bar = container.NewBorder(nil, nil, buttons, borderIcon, container.New(layout.NewCustomPaddedLayout(topPad, 0, 0, 0), title))
 	} else {
 		// Right side (Windows/Linux default and explicit right alignment)
 		buttons = container.NewHBox(min, max, close)
-		//bar = container.NewBorder(nil, nil, borderIcon, buttons, title)
+		// bar = container.NewBorder(nil, nil, borderIcon, buttons, title)
 		bar = container.NewBorder(nil, nil, borderIcon, buttons, container.New(layout.NewCustomPaddedLayout(topPad, 0, 0, 0), title))
 	}
 
@@ -275,7 +275,8 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 		leftBottomCorner:  leftBottomCorner,
 		rightBottomCorner: rightBottomCorner,
 		borders:           borders,
-		contentBG:         contentBG}
+		contentBG:         contentBG,
+	}
 	r.Layout(w.Size())
 	return r
 }
@@ -420,7 +421,7 @@ func (i *innerWindowRenderer) MinSize() fyne.Size {
 		return fyne.NewSize(minimizedWidth, barHeight+pad)
 	}
 	contentMin := i.win.content.MinSize()
-	innerWidth := fyne.Max(i.bar.MinSize().Width, contentMin.Width)
+	innerWidth := max(i.bar.MinSize().Width, contentMin.Width)
 	return fyne.NewSize(innerWidth+pad*2, contentMin.Height+pad+barHeight)
 }
 
@@ -442,9 +443,11 @@ func (i *innerWindowRenderer) Refresh() {
 	i.ShadowingRenderer.RefreshShadow()
 }
 
-var _ desktop.Mouseable = (*draggableLabel)(nil)
-var _ fyne.Draggable = (*draggableLabel)(nil)
-var _ fyne.Focusable = (*draggableLabel)(nil)
+var (
+	_ desktop.Mouseable = (*draggableLabel)(nil)
+	_ fyne.Draggable    = (*draggableLabel)(nil)
+	_ fyne.Focusable    = (*draggableLabel)(nil)
+)
 
 type draggableLabel struct {
 	widget.Label
@@ -633,7 +636,7 @@ func (b *buttonTheme) Size(n fyne.ThemeSizeName) float32 {
 		//n = theme.SizeNameWindowButtonRadius
 		return 4
 	case theme.SizeNameInlineIcon:
-		//n = theme.SizeNameWindowButtonIcon
+		// n = theme.SizeNameWindowButtonIcon
 		return 20
 	}
 

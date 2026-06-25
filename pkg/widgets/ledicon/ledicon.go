@@ -25,7 +25,7 @@ func New(text string) *Widget {
 		ColorOff: color.RGBA{0x80, 0x80, 0x80, 0xFF},
 	}
 	w.ExtendBaseWidget(w)
-	w.ledicon = &canvas.Circle{FillColor: color.RGBA{0x80, 0x80, 0x80, 0xFF}}
+	w.ledicon = &canvas.Circle{FillColor: w.ColorOff}
 	w.label = widget.NewLabel(text)
 	return w
 }
@@ -52,7 +52,10 @@ func (w *Widget) SetState(state bool) {
 }
 
 func (w *Widget) CreateRenderer() fyne.WidgetRenderer {
-	return &iconRenderer{w: w}
+	return &iconRenderer{
+		w:       w,
+		objects: []fyne.CanvasObject{w.ledicon, w.label},
+	}
 }
 
 var _ fyne.WidgetRenderer = (*iconRenderer)(nil)
@@ -82,8 +85,5 @@ func (r *iconRenderer) Destroy() {
 }
 
 func (r *iconRenderer) Objects() []fyne.CanvasObject {
-	if r.objects == nil {
-		r.objects = []fyne.CanvasObject{r.w.ledicon, r.w.label}
-	}
 	return r.objects
 }

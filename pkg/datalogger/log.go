@@ -54,7 +54,3 @@ func createLog(path, prefix, extension string) (*os.File, string, error) {
 	}
 	return file, fullFilename, nil
 }
-
-func replaceDot(s string) string {
-	return strings.Replace(s, ".", ",", 1)
-}

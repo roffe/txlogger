@@ -193,10 +193,6 @@ func (s *CBar) updateDisplayTextPosition() {
 	s.displayText.Move(fyne.Position{X: x, Y: s.displayY})
 }
 
-func (s *CBar) SetValue2(value float64) {
-	s.SetValue(value)
-}
-
 func (s *CBar) CreateRenderer() fyne.WidgetRenderer {
 	// Initialize visual elements
 	s.initializeVisualElements()

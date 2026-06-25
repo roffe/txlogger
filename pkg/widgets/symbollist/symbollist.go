@@ -386,7 +386,10 @@ func (sw *SymbolWidgetEntry) SetCorrectionFactor(f float64) {
 */
 
 func (sw *SymbolWidgetEntry) CreateRenderer() fyne.WidgetRenderer {
-	return &symbolWidgetEntryRenderer{e: sw}
+	return &symbolWidgetEntryRenderer{
+		e:       sw,
+		objects: []fyne.CanvasObject{sw.container},
+	}
 	// return widget.NewSimpleRenderer(sw.container)
 }
 
@@ -416,13 +419,9 @@ func (s *symbolWidgetEntryRenderer) Refresh() {
 	col.A = barAlpha
 	s.e.valueBar.FillColor = col
 	s.e.valueBar.StrokeColor = col
-	// cascades to the labels, delete button and value bar
 	s.e.container.Refresh()
 }
 
 func (s *symbolWidgetEntryRenderer) Objects() []fyne.CanvasObject {
-	if s.objects == nil {
-		s.objects = []fyne.CanvasObject{s.e.container}
-	}
 	return s.objects
 }

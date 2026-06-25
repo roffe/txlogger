@@ -7,11 +7,12 @@ import (
 	"time"
 
 	"github.com/roffe/gocan"
+	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
 func (t *Client) EraseECU(ctx context.Context) error {
 	data := make([]byte, 8)
-	eraseMsg := []byte{0x40, 0xA1, 0x02, 0x31, 0x52, 0x00, 0x00, 0x00}
+	eraseMsg := []byte{0x40, 0xA1, 0x02, kwp2000.START_ROUTINE_BY_IDENTIFIER, kwp2000.RLI_EOL_START, 0x00, 0x00, 0x00}
 	confirmMsg := []byte{0x40, 0xA1, 0x01, 0x3E, 0x00, 0x00, 0x00, 0x00}
 
 	t.cfg.OnProgress(-float64(17))
@@ -41,7 +42,7 @@ func (t *Client) EraseECU(ctx context.Context) error {
 	// Start erase routine
 	data[3] = 0
 	i = 0
-	eraseMsg[4] = 0x53
+	eraseMsg[4] = kwp2000.RLI_ERASE
 	for data[3] != 0x71 && i < 200 {
 		f, err := t.c.SendAndWait(ctx, gocan.NewFrame(0x240, eraseMsg, gocan.ResponseRequired), t.defaultTimeout, 0x258)
 		if err != nil {

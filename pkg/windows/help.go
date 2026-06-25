@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/assets"
+	"github.com/roffe/txlogger/pkg/widgets/tappabletext"
 )
 
 func Help() *container.AppTabs {
@@ -117,7 +118,7 @@ func Help() *container.AppTabs {
 	return tabs
 }
 
-func About() *fyne.Container {
+func (mw *MainWindow) about() *fyne.Container {
 	kvaserLogo := canvas.NewImageFromResource(fyne.NewStaticResource("kvaser_logo.png", assets.KvaserLogoBytes))
 	kvaserLogo.SetMinSize(fyne.NewSize(190, 117))
 	kvaserLogo.FillMode = canvas.ImageFillContain
@@ -149,6 +150,12 @@ func About() *fyne.Container {
 	thnx := widget.NewLabel("Special thanks to")
 	thnx.TextStyle.Bold = true
 
+	versionString := tappabletext.New("Version: "+fyne.CurrentApp().Metadata().Version+" Build: "+strconv.Itoa(fyne.CurrentApp().Metadata().Build), 10, func() {
+		mw.app.Preferences().SetBool("enable_preview_features1337", true)
+		mw.previewFeatures = true
+		mw.SetMainMenu(mw.GetMenu(mw.selects.ecuSelect.Selected))
+	})
+
 	return container.NewBorder(
 		nil,
 		nil,
@@ -160,7 +167,7 @@ func About() *fyne.Container {
 				nil,
 				container.NewVBox(
 					widget.NewHyperlink("txlogger.com", tx),
-					widget.NewLabel("Version: "+fyne.CurrentApp().Metadata().Version+" Build: "+strconv.Itoa(fyne.CurrentApp().Metadata().Build)),
+					versionString,
 					widget.NewLabel("Author: Joakim \"Roffe\" Karlsson"),
 				),
 			),

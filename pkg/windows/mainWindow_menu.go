@@ -100,7 +100,7 @@ func (mw *MainWindow) setupMenu() {
 					mw.wm.Raise(w)
 					return
 				}
-				inner := multiwindow.NewInnerWindow("About", About())
+				inner := multiwindow.NewInnerWindow("About", mw.about())
 				inner.Icon = theme.HelpIcon()
 				mw.wm.Add(inner)
 			}),

@@ -2,7 +2,6 @@ package msglist
 
 import (
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/widget"
 )
@@ -12,73 +11,50 @@ var _ fyne.Widget = (*MsgList)(nil)
 type MsgList struct {
 	widget.BaseWidget
 	msgs     binding.StringList
-	output   *widget.List
+	list     *widget.List
 	listener binding.DataListener
 }
 
 func New(data binding.StringList) *MsgList {
-	m := &MsgList{
-		msgs: data,
-	}
+	m := &MsgList{msgs: data}
 	m.ExtendBaseWidget(m)
 
-	m.output = widget.NewListWithData(
-		m.msgs,
+	m.list = widget.NewListWithData(
+		data,
 		func() fyne.CanvasObject {
-			w := widget.NewLabel("")
-			w.Alignment = fyne.TextAlignLeading
-			w.Selectable = true
-			return w
+			l := widget.NewLabel("")
+			l.Selectable = true
+			return l
 		},
 		func(item binding.DataItem, obj fyne.CanvasObject) {
-			i := item.(binding.String)
-			txt, err := i.Get()
+			txt, err := item.(binding.String).Get()
 			if err != nil {
-				fyne.LogError("Failed to get string", err)
+				fyne.LogError("msglist: get string", err)
 				return
 			}
 			obj.(*widget.Label).SetText(txt)
 		},
 	)
 
-	m.listener = binding.NewDataListener(func() {
-		m.output.ScrollToBottom()
-	})
+	m.listener = binding.NewDataListener(m.list.ScrollToBottom)
 
 	return m
 }
 
 func (m *MsgList) CreateRenderer() fyne.WidgetRenderer {
 	m.msgs.AddListener(m.listener)
-	return &msgListRenderer{
-		m:         m,
-		container: container.NewScroll(m.output),
-	}
+	return &msgListRenderer{m: m, objects: []fyne.CanvasObject{m.list}}
 }
 
 var _ fyne.WidgetRenderer = (*msgListRenderer)(nil)
 
 type msgListRenderer struct {
-	m         *MsgList
-	container *container.Scroll
+	m       *MsgList
+	objects []fyne.CanvasObject
 }
 
-func (r *msgListRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(300, 100)
-}
-
-func (r *msgListRenderer) Layout(size fyne.Size) {
-	r.container.Resize(size)
-}
-
-func (r *msgListRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.container}
-}
-
-func (r *msgListRenderer) Refresh() {
-
-}
-
-func (r *msgListRenderer) Destroy() {
-	r.m.msgs.RemoveListener(r.m.listener)
-}
+func (r *msgListRenderer) MinSize() fyne.Size           { return fyne.NewSize(300, 200) }
+func (r *msgListRenderer) Layout(size fyne.Size)        { r.m.list.Resize(size) }
+func (r *msgListRenderer) Objects() []fyne.CanvasObject { return r.objects }
+func (r *msgListRenderer) Refresh()                     { r.m.list.Refresh() }
+func (r *msgListRenderer) Destroy()                     { r.m.msgs.RemoveListener(r.m.listener) }

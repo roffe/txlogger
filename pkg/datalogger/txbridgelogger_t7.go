@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
@@ -25,10 +26,10 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 
 	c.OnMessage("Watching for broadcast messages")
 	<-time.After(1550 * time.Millisecond)
-	found := c.sysvars.Keys()
-	c.OnMessage(fmt.Sprintf("Found %s", found))
-
-	if len(found) == 0 {
+	if found := c.sysvars.Keys(); len(found) > 0 {
+		c.OnMessage(fmt.Sprintf("Found: %s", strings.Join(found, ", ")))
+	} else {
+		c.OnMessage("No broadcast messages found, stopping broadcast listener")
 		bcancel()
 	}
 

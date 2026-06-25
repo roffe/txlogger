@@ -260,7 +260,7 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 		case resizeUp:
 			actualDY := ev.Dragged.DY
 			if actualDY > 0 {
-				actualDY = fyne.Min(actualDY, currentSize.Height-minSize.Height)
+				actualDY = min(actualDY, currentSize.Height-minSize.Height)
 			} else if w.Position().Y+actualDY < 0 {
 				actualDY = -w.Position().Y
 			}
@@ -272,7 +272,7 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 			actualDX := ev.Dragged.DX
 			if actualDX > 0 {
 				// When shrinking (dragging right), limit by remaining width
-				actualDX = fyne.Min(actualDX, currentSize.Width-minSize.Width)
+				actualDX = min(actualDX, currentSize.Width-minSize.Width)
 			} else if w.Position().X+actualDX < 0 {
 				// Prevent dragging past left edge
 				actualDX = -w.Position().X
@@ -284,14 +284,14 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 		case resizeUpLeft:
 			actualDY := ev.Dragged.DY
 			if actualDY > 0 {
-				actualDY = fyne.Min(actualDY, currentSize.Height-minSize.Height)
+				actualDY = min(actualDY, currentSize.Height-minSize.Height)
 			} else if w.Position().Y+actualDY < 0 {
 				actualDY = -w.Position().Y
 			}
 			actualDX := ev.Dragged.DX
 			if actualDX > 0 {
 				// When shrinking (dragging right), limit by remaining width
-				actualDX = fyne.Min(actualDX, currentSize.Width-minSize.Width)
+				actualDX = min(actualDX, currentSize.Width-minSize.Width)
 			} else if w.Position().X+actualDX < 0 {
 				// Prevent dragging past left edge
 				actualDX = -w.Position().X
@@ -301,7 +301,7 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 		case resizeUpRight:
 			actualDY := ev.Dragged.DY
 			if actualDY > 0 {
-				actualDY = fyne.Min(actualDY, currentSize.Height-minSize.Height)
+				actualDY = min(actualDY, currentSize.Height-minSize.Height)
 			} else if w.Position().Y+actualDY < 0 {
 				actualDY = -w.Position().Y
 			}
@@ -311,7 +311,7 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 			actualDX := ev.Dragged.DX
 			if actualDX > 0 {
 				// When shrinking (dragging right), limit by remaining width
-				actualDX = fyne.Min(actualDX, currentSize.Width-minSize.Width)
+				actualDX = min(actualDX, currentSize.Width-minSize.Width)
 			} else if w.Position().X+actualDX < 0 {
 				// Prevent dragging past left edge
 				actualDX = -w.Position().X
@@ -328,8 +328,8 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 			pos := w.Position()
 			maxWidth := contentSize.Width - pos.X
 			maxHeight := contentSize.Height - pos.Y
-			newSize.Width = fyne.Min(newSize.Width, maxWidth)
-			newSize.Height = fyne.Min(newSize.Height, maxHeight)
+			newSize.Width = min(newSize.Width, maxWidth)
+			newSize.Height = min(newSize.Height, maxHeight)
 		}
 
 		w.Resize(newSize.Max(minSize))

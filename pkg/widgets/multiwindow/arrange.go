@@ -71,7 +71,7 @@ func (f *FloatingArranger) Layout(maxSize fyne.Size, confined bool, windows []*I
 		return
 	}
 
-	maxSteps := int(fyne.Min(
+	maxSteps := int(min(
 		(maxSize.Width-initOffset)/20,
 		(maxSize.Height-initOffset)/20,
 	))
@@ -90,14 +90,14 @@ func (f *FloatingArranger) Layout(maxSize fyne.Size, confined bool, windows []*I
 			// Clamp positions to keep windows within bounds
 			maxX := maxSize.Width - window.MinSize().Width
 			maxY := maxSize.Height - window.MinSize().Height
-			posX = fyne.Min(posX, maxX)
-			posY = fyne.Min(posY, maxY)
+			posX = min(posX, maxX)
+			posY = min(posY, maxY)
 		}
 
 		pos := fyne.NewPos(posX, posY)
 		size := fyne.NewSize(
-			fyne.Max(maxSize.Width/2, window.MinSize().Width),
-			fyne.Max(maxSize.Height/2, window.MinSize().Height),
+			max(maxSize.Width/2, window.MinSize().Width),
+			max(maxSize.Height/2, window.MinSize().Height),
 		)
 
 		f.setWindowState(window, pos, size, false)
@@ -177,7 +177,7 @@ func (p *PackArranger) expandWindows(spaces []windowSpace, maxSize fyne.Size) {
 			if node.pos.Y < otherNode.pos.Y+otherNode.size.Height &&
 				node.pos.Y+node.size.Height > otherNode.pos.Y {
 				if otherNode.pos.X > node.pos.X {
-					maxWidth = fyne.Min(maxWidth, otherNode.pos.X-node.pos.X-padding)
+					maxWidth = min(maxWidth, otherNode.pos.X-node.pos.X-padding)
 				}
 			}
 
@@ -185,14 +185,14 @@ func (p *PackArranger) expandWindows(spaces []windowSpace, maxSize fyne.Size) {
 			if node.pos.X < otherNode.pos.X+otherNode.size.Width &&
 				node.pos.X+node.size.Width > otherNode.pos.X {
 				if otherNode.pos.Y > node.pos.Y {
-					maxHeight = fyne.Min(maxHeight, otherNode.pos.Y-node.pos.Y-padding)
+					maxHeight = min(maxHeight, otherNode.pos.Y-node.pos.Y-padding)
 				}
 			}
 		}
 
 		// Ensure we don't exceed the container bounds
-		maxWidth = fyne.Min(maxWidth, maxSize.Width-node.pos.X-padding)
-		maxHeight = fyne.Min(maxHeight, maxSize.Height-node.pos.Y-padding)
+		maxWidth = min(maxWidth, maxSize.Width-node.pos.X-padding)
+		maxHeight = min(maxHeight, maxSize.Height-node.pos.Y-padding)
 
 		// Calculate expanded size while maintaining aspect ratio
 		minSize := window.MinSize()
@@ -302,8 +302,8 @@ func (p *PreservingArranger) Layout(maxSize fyne.Size, confined bool, windows []
 			// Ensure window stays within bounds
 			maxWidth := maxSize.Width - r.pos.X
 			maxHeight := maxSize.Height - r.pos.Y
-			newSize.Width = fyne.Min(newSize.Width, maxWidth)
-			newSize.Height = fyne.Min(newSize.Height, maxHeight)
+			newSize.Width = min(newSize.Width, maxWidth)
+			newSize.Height = min(newSize.Height, maxHeight)
 		}
 		p.setWindowState(r.window, r.pos, newSize, false)
 	}

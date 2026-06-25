@@ -525,7 +525,7 @@ func (db *Dashboard) layoutIcons(dims *dims) {
 	})
 
 	// Taz icon
-	tazMin := fyne.Min(dims.sixthWidth, dims.thirdHeight)
+	tazMin := min(dims.sixthWidth, dims.thirdHeight)
 	tazSize := fyne.Size{Width: tazMin, Height: tazMin + 16}
 
 	db.image.taz.Resize(tazSize)
@@ -672,10 +672,6 @@ func (dr *DashboardRenderer) Destroy() {
 }
 
 func (dr *DashboardRenderer) Objects() []fyne.CanvasObject {
-	// The object set is fixed for the lifetime of the renderer, so build it
-	// once and reuse it. Fyne calls Objects() on every render/refresh pass,
-	// and during live logging this would otherwise allocate a new slice each
-	// time, creating needless GC pressure.
 	if dr.objects == nil {
 		dr.objects = []fyne.CanvasObject{
 			dr.db.image.wheelLeft,

@@ -16,9 +16,9 @@ require (
 	github.com/lusingander/colorpicker v0.7.5
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pion/mdns/v2 v2.1.0
-	github.com/roffe/ecusymbol v1.2.3
-	github.com/roffe/gocan v1.4.1
-	go.bug.st/serial v1.6.4
+	github.com/roffe/ecusymbol v1.2.4
+	github.com/roffe/gocan v1.4.2
+	go.bug.st/serial v1.7.1
 	golang.org/x/image v0.40.0
 	golang.org/x/mod v0.36.0
 	golang.org/x/net v0.54.0
@@ -32,7 +32,7 @@ require (
 	github.com/ebitengine/oto/v3 v3.4.0
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/hajimehoshi/go-mp3 v0.3.4
-	golang.org/x/sys v0.44.0
+	golang.org/x/sys v0.46.0
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.78
 )
 
@@ -40,10 +40,8 @@ require (
 	fyne.io/systray v1.12.2 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/FyshOS/fancyfs v0.0.1 // indirect
-	github.com/albenik/bcd v0.0.0-20170831201648-635201416bc7 // indirect
 	github.com/anthonynsimon/bild v0.13.0 // indirect
 	github.com/bendikro/dl v0.0.0-20190410215913-e41fdb9069d4 // indirect
-	github.com/creack/goselect v0.1.3 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/ebitengine/purego v0.9.1 // indirect
 	github.com/fatih/color v1.19.0 // indirect

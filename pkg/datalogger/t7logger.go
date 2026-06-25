@@ -25,7 +25,7 @@ func NewT7(cfg Config, lw LogWriter) (IClient, error) {
 }
 
 func t7broadcastListener(ctx context.Context, cl *gocan.Client, sysvars *ThreadSafeMap) {
-	broadcast := cl.Subscribe(ctx, 0x1A0, 0x280, 0x3A0)
+	broadcast := cl.Subscribe(ctx, 0x1A0, 0x280, 0x3A0 /*, 0x5C0*/)
 	defer broadcast.Close()
 	var speed uint16
 	var rpm uint16
@@ -50,7 +50,6 @@ func t7broadcastListener(ctx context.Context, cl *gocan.Client, sysvars *ThreadS
 				limp = msg.Data[3] & 0x01
 				cel = msg.Data[4] & 0x80 >> 7
 				cruise = msg.Data[4] & 0x20 >> 5
-
 				gear = msg.Data[1]
 				sysvars.Set("Out.X_ActualGear", float64(gear))
 				brakeLight = msg.Data[2] & 0x02 >> 1
@@ -61,11 +60,16 @@ func t7broadcastListener(ctx context.Context, cl *gocan.Client, sysvars *ThreadS
 				ebus.Publish("LIMP", float64(limp))
 				ebus.Publish("CRUISE", float64(cruise))
 				ebus.Publish("CEL", float64(cel))
-
 			case 0x3A0:
 				speed = uint16(msg.Data[4]) | uint16(msg.Data[3])<<8
 				realSpeed = float64(speed) * 0.1
 				sysvars.Set("In.v_Vehicle", realSpeed)
+			case 0x5C0:
+				// 0x5C0 COTE_ECS: Data[1]=coolant. byte=(u8)(V+40),
+				coolant := float64(msg.Data[1]) - 40
+				sysvars.Set("ActualIn.T_Engine", coolant)
+				// log.Printf("0x5C0: % X valid=%t coolant=%v", msg.Data, msg.Data[0]&0x10 != 0, coolant)
+
 			}
 		}
 	}
@@ -109,7 +113,7 @@ func (c *T7Client) Start() error {
 		c.OnMessage("Watching for broadcast messages")
 		<-time.After(1550 * time.Millisecond)
 		if found := c.sysvars.Keys(); len(found) > 0 {
-			c.OnMessage(fmt.Sprintf("Found %s", found))
+			c.OnMessage(fmt.Sprintf("Found: %s", strings.Join(found, ", ")))
 		} else {
 			c.OnMessage("No broadcast messages found, stopping broadcast listener")
 			bcancel()
@@ -354,7 +358,7 @@ func (c *T7Client) Start() error {
 
 func initT7logging(ctx context.Context, kwp *kwp2000.Client, symbols []*symbol.Symbol, onMessage func(string)) error {
 	if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
-		return errors.New("failed to start session")
+		return fmt.Errorf("failed to start session: %w", err)
 	}
 	onMessage("Connected to ECU")
 

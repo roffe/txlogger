@@ -48,9 +48,9 @@ func ExportRecords(dir, prefix, ext string, records []logfile.Record) (string, e
 	for i, name := range cols {
 		i := i
 		channels[i] = Channel{
-			Name:   name,
-			read:   func() float64 { return values[i] },
-			format: sysvarFormat(name),
+			Name:      name,
+			read:      func() float64 { return values[i] },
+			appendFmt: sysvarFormat(name),
 		}
 	}
 

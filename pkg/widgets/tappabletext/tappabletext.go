@@ -1,12 +1,10 @@
-package secrettext
+package tappabletext
 
 import (
 	"bytes"
-	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 	"github.com/hajimehoshi/go-mp3"
 	"github.com/roffe/txlogger/pkg/assets"
@@ -19,32 +17,26 @@ var _ fyne.Tappable = (*SecretText)(nil)
 type SecretText struct {
 	*widget.Label
 	tappedTimes int
-	SecretFunc  func()
-	initOnce    sync.Once
+	Taps        int
+	Func        func()
 }
 
-func New(text string) *SecretText {
+func New(text string, taps int, fn func()) *SecretText {
 	label := widget.NewLabel(text)
 	return &SecretText{
 		Label: label,
+		Taps:  taps,
+		Func:  fn,
 	}
 }
 
 func (s *SecretText) Tapped(*fyne.PointEvent) {
 	s.tappedTimes++
 	//	log.Println("tapped", s.tappedTimes)
-	if s.tappedTimes >= 10 {
-
-		/*
-			t := fyne.NewStaticResource("taz.png", assets.Taz)
-			cv := canvas.NewImageFromResource(t)
-			cv.ScaleMode = canvas.ImageScaleFastest
-			cv.SetMinSize(fyne.NewSize(0, 0))
-		*/
+	if s.tappedTimes >= s.Taps {
+		s.tappedTimes = 0
 
 		fileBytesReader := bytes.NewReader(assets.Korvring)
-
-		// Decode file
 		decodedMp3, err := mp3.NewDecoder(fileBytesReader)
 		if err != nil {
 			panic("mp3.NewDecoder failed: " + err.Error())
@@ -54,8 +46,7 @@ func (s *SecretText) Tapped(*fyne.PointEvent) {
 
 		player.Play()
 
-		s.tappedTimes = 0
-		if f := s.SecretFunc; f != nil {
+		if f := s.Func; f != nil {
 			f()
 		}
 
@@ -82,16 +73,9 @@ func (s *SecretText) Tapped(*fyne.PointEvent) {
 			player.Pause()
 		})
 		d.Show()
-		/*
-			an := canvas.NewSizeAnimation(fyne.NewSize(0, 0), fyne.NewSize(370, 386), time.Second, func(size fyne.Size) {
-				cv.Resize(size)
-			})
-
-			an.Start()
-		*/
 	}
 }
 
-func (s *SecretText) Cursor() desktop.Cursor {
-	return desktop.CrosshairCursor
-}
+//func (s *SecretText) Cursor() desktop.Cursor {
+//	return desktop.CrosshairCursor
+//}

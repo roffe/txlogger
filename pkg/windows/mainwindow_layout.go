@@ -58,12 +58,13 @@ func (mw *MainWindow) SaveLayout() error {
 
 	return nil
 }
+
 func writeLayout(name string, data []byte) error {
 	layoutPath, err := common.GetLayoutPath()
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(layoutPath, name+".json"), data, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(layoutPath, name+".json"), data, 0o644); err != nil {
 		return err
 	}
 	return nil
@@ -117,7 +118,6 @@ func (mw *MainWindow) jsonLayout() ([]byte, error) {
 		Preset:  mw.selects.presetSelect.Selected,
 		Windows: history,
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func (mw *MainWindow) LoadLayout(name string) error {
 	mw.wm.CloseAll()
 
 	if mw.dlc == nil {
-		//mw.selects.ecuSelect.SetSelected(layout.ECU)
+		// mw.selects.ecuSelect.SetSelected(layout.ECU)
 		mw.selects.ecuSelect.Selected = layout.ECU
 		mw.selects.presetSelect.SetSelected(layout.Preset)
 	}
@@ -163,16 +163,14 @@ func (mw *MainWindow) LoadLayout(name string) error {
 		}
 
 		if h.GaugeConfig != nil {
-			gauge, cancelFuncs, err := gauge.New(h.GaugeConfig)
+			gauge, cancelFn, err := gauge.New(h.GaugeConfig)
 			if err != nil {
 				mw.Error(fmt.Errorf("failed to create gauge: %w", err))
 				continue
 			}
 			iw := multiwindow.NewInnerWindow(h.Title, gauge)
 			iw.OnClose = func() {
-				for _, cancel := range cancelFuncs {
-					cancel()
-				}
+				cancelFn()
 			}
 			mw.wm.Add(iw)
 			continue

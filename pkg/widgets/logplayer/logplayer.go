@@ -261,6 +261,7 @@ func (l *Logplayer) render() {
 	l.objs.selectionLabel = widget.NewLabel("")
 	l.updateSelectionLabel()
 
+	n := l.logFile.Len()
 	values := make(map[string][]float64)
 	for {
 		if rec := l.logFile.Next(); !rec.EOF {
@@ -268,7 +269,11 @@ func (l *Logplayer) render() {
 				if k == "Pgm_status" {
 					continue
 				}
-				values[k] = append(values[k], v)
+				s, ok := values[k]
+				if !ok {
+					s = make([]float64, 0, n) // ponytail: cap once, kills append regrowth churn
+				}
+				values[k] = append(s, v)
 			}
 		} else {
 			break
@@ -492,12 +497,40 @@ func (l *Logplayer) exportSelection() {
 	l.cfg.OnExport(records)
 }
 
+// frameTarget returns the wall-clock instant a record should play at, given an
+// anchor (anchorWall pinned to anchorRec) and a speed multiplier where larger
+// means slower (1 = real time). Because the target is computed from the record's
+// own timestamp relative to the fixed anchor, scheduling jitter on earlier
+// frames does not shift it — error stays bounded instead of accumulating.
+func frameTarget(anchorWall, anchorRec, recTime time.Time, speed float64) time.Time {
+	return anchorWall.Add(time.Duration(float64(recTime.Sub(anchorRec)) * speed))
+}
+
 func (l *Logplayer) playLog() {
 	speedMultiplier := 1.0
 	timer := time.NewTimer(0)
 	defer timer.Stop()
 
-	var nextDelay time.Duration
+	// Absolute scheduling: anchorWall maps to anchorRec (the wall-clock instant
+	// the current record's timeline position was pinned). Every frame is
+	// scheduled against its record's true timestamp relative to this anchor, so
+	// per-frame scheduling jitter cannot accumulate into drift — a late frame
+	// fires immediately and re-syncs instead of pushing the whole timeline back.
+	var anchorWall, anchorRec time.Time
+
+	// reanchor pins the timeline to the current record at the current instant.
+	// Called whenever playback (re)starts or jumps: play, seek, step, speed change.
+	reanchor := func() {
+		anchorWall = time.Now()
+		anchorRec = l.logFile.Get().Time
+	}
+
+	// schedule arms the timer for the next record using its real timestamp.
+	// time.Until goes negative when we're behind, firing immediately to catch up.
+	schedule := func() {
+		next := l.logFile.RecordAt(l.logFile.Pos() + 1)
+		timer.Reset(time.Until(frameTarget(anchorWall, anchorRec, next.Time, speedMultiplier)))
+	}
 
 	timeSetter := func(t time.Time) {
 		timeText := t.Format("15:04:05.00")
@@ -515,6 +548,10 @@ func (l *Logplayer) playLog() {
 			switch op.Op {
 			case OpPlaybackSpeed:
 				speedMultiplier = op.Rate
+				if l.state == statePlaying {
+					reanchor()
+					schedule()
+				}
 			case OpSeek:
 				l.logFile.Seek(op.Pos)
 				if rec := l.logFile.Get(); !rec.EOF {
@@ -524,7 +561,8 @@ func (l *Logplayer) playLog() {
 						f(rec.Time)
 					}
 					if l.state == statePlaying {
-						timer.Reset(0)
+						reanchor()
+						schedule()
 					} else {
 						for k, v := range rec.Values {
 							l.cfg.EBus.Publish(k, v)
@@ -545,7 +583,8 @@ func (l *Logplayer) playLog() {
 					})
 
 					if l.state == statePlaying {
-						timer.Reset(0)
+						reanchor()
+						schedule()
 					} else {
 						for k, v := range rec.Values {
 							l.cfg.EBus.Publish(k, v)
@@ -565,7 +604,8 @@ func (l *Logplayer) playLog() {
 					l.objs.positionSlider.Value = float64(pos)
 					timeSetter(rec.Time)
 					if l.state == statePlaying {
-						timer.Reset(0)
+						reanchor()
+						schedule()
 					} else {
 						for k, v := range rec.Values {
 							l.cfg.EBus.Publish(k, v)
@@ -579,7 +619,8 @@ func (l *Logplayer) playLog() {
 				}
 			case OpPlay:
 				l.state = statePlaying
-				timer.Reset(0) // Start playback immediately
+				reanchor()
+				schedule()
 			case OpPause:
 				l.state = statePaused
 				timer.Stop()
@@ -591,8 +632,7 @@ func (l *Logplayer) playLog() {
 			}
 			if rec := l.logFile.Next(); !rec.EOF {
 				currentPos := l.logFile.Pos()
-				nextDelay = time.Duration(float64(rec.DelayTillNext)*speedMultiplier) * time.Millisecond
-				timer.Reset(nextDelay)
+				schedule()
 
 				l.objs.positionSlider.Value = float64(currentPos)
 				timeText := rec.Time.Format("15:04:05.00")

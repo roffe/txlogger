@@ -35,7 +35,6 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/ledicon"
 	"github.com/roffe/txlogger/pkg/widgets/logplayer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
-	"github.com/roffe/txlogger/pkg/widgets/secrettext"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -80,7 +79,7 @@ type MainWindow struct {
 	gwclient        proto.GocanClient
 	buttonsDisabled bool
 	settings        *settings.Widget
-	statusText      *secrettext.SecretText
+	statusText      *widget.Label
 	wm              *multiwindow.MultipleWindows
 	content         *fyne.Container
 	startup         bool
@@ -136,12 +135,8 @@ func NewMainWindow(app fyne.App) *MainWindow {
 
 		gocanGatewayLED: ledicon.New("Gateway"),
 		canLED:          ledicon.New("CAN"),
-		statusText:      secrettext.New("Harder, Better, Faster, Stronger"),
-		previewFeatures: app.Preferences().BoolWithFallback("enable_preview_features", false),
-	}
-
-	mw.statusText.SecretFunc = func() {
-		mw.app.Preferences().SetBool("enable_preview_features", true)
+		statusText:      widget.NewLabel("Harder, Better, Faster, Stronger"),
+		previewFeatures: app.Preferences().BoolWithFallback("enable_preview_features1337", false),
 	}
 
 	ebus.SubscribeFunc(ebus.TOPIC_COLORBLINDMODE, func(v float64) {
