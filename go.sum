@@ -136,6 +136,8 @@ github.com/roffe/ecusymbol v1.2.4 h1:5MGAs7e6djTAaa4y8bpByATMXjgq7/khLJqff3t3Zx0
 github.com/roffe/ecusymbol v1.2.4/go.mod h1:exejs9+FhPTHhUe+ZKAezRIzjZWFyvrANzF6zZ8h7Y0=
 github.com/roffe/gocan v1.4.3 h1:G7DBUK2tAHDtqRR9KJ3OCJiWoi28gb/jPYtsAFUUa9k=
 github.com/roffe/gocan v1.4.3/go.mod h1:8TjfD7TGUNpAZSPwdtnYRI58ICd2NPAo/gTWZUsne+k=
+github.com/roffe/gocan v1.4.4 h1:8CxnuAzqUyOWqTOk/FZLf20J+DNFyHo9Iar9DdUm7uY=
+github.com/roffe/gocan v1.4.4/go.mod h1:8TjfD7TGUNpAZSPwdtnYRI58ICd2NPAo/gTWZUsne+k=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
