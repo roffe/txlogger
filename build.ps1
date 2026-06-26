@@ -3,8 +3,7 @@ param(
     [switch]$txlogger,
     [switch]$setup,
     [switch]$release,
-    [switch]$usegitsrc,
-    [switch]$gcc
+    [switch]$usegitsrc
 )
 
 if (-not ($cangateway -or $txlogger -or $setup -or $release)) {
@@ -22,12 +21,8 @@ if ($release) {
 
 $env:CGO_ENABLED = "1"
 $env:GOGC = "100"
-# Default: llvm-mingw clang (much faster, multi-target so one compiler handles 386 + amd64).
-# -gcc: GCC-based mingw-w64 (slower, but avoids AV false positives; needs separate per-arch compilers, set below).
-if (-not $gcc) {
-    $env:CC = "x86_64-w64-mingw32-clang.exe"
-    $env:CXX = "x86_64-w64-mingw32-clang++.exe"
-}
+$env:CC = "x86_64-w64-mingw32-clang.exe"
+$env:CXX = "x86_64-w64-mingw32-clang++.exe"
 
 $current_path = Get-Location
 
@@ -44,22 +39,20 @@ if ($cangateway) {
     # $env:CGO_CFLAGS = ($includes | ForEach-Object { '-I' + $_ }) -join ' '
     # $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
     $env:GOARCH = "386"
-    if ($gcc) {
-        $env:CC = "i686-w64-mingw32-gcc.exe"
-        $env:CXX = "i686-w64-mingw32-g++.exe"
-    }
     if ($usegitsrc) {
         # git clone https://github.com/roffe/gocangateway.git
         # Set-Location -Path ".\gocangateway"
         # go build -tags="canlib,j2534" -ldflags '-s -w -H=windowsgui' -o cangateway.exe .
         # Move-Item -Path ".\cangateway.exe" -Destination "$current_path\cangateway.exe" -Force
         # Set-Location -Path $current_path
-        go install -tags="j2534" -ldflags '-s -w -H=windowsgui' github.com/roffe/gocangateway@latest
+        # console subsystem (no -H=windowsgui): GUI-subsystem console-less exes trip AV heuristics.
+        # txlogger spawns it with CREATE_NO_WINDOW so no console window shows. See pkg/cangw.
+        go install -tags="j2534" -ldflags '-s -w' github.com/roffe/gocangateway@latest
         Move-Item -Path "$Env:USERPROFILE\go\bin\windows_386\gocangateway.exe" -Destination "$current_path\cangateway.exe" -Force
     }
     else {
         #Set-Location -Path "..\gocangateway"
-        go build -tags="j2534" -ldflags '-s -w -H=windowsgui' -o cangateway.exe ..\gocangateway
+        go build -tags="j2534" -ldflags '-s -w' -o cangateway.exe ..\gocangateway
         #Move-Item -Path ".\cangateway.exe" -Destination "$current_path\cangateway.exe" -Force
         #Set-Location -Path $current_path
     } 
@@ -90,10 +83,6 @@ if ($txlogger) {
     $env:CGO_CFLAGS = ($includes | ForEach-Object { '-I' + $_ }) -join ' '
     # $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
     $env:GOARCH = "amd64"
-    if ($gcc) {
-        $env:CC = "x86_64-w64-mingw32-gcc.exe"
-        $env:CXX = "x86_64-w64-mingw32-g++.exe"
-    }
     fyne package -tags="canlib,canusb,combi,ftdi,j2534,pcan,rcan" --release
 }
 

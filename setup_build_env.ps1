@@ -1,7 +1,3 @@
-param(
-    [switch]$gcc
-)
-
 $temp_dir = ".\setup_temp"
 $canusb = "https://www.canusb.com/files/canusb_dll_driver.zip"
 $canlib = "https://pim.kvaser.com/var/assets/Product_Resources/7330130980150/5.51.461/canlib_5_51_461.exe"
@@ -31,23 +27,15 @@ Invoke-WebRequest -Uri $canlib -OutFile "$temp_dir\canlib.exe"
 Write-Output "Extracting CANUSB"
 Expand-Archive -Path "$temp_dir\canusb_dll_driver.zip" -DestinationPath ".\canusb" -Force
 
-if ($gcc) {
-    # GCC-based mingw-w64 (32-bit for cangateway, 64-bit for txlogger).
-    # Slower than llvm but avoids AV false positives; used by the CI workflows.
-    Write-Output "Installing mingw-w64 GCC toolchains"
-    C:\msys64\usr\bin\pacman.exe -S --noconfirm --needed mingw-w64-i686-gcc mingw-w64-x86_64-gcc
-}
-else {
-    # llvm-mingw clang: default for local dev, builds an order of magnitude faster
-    Write-Output "Downloading llvm-MinGW"
-    Invoke-WebRequest -Uri $llvm -OutFile "$temp_dir\llvm-mingw.zip"
+# download llvm-mingw
+Write-Output "Downloading llvm-MinGW"
+Invoke-WebRequest -Uri $llvm -OutFile "$temp_dir\llvm-mingw.zip"
 
-    Write-Output "Extracting llvm-MinGW"
-    Expand-Archive -Path "$temp_dir\llvm-mingw.zip" -DestinationPath ".\" -Force
+Write-Output "Extracting llvm-MinGW"
+Expand-Archive -Path "$temp_dir\llvm-mingw.zip" -DestinationPath ".\" -Force
 
-    Write-Output "Renaming llvm-MinGW folder"
-    Rename-Item -Path ".\llvm-mingw-20251216-ucrt-x86_64" -NewName "llvm-mingw"
-}
+Write-Output "Renaming llvm-MinGW folder"
+Rename-Item -Path ".\llvm-mingw-20251216-ucrt-x86_64" -NewName "llvm-mingw"
 
 Write-Output "Installing CANLIB"
 Start-Process -FilePath "$temp_dir\canlib.exe" -ArgumentList "/S" -Wait

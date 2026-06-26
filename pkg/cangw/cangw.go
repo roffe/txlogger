@@ -32,8 +32,9 @@ func Start() (*os.Process, error) {
 	}
 	cmd := exec.Command(filepath.Join(wd, exeName))
 
-	// Uncomment on Windows if you want to hide the console window:
-	// cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	// cangateway is built as a console exe (GUI-subsystem console-less binaries
+	// trip AV heuristics); hide the console window at launch instead.
+	hideWindow(cmd)
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
