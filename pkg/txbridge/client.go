@@ -1,28 +1,51 @@
 package txbridge
 
 import (
-	"context"
 	"errors"
-	"fmt"
-	"log"
 	"net"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/roffe/gocan/pkg/serialcommand"
-	"github.com/roffe/txlogger/pkg/mdns"
 )
 
-var ErrNotConnected = errors.New("not connected")
-var ErrNoData = errors.New("no data read")
+const DefaultAddress = "192.168.4.1:1337"
 
-func NewClient() *Client {
-	return &Client{}
+var (
+	ErrNotConnected = errors.New("not connected")
+	ErrNoData       = errors.New("no data read")
+)
+
+// ResolveAddress returns the host:port to dial for a txbridge connection.
+// The host comes from a "tcp://host[:port]" port string; the port is always
+// forced to 1337 (appended if missing, overwritten if wrong). Anything else
+// falls back to DefaultAddress.
+func ResolveAddress(port string) string {
+	addr, ok := strings.CutPrefix(port, "tcp://")
+	if !ok || addr == "" {
+		return DefaultAddress
+	}
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr // no port present
+	}
+	return net.JoinHostPort(host, "1337")
+}
+
+func NewClient(address string) *Client {
+	return &Client{
+		address: address,
+	}
+}
+
+// SetAddress updates the address used by the next Connect call.
+func (c *Client) SetAddress(address string) {
+	c.address = address
 }
 
 type Client struct {
-	conn net.Conn
+	conn    net.Conn
+	address string
 }
 
 func (c *Client) Connect() error {
@@ -30,28 +53,19 @@ func (c *Client) Connect() error {
 		return nil // Already connected
 	}
 	dialer := net.Dialer{Timeout: 2 * time.Second}
+	//ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	//defer cancel()
+	//if src, err := mdns.Query(ctx, "txbridge.local"); err != nil {
+	//	log.Printf("failed to query mDNS: %v", err)
+	//} else {
+	//	if src.IsValid() {
+	//		address = fmt.Sprintf("%s:%d", src.String(), 1337)
+	//	} else {
+	//		log.Printf("No mDNS response, using address: %s", address)
+	//	}
+	//}
 
-	address := "192.168.4.1:1337"
-	if value := os.Getenv("TXBRIDGE_ADDRESS"); value != "" {
-		address = value
-	}
-	if !strings.HasSuffix(address, ":1337") {
-		address += ":1337" // Ensure the port is always set
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	if src, err := mdns.Query(ctx, "txbridge.local"); err != nil {
-		log.Printf("failed to query mDNS: %v", err)
-	} else {
-		if src.IsValid() {
-			address = fmt.Sprintf("%s:%d", src.String(), 1337)
-		} else {
-			log.Printf("No mDNS response, using address: %s", address)
-		}
-	}
-
-	conn, err := dialer.Dial("tcp", address)
+	conn, err := dialer.Dial("tcp", c.address)
 	if err != nil {
 		return err
 	}

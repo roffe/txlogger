@@ -49,6 +49,11 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 
 	go func() {
 		defer cl.Close()
+		defer func() {
+			_ = c.stopLogging(cl) // stop the dongle's read loop before closing the connection
+			time.Sleep(50 * time.Millisecond)
+		}()
+		lastData := time.Now()
 		for {
 			select {
 			case <-ctx.Done():
@@ -60,6 +65,10 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 				c.FpsCounter(c.capturePerSecond)
 				if c.errPerSecond > 5 {
 					c.OnMessage("too many errors, aborting logging")
+					return
+				}
+				if time.Since(lastData) > dataTimeout {
+					c.OnMessage("no data for 5s, aborting logging")
 					return
 				}
 				c.resetPerSecond()
@@ -148,6 +157,7 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 					c.OnMessage("txbridge sub closed")
 					return
 				}
+				lastData = time.Now()
 
 				if msg.DLC() != (expectedPayloadSize + 4) {
 					c.onError()

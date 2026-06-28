@@ -1,10 +1,8 @@
 package txconfigurator
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -13,7 +11,6 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/txlogger/pkg/mdns"
 	"github.com/roffe/txlogger/pkg/ota"
 	"github.com/roffe/txlogger/pkg/txbridge"
 )
@@ -23,7 +20,8 @@ var _ desktop.Mouseable = (*ConfiguratorWidget)(nil)
 type ConfiguratorWidget struct {
 	widget.BaseWidget
 
-	client *txbridge.Client
+	client  *txbridge.Client
+	getPort func() string
 
 	apSSIDEntry      *widget.Entry
 	apPasswordEntry  *widget.Entry
@@ -40,9 +38,10 @@ type ConfiguratorWidget struct {
 	container *fyne.Container
 }
 
-func NewConfigurator() *ConfiguratorWidget {
+func NewConfigurator(getPort func() string) *ConfiguratorWidget {
 	t := &ConfiguratorWidget{
-		client: txbridge.NewClient(),
+		client:  txbridge.NewClient(""),
+		getPort: getPort,
 	}
 
 	t.apChannelSelect = widget.NewSelect([]string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13"}, func(s string) {
@@ -66,21 +65,9 @@ func NewConfigurator() *ConfiguratorWidget {
 				t.updateButton.Enable()
 				t.connectButton.Enable()
 			})
-			address := "tcp://192.168.4.1:1337"
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-			defer cancel()
-			if src, err := mdns.Query(ctx, "txbridge.local"); err != nil {
-				log.Printf("failed to query mDNS: %v", err)
-			} else {
-				if src.IsValid() {
-					address = fmt.Sprintf("tcp://%s:%d", src.String(), 1337)
-				} else {
-					log.Printf("No mDNS response, using address: %s", address)
-				}
-			}
 
 			err := ota.UpdateOTA(ota.Config{
-				Port: address,
+				Port: "tcp://" + txbridge.ResolveAddress(t.getPort()),
 				Logfunc: func(a ...any) {
 					t.statusLabel.SetText(fmt.Sprint(a...))
 				},
@@ -90,9 +77,8 @@ func NewConfigurator() *ConfiguratorWidget {
 					})
 				},
 			})
-
 			if err != nil {
-				//dialog.ShowError(err, fyne.CurrentApp().Driver().AllWindows()[0])
+				// dialog.ShowError(err, fyne.CurrentApp().Driver().AllWindows()[0])
 				t.statusLabel.SetText("Status: " + err.Error())
 				return
 			}
@@ -167,6 +153,7 @@ func NewConfigurator() *ConfiguratorWidget {
 }
 
 func (t *ConfiguratorWidget) connect() {
+	t.client.SetAddress(txbridge.ResolveAddress(t.getPort()))
 	err := t.client.Connect()
 	if err != nil {
 		dialog.ShowError(err, fyne.CurrentApp().Driver().AllWindows()[0])
@@ -410,7 +397,6 @@ func (tr *ConfiguratorWidgetRenderer) MinSize() fyne.Size {
 }
 
 func (tr *ConfiguratorWidgetRenderer) Refresh() {
-
 }
 
 func (tr *ConfiguratorWidgetRenderer) Objects() []fyne.CanvasObject {

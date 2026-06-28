@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"os"
 	"strings"
 	"time"
 
@@ -24,7 +23,7 @@ var firmware []byte
 
 const (
 	COM_SPEED              = 1000000
-	MinimumtxbridgeVersion = "1.1.3"
+	MinimumtxbridgeVersion = "1.1.4"
 )
 
 type Config struct {
@@ -57,7 +56,6 @@ func UpdateOTA(cfg Config) error {
 	} else {
 		sp, err = openSerialPort(cfg.Port)
 	}
-
 	if err != nil {
 		if sp != nil {
 			sp.Close()
@@ -71,7 +69,7 @@ func UpdateOTA(cfg Config) error {
 	//	return err
 	//}
 
-	//cfg.Logfunc("Firmware size: ", len(firmware))
+	// cfg.Logfunc("Firmware size: ", len(firmware))
 
 	cmd := serialcommand.NewSerialCommand('v', []byte{0x10})
 	buf, err := cmd.MarshalBinary()
@@ -204,15 +202,6 @@ func openSerialPort(port string) (io.ReadWriteCloser, error) {
 
 func openTcpPort(address string) (io.ReadWriteCloser, error) {
 	d := net.Dialer{Timeout: 2 * time.Second}
-	if address == "" {
-		address = "192.168.4.1:1337"
-	}
-	if value := os.Getenv("TXBRIDGE_ADDRESS"); value != "" {
-		address = value
-	}
-	if !strings.HasSuffix(address, ":1337") {
-		address += ":1337" // Ensure the port is always set
-	}
 	p, err := d.Dial("tcp", address)
 	if err != nil {
 		return nil, err
@@ -226,7 +215,6 @@ func openTcpPort(address string) (io.ReadWriteCloser, error) {
 
 // readSerialCommand reads a single command from the serial port with timeout
 func readSerialCommand(port io.ReadWriteCloser, timeout time.Duration) (*serialcommand.SerialCommand, error) {
-
 	var (
 		parsingCommand  bool
 		command         byte

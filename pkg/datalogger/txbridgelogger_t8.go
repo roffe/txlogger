@@ -62,10 +62,12 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 		adConverter := NewWBLInterpolator(c.WidebandConfig)
 
 		defer func() {
+			_ = c.stopLogging(cl) // stop the dongle's read loop before ending the session
 			_ = gm.ReturnToNormalMode(ctx)
 			time.Sleep(100 * time.Millisecond)
 		}()
 
+		lastData := time.Now()
 		for {
 			select {
 			case <-ctx.Done():
@@ -77,6 +79,10 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 				c.FpsCounter(c.capturePerSecond)
 				if c.errPerSecond > 5 {
 					c.OnMessage("too many errors, aborting logging")
+					return
+				}
+				if time.Since(lastData) > dataTimeout {
+					c.OnMessage("no data for 5s, aborting logging")
 					return
 				}
 				c.resetPerSecond()
@@ -94,6 +100,7 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 					c.OnMessage("txbridge recv channel closed")
 					return
 				}
+				lastData = time.Now()
 				if msg.DLC() != int(expectedPayloadSize+4) {
 					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, msg.DLC()))
 					return

@@ -8,6 +8,11 @@ import (
 	"github.com/roffe/gocan"
 )
 
+// dataTimeout aborts a txbridge logging session if no log frame arrives for
+// this long. The txbridge loggers wait passively on the autonomous stream, so
+// without this a dead stream would hang the session forever instead of erroring.
+const dataTimeout = 5 * time.Second
+
 var _ IClient = (*TxBridge)(nil)
 
 type TxBridge struct {
@@ -76,9 +81,31 @@ func (c *TxBridge) setECU(cl *gocan.Client, ecuType string) error {
 		return err
 	}
 	time.Sleep(75 * time.Millisecond)
+	// Setting the ECU above applies a per-ECU default delay. Override it with the
+	// configured rate now: delayTime is the firmware's ms between reads = 1000/Hz.
+	// Framed command: 'D' <len=1> <delay> <checksum=delay>.
+	if c.Config.Rate > 0 {
+		delay := 1000 / c.Config.Rate
+		if delay < 1 {
+			delay = 1
+		} else if delay > 255 {
+			delay = 255
+		}
+		if err := cl.Send(gocan.SystemMsg, []byte{'D', 0x01, byte(delay), byte(delay)}, gocan.Outgoing); err != nil {
+			return err
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 	return nil
 }
 
 func (c *TxBridge) startLogging(cl *gocan.Client) error {
 	return cl.Send(gocan.SystemMsg, []byte("r"), gocan.Outgoing)
+}
+
+// stopLogging tells the dongle to stop its autonomous read loop. Send this before
+// ending the ECU session (StopSession / ReturnToNormalMode): otherwise the dongle
+// keeps issuing reads against an ended session and work() logs a spurious timeout.
+func (c *TxBridge) stopLogging(cl *gocan.Client) error {
+	return cl.Send(gocan.SystemMsg, []byte("s"), gocan.Outgoing)
 }

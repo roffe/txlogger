@@ -15,7 +15,11 @@ func init() {
 func main() {
 	myApp := app.New()
 	myWindow := myApp.NewWindow("txbridge configurator")
-	cfg := txconfigurator.NewConfigurator()
+
+	p := func() string {
+		return "192.168.4.1:1337"
+	}
+	cfg := txconfigurator.NewConfigurator(p)
 	myWindow.SetContent(cfg)
 	myWindow.Resize(fyne.NewSize(480, 200))
 	myWindow.ShowAndRun()

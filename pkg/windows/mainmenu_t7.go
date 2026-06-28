@@ -71,6 +71,7 @@ func (mw *MainWindow) t7Menu() []MenuItem {
 			{Name: "Enrichment factor during starting E85", Data: "StartCal.EnrFacE85Tab"},
 			{Name: "Enable cloosed loop regulation", Data: "LambdaCal.ST_Enable"},
 			{Name: "Common for tuning", Data: "AdpFuelCal.T_AdaptLim|E85Cal.ST_Enable|FCutCal.ST_Enable|LambdaCal.ST_Enable|PurgeCal.ST_PurgeEnable|TorqueCal.M_BrakeLimit"},
+			{Name: "Injection end angles", Data: "InjAnglCal.Map"},
 		}},
 		{Name: "Ignition", Children: []MenuItem{
 			{Name: "Ignition map", Data: "IgnNormCal.Map", Region: "LambdaCal.MaxLoadNormTab"},

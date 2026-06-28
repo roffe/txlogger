@@ -2,7 +2,6 @@ package settings
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -26,7 +25,7 @@ func (sw *Widget) GetAdapterWithExtraFilters(ecuType string, filters []uint32) (
 	}
 
 	port := prefPort.get()
-	if ad, found := sw.adapters[adapterName]; found && ad.RequiresSerialPort && port == "" {
+	if ad, found := sw.adapters[adapterName]; found && ad.RequiresSerialPort && port == "" && !ad.SerialPortOptional {
 		return nil, errors.New("Select port in setings") //lint:ignore ST1005 This is ok
 	}
 
@@ -47,7 +46,6 @@ func (sw *Widget) GetAdapterWithExtraFilters(ecuType string, filters []uint32) (
 
 	if adapterName == "txbridge wifi" {
 		cfg.AdditionalConfig = map[string]string{
-			"address":    fmt.Sprintf("%s:%d", "192.168.4.1", 1337),
 			"minversion": ota.MinimumtxbridgeVersion,
 		}
 	}

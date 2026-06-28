@@ -150,15 +150,17 @@ func (sw *Widget) newAdapterSelector() *widget.Select {
 	})
 }
 
-func (sw *Widget) newPortSelector() *widget.Select {
-	return widget.NewSelect(sw.ListPorts(), func(s string) {
+func (sw *Widget) newPortSelector() *widget.SelectEntry {
+	sel := widget.NewSelectEntry(sw.ListPorts())
+	sel.OnChanged = func(s string) {
 		prefPort.set(s)
 		if itm, ok := portCache[s]; ok {
 			sw.portDescription.SetText(itm.SerialNumber)
 		} else {
 			sw.portDescription.SetText("")
 		}
-	})
+	}
+	return sel
 }
 
 func (sw *Widget) newSpeedSelector() *widget.Select {
@@ -167,7 +169,7 @@ func (sw *Widget) newSpeedSelector() *widget.Select {
 
 func (sw *Widget) newPortRefreshButton() *widget.Button {
 	return widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
-		sw.portSelector.Options = sw.ListPorts()
+		sw.portSelector.SetOptions(sw.ListPorts())
 		sw.portSelector.Refresh()
 	})
 }
@@ -202,7 +204,7 @@ func (sw *Widget) loadPreferences() {
 	sw.colorBlindMode.SetSelected(prefColorBlindMode.get())
 
 	sw.adapterSelector.SetSelected(prefAdapter.get())
-	sw.portSelector.SetSelected(prefPort.get())
+	sw.portSelector.SetText(prefPort.get())
 	sw.speedSelector.SetSelected(prefSpeed.get())
 	sw.debugCheckbox.SetChecked(prefDebug.get())
 

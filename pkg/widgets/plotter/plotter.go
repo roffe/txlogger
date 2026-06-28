@@ -412,7 +412,7 @@ func defaultRange(name string) (min, max float64, ok bool) {
 		return 0, 2200, true
 	case "ActualIn.p_AirInlet", "In.p_AirInlet", "ActualIn.p_AirBefThrottle", "In.p_AirBefThrottle":
 		return -1.0, 3.0, true
-	case "DisplProt.LambdaScanner", "Lambda.ADScanner", "LambdaScan.LambdaScanner", "LambdaScan.LambdaScanner2":
+	case "DisplProt.LambdaScanner", "Lambda.ADScanner", "LambdaScan.LambdaScanner", "LambdaScan.LambdaScanner2", "Lambda.External":
 		return 0.5, 1.5, true
 	case "IgnProt.fi_Offset":
 		return -30, 10, true
@@ -420,8 +420,6 @@ func defaultRange(name string) (min, max float64, ok bool) {
 		return -25, 25, true
 	case "ECMStat.p_Diff":
 		return -1, 2, true
-	case "Lambda.External":
-		return 0.5, 1.5, true
 	case "P_medel", "Max_tryck", "Regl_tryck":
 		return -1, 3, true
 	}

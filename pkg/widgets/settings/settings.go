@@ -58,7 +58,7 @@ type Widget struct {
 	debugCheckbox   *widget.Check
 	adapterSelector *widget.Select
 	refreshBtn      *widget.Button
-	portSelector    *widget.Select
+	portSelector    *widget.SelectEntry
 	portDescription *widget.Label
 	speedSelector   *widget.Select
 	adapters        map[string]*gocan.AdapterInfo
@@ -143,7 +143,8 @@ func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	tabs.Append(sw.loggingTab())
 	tabs.Append(sw.wblTab())
 	tabs.Append(sw.adScannerTab())
-	tabs.Append(container.NewTabItemWithIcon("txbridge", theme.DownloadIcon(), txconfigurator.NewConfigurator()))
+
+	tabs.Append(container.NewTabItemWithIcon("txbridge", theme.DownloadIcon(), txconfigurator.NewConfigurator(prefPort.get)))
 
 	sw.loadPreferences()
 	return widget.NewSimpleRenderer(tabs)

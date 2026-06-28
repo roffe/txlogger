@@ -11,6 +11,9 @@ endif
 
 default: txlogger
 
+pkg/ota/firmware.bin: /home/roffe/Documents/PlatformIO/Projects/txbridge/.pio/build/esp32dev/firmware.bin
+	@cp $< $@
+
 cangateway:
 	go build -tags="j2534" -ldflags '-s -w' -o cangateway ../gocangateway
 
@@ -35,7 +38,7 @@ windows:
 	fyne package -os windows -tags=$(BUILDTAGS) --release
 #	go build -tags=$(BUILDTAGS) -ldflags '-s -w' -o txlogger.exe .
 
-run: clean cangateway
+run: clean cangateway pkg/ota/firmware.bin
 	@echo Using compiler "$(CC)"
 	-GOEXPERIMENT=simd go run -tags=$(BUILDTAGS) . 2>&1 | tee run.log
 
