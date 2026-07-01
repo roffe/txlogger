@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/roffe/gocan"
+	"github.com/roffe/txlogger/pkg/debug"
 )
 
 // dataTimeout aborts a txbridge logging session if no log frame arrives for
@@ -59,6 +60,10 @@ func (c *TxBridge) Start() error {
 	case "T5":
 		if err := c.setECU(cl, "5"); err != nil {
 			return err
+		}
+		if c.Config.ExperimentalT5FastLogging {
+			debug.Log("Using experimental T5 fast logger")
+			return c.t5new(ctx, cl)
 		}
 		return c.t5(ctx, cl)
 	case "T7":

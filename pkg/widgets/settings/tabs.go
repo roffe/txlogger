@@ -106,6 +106,9 @@ func (sw *Widget) loggingTab() *container.TabItem {
 		section("Storage",
 			container.NewBorder(nil, logFolderButtons, widget.NewLabel("Log folder"), nil, sw.logPath),
 		),
+		section("Experimental",
+			container.NewBorder(nil, nil, widget.NewIcon(theme.WarningIcon()), widget.NewLabel("MIGHT CORRUPT RAM!!"), sw.experimentalT5FastLogger),
+		),
 	)
 }
 

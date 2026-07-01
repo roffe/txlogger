@@ -7,6 +7,7 @@ import (
 
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan"
+	"github.com/roffe/txlogger/pkg/debug"
 )
 
 var ErrToManyErrors = fmt.Errorf("too many errors, aborting logging")
@@ -29,19 +30,20 @@ type IClient interface {
 }
 
 type Config struct {
-	FilenamePrefix string
-	ECU            string
-	Device         gocan.Adapter
-	Symbols        []*symbol.Symbol
-	Rate           int
-	OnMessage      func(string)
-	CaptureCounter func(int)
-	ErrorCounter   func(int)
-	FpsCounter     func(int)
-	LogFormat      string
-	LogPath        string
-	WidebandConfig WidebandConfig
-	RemoteMode     int
+	FilenamePrefix            string
+	ECU                       string
+	Device                    gocan.Adapter
+	Symbols                   []*symbol.Symbol
+	Rate                      int
+	OnMessage                 func(string)
+	CaptureCounter            func(int)
+	ErrorCounter              func(int)
+	FpsCounter                func(int)
+	LogFormat                 string
+	LogPath                   string
+	WidebandConfig            WidebandConfig
+	RemoteMode                int
+	ExperimentalT5FastLogging bool
 }
 
 type Client struct {
@@ -89,7 +91,12 @@ func New(cfg Config) (IClient, string, error) {
 
 	switch cfg.ECU {
 	case "T5":
-		datalogger.IClient, err = NewT5(cfg, lw)
+		if cfg.ExperimentalT5FastLogging {
+			debug.Log("Using experimental T5 fast logger")
+			datalogger.IClient, err = NewT5Fast(cfg, lw)
+		} else {
+			datalogger.IClient, err = NewT5(cfg, lw)
+		}
 		if err != nil {
 			return nil, "", err
 		}

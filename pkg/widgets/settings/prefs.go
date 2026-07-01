@@ -84,8 +84,9 @@ var (
 	prefMeshRenderer    = intPref{"meshRenderer", 2}
 
 	// Logging
-	prefLogFormat = stringPref{"logFormat", "CSV"}
-	prefLogPath   = stringPref{"logPath", ""}
+	prefLogFormat                = stringPref{"logFormat", "CSV"}
+	prefLogPath                  = stringPref{"logPath", ""}
+	prefExperimentalT5FastLogger = boolPref{"experimentalT5FastLogger", false}
 
 	// Dashboard
 	prefUseMPH          = boolPref{"useMPH", false}

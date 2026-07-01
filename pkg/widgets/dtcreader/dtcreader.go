@@ -137,7 +137,7 @@ func (d *DTCReader) ReadDTCS() error {
 	}
 
 	go func() {
-		defer d.Enable()
+		defer fyne.Do(d.Enable)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
@@ -181,7 +181,7 @@ func (d *DTCReader) ClearDTCS() error {
 		return fmt.Errorf("DTC clearing not supported for ECU %s", ecu)
 	}
 	go func() {
-		defer d.Enable()
+		defer fyne.Do(d.Enable)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()

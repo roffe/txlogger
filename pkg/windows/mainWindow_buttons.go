@@ -176,6 +176,10 @@ func (mw *MainWindow) addSymbolBtnFunc() *widget.Button {
 		if mw.selects.symbolLookup.Text == "" {
 			return
 		}
+		if mw.fw == nil {
+			mw.Error(fmt.Errorf("Cannot add symbol, no binary loaded"))
+			return
+		}
 		/*
 			switch mw.selects.symbolLookup.Text {
 			case "ADC1":
@@ -218,7 +222,7 @@ func (mw *MainWindow) addSymbolBtnFunc() *widget.Button {
 
 		sym := mw.fw.GetByName(mw.selects.symbolLookup.Text)
 		if sym == nil {
-			mw.Error(fmt.Errorf("%q not found", mw.selects.symbolLookup.Text))
+			mw.Error(fmt.Errorf("%q not found in binary", mw.selects.symbolLookup.Text))
 			return
 		}
 		mw.symbolList.Add(sym)
@@ -451,6 +455,7 @@ func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, st
 			LambdaValues:    mw.settings.GetWBLLambdaValues(),
 		},
 		// Remote: mw.selects.remoteSelect.Selected == "Remote",
-		RemoteMode: mw.selects.remoteSelect.SelectedIndex(),
+		RemoteMode:                mw.selects.remoteSelect.SelectedIndex(),
+		ExperimentalT5FastLogging: mw.settings.GetExperimentalT5FastLogger(),
 	})
 }

@@ -52,6 +52,8 @@ func (sw *Widget) GetLogPath() string {
 	return p
 }
 
+func (sw *Widget) GetExperimentalT5FastLogger() bool { return prefExperimentalT5FastLogger.get() }
+
 // Dashboard
 func (sw *Widget) GetUseMPH() bool          { return prefUseMPH.get() }
 func (sw *Widget) GetSwapRPMandSpeed() bool { return prefSwapRPMandSpeed.get() }

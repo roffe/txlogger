@@ -1,19 +1,27 @@
 {
 	"folders": [
 		{
+			"name": "txlogger",
 			"path": "."
 		},
 		{
-			"path": "../gocan"
-		},
-		{
+			"name": "ecusymbol",
 			"path": "../ecusymbol"
 		},
 		{
+			"name": "gocan",
+			"path": "../gocan"
+		},
+		{
+			"name": "gocangateway",
 			"path": "../gocangateway"
 		},
 		{
+			"name": "txweb",
 			"path": "../txweb"
+		},
+		{
+			"path": "../../../../../Documents/PlatformIO/Projects/txbridge"
 		}
 	],
 	"settings": {

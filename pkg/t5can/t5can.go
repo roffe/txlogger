@@ -62,6 +62,9 @@ func (c *Client) sendReadCommand(ctx context.Context, address uint32) ([]byte, e
 	if resp.Data[0] != cmdByte {
 		return nil, fmt.Errorf("invalid response: expected 0x%X, got 0x%X", cmdByte, resp.Data[0])
 	}
+	if resp.Data[1] != respOK { // D2 code: 4 = error (e.g. address out of range)
+		return nil, fmt.Errorf("read error at 0x%X: code 0x%02X", address, resp.Data[1])
+	}
 
 	data := append([]byte(nil), resp.Data[2:8]...) // copy slice
 	slices.Reverse(data)

@@ -211,4 +211,7 @@ func (sw *Widget) loadPreferences() {
 	// Graphics
 	sw.plotRendererSelect.SetSelectedIndex(prefPlotterRenderer.get())
 	sw.meshRendererSelect.SetSelectedIndex(prefMeshRenderer.get())
+
+	// Logging
+	sw.experimentalT5FastLogger.SetChecked(prefExperimentalT5FastLogger.get())
 }

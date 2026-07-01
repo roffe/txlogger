@@ -63,6 +63,9 @@ type Widget struct {
 	speedSelector   *widget.Select
 	adapters        map[string]*gocan.AdapterInfo
 
+	// Loggging
+	experimentalT5FastLogger *widget.Check
+
 	// Wideband
 	wbleditor            *WBLEditor
 	wblADscanner         *widget.Check
@@ -110,9 +113,13 @@ func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	sw.livePreview = checkBox("Live preview values in symbollist (uncheck if you have a slow pc)", prefLivePreview)
 	sw.meshView = checkBox("3D Mesh on map viewing", prefMeshView)
 	sw.realtimeBars = checkBox("Bars on live preview values (uncheck if you have a slow pc)", prefRealtimeBars)
+
+	// Logging
 	sw.logFormat = sw.newLogFormat()
 	sw.logPath = widget.NewLabel("")
 	sw.logPath.Truncation = fyne.TextTruncateEllipsis
+	sw.experimentalT5FastLogger = checkBox("Experimental T5 fast logger", prefExperimentalT5FastLogger)
+
 	sw.useMPH = checkBox("Use mph instead of km/h", prefUseMPH)
 	sw.swapRPMandSpeed = checkBox("Swap RPM and speed gauge position", prefSwapRPMandSpeed)
 	sw.colorBlindMode = sw.newColorBlindMode()
