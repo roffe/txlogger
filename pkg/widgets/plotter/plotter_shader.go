@@ -65,8 +65,8 @@ const plotShaderBody = `
 #define MAX_RAW 16
 #define MAX_GROUPS 24
 
-uniform vec2 frame_size;
-uniform vec4 rect_coords;
+uniform vec2 frame;
+uniform vec4 bounds;
 
 uniform sampler2D data_tex; // one texel per sample, 16-bit value in RG
 uniform sampler2D mm_tex;   // min/max per 16 samples: RG=min, BA=max
@@ -130,10 +130,10 @@ float seg_dist(vec2 p, vec2 a, vec2 b) {
 }
 
 void main() {
-    float pix_scale = (rect_coords.y - rect_coords.x) / max(size_w, 1.0);
-    vec2 p_dev = vec2(gl_FragCoord.x, frame_size.y - gl_FragCoord.y) - rect_coords.xz;
-    float w_dev = rect_coords.y - rect_coords.x;
-    float h_dev = rect_coords.w - rect_coords.z;
+    float pix_scale = (bounds.z - bounds.x) / max(size_w, 1.0);
+    vec2 p_dev = vec2(gl_FragCoord.x, frame.y - gl_FragCoord.y) - bounds.xy;
+    float w_dev = bounds.z - bounds.x;
+    float h_dev = bounds.w - bounds.y;
 
     // the painter expands the quad slightly for edge softness; stay inside
     if (p_dev.x < 0.0 || p_dev.y < 0.0 || p_dev.x > w_dev || p_dev.y > h_dev) {

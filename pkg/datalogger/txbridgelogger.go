@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/pkg/serialcommand"
 	"github.com/roffe/txlogger/pkg/debug"
 )
 
@@ -102,6 +103,22 @@ func (c *TxBridge) setECU(cl *gocan.Client, ecuType string) error {
 		time.Sleep(10 * time.Millisecond)
 	}
 	return nil
+}
+
+// sendBroadcastCollect tells the dongle which CAN broadcast ids to cache and fold
+// into the 'r' log responses (empty clears). The per-ECU id lists live with each
+// ECU's broadcast decoder (e.g. t7BroadcastIDs).
+func sendBroadcastCollect(cl *gocan.Client, ids []uint16) error {
+	data := make([]byte, 0, len(ids)*2)
+	for _, id := range ids {
+		data = append(data, byte(id), byte(id>>8)) // 11-bit ids, little-endian
+	}
+	cmd := serialcommand.SerialCommand{Command: 'b', Data: data}
+	payload, err := cmd.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	return cl.Send(gocan.SystemMsg, payload, gocan.Outgoing)
 }
 
 func (c *TxBridge) startLogging(cl *gocan.Client) error {

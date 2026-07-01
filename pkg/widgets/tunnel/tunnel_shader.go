@@ -41,8 +41,8 @@ precision mediump float;
 const tunnelBody = `
 #define PI 3.14159265359
 
-uniform vec2 frame_size;   // output frame size, device px
-uniform vec4 rect_coords;  // this object's bounds (x1, x2, y1, y2), device px
+uniform vec2 frame;   // output frame size, device px
+uniform vec4 bounds;  // this object's bounds (x1, y1, x2, y2), device px
 uniform float time;        // elapsed animation seconds
 
 // optional tuning knobs (default sensibly if left at 0 by the Go side)
@@ -78,8 +78,8 @@ float tri(float x) {
 }
 
 void main() {
-    vec2 size = vec2(rect_coords.y - rect_coords.x, rect_coords.w - rect_coords.z);
-    vec2 p_dev = vec2(gl_FragCoord.x, frame_size.y - gl_FragCoord.y) - rect_coords.xz;
+    vec2 size = vec2(bounds.z - bounds.x, bounds.w - bounds.y);
+    vec2 p_dev = vec2(gl_FragCoord.x, frame.y - gl_FragCoord.y) - bounds.xy;
 
     // the painter expands the quad slightly for edge softness; stay inside
     if (p_dev.x < 0.0 || p_dev.y < 0.0 || p_dev.x > size.x || p_dev.y > size.y) {

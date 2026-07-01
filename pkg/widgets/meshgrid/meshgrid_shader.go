@@ -57,8 +57,8 @@ precision mediump float;
 const meshShaderBody = `
 #define MAX_STEPS 160
 
-uniform vec2 frame_size;
-uniform vec4 rect_coords;
+uniform vec2 frame;
+uniform vec4 bounds;
 
 uniform sampler2D mesh_tex;     // cols x rows cell values (or corner grid), 16 bit in RG
 uniform sampler2D colormap_tex; // 256x1 value -> base color lookup
@@ -253,11 +253,11 @@ vec3 shade_surface(vec3 base, vec3 n, vec3 light, vec3 view_dir, float ao) {
 void main() {
     mat3 rot = mat3(r0, r3, r6, r1, r4, r7, r2, r5, r8);
 
-    float pix_scale = (rect_coords.y - rect_coords.x) / max(size_w, 1.0);
-    vec2 p_dev = vec2(gl_FragCoord.x, frame_size.y - gl_FragCoord.y) - rect_coords.xz;
+    float pix_scale = (bounds.z - bounds.x) / max(size_w, 1.0);
+    vec2 p_dev = vec2(gl_FragCoord.x, frame.y - gl_FragCoord.y) - bounds.xy;
 
     // the painter expands the quad slightly for edge softness; stay inside
-    if (p_dev.x < 0.0 || p_dev.y < 0.0 || p_dev.x > rect_coords.y - rect_coords.x || p_dev.y > rect_coords.w - rect_coords.z) {
+    if (p_dev.x < 0.0 || p_dev.y < 0.0 || p_dev.x > bounds.z - bounds.x || p_dev.y > bounds.w - bounds.y) {
         discard;
     }
 

@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"log"
-	"strings"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
@@ -20,28 +20,21 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
-	bctx, bcancel := context.WithCancel(ctx)
-	defer bcancel()
-	go t7broadcastListener(bctx, cl, c.sysvars)
-
-	c.OnMessage("Watching for broadcast messages")
-	<-time.After(1550 * time.Millisecond)
-	if found := c.sysvars.Keys(); len(found) > 0 {
-		c.OnMessage(fmt.Sprintf("Found: %s", strings.Join(found, ", ")))
-	} else {
-		c.OnMessage("No broadcast messages found, stopping broadcast listener")
-		bcancel()
-	}
-
 	if c.lamb != nil {
 		defer c.lamb.Stop()
 	}
 
+	// Tell the dongle to collect the T7 broadcast frames and fold them into the log
+	// stream, then source those symbols from the folded trailer (decodeT7Broadcast)
+	// instead of the KWP F0 read, rather than parsing a live broadcast flood here.
+	c.OnMessage("Enabling T7 broadcast collection")
+	if err := sendBroadcastCollect(cl, t7BroadcastIDs); err != nil {
+		return fmt.Errorf("failed to set broadcast collect: %w", err)
+	}
 	for _, sym := range c.Symbols {
-		if c.sysvars.Exists(sym.Name) {
+		if _, ok := t7BroadcastSymbols[sym.Name]; ok {
 			log.Println("Skipping", sym.Name, "in broadcast")
 			sym.Number = -1
-			continue
 		}
 	}
 
@@ -210,12 +203,13 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 					return
 				}
 				lastData = time.Now()
-				if msg.DLC() != int(expectedPayloadSize+4) {
+				// timestamp(4) + fixed symbol payload, then a variable broadcast trailer
+				// the dongle folded in (see decodeT7Broadcast), so this is a lower bound.
+				if msg.DLC() < int(expectedPayloadSize+4) {
 					c.onError()
-					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, msg.DLC()))
+					c.OnMessage(fmt.Sprintf("expected at least %d bytes, got %d", expectedPayloadSize+4, msg.DLC()))
 					// log.Printf("unexpected data %X", msg.Data)
 					continue
-					// return fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff))
 				}
 
 				r := bytes.NewReader(msg.Data)
@@ -233,15 +227,18 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 
 				timeStamp := c.calculateCompensatedTimestamp()
 
+				// Read the fixed symbol payload first; broadcast (-1) symbols carry no
+				// bytes here — they come from the trailer parsed just below.
+				readErr := false
 				for _, va := range c.Symbols {
 					if va.Number == -1 {
-						ebus.Publish(va.Name, c.sysvars.Get(va.Name))
 						continue
 					}
 					if err := va.Read(r); err != nil {
 						log.Printf("data ex %d %X len %d", expectedPayloadSize, msg.Data, msg.DLC())
 						c.onError()
 						c.OnMessage(err.Error())
+						readErr = true
 						break
 					}
 
@@ -251,9 +248,32 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 
 					ebus.Publish(va.Name, va.Float64())
 				}
+				if readErr {
+					continue // r is misaligned; skip the trailer for this frame
+				}
 
-				if r.Len() > 0 {
-					c.OnMessage(fmt.Sprintf("%d leftover bytes!", r.Len()))
+				// Drain the folded broadcast trailer: [idHi, idLo, dlc, data...] per
+				// collected frame -> update sysvars via the shared T7 decoder.
+				var bcbuf [8]byte
+				for r.Len() >= 3 {
+					idHi, _ := r.ReadByte()
+					idLo, _ := r.ReadByte()
+					dlc, _ := r.ReadByte()
+					if dlc > 8 || r.Len() < int(dlc) {
+						c.OnMessage("malformed broadcast trailer")
+						break
+					}
+					if _, err := io.ReadFull(r, bcbuf[:dlc]); err != nil {
+						break
+					}
+					decodeT7Broadcast(uint16(idHi)<<8|uint16(idLo), bcbuf[:dlc], c.sysvars)
+				}
+
+				// Publish the broadcast-sourced symbols from the freshly updated sysvars.
+				for _, va := range c.Symbols {
+					if va.Number == -1 {
+						ebus.Publish(va.Name, c.sysvars.Get(va.Name))
+					}
 				}
 
 				if c.lamb != nil {

@@ -25,8 +25,8 @@ precision mediump float;
 `
 
 const dualDialShaderBody = `
-uniform vec2 frame_size;
-uniform vec4 rect_coords;
+uniform vec2 frame;
+uniform vec4 bounds;
 
 uniform float size_d;    // dial diameter, logical px
 uniform float steps;     // pip intervals; steps+1 pips are drawn
@@ -61,8 +61,8 @@ void over(inout vec3 col, inout float alpha, vec3 c, float a) {
 }
 
 void main() {
-    vec2 ext = vec2(rect_coords.y - rect_coords.x, rect_coords.w - rect_coords.z);
-    vec2 p_dev = vec2(gl_FragCoord.x, frame_size.y - gl_FragCoord.y) - rect_coords.xz;
+    vec2 ext = vec2(bounds.z - bounds.x, bounds.w - bounds.y);
+    vec2 p_dev = vec2(gl_FragCoord.x, frame.y - gl_FragCoord.y) - bounds.xy;
 
     // the painter expands the quad slightly for edge softness; stay inside
     if (p_dev.x < 0.0 || p_dev.y < 0.0 || p_dev.x > ext.x || p_dev.y > ext.y) {

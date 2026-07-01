@@ -24,53 +24,76 @@ func NewT7(cfg Config, lw LogWriter) (IClient, error) {
 	return &T7Client{BaseLogger: NewBaseLogger(cfg, lw)}, nil
 }
 
+// t7BroadcastIDs are the T7 CAN broadcast frames decodeT7Broadcast understands.
+// The txbridge path hands this list to the dongle ('b' command) so it collects and
+// folds them into the log stream; generic adapters subscribe to them live below.
+var t7BroadcastIDs = []uint16{0x1A0, 0x280, 0x3A0 /*, 0x5C0*/}
+
+// t7BroadcastSymbols are the symbol names decodeT7Broadcast can produce. On the
+// txbridge path, requested symbols in this set are sourced from the folded trailer
+// instead of the KWP F0 read.
+var t7BroadcastSymbols = map[string]struct{}{
+	"ActualIn.n_Engine":  {},
+	"Out.X_AccPedal":     {},
+	"Out.X_ActualGear":   {},
+	"Out.ST_BrakeLight":  {},
+	"In.ST_ClutchBrake1": {},
+	"In.v_Vehicle":       {},
+	// "ActualIn.T_Engine": {}, // enable together with 0x5C0 in t7BroadcastIDs
+}
+
+// decodeT7Broadcast decodes one raw T7 broadcast frame into sysvars (plus a few
+// ebus-only status bits). Shared by the live listener (generic adapters) and the
+// txbridge path, which feeds the same bytes from the folded 'r' trailer. Guards on
+// length because the folded frames carry their own dlc.
+func decodeT7Broadcast(id uint16, data []byte, sysvars *ThreadSafeMap) {
+	switch id {
+	case 0x1A0:
+		if len(data) < 6 {
+			return
+		}
+		rpm := binary.BigEndian.Uint16(data[1:3])
+		sysvars.Set("ActualIn.n_Engine", float64(rpm))
+		sysvars.Set("Out.X_AccPedal", float64(data[5]))
+	case 0x280:
+		if len(data) < 5 {
+			return
+		}
+		sysvars.Set("Out.X_ActualGear", float64(data[1]))
+		sysvars.Set("Out.ST_BrakeLight", float64(data[2]&0x02>>1))
+		sysvars.Set("In.ST_ClutchBrake1", float64(data[2]&0x08>>3))
+		ebus.Publish("LIMP", float64(data[3]&0x01))
+		ebus.Publish("CRUISE", float64(data[4]&0x20>>5))
+		ebus.Publish("CEL", float64(data[4]&0x80>>7))
+	case 0x3A0:
+		if len(data) < 5 {
+			return
+		}
+		speed := uint16(data[4]) | uint16(data[3])<<8
+		sysvars.Set("In.v_Vehicle", float64(speed)*0.1)
+	case 0x5C0:
+		// 0x5C0 COTE_ECS: Data[1]=coolant. byte=(u8)(V+40)
+		if len(data) < 2 {
+			return
+		}
+		sysvars.Set("ActualIn.T_Engine", float64(data[1])-40)
+	}
+}
+
 func t7broadcastListener(ctx context.Context, cl *gocan.Client, sysvars *ThreadSafeMap) {
-	broadcast := cl.Subscribe(ctx, 0x1A0, 0x280, 0x3A0 /*, 0x5C0*/)
+	ids := make([]uint32, len(t7BroadcastIDs))
+	for i, id := range t7BroadcastIDs {
+		ids[i] = uint32(id)
+	}
+	broadcast := cl.Subscribe(ctx, ids...)
 	defer broadcast.Close()
-	var speed uint16
-	var rpm uint16
-	var throttle float64
-	var realSpeed float64
-	var limp, cruise, cel uint8
-	var gear uint8
-	var clutchBreak, brakeLight uint8
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case msg := <-broadcast.Chan():
-			switch msg.Identifier {
-			case 0x1A0:
-				rpm = binary.BigEndian.Uint16(msg.Data[1:3])
-				throttle = float64(msg.Data[5])
-				sysvars.Set("ActualIn.n_Engine", float64(rpm))
-				sysvars.Set("Out.X_AccPedal", throttle)
-			case 0x280:
-				limp = msg.Data[3] & 0x01
-				cel = msg.Data[4] & 0x80 >> 7
-				cruise = msg.Data[4] & 0x20 >> 5
-				gear = msg.Data[1]
-				sysvars.Set("Out.X_ActualGear", float64(gear))
-				brakeLight = msg.Data[2] & 0x02 >> 1
-				sysvars.Set("Out.ST_BrakeLight", float64(brakeLight))
-				clutchBreak = msg.Data[2] & 0x08 >> 3
-				sysvars.Set("In.ST_ClutchBrake1", float64(clutchBreak))
-
-				ebus.Publish("LIMP", float64(limp))
-				ebus.Publish("CRUISE", float64(cruise))
-				ebus.Publish("CEL", float64(cel))
-			case 0x3A0:
-				speed = uint16(msg.Data[4]) | uint16(msg.Data[3])<<8
-				realSpeed = float64(speed) * 0.1
-				sysvars.Set("In.v_Vehicle", realSpeed)
-			case 0x5C0:
-				// 0x5C0 COTE_ECS: Data[1]=coolant. byte=(u8)(V+40),
-				coolant := float64(msg.Data[1]) - 40
-				sysvars.Set("ActualIn.T_Engine", coolant)
-				// log.Printf("0x5C0: % X valid=%t coolant=%v", msg.Data, msg.Data[0]&0x10 != 0, coolant)
-
-			}
+			decodeT7Broadcast(uint16(msg.Identifier), msg.Data, sysvars)
 		}
 	}
 }

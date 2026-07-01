@@ -217,6 +217,7 @@ func openTcpPort(address string) (io.ReadWriteCloser, error) {
 func readSerialCommand(port io.ReadWriteCloser, timeout time.Duration) (*serialcommand.SerialCommand, error) {
 	var (
 		parsingCommand  bool
+		haveLength      bool // length byte read? distinguishes "no len yet" from len==0
 		command         byte
 		commandSize     byte
 		commandChecksum byte
@@ -243,8 +244,9 @@ func readSerialCommand(port io.ReadWriteCloser, timeout time.Duration) (*serialc
 				continue
 			}
 
-			if commandSize == 0 {
+			if !haveLength { // length byte; zero is a legitimate size, so don't sentinel on it
 				commandSize = b
+				haveLength = true
 				continue
 			}
 
