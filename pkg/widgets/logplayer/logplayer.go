@@ -3,6 +3,7 @@ package logplayer
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -55,6 +56,11 @@ type Logplayer struct {
 
 	logFile  logfile.Logfile
 	playOnce sync.Once
+
+	// uiUpdatePending coalesces per-frame slider/time updates: while a refresh
+	// is queued, further frames only update slider.Value and the pending
+	// refresh paints the latest position (same pattern as plotter.Seek).
+	uiUpdatePending atomic.Bool
 
 	OnMouseDown func()
 
@@ -560,15 +566,15 @@ func (l *Logplayer) playLog() {
 					if f := l.cfg.TimeSetter; f != nil {
 						f(rec.Time)
 					}
+					for k, v := range rec.Values {
+						l.cfg.EBus.Publish(k, v)
+					}
+					timeSetter(rec.Time)
+					l.cfg.EBus.Publish("__frame__", float64(rec.Time.UnixMilli()))
 					if l.state == statePlaying {
 						reanchor()
 						schedule()
 					} else {
-						for k, v := range rec.Values {
-							l.cfg.EBus.Publish(k, v)
-						}
-						timeSetter(rec.Time)
-						l.cfg.EBus.Publish("__frame__", float64(rec.Time.UnixMilli()))
 						timer.Stop()
 					}
 					l.objs.plotter.Seek(op.Pos)
@@ -635,11 +641,14 @@ func (l *Logplayer) playLog() {
 				schedule()
 
 				l.objs.positionSlider.Value = float64(currentPos)
-				timeText := rec.Time.Format("15:04:05.00")
-				fyne.Do(func() {
-					l.objs.positionSlider.Refresh()
-					l.objs.timeLabel.SetText(timeText)
-				})
+				if l.uiUpdatePending.CompareAndSwap(false, true) {
+					timeText := rec.Time.Format("15:04:05.00")
+					fyne.Do(func() {
+						l.uiUpdatePending.Store(false)
+						l.objs.positionSlider.Refresh()
+						l.objs.timeLabel.SetText(timeText)
+					})
+				}
 				for k, v := range rec.Values {
 					l.cfg.EBus.Publish(k, v)
 				}

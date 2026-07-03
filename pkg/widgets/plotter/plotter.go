@@ -312,8 +312,7 @@ func (p *Plotter) seekTo(pos int) {
 		if obj.value.Text == newValue {
 			continue
 		}
-		obj.value.Text = newValue
-		obj.Refresh()
+		obj.SetValue(newValue)
 	}
 
 	if p.backend == PlotBackendShader {

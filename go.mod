@@ -4,17 +4,16 @@ go 1.26.0
 
 //replace github.com/roffe/gocan => ..\gocan
 //replace github.com/roffe/ecusymbol => ..\ecusymbol
-//replace fyne.io/fyne/v2 => ..\..\fyne-io\fyne
+//replace fyne.io/fyne/v2 => ../fyne
+
 //replace go.bug.st/serial => ../../../go.bug.st/serial
 
 replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 
 require (
-	fyne.io/fyne/v2 v2.8.0-rc1.0.20260701153857-4a089fc3dab4
-	fyne.io/x/fyne v0.0.0-20260404122735-cbbdf562353e
+	fyne.io/fyne/v2 v2.8.0-rc1.0.20260703173000-4a52a9fe8ec0
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/lusingander/colorpicker v0.7.5
-	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/roffe/ecusymbol v1.2.5
 	github.com/roffe/gocan v1.4.6
 	go.bug.st/serial v1.7.1
@@ -31,6 +30,7 @@ require (
 	github.com/ebitengine/oto/v3 v3.4.0
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/hajimehoshi/go-mp3 v0.3.4
+	github.com/stretchr/testify v1.11.1
 	golang.org/x/sys v0.46.0
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.78
 )
@@ -68,6 +68,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.17 // indirect
 	github.com/mdlayher/netlink v1.8.0 // indirect
 	github.com/mdlayher/socket v0.5.1 // indirect
+	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.6.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
@@ -75,7 +76,6 @@ require (
 	github.com/rymdport/portal v0.4.2 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9 // indirect
 	github.com/yuin/goldmark v1.7.16 // indirect
 	go.einride.tech/can v0.16.1 // indirect

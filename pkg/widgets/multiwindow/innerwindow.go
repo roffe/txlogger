@@ -525,11 +525,26 @@ type draggableCorner struct {
 	widget.BaseWidget
 	win       *InnerWindow
 	resizeDir resizeDirection
+	cursor    desktop.Cursor
 }
 
 func newDraggableCorner(w *InnerWindow, resizeDir resizeDirection) *draggableCorner {
 	d := &draggableCorner{win: w, resizeDir: resizeDir}
 	d.ExtendBaseWidget(d)
+
+	switch d.resizeDir {
+	case resizeUp, resizeDown:
+		d.cursor = desktop.VResizeCursor
+	case resizeLeft, resizeRight:
+		d.cursor = desktop.HResizeCursor
+	case resizeDownLeft, resizeUpRight:
+		d.cursor = desktop.NESWResizeCursor
+	case resizeDownRight, resizeUpLeft:
+		d.cursor = desktop.NWSEResizeCursor
+	default:
+		d.cursor = desktop.DefaultCursor
+	}
+
 	return d
 }
 
@@ -539,7 +554,7 @@ func (c *draggableCorner) CreateRenderer() fyne.WidgetRenderer {
 }
 
 func (c *draggableCorner) Cursor() desktop.Cursor {
-	return desktop.PointerCursor
+	return c.cursor
 }
 
 func (c *draggableCorner) Dragged(ev *fyne.DragEvent) {
@@ -662,9 +677,9 @@ func newDraggableBorder(w *InnerWindow, resizeDir resizeDirection) *draggableBor
 	case resizeLeft, resizeRight:
 		d.cursor = desktop.HResizeCursor
 	case resizeDownLeft, resizeUpRight:
-		d.cursor = desktop.PointerCursor
+		d.cursor = desktop.NESWResizeCursor
 	case resizeDownRight, resizeUpLeft:
-		d.cursor = desktop.PointerCursor
+		d.cursor = desktop.NWSEResizeCursor
 	default:
 		d.cursor = desktop.DefaultCursor
 	}

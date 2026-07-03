@@ -105,7 +105,7 @@ func NewConfigurator(getPort func() string) *ConfiguratorWidget {
 	}
 	t.apPasswordEntry.Disable()
 
-	t.wifiModeSelect = widget.NewSelect([]string{"AP", "STA", "AP+STA"}, func(s string) {
+	t.wifiModeSelect = widget.NewSelect([]string{"AP", "STA", "AP+STA", "BLE"}, func(s string) {
 		switch s {
 		case "AP":
 			t.apSSIDEntry.Enable()
@@ -128,6 +128,13 @@ func NewConfigurator(getPort func() string) *ConfiguratorWidget {
 			t.apChannelSelect.Enable()
 			t.staSSIDEntry.Enable()
 			t.staPasswordEntry.Enable()
+		case "BLE":
+			t.apSSIDEntry.Enable() // AP SSID doubles as the BLE device name
+			t.apPasswordEntry.Disable()
+			t.wifiModeSelect.Enable()
+			t.apChannelSelect.Disable()
+			t.staSSIDEntry.Disable()
+			t.staPasswordEntry.Disable()
 		}
 	})
 	t.wifiModeSelect.Disable()
@@ -187,8 +194,10 @@ func (t *ConfiguratorWidget) connect() {
 		t.wifiModeSelect.SetSelectedIndex(1) // STA mode
 	case 0x02:
 		t.wifiModeSelect.SetSelectedIndex(2) // AP+STA mode
+	case 0x03:
+		t.wifiModeSelect.SetSelectedIndex(3) // BLE mode
 	default:
-		dialog.ShowError(errors.New("unknown WiFi mode"), fyne.CurrentApp().Driver().AllWindows()[0])
+		dialog.ShowError(errors.New("unknown connection mode"), fyne.CurrentApp().Driver().AllWindows()[0])
 		return
 	}
 
@@ -349,8 +358,8 @@ func (t *ConfiguratorWidget) render() *ConfiguratorWidget {
 				nil,
 				t.restartButton,
 				container.NewVBox(
-					widget.NewLabel("WiFi Mode:"),
-					widget.NewLabel("AP SSID:"),
+					widget.NewLabel("Mode:"),
+					widget.NewLabel("AP SSID / BLE name:"),
 					widget.NewLabel("AP Channel:"),
 					widget.NewLabel("AP Password:"),
 					widget.NewLabel("STA SSID:"),

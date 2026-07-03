@@ -19,7 +19,6 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	xwidget "fyne.io/x/fyne/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/ecusymbol/as2"
 	"github.com/roffe/gocan"
@@ -30,6 +29,7 @@ import (
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/update"
+	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/ledicon"
@@ -91,7 +91,7 @@ type MainWindow struct {
 }
 
 type mainWindowSelects struct {
-	symbolLookup *xwidget.CompletionEntry
+	symbolLookup *widgets.CompletionEntry
 	ecuSelect    *widget.Select
 	presetSelect *widget.Select
 	layoutSelect *widget.Select

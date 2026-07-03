@@ -238,14 +238,27 @@ func (c *DualDial) SetValue2(value float64) {
 	}
 }
 
-func (c *DualDial) CreateRenderer() fyne.WidgetRenderer { return &DualDialRenderer{DualDial: c} }
+func (c *DualDial) CreateRenderer() fyne.WidgetRenderer {
+	objs := make([]fyne.CanvasObject, 0, len(c.pips)+len(c.pipLabels)+7)
+	for _, v := range c.pips {
+		objs = append(objs, v)
+	}
+	for _, v := range c.pipLabels {
+		if v != nil {
+			objs = append(objs, v)
+		}
+	}
+	objs = append(objs, c.face, c.titleText, c.center, c.needle2, c.needle, c.displayText, c.displayText2)
+	return &DualDialRenderer{d: c, objects: objs}
+}
 
 type DualDialRenderer struct {
-	*DualDial
+	d       *DualDial
 	objects []fyne.CanvasObject
 }
 
-func (c *DualDialRenderer) Layout(space fyne.Size) {
+func (r *DualDialRenderer) Layout(space fyne.Size) {
+	c := r.d
 	if c.size == space {
 		return
 	}
@@ -330,23 +343,7 @@ func (c *DualDialRenderer) Layout(space fyne.Size) {
 	}
 }
 
-func (c *DualDialRenderer) MinSize() fyne.Size { return c.minsize }
-func (c *DualDialRenderer) Refresh()           {}
-func (c *DualDialRenderer) Destroy()           {}
-
-func (c *DualDialRenderer) Objects() []fyne.CanvasObject {
-	if c.objects == nil {
-		objs := make([]fyne.CanvasObject, 0, len(c.pips)+len(c.pipLabels)+7)
-		for _, v := range c.pips {
-			objs = append(objs, v)
-		}
-		for _, v := range c.pipLabels {
-			if v != nil {
-				objs = append(objs, v)
-			}
-		}
-		objs = append(objs, c.face, c.titleText, c.center, c.needle2, c.needle, c.displayText, c.displayText2)
-		c.objects = objs
-	}
-	return c.objects
-}
+func (r *DualDialRenderer) MinSize() fyne.Size           { return r.d.minsize }
+func (r *DualDialRenderer) Refresh()                     {}
+func (r *DualDialRenderer) Destroy()                     {}
+func (r *DualDialRenderer) Objects() []fyne.CanvasObject { return r.objects }

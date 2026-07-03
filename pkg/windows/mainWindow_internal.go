@@ -13,9 +13,9 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
-	xwidget "fyne.io/x/fyne/widget"
 	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/common"
+	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
 
@@ -166,7 +166,7 @@ func (mw *MainWindow) loadPrefs() {
 }
 
 func (mw *MainWindow) newSymbolnameTypeahead() {
-	mw.selects.symbolLookup = xwidget.NewCompletionEntry([]string{})
+	mw.selects.symbolLookup = widgets.NewCompletionEntry([]string{})
 	mw.selects.symbolLookup.PlaceHolder = "Search for symbol"
 	mw.selects.symbolLookup.OnChanged = func(s string) {
 		if mw.fw == nil {

@@ -12,11 +12,11 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	xlayout "fyne.io/x/fyne/layout"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
+	xlayout "github.com/roffe/txlogger/pkg/layout"
 )
 
 const (

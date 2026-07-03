@@ -209,7 +209,19 @@ func (c *Dial) SetValue(value float64) {
 	}
 }
 
-func (c *Dial) CreateRenderer() fyne.WidgetRenderer { return &DialRenderer{d: c} }
+func (c *Dial) CreateRenderer() fyne.WidgetRenderer {
+	objs := make([]fyne.CanvasObject, 0, len(c.pips)+len(c.pipLabels)+5)
+	for _, v := range c.pips {
+		objs = append(objs, v)
+	}
+	for _, t := range c.pipLabels {
+		if t != nil {
+			objs = append(objs, t)
+		}
+	}
+	objs = append(objs, c.face, c.titleText, c.center, c.needle, c.displayText)
+	return &DialRenderer{d: c, objects: objs}
+}
 
 type DialRenderer struct {
 	d       *Dial
@@ -279,7 +291,7 @@ func (r *DialRenderer) Layout(space fyne.Size) {
 	for i, p := range c.pips {
 		if i%2 == 0 {
 			p.StrokeWidth = max(2.0, midStroke)
-			c.applySinCos(p, c.pipSin[i], c.pipCos[i], radius43, fourthRadius-1)
+			c.applySinCos(p, c.pipSin[i], c.pipCos[i], radius43, fourthRadius-2)
 
 			// Label for long pip
 			lbl := c.pipLabels[i]
@@ -299,7 +311,7 @@ func (r *DialRenderer) Layout(space fyne.Size) {
 			}
 		} else {
 			p.StrokeWidth = max(2.0, smallStroke)
-			c.applySinCos(p, c.pipSin[i], c.pipCos[i], radius87, eightRadius-1)
+			c.applySinCos(p, c.pipSin[i], c.pipCos[i], radius87, eightRadius-2)
 		}
 	}
 }
@@ -308,21 +320,4 @@ func (r *DialRenderer) MinSize() fyne.Size { return r.d.minsize }
 func (r *DialRenderer) Refresh()           {}
 func (r *DialRenderer) Destroy()           {}
 
-func (r *DialRenderer) Objects() []fyne.CanvasObject {
-	if r.objects == nil {
-		c := r.d
-		objs := make([]fyne.CanvasObject, 0, len(c.pips)+len(c.pipLabels)+6)
-		for _, v := range c.pips {
-			objs = append(objs, v)
-		}
-		for _, t := range c.pipLabels {
-			if t != nil {
-				objs = append(objs, t)
-			}
-		}
-		objs = append(objs, c.face, c.titleText, c.center,
-			c.needle, c.displayText)
-		r.objects = objs
-	}
-	return r.objects
-}
+func (r *DialRenderer) Objects() []fyne.CanvasObject { return r.objects }

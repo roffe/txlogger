@@ -1,13 +1,10 @@
 package bus
 
-import "sync"
+import (
+	"sync"
 
-// Number is the set of value types DIFFAggregator can subtract.
-type Number interface {
-	~int | ~int8 | ~int16 | ~int32 | ~int64 |
-		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
-		~float32 | ~float64
-}
+	"github.com/roffe/txlogger/pkg/common"
+)
 
 // DIFFAggregator subscribes to the first and second topics and, once both have
 // produced a value, publishes their difference (second - first) to the output
@@ -21,7 +18,7 @@ type Number interface {
 //
 // The returned unsubscribe function removes both input subscriptions; calling
 // it more than once is safe and has no further effect.
-func DIFFAggregator[K comparable, V Number](c *Controller[K, V], first, second, output K) (unsubscribe func()) {
+func DIFFAggregator[K comparable, V common.Number](c *Controller[K, V], first, second, output K) (unsubscribe func()) {
 	var (
 		mu            sync.Mutex
 		firstUpdated  bool
