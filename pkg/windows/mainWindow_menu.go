@@ -36,6 +36,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/symbolbrowser"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmmod"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmstatus"
+	"github.com/roffe/txlogger/pkg/widgets/trionic5/t5cli"
 	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7esp"
 )
 
@@ -131,6 +132,7 @@ func (mw *MainWindow) setupMenu() {
 			}),
 			fyne.NewMenuItemWithIcon("Compare symbols with other binary", theme.SearchReplaceIcon(), mw.openSymbolCompare),
 			fyne.NewMenuItemWithIcon("Matrix Builder", theme.InfoIcon(), mw.openMatrixBuilder),
+			fyne.NewMenuItemWithIcon("T5 CLI", theme.ComputerIcon(), mw.openT5CLI),
 			//fyne.NewMenuItemWithIcon("Rescale AccPedalMap", theme.GridIcon(), func() {
 			//	mw.openRescaler(symbol.ECU_T8, "TrqMastCal.X_AccPedalMAP")
 			//}),
@@ -175,6 +177,21 @@ func (mw *MainWindow) setupMenu() {
 
 	mw.leadingMenus = leading
 	mw.trailingMenus = trailing
+}
+
+func (mw *MainWindow) openT5CLI() {
+	if w := mw.wm.HasWindow("T5 CLI"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	cli := t5cli.New(func() (gocan.Adapter, error) {
+		return mw.settings.GetAdapter("T5")
+	})
+	inner := multiwindow.NewInnerWindow("T5 CLI", cli)
+	inner.Icon = theme.ComputerIcon()
+	inner.OnClose = cli.Close
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(700, 480))
 }
 
 func (mw *MainWindow) getAdapter() (gocan.Adapter, error) {
