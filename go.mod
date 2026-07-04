@@ -3,6 +3,7 @@ module github.com/roffe/txlogger
 go 1.26.0
 
 replace github.com/roffe/gocan => ../gocan
+
 //replace github.com/roffe/ecusymbol => ..\ecusymbol
 //replace fyne.io/fyne/v2 => ../fyne
 
@@ -11,7 +12,7 @@ replace github.com/roffe/gocan => ../gocan
 replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 
 require (
-	fyne.io/fyne/v2 v2.8.0-rc1.0.20260703173000-4a52a9fe8ec0
+	fyne.io/fyne/v2 v2.8.0-rc1.0.20260703210617-147177dcb3bb
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/lusingander/colorpicker v0.7.5
 	github.com/roffe/ecusymbol v1.2.5
