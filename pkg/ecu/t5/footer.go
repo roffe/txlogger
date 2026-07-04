@@ -7,42 +7,24 @@ import (
 	"strings"
 )
 
-var ecuFooter []byte
-
 func (t *Client) GetECUFooter(ctx context.Context) ([]byte, error) {
-	//if !t.bootloaded {
-	//	if err := t.UploadBootLoader(ctx); err != nil {
-	//		return err
-	//	}
-	//}
-	if len(ecuFooter) > 0 {
-		return ecuFooter, nil
+	if len(t.footer) > 0 {
+		return t.footer, nil
 	}
 
-	footer := make([]byte, 0x80)
-	var address uint32 = 0x7FF80 + 5
-
-	for i := 0; i < (0x80 / 6); i++ {
-		b, err := t.ReadMemoryByAddress(ctx, address)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get ECU footer: %v", err)
-		}
-		for j := 0; j < 6; j++ {
-			footer[(i*6)+j] = b[j]
-		}
-		address += 6
-	}
-	lastBytes, err := t.ReadMemoryByAddress(ctx, 0x7FFFF)
+	footer, err := t.readFlash(ctx, 0x7FF80, 0x80)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ECU footer: %v", err)
+		return nil, fmt.Errorf("failed to get ECU footer: %w", err)
 	}
 
-	for j := 2; j < 6; j++ {
-		footer[(0x80-6)+j] = lastBytes[j]
-	}
-
-	ecuFooter = footer
+	t.footer = footer
 	return footer, nil
+}
+
+// invalidateFooter must be called whenever the flash content changes
+// (erase/flash) so a stale footer is never used afterwards.
+func (t *Client) invalidateFooter() {
+	t.footer = nil
 }
 
 func GetIdentifierFromFooter(footer []byte, identifier byte) string {
@@ -53,6 +35,9 @@ func GetIdentifierFromFooter(footer []byte, identifier byte) string {
 		offset--
 		search := footer[offset]
 		offset--
+		if offset < 0 || length > offset+1 {
+			break // corrupt footer, entry would run past the start
+		}
 		if identifier == search {
 			for i := 0; i < length; i++ {
 				result.WriteByte(footer[offset])

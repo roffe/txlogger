@@ -2,11 +2,25 @@ package t5
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"time"
-
-	"github.com/roffe/gocan"
 )
+
+// Erase failure codes as documented in MyBooty.asm. For codes 01 and 02 the
+// reply also carries the address that failed in bytes 2-5.
+var eraseErrors = map[byte]string{
+	0x01: "unable to erase FLASH chips",
+	0x02: "cannot write zeroes to 28F512/010 chips",
+	0x03: "unrecognised FLASH chips, unknown make",
+	0x04: "unrecognised Intel FLASH chips",
+	0x05: "unrecognised AMD FLASH chips",
+	0x06: "unrecognised CSI/Catalyst FLASH chips",
+	0x07: "unrecognised Atmel FLASH chips",
+	0x08: "unrecognised Microchip/SST FLASH chips",
+	0x09: "unrecognised ST FLASH chips",
+	0x0A: "unrecognised AMIC FLASH chips",
+}
 
 func (t *Client) EraseECU(ctx context.Context) error {
 	startTime := time.Now()
@@ -18,17 +32,24 @@ func (t *Client) EraseECU(ctx context.Context) error {
 	t.cfg.OnProgress(-float64(100))
 	t.cfg.OnMessage("Erasing FLASH...")
 
-	cmd := []byte{0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-	frame := gocan.NewFrame(0x005, cmd, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frame, 20*time.Second, 0xC)
+	// Flash content changes no matter how this ends.
+	t.invalidateFooter()
+
+	data, err := t.command(ctx, []byte{0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, eraseTimeout)
 	if err != nil {
-		return err
+		return fmt.Errorf("erase failed: %w", err)
 	}
-	if resp.Data[0] == 0xC0 && resp.Data[1] == 0x00 {
-		t.cfg.OnMessage(fmt.Sprintf("FLASH erased, took: %s\n", time.Since(startTime).Round(time.Millisecond).String()))
+	if data[1] == 0x00 {
+		t.cfg.OnMessage(fmt.Sprintf("FLASH erased, took: %s", time.Since(startTime).Round(time.Millisecond).String()))
 		t.cfg.OnProgress(float64(100))
 		return nil
 	}
 
-	return fmt.Errorf("erase FAILED: %X", resp.Data)
+	if desc, ok := eraseErrors[data[1]]; ok {
+		if data[1] <= 0x02 {
+			return fmt.Errorf("erase failed: %s (address 0x%06X)", desc, binary.BigEndian.Uint32(data[2:6]))
+		}
+		return fmt.Errorf("erase failed: %s", desc)
+	}
+	return fmt.Errorf("erase failed: %X", data)
 }

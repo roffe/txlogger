@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/avast/retry-go/v4"
 	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/ecu"
 )
@@ -18,6 +19,13 @@ func init() {
 		Filter:  []uint32{0x00, 0x05, 0x06, 0x0C},
 	})
 }
+
+// Timeouts matching TrionicCANLib (GeneralTimeoutmS, EraseTimeoutmS, ChecksumTimeoutmS)
+const (
+	generalTimeout  = 1 * time.Second
+	eraseTimeout    = 60 * time.Second
+	checksumTimeout = 10 * time.Second
+)
 
 type ECUType int
 
@@ -45,62 +53,116 @@ const (
 )
 
 type Client struct {
-	c              *gocan.Client
-	defaultTimeout time.Duration
-	bootloaded     bool
-	//cb             model.ProgressCallback
-	cfg *ecu.Config
+	c          *gocan.Client
+	bootloaded bool
+	chipTypes  []byte
+	footer     []byte
+	cfg        *ecu.Config
 }
 
 func (t *Client) MarryECU(context.Context, string) error {
 	return errors.New("not supported")
 }
 
-func (t *Client) RecoverECU(context.Context, []byte) error {
-	return errors.New("not supported")
+// RecoverECU flashes without relying on the (possibly erased) flash footer:
+// the box type is determined from the FLASH chip id which is readable even
+// when the flash is blank. Requires the ECU to have stayed powered since the
+// failed flash so the SRAM bootloader is still reachable.
+func (t *Client) RecoverECU(ctx context.Context, bin []byte) error {
+	return t.FlashECU(ctx, bin)
 }
 
 func New(c *gocan.Client, cfg *ecu.Config) ecu.Client {
 	t := &Client{
-		c:              c,
-		cfg:            ecu.LoadConfig(cfg),
-		defaultTimeout: 250 * time.Millisecond,
+		c:   c,
+		cfg: ecu.LoadConfig(cfg),
 	}
 	return t
 }
 
-var chipTypes []byte
-
-func (t *Client) GetChipTypes(ctx context.Context) ([]byte, error) {
-	if len(chipTypes) > 0 {
-		return chipTypes, nil
-	}
-	frame := gocan.NewFrame(0x5, []byte{0xC9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frame, 150*time.Millisecond, 0xC)
+// command sends a single 8-byte bootloader command and validates the reply:
+// full 8 byte DLC and the first byte echoing back what we sent. Status byte
+// (Data[1]) semantics differ per command and are left to the caller.
+func (t *Client) command(ctx context.Context, payload []byte, timeout time.Duration) ([]byte, error) {
+	frame := gocan.NewFrame(0x5, payload, gocan.ResponseRequired)
+	resp, err := t.c.SendAndWait(ctx, frame, timeout, 0xC)
 	if err != nil {
 		return nil, err
 	}
-	if resp.Data[0] != 0xC9 || resp.Data[1] != 0x00 {
-		return nil, errors.New("invalid GetChipTypes response")
+	if resp.DLC() != 8 {
+		return nil, fmt.Errorf("short response to command %02X: %X", payload[0], resp.Data)
 	}
-	chipTypes = resp.Data[2:]
-	return chipTypes, nil
+	if resp.Data[0] != payload[0] {
+		return nil, fmt.Errorf("response echo mismatch for command %02X: %X", payload[0], resp.Data)
+	}
+	return resp.Data, nil
 }
 
+func (t *Client) GetChipTypes(ctx context.Context) ([]byte, error) {
+	if len(t.chipTypes) > 0 {
+		return t.chipTypes, nil
+	}
+	data, err := t.command(ctx, []byte{0xC9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, generalTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chip types: %w", err)
+	}
+	if data[1] != 0x00 {
+		return nil, fmt.Errorf("invalid GetChipTypes response: %X", data)
+	}
+	t.chipTypes = data[2:]
+	return t.chipTypes, nil
+}
+
+// ReadMemoryByAddress reads the 6 bytes at [address-5 .. address].
+// NOTE per MyBooty: reading outside the valid FLASH address range makes the
+// ECU restart, so callers must keep address within [start+5, 0x7FFFF].
 func (t *Client) ReadMemoryByAddress(ctx context.Context, address uint32) ([]byte, error) {
 	p := []byte{0xC7, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address), 0x00, 0x00, 0x00}
-	frame := gocan.NewFrame(0x5, p, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frame, 150*time.Millisecond, 0xC)
+	data, err := t.command(ctx, p, generalTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read memory by address: %v", err)
+		return nil, fmt.Errorf("failed to read memory by address: %w", err)
 	}
-	data := resp.Data[2:]
-	reverse(data)
-	return data, nil
+	if data[1] != 0x00 {
+		return nil, fmt.Errorf("read memory by address failed: %X", data)
+	}
+	out := make([]byte, 6)
+	copy(out, data[2:8])
+	reverse(out)
+	return out, nil
 }
 
 func reverse(s []byte) {
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
 		s[i], s[j] = s[j], s[i]
 	}
+}
+
+func (t *Client) readMemoryRetry(ctx context.Context, address uint32) ([]byte, error) {
+	return retry.DoWithData(
+		func() ([]byte, error) {
+			return t.ReadMemoryByAddress(ctx, address)
+		},
+		retry.Context(ctx),
+		retry.Attempts(3),
+		retry.LastErrorOnly(true),
+	)
+}
+
+// readFlash reads length (>= 6) bytes of flash starting at address with C7
+// reads. The final read is aligned to the end of the range so no read ever
+// goes past address+length-1.
+func (t *Client) readFlash(ctx context.Context, address uint32, length int) ([]byte, error) {
+	out := make([]byte, length)
+	for i := 0; i < length; i += 6 {
+		offset := i
+		if offset+6 > length {
+			offset = length - 6
+		}
+		b, err := t.readMemoryRetry(ctx, address+uint32(offset)+5)
+		if err != nil {
+			return nil, err
+		}
+		copy(out[offset:], b)
+	}
+	return out, nil
 }
