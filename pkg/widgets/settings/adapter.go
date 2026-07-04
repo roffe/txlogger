@@ -10,10 +10,14 @@ import (
 )
 
 func (sw *Widget) GetAdapter(ecuType string) (gocan.Adapter, error) {
-	return sw.GetAdapterWithExtraFilters(ecuType, nil)
+	return sw.GetAdapterWithExtraFilters(ecuType, nil, false)
 }
 
-func (sw *Widget) GetAdapterWithExtraFilters(ecuType string, filters []uint32) (gocan.Adapter, error) {
+func (sw *Widget) GetAdapterWithOverrideFilters(ecuType string, filters []uint32) (gocan.Adapter, error) {
+	return sw.GetAdapterWithExtraFilters(ecuType, filters, true)
+}
+
+func (sw *Widget) GetAdapterWithExtraFilters(ecuType string, filters []uint32, overrideFilters bool) (gocan.Adapter, error) {
 	baudrate, err := parseBaudrate(prefSpeed.getOr(""))
 	if err != nil {
 		return nil, err
@@ -30,6 +34,10 @@ func (sw *Widget) GetAdapterWithExtraFilters(ecuType string, filters []uint32) (
 	}
 
 	canFilter, canRate := canFilterAndRate(ecuType, adapterName, filters)
+
+	if overrideFilters && len(filters) > 0 {
+		canFilter = filters
+	}
 
 	cfg := &gocan.AdapterConfig{
 		Port:         port,

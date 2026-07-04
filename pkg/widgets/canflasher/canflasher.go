@@ -113,11 +113,7 @@ func (t *CanFlasherWidget) progress(v float64) {
 }
 
 func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
-	t.ecuSelect = widget.NewSelect([]string{"Trionic 5", "Trionic 7", "Trionic 8", "Trionic 8 MCP", "Z22SE", "Z22SE MCP"}, func(s string) {
-		fyne.CurrentApp().Preferences().SetString("canflasher_ecu", s)
-	})
-
-	t.ecuSelect.SetSelected(fyne.CurrentApp().Preferences().StringWithFallback("canflasher_ecu", "Trionic 5"))
+	t.ecuSelect = widget.NewSelect([]string{"Trionic 5", "Trionic 7", "Trionic 8", "Trionic 8 MCP", "Z22SE", "Z22SE MCP"}, nil)
 
 	t.logList = widget.NewListWithData(
 		t.logValues,
@@ -271,6 +267,7 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	t.container.Offset = 1
 
 	t.ecuSelect.OnChanged = func(s string) {
+		t.app.Preferences().SetString("canflasher_ecu", s)
 		if s != "Trionic 8" {
 			t.marryBTN.Hide()
 			t.recoveryBTN.Hide()
@@ -289,6 +286,8 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 			t.flashLabel.Show()
 		}
 	}
+
+	t.ecuSelect.SetSelected(t.app.Preferences().StringWithFallback("canflasher_ecu", "Trionic 5"))
 
 	//return widget.NewSimpleRenderer(t.container)
 	return &CanFlasherWidgetRenderer{

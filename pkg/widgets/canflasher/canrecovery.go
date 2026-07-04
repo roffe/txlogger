@@ -12,8 +12,7 @@ import (
 )
 
 func (t *CanFlasherWidget) ecuRecover(filename string) {
-
-	dev, err := t.cfg.CSW.GetAdapterWithExtraFilters(t.ecuSelect.Selected, []uint32{0x011, 0x311})
+	dev, err := t.cfg.CSW.GetAdapterWithExtraFilters(t.ecuSelect.Selected, []uint32{0x011, 0x311}, true)
 	if err != nil {
 		t.log(err.Error())
 		return
@@ -31,7 +30,7 @@ func (t *CanFlasherWidget) ecuRecover(filename string) {
 		ctx, cancel := context.WithTimeout(context.Background(), 1800*time.Second)
 		defer cancel()
 
-		//defer dev.Close()
+		// defer dev.Close()
 
 		fyne.Do(t.Disable)
 		defer fyne.Do(t.Enable)

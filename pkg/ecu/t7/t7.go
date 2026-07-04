@@ -18,7 +18,7 @@ func init() {
 		Name:    "Trionic 7",
 		NewFunc: New,
 		CANRate: 500,
-		Filter:  []uint32{0x238, 0x258, 0x266},
+		Filter:  []uint32{0x238, 0x258, 0x266, 0x270},
 	})
 }
 
@@ -173,7 +173,6 @@ func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 	f, err := t.c.SendAndWait(ctx, gocan.NewFrame(0x240, msg, gocan.ResponseRequired), t.defaultTimeout, 0x258)
 	if err != nil {
 		return false, fmt.Errorf("request seed: %v", err)
-
 	}
 	t.Ack(f.Data[0], gocan.ResponseRequired)
 
@@ -186,7 +185,6 @@ func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 	f2, err := t.c.SendAndWait(ctx, gocan.NewFrame(0x240, msgReply, gocan.ResponseRequired), t.defaultTimeout, 0x258)
 	if err != nil {
 		return false, fmt.Errorf("send seed: %v", err)
-
 	}
 	t.Ack(f2.Data[0], gocan.ResponseRequired)
 	if f2.Data[3] == 0x67 && f2.Data[5] == 0x34 {

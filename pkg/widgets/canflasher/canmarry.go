@@ -17,7 +17,7 @@ func (t *CanFlasherWidget) ecuMarry(pin string) {
 		return
 	}
 
-	dev, err := t.cfg.CSW.GetAdapterWithExtraFilters(t.ecuSelect.Selected, []uint32{0x645})
+	dev, err := t.cfg.CSW.GetAdapterWithExtraFilters(t.ecuSelect.Selected, []uint32{0x645}, false)
 	if err != nil {
 		t.log(err.Error())
 		return
@@ -42,7 +42,7 @@ func (t *CanFlasherWidget) ecuMarry(pin string) {
 		ctx, cancel := context.WithTimeout(context.Background(), 1800*time.Second)
 		defer cancel()
 
-		//defer dev.Close()
+		// defer dev.Close()
 
 		fyne.Do(t.Disable)
 		defer fyne.Do(t.Enable)
