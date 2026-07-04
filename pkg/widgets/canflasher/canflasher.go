@@ -8,9 +8,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 
 	// Import ecu packages
@@ -37,8 +35,8 @@ type CanFlasherWidget struct {
 
 	ecuSelect *widget.Select
 
-	logList     *widget.List
-	logValues   binding.StringList
+	logText     *widget.Label
+	logScroll   *container.Scroll
 	infoBTN     *widget.Button
 	dumpBTN     *widget.Button
 	flashBTN    *widget.Button
@@ -50,7 +48,6 @@ type CanFlasherWidget struct {
 	progressBar *widget.ProgressBar
 	flashLabel  *widget.Label
 	pinLabel    *widget.Label
-	l           binding.DataListener
 	cfg         *Config
 }
 
@@ -60,9 +57,8 @@ type Config struct {
 
 func New(cfg *Config) *CanFlasherWidget {
 	t := &CanFlasherWidget{
-		app:       fyne.CurrentApp(),
-		logValues: binding.NewStringList(),
-		cfg:       cfg,
+		app: fyne.CurrentApp(),
+		cfg: cfg,
 	}
 	t.ExtendBaseWidget(t)
 	return t
@@ -91,12 +87,15 @@ func (t *CanFlasherWidget) Enable() {
 }
 
 func (t *CanFlasherWidget) log(s string) {
-	var text string
+	text := "\n"
 	if s != "" {
 		text = fmt.Sprintf("%s - %s\n", time.Now().Format("15:04:05.000"), s)
 	}
-	//logData = append(logData, text)
-	t.logValues.Append(text)
+	fyne.Do(func() {
+		// ponytail: O(n²) string append, fine for flash-session log volumes
+		t.logText.SetText(t.logText.Text + text)
+		t.logScroll.ScrollToBottom()
+	})
 }
 
 func (t *CanFlasherWidget) progress(v float64) {
@@ -115,29 +114,10 @@ func (t *CanFlasherWidget) progress(v float64) {
 func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	t.ecuSelect = widget.NewSelect([]string{"Trionic 5", "Trionic 7", "Trionic 8", "Trionic 8 MCP", "Z22SE", "Z22SE MCP"}, nil)
 
-	t.logList = widget.NewListWithData(
-		t.logValues,
-		func() fyne.CanvasObject {
-			w := widget.NewLabel("")
-			w.TextStyle.Monospace = true
-			w.Selectable = true
-			return w
-		},
-		func(item binding.DataItem, obj fyne.CanvasObject) {
-			i := item.(binding.String)
-			txt, err := i.Get()
-			if err != nil {
-				panic(err)
-			}
-			obj.(*widget.Label).SetText(txt)
-		},
-	)
-
-	t.l = binding.NewDataListener(func() {
-		t.logList.ScrollToBottom()
-	})
-
-	t.logValues.AddListener(t.l)
+	t.logText = widget.NewLabel("")
+	t.logText.TextStyle.Monospace = true
+	t.logText.Selectable = true
+	t.logScroll = container.NewScroll(t.logText)
 
 	t.progressBar = widget.NewProgressBar()
 	t.pinEntry = widget.NewEntry()
@@ -243,7 +223,7 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	// t.speedList.PlaceHolder = "Select Speed"
 	t.flashLabel = widget.NewLabel("Flash options:")
 	t.pinLabel = widget.NewLabel("PIN code:")
-	left := container.New(layout.NewStackLayout(), t.logList)
+	left := t.logScroll
 	right := container.NewVBox(
 		t.ecuSelect,
 		t.infoBTN,
@@ -316,6 +296,4 @@ func (tr *CanFlasherWidgetRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{tr.t.container}
 }
 
-func (tr *CanFlasherWidgetRenderer) Destroy() {
-	tr.t.logValues.RemoveListener(tr.t.l)
-}
+func (tr *CanFlasherWidgetRenderer) Destroy() {}

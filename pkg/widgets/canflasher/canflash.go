@@ -2,7 +2,6 @@ package canflasher
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"time"
 
@@ -49,7 +48,7 @@ func (t *CanFlasherWidget) ecuFlash(filename string) {
 			t.log(e.String())
 		}))
 		if err != nil {
-			t.logValues.Append(err.Error())
+			t.log(err.Error())
 			return
 		}
 		defer c.Close()
@@ -57,12 +56,8 @@ func (t *CanFlasherWidget) ecuFlash(filename string) {
 		tr, err := ecu.New(c, &ecu.Config{
 			Name:       t.ecuSelect.Selected,
 			OnProgress: t.progress,
-			OnMessage: func(s string) {
-				t.logValues.Append(fmt.Sprintf("%s - %s\n", time.Now().Format("15:04:05.000"), s))
-			},
-			OnError: func(err error) {
-				t.logValues.Append(fmt.Sprintf("%s - %s\n", time.Now().Format("15:04:05.000"), err.Error()))
-			},
+			OnMessage:  t.log,
+			OnError:    func(err error) { t.log(err.Error()) },
 		})
 		if err != nil {
 			t.log(err.Error())
@@ -73,6 +68,16 @@ func (t *CanFlasherWidget) ecuFlash(filename string) {
 		if err != nil {
 			t.log(err.Error())
 			return
+		}
+
+		// Show what the ECU reports after flashing as confirmation the
+		// right bin landed (the bootloader is still running at this point).
+		if res, err := tr.Info(ctx); err == nil {
+			for _, r := range res {
+				t.log(r.String())
+			}
+		} else {
+			t.log(err.Error())
 		}
 
 		t.app.SendNotification(fyne.NewNotification("txlogger", "ECU flash completed"))

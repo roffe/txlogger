@@ -29,7 +29,7 @@ func (t *CanFlasherWidget) ecuInfo() {
 
 		c, err := gocan.NewWithOpts(ctx, dev)
 		if err != nil {
-			t.logValues.Append(err.Error())
+			t.log(err.Error())
 			return
 		}
 		defer c.Close()
@@ -37,8 +37,8 @@ func (t *CanFlasherWidget) ecuInfo() {
 		tr, err := ecu.New(c, &ecu.Config{
 			Name:       t.ecuSelect.Selected,
 			OnProgress: t.progress,
-			OnMessage:  func(s string) { t.logValues.Append(s) },
-			OnError:    func(err error) { t.logValues.Append(err.Error()) },
+			OnMessage:  t.log,
+			OnError:    func(err error) { t.log(err.Error()) },
 		})
 		if err != nil {
 			t.log(err.Error())

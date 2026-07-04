@@ -2,7 +2,6 @@ package canflasher
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
@@ -49,7 +48,7 @@ func (t *CanFlasherWidget) ecuMarry(pin string) {
 
 		c, err := gocan.NewWithOpts(ctx, dev)
 		if err != nil {
-			t.logValues.Append(err.Error())
+			t.log(err.Error())
 			return
 		}
 		defer c.Close()
@@ -57,12 +56,8 @@ func (t *CanFlasherWidget) ecuMarry(pin string) {
 		tr, err := ecu.New(c, &ecu.Config{
 			Name:       t.ecuSelect.Selected,
 			OnProgress: t.progress,
-			OnMessage: func(s string) {
-				t.logValues.Append(fmt.Sprintf("%s - %s\n", time.Now().Format("15:04:05.000"), s))
-			},
-			OnError: func(err error) {
-				t.logValues.Append(fmt.Sprintf("%s - %s\n", time.Now().Format("15:04:05.000"), err.Error()))
-			},
+			OnMessage:  t.log,
+			OnError:    func(err error) { t.log(err.Error()) },
 		})
 		if err != nil {
 			t.log(err.Error())
