@@ -13,8 +13,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/proto"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/widgets/txconfigurator"
 	"go.bug.st/serial/enumerator"
 )
@@ -87,7 +86,7 @@ func New(cfg *Config) *Widget {
 		wblImage: newImageFromResource("t7"),
 	}
 
-	for _, adapter := range gocan.ListAdapters() {
+	for _, adapter := range gocan.Adapters() {
 		sw.adapters[adapter.Name] = &adapter
 	}
 
@@ -186,27 +185,22 @@ func (sw *Widget) ListPorts() []string {
 	return portsList
 }
 
-func (sw *Widget) AddAdapters(adapters []*proto.AdapterInfo) {
+// AddAdapters extends the adapter list with adapters discovered after
+// startup (e.g. the 32-bit J2534 DLLs served by j2534proxy).
+func (sw *Widget) AddAdapters(adapters []gocan.AdapterInfo) {
 	if len(adapters) == 0 {
 		return
 	}
 	sw.mu.Lock()
-	defer sw.mu.Unlock()
 	for _, adapter := range adapters {
-		info := &gocan.AdapterInfo{
-			Name:        adapter.GetName(),
-			Description: adapter.GetDescription(),
-			Capabilities: gocan.AdapterCapabilities{
-				HSCAN: adapter.GetCapabilities().GetHSCAN(),
-				SWCAN: adapter.GetCapabilities().GetSWCAN(),
-				KLine: adapter.GetCapabilities().GetKLine(),
-			},
-			RequiresSerialPort: adapter.GetRequireSerialPort(),
-		}
-		if _, found := sw.adapters[info.Name]; found {
+		if _, found := sw.adapters[adapter.Name]; found {
 			continue
 		}
-		sw.adapters[info.Name] = info
+		sw.adapters[adapter.Name] = &adapter
+	}
+	sw.mu.Unlock()
+	if sw.adapterSelector != nil {
+		sw.adapterSelector.SetOptions(sw.sortedAdapterNames())
 	}
 }
 

@@ -21,8 +21,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/ecusymbol/as2"
-	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/proto"
+	"github.com/roffe/txlogger/j2534proxy/client"
 	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
@@ -37,7 +36,6 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -76,7 +74,7 @@ type MainWindow struct {
 	fw  symbol.SymbolCollection
 
 	dlc             datalogger.IClient
-	gwclient        proto.GocanClient
+	dlcCancel       context.CancelFunc
 	buttonsDisabled bool
 	settings        *settings.Widget
 	statusText      *widget.Label
@@ -84,8 +82,8 @@ type MainWindow struct {
 	content         *fyne.Container
 	startup         bool
 
-	gocanGatewayLED *ledicon.Widget
-	canLED          *ledicon.Widget
+	j2534LED *ledicon.Widget
+	canLED   *ledicon.Widget
 
 	previewFeatures bool
 }
@@ -133,7 +131,7 @@ func NewMainWindow(app fyne.App) *MainWindow {
 
 		symbolList: symbollist.New(symbolListConfig),
 
-		gocanGatewayLED: ledicon.New("Gateway"),
+		j2534LED:        ledicon.New("J2534"),
 		canLED:          ledicon.New("CAN"),
 		statusText:      widget.NewLabel("Harder, Better, Faster, Stronger"),
 		previewFeatures: app.Preferences().BoolWithFallback("enable_preview_features1337", false),
@@ -184,7 +182,7 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	mw.startup = false
 
 	if !fyne.CurrentApp().Driver().Device().IsMobile() {
-		mw.gocanGatewayClient()
+		mw.startJ2534Proxy()
 	}
 
 	mw.updateCheck()
@@ -214,22 +212,26 @@ func (mw *MainWindow) updateCheck() {
 	}
 }
 
-func (mw *MainWindow) gocanGatewayClient() {
-	_, client, err := gocan.NewGRPCClient()
-	if err != nil {
-		mw.Error(fmt.Errorf("failed to connect to gocan gateway: %w", err))
-		mw.gocanGatewayLED.Off()
+// startJ2534Proxy launches the 32-bit J2534 helper next to the executable
+// and folds the DLL adapters it serves into the settings adapter list. The
+// proxy keeps itself alive only as long as txlogger runs (stdin lifeline +
+// pings), so there is nothing to tear down on exit.
+func (mw *MainWindow) startJ2534Proxy() {
+	if runtime.GOOS != "windows" {
 		return
 	}
-
-	mw.gocanGatewayLED.On()
-	res, err := client.GetAdapters(context.Background(), &emptypb.Empty{})
-	if err != nil {
-		mw.Error(fmt.Errorf("failed to get adapters from gocan gateway: %w", err))
-		return
-	}
-	mw.settings.AddAdapters(res.Adapters)
-	mw.gwclient = client
+	go func() {
+		_, adapters, err := client.Start(context.Background(), debug.Log)
+		if err != nil {
+			debug.Log("j2534proxy: " + err.Error())
+			fyne.Do(mw.j2534LED.Off)
+			return
+		}
+		fyne.Do(func() {
+			mw.j2534LED.On()
+			mw.settings.AddAdapters(adapters)
+		})
+	}()
 }
 
 func (mw *MainWindow) setupShortcuts() {
@@ -275,7 +277,7 @@ func (mw *MainWindow) render() {
 		nil,
 		container.NewHBox(
 			container.NewHBox(
-				mw.gocanGatewayLED,
+				mw.j2534LED,
 				mw.canLED,
 				mw.counters.capturedCounterLabel,
 				mw.counters.errorCounterLabel,

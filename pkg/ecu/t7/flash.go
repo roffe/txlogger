@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 )
 
 func (t *Client) LoadBinFile(filename string) (int64, []byte, error) {
@@ -167,12 +167,12 @@ func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
 		}
 
 	}
-	end, err := t.c.SendAndWait(ctx, gocan.NewFrame(0x240, []byte{0x40, 0xA1, 0x01, 0x37, 0x00, 0x00, 0x00, 0x00}, gocan.ResponseRequired), t.defaultTimeout, 0x258)
+	end, err := t.request(ctx, []byte{0x40, 0xA1, 0x01, 0x37, 0x00, 0x00, 0x00, 0x00}, t.defaultTimeout)
 	if err != nil {
 		return fmt.Errorf("error waiting for data transfer exit reply: %v", err)
 	}
 	// Send acknowledgement
-	t.Ack(end.Data[0], gocan.Outgoing)
+	t.Ack(ctx, end.Data[0], false)
 
 	if end.Data[3] != 0x77 {
 		return errors.New("exit download mode failed")
@@ -190,17 +190,17 @@ func (t *Client) writeJump(ctx context.Context, offset, length int) error {
 
 	log.Printf("writeJump: offset=%d, length=%d", offset, length)
 	log.Printf("writeJump: jumpMsg=%X", jumpMsg)
-	if err := t.c.Send(0x240, jumpMsg, gocan.Outgoing); err != nil {
+	if err := t.c.Send(ctx, gocan.NewFrame(0x240, jumpMsg)); err != nil {
 		return fmt.Errorf("failed to enable request download #1: %w", err)
 	}
 	log.Printf("writeJump: jumpMsg2=%X", jumpMsg2)
 
-	f, err := t.c.SendAndWait(ctx, gocan.NewFrame(0x240, jumpMsg2, gocan.ResponseRequired), t.defaultTimeout, 0x258)
+	f, err := t.request(ctx, jumpMsg2, t.defaultTimeout)
 	if err != nil {
 		return fmt.Errorf("failed to enable request download #2: %w", err)
 	}
 
-	t.Ack(f.Data[0], gocan.Outgoing)
+	t.Ack(ctx, f.Data[0], false)
 
 	if f.Data[3] != 0x74 {
 		log.Println(f.String())
@@ -216,7 +216,7 @@ func (t *Client) writeRange(ctx context.Context, start, end int, bin []byte) err
 	rows := (length + 3) / 6
 	first := true
 	data := make([]byte, 8)
-	var resp *gocan.CANFrame
+	var resp gocan.Frame
 	for i := rows; i >= 0; i-- {
 		data[1] = 0xA1
 		select {
@@ -256,16 +256,16 @@ func (t *Client) writeRange(ctx context.Context, start, end int, bin []byte) err
 			}
 		}
 		if i > 0 {
-			// block until the adapter has written this frame, pacing the burst to
-			// the ECU (degrades to async send on adapters that don't confirm writes)
-			if err := t.c.SendSync(ctx, gocan.NewFrame(0x240, data, gocan.Outgoing), t.defaultTimeout); err != nil {
+			// Send blocks until the adapter has written this frame, pacing the
+			// burst to the ECU
+			if err := t.c.Send(ctx, gocan.NewFrame(0x240, data)); err != nil {
 				return fmt.Errorf("error writing 0x%X - 0x%X was at pos 0x%X: %w", start, end, binPos, err)
 			}
 			continue
 		}
-		// last frame: SendAndWait registers the 0x258 subscription before sending,
+		// last frame: Request registers the 0x258 subscription before sending,
 		// so a fast ECU reply can't slip through between the send and the receive
-		r, err := t.c.SendAndWait(ctx, gocan.NewFrame(0x240, data, gocan.ResponseRequired), t.defaultTimeout, 0x258)
+		r, err := t.request(ctx, data, t.defaultTimeout)
 		if err != nil {
 			return fmt.Errorf("error writing 0x%X - 0x%X was at pos 0x%X: %w", start, end, binPos, err)
 		}
@@ -273,7 +273,7 @@ func (t *Client) writeRange(ctx context.Context, start, end int, bin []byte) err
 	}
 
 	// Send acknowledgement
-	t.Ack(resp.Data[0], gocan.Outgoing)
+	t.Ack(ctx, resp.Data[0], false)
 
 	if resp.Data[3] != 0x76 {
 		if resp.Data[3] == 0x7F {

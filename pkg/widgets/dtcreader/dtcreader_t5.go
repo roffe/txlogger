@@ -8,7 +8,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/dtc"
 	"github.com/roffe/txlogger/pkg/t5can"
 )
@@ -33,7 +33,7 @@ func (d *DTCReader) getT5DTCSymbols() ([]*symbol.Symbol, error) {
 	return symbolsToCheck, nil
 }
 
-func (d *DTCReader) readT5DTCS(ctx context.Context, cl *gocan.Client) {
+func (d *DTCReader) readT5DTCS(ctx context.Context, cl *gocan.Bus) {
 	symbolsToCheck, err := d.getT5DTCSymbols()
 	if err != nil {
 		d.err(err)
@@ -69,7 +69,7 @@ func (d *DTCReader) readT5DTCS(ctx context.Context, cl *gocan.Client) {
 	})
 }
 
-func (d *DTCReader) clearT5DTCS(ctx context.Context, cl *gocan.Client) {
+func (d *DTCReader) clearT5DTCS(ctx context.Context, cl *gocan.Bus) {
 	symbolsToClear, err := d.getT5DTCSymbols()
 	if err != nil {
 		d.err(err)

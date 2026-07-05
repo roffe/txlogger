@@ -14,7 +14,6 @@ require (
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/lusingander/colorpicker v0.7.5
 	github.com/roffe/ecusymbol v1.2.5
-	github.com/roffe/gocan v1.4.8
 	go.bug.st/serial v1.7.1
 	golang.org/x/image v0.40.0
 	golang.org/x/mod v0.36.0

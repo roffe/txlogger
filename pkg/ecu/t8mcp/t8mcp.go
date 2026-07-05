@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/dtc"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ecu/t8legion"
@@ -27,13 +27,13 @@ func init() {
 }
 
 type Client struct {
-	c              *gocan.Client
+	c              *gocan.Bus
 	cfg            *ecu.Config
 	defaultTimeout time.Duration
 	legion         *t8legion.Client
 }
 
-func New(c *gocan.Client, cfg *ecu.Config) ecu.Client {
+func New(c *gocan.Bus, cfg *ecu.Config) ecu.Client {
 	t := &Client{
 		c:              c,
 		cfg:            ecu.LoadConfig(cfg),

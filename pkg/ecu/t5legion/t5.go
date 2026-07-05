@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ecu"
 )
 
@@ -45,15 +45,15 @@ const (
 )
 
 type Client struct {
-	c              *gocan.Client
+	c              *gocan.Bus
 	defaultTimeout time.Duration
 	bootloaded     bool
-	//cb             model.ProgressCallback
+	// cb             model.ProgressCallback
 	cfg       *ecu.Config
 	ecuFooter []byte
 }
 
-func New(c *gocan.Client, cfg *ecu.Config) ecu.Client {
+func New(c *gocan.Bus, cfg *ecu.Config) ecu.Client {
 	t := &Client{
 		c:              c,
 		cfg:            ecu.LoadConfig(cfg),
@@ -70,14 +70,20 @@ func (t *Client) RecoverECU(context.Context, []byte) error {
 	return errors.New("not supported")
 }
 
+// request sends a command frame on 0x5 and waits for the reply on 0xC.
+func (t *Client) request(ctx context.Context, payload []byte, timeout time.Duration) (gocan.Frame, error) {
+	rctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return t.c.Request(rctx, gocan.NewFrame(0x5, payload), 0xC)
+}
+
 var chipTypes []byte
 
 func (t *Client) GetChipTypes(ctx context.Context) ([]byte, error) {
 	if len(chipTypes) > 0 {
 		return chipTypes, nil
 	}
-	frame := gocan.NewFrame(0x5, []byte{0xC9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frame, 150*time.Millisecond, 0xC)
+	resp, err := t.request(ctx, []byte{0xC9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, 150*time.Millisecond)
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +96,7 @@ func (t *Client) GetChipTypes(ctx context.Context) ([]byte, error) {
 
 func (t *Client) ReadMemoryByAddress(ctx context.Context, address uint32) ([]byte, error) {
 	p := []byte{0xC7, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address), 0x00, 0x00, 0x00}
-	frame := gocan.NewFrame(0x5, p, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frame, 150*time.Millisecond, 0xC)
+	resp, err := t.request(ctx, p, 150*time.Millisecond)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read memory by address: %v", err)
 	}

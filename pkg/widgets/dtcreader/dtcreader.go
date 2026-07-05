@@ -12,7 +12,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/dtc"
 )
 
@@ -122,7 +122,7 @@ func (d *DTCReader) Refresh() {
 func (d *DTCReader) ReadDTCS() error {
 	ecu := d.getECU()
 
-	var readDTCSFunc func(context.Context, *gocan.Client)
+	var readDTCSFunc func(context.Context, *gocan.Bus)
 	switch ecu {
 	case "T5":
 		readDTCSFunc = d.readT5DTCS
@@ -148,11 +148,11 @@ func (d *DTCReader) ReadDTCS() error {
 			return
 		}
 
-		d.log("Connecting to device " + dev.Name())
+		d.log("Connecting to device " + gocan.AdapterName(dev))
 
 		// Events (incl. the final fatal) stream to the log; a fatal adapter
 		// failure also aborts any in-flight call below with that error.
-		cl, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
+		cl, err := gocan.OpenAdapter(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
 			d.log(e.String())
 		}))
 		if err != nil {
@@ -168,7 +168,7 @@ func (d *DTCReader) ReadDTCS() error {
 
 func (d *DTCReader) ClearDTCS() error {
 	ecu := d.getECU()
-	var clearDTCSFunc func(context.Context, *gocan.Client)
+	var clearDTCSFunc func(context.Context, *gocan.Bus)
 	switch ecu {
 	case "T5":
 		clearDTCSFunc = d.clearT5DTCS
@@ -191,11 +191,11 @@ func (d *DTCReader) ClearDTCS() error {
 			d.err(err)
 			return
 		}
-		d.log("Connecting to device " + dev.Name())
+		d.log("Connecting to device " + gocan.AdapterName(dev))
 
 		// Events (incl. the final fatal) stream to the log; a fatal adapter
 		// failure also aborts any in-flight call below with that error.
-		cl, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
+		cl, err := gocan.OpenAdapter(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
 			d.log(e.String())
 		}))
 		if err != nil {

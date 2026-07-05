@@ -2,11 +2,10 @@ package canflasher
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"fyne.io/fyne/v2"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ecu"
 )
 
@@ -23,21 +22,7 @@ func (t *CanFlasherWidget) ecuMarry(pin string) {
 	}
 	t.progressBar.SetValue(0)
 
-	done := make(chan struct{})
-
 	go func() {
-		for {
-			select {
-			case err := <-dev.Err():
-				log.Println("Error:", err)
-			case <-done:
-				return
-			}
-		}
-	}()
-
-	go func() {
-		defer close(done)
 		ctx, cancel := context.WithTimeout(context.Background(), 1800*time.Second)
 		defer cancel()
 
@@ -46,7 +31,9 @@ func (t *CanFlasherWidget) ecuMarry(pin string) {
 		fyne.Do(t.Disable)
 		defer fyne.Do(t.Enable)
 
-		c, err := gocan.NewWithOpts(ctx, dev)
+		c, err := gocan.OpenAdapter(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
+			t.log(e.String())
+		}))
 		if err != nil {
 			t.log(err.Error())
 			return

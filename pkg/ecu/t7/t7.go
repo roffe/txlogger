@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ecu"
 )
 
@@ -23,9 +23,16 @@ func init() {
 }
 
 type Client struct {
-	c              *gocan.Client
+	c              *gocan.Bus
 	defaultTimeout time.Duration
 	cfg            *ecu.Config
+}
+
+// request sends a command frame on 0x240 and waits for the reply on 0x258.
+func (t *Client) request(ctx context.Context, payload []byte, timeout time.Duration) (gocan.Frame, error) {
+	rctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return t.c.Request(rctx, gocan.NewFrame(0x240, payload), 0x258)
 }
 
 func (t *Client) MarryECU(context.Context, string) error {
@@ -36,7 +43,7 @@ func (t *Client) RecoverECU(context.Context, []byte) error {
 	return errors.New("not supported")
 }
 
-func New(c *gocan.Client, cfg *ecu.Config) ecu.Client {
+func New(c *gocan.Bus, cfg *ecu.Config) ecu.Client {
 	t := &Client{
 		c:              c,
 		cfg:            ecu.LoadConfig(cfg),
@@ -45,9 +52,13 @@ func New(c *gocan.Client, cfg *ecu.Config) ecu.Client {
 	return t
 }
 
-// 266h Send acknowledgement, has 0x3F on 3rd!
-func (t *Client) Ack(val byte, typ gocan.CANFrameType) error {
-	return t.c.Send(0x266, []byte{0x40, 0xA1, 0x3F, val & 0xBF, 0x00, 0x00, 0x00, 0x00}, typ)
+// 266h Send acknowledgement, has 0x3F on 3rd! expectReply hints buffered
+// (ELM/STN) adapters that another 0x258 frame follows this ack.
+func (t *Client) Ack(ctx context.Context, val byte, expectReply bool) error {
+	if expectReply {
+		ctx = gocan.WithExpectedResponses(ctx, 1)
+	}
+	return t.c.Send(ctx, gocan.NewFrame(0x266, []byte{0x40, 0xA1, 0x3F, val & 0xBF, 0x00, 0x00, 0x00, 0x00}))
 }
 
 var lastDataInitialization time.Time
@@ -62,11 +73,13 @@ func (t *Client) DataInitialization(ctx context.Context) error {
 
 	err := retry.Do(
 		func() error {
-			resp, err := t.c.SendAndWait(ctx, gocan.NewFrame(0x220, []byte{0x3F, 0x81, 0x00, 0x11, 0x02, 0x40, 0x00, 0x00}, gocan.ResponseRequired), t.defaultTimeout, 0x238)
+			rctx, cancel := context.WithTimeout(ctx, t.defaultTimeout)
+			defer cancel()
+			resp, err := t.c.Request(rctx, gocan.NewFrame(0x220, []byte{0x3F, 0x81, 0x00, 0x11, 0x02, 0x40, 0x00, 0x00}), 0x238)
 			if err != nil {
 				return fmt.Errorf("%v", err)
 			}
-			if !bytes.Equal(resp.Data, []byte{0x40, 0xBF, 0x21, 0xC1, 0x00, 0x11, 0x02, 0x58}) {
+			if !bytes.Equal(resp.Data[:], []byte{0x40, 0xBF, 0x21, 0xC1, 0x00, 0x11, 0x02, 0x58}) {
 				return fmt.Errorf("/!\\ Invalid data initialization response")
 			}
 
@@ -93,7 +106,7 @@ func (t *Client) DataInitialization(ctx context.Context) error {
 func (t *Client) GetHeader(ctx context.Context, id byte) (string, error) {
 	err := retry.Do(
 		func() error {
-			return t.c.Send(0x240, []byte{0x40, 0xA1, 0x02, 0x1A, id, 0x00, 0x00, 0x00}, gocan.ResponseRequired)
+			return t.c.Send(gocan.WithExpectedResponses(ctx, 1), gocan.NewFrame(0x240, []byte{0x40, 0xA1, 0x02, 0x1A, id, 0x00, 0x00, 0x00}))
 		},
 		retry.Context(ctx),
 		retry.Attempts(3),
@@ -111,7 +124,9 @@ func (t *Client) GetHeader(ctx context.Context, id byte) (string, error) {
 	var answer []byte
 	var length int
 	for i := 0; i < 10; i++ {
-		f, err := t.c.Recv(ctx, t.defaultTimeout, 0x258)
+		rctx, cancel := context.WithTimeout(ctx, t.defaultTimeout)
+		f, err := t.c.Recv(rctx, 0x258)
+		cancel()
 		if err != nil {
 			return "", err
 		}
@@ -136,10 +151,10 @@ func (t *Client) GetHeader(ctx context.Context, id byte) (string, error) {
 		}
 
 		if f.Data[0] == 0x80 || f.Data[0] == 0xC0 {
-			t.Ack(f.Data[0], gocan.Outgoing)
+			t.Ack(ctx, f.Data[0], false)
 			break
 		} else {
-			t.Ack(f.Data[0], gocan.ResponseRequired)
+			t.Ack(ctx, f.Data[0], true)
 		}
 	}
 
@@ -170,11 +185,11 @@ func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 	msg := []byte{0x40, 0xA1, 0x02, 0x27, 0x05, 0x00, 0x00, 0x00}
 	msgReply := []byte{0x40, 0xA1, 0x04, 0x27, 0x06, 0x00, 0x00, 0x00}
 
-	f, err := t.c.SendAndWait(ctx, gocan.NewFrame(0x240, msg, gocan.ResponseRequired), t.defaultTimeout, 0x258)
+	f, err := t.request(ctx, msg, t.defaultTimeout)
 	if err != nil {
 		return false, fmt.Errorf("request seed: %v", err)
 	}
-	t.Ack(f.Data[0], gocan.ResponseRequired)
+	t.Ack(ctx, f.Data[0], true)
 
 	s := int(f.Data[5])<<8 | int(f.Data[6])
 	k := calcen(s, method)
@@ -182,11 +197,11 @@ func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 	msgReply[5] = byte(int(k) >> 8 & int(0xFF))
 	msgReply[6] = byte(k) & 0xFF
 
-	f2, err := t.c.SendAndWait(ctx, gocan.NewFrame(0x240, msgReply, gocan.ResponseRequired), t.defaultTimeout, 0x258)
+	f2, err := t.request(ctx, msgReply, t.defaultTimeout)
 	if err != nil {
 		return false, fmt.Errorf("send seed: %v", err)
 	}
-	t.Ack(f2.Data[0], gocan.ResponseRequired)
+	t.Ack(ctx, f2.Data[0], true)
 	if f2.Data[3] == 0x67 && f2.Data[5] == 0x34 {
 		return true, nil
 	} else {
@@ -223,13 +238,13 @@ func (t *Client) LetMeTry(ctx context.Context, key1, key2 int) bool {
 	msg := []byte{0x40, 0xA1, 0x02, 0x27, 0x05, 0x00, 0x00, 0x00}
 	msgReply := []byte{0x40, 0xA1, 0x04, 0x27, 0x06, 0x00, 0x00, 0x00}
 
-	f, err := t.c.SendAndWait(ctx, gocan.NewFrame(0x240, msg, gocan.ResponseRequired), t.defaultTimeout, 0x258)
+	f, err := t.request(ctx, msg, t.defaultTimeout)
 	if err != nil {
 		log.Println(err)
 		return false
 
 	}
-	t.Ack(f.Data[0], gocan.ResponseRequired)
+	t.Ack(ctx, f.Data[0], true)
 
 	s := int(f.Data[5])<<8 | int(f.Data[6])
 	k := calcenCustom(s, key1, key2)
@@ -237,14 +252,14 @@ func (t *Client) LetMeTry(ctx context.Context, key1, key2 int) bool {
 	msgReply[5] = byte(int(k) >> 8 & int(0xFF))
 	msgReply[6] = byte(k) & 0xFF
 
-	f2, err := t.c.SendAndWait(ctx, gocan.NewFrame(0x240, msgReply, gocan.ResponseRequired), t.defaultTimeout, 0x258)
+	f2, err := t.request(ctx, msgReply, t.defaultTimeout)
 	if err != nil {
 		log.Println(err)
 		return false
 
 	}
 
-	t.Ack(f2.Data[0], gocan.ResponseRequired)
+	t.Ack(ctx, f2.Data[0], true)
 
 	if f2.Data[3] == 0x67 && f2.Data[5] == 0x34 {
 		return true
@@ -263,5 +278,5 @@ func calcenCustom(seed int, key1, key2 int) int {
 }
 
 func (t *Client) StopSession(ctx context.Context) error {
-	return t.c.Send(0x220, []byte{0x40, 0xA1, 0x02, 0x82, 0x00, 0x00, 0x00, 0x00}, gocan.ResponseRequired)
+	return t.c.Send(gocan.WithExpectedResponses(ctx, 1), gocan.NewFrame(0x220, []byte{0x40, 0xA1, 0x02, 0x82, 0x00, 0x00, 0x00, 0x00}))
 }

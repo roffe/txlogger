@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 )
 
 const (
@@ -36,29 +36,28 @@ var (
 )
 
 type LambdaToCAN struct {
-	c       *gocan.Client
+	c       *gocan.Bus
 	st      LambdaToCANStatus
 	running bool
 	mu      sync.Mutex
 }
 
-func NewLambdaToCAN(c *gocan.Client) *LambdaToCAN {
+func NewLambdaToCAN(c *gocan.Bus) *LambdaToCAN {
 	return &LambdaToCAN{c: c}
 }
 
 func (l *LambdaToCAN) Start(ctx context.Context) error {
 	l.running = true
-	sub := l.c.Subscribe(ctx, 0x664, 0x665)
+	ch := l.c.Subscribe(ctx, 0x664, 0x665)
 	go func() {
-		defer sub.Close()
 		for l.running {
 			select {
-			case msg, ok := <-sub.Chan():
+			case msg, ok := <-ch:
 				if !ok {
 					log.Println("channel closed")
 					return //channel closed
 				}
-				if err := l.decodeCAN(msg.Identifier, msg.Data); err != nil {
+				if err := l.decodeCAN(msg.ID, msg.Bytes()); err != nil {
 					log.Println(err)
 				}
 			case <-ctx.Done():

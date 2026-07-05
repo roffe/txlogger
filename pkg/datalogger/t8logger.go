@@ -9,8 +9,8 @@ import (
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/pkg/gmlan"
+	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/gmlan"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu/t8sec"
 )
@@ -38,11 +38,11 @@ const (
 	lastPresentInterval = 2500 * time.Millisecond
 )
 
-func (c *T8Client) Start() error {
+func (c *T8Client) Start(pctx context.Context) error {
 	defer c.secondTicker.Stop()
 	defer c.lw.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
 	eventHandler := func(e gocan.Event) {
@@ -52,7 +52,7 @@ func (c *T8Client) Start() error {
 		}
 	}
 
-	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventFunc(eventHandler))
+	cl, err := gocan.OpenAdapter(ctx, c.Device, gocan.WithEventFunc(eventHandler))
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (c *T8Client) Start() error {
 	return cl.Wait(ctx)
 }
 
-func (c *T8Client) run(ctx context.Context, cl *gocan.Client, gm *gmlan.Client, channels []Channel) {
+func (c *T8Client) run(ctx context.Context, cl *gocan.Bus, gm *gmlan.Client, channels []Channel) {
 	defer cl.Close()
 
 	var timeStamp time.Time

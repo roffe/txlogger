@@ -1,12 +1,13 @@
 package datalogger
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/debug"
 )
 
@@ -23,7 +24,9 @@ type LogWriter interface {
 }
 
 type IClient interface {
-	Start() error
+	// Start runs the logging session until ctx is cancelled, Close is
+	// called or a fatal error occurs.
+	Start(ctx context.Context) error
 	SetRAM(address uint32, data []byte) error
 	GetRAM(address uint32, length uint32) ([]byte, error)
 	Close()
@@ -81,7 +84,8 @@ func New(cfg Config) (IClient, string, error) {
 		return datalogger, filename, nil
 	}
 
-	if cfg.Device.Name() == "txbridge wifi" || cfg.Device.Name() == "txbridge bluetooth" {
+	devName := gocan.AdapterName(cfg.Device)
+	if devName == "txbridge wifi" || devName == "txbridge bluetooth" {
 		dc, err := NewTxbridge(cfg, lw)
 		if err != nil {
 			return nil, "", err
@@ -118,9 +122,9 @@ func New(cfg Config) (IClient, string, error) {
 	return datalogger, filename, nil
 }
 
-func (d *Client) Start() error {
+func (d *Client) Start(ctx context.Context) error {
 	d.cfg.ErrorCounter(0)
 	d.cfg.CaptureCounter(0)
 	d.cfg.FpsCounter(0)
-	return d.IClient.Start()
+	return d.IClient.Start(ctx)
 }

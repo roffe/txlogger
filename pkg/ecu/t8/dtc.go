@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/roffe/gocan/pkg/gmlan"
+	"github.com/roffe/gocan/v2/gmlan"
 	"github.com/roffe/txlogger/pkg/dtc"
 )
 

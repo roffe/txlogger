@@ -1,8 +1,6 @@
 package windows
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"os"
 	"path"
@@ -13,7 +11,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
-	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
@@ -51,15 +48,6 @@ func (mw *MainWindow) Close() {
 		mw.Log("Closing datalogger client")
 		mw.dlc.Close()
 		time.Sleep(250 * time.Millisecond)
-	}
-	if mw.gwclient != nil {
-		mw.Log("Sending quit command to cangateway")
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		_, err := mw.gwclient.SendCommand(ctx, &proto.Command{Data: []byte("quit")})
-		if err != nil {
-			mw.Error(fmt.Errorf("error sending quit to cangateway: %w", err))
-		}
 	}
 	mw.Window.Close()
 	time.Sleep(200 * time.Millisecond)

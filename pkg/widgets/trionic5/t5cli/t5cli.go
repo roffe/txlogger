@@ -21,7 +21,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 )
 
 const (
@@ -64,7 +64,7 @@ type Widget struct {
 	getAdapter func() (gocan.Adapter, error)
 
 	// client, symbols and verbose are only touched by the worker goroutine.
-	client  *gocan.Client
+	client  *gocan.Bus
 	symbols []Symbol
 	verbose bool
 
@@ -179,8 +179,8 @@ func (w *Widget) connect() error {
 	if err != nil {
 		return err
 	}
-	w.print("connecting to " + dev.Name() + "...")
-	cl, err := gocan.NewWithOpts(w.ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
+	w.print("connecting to " + gocan.AdapterName(dev) + "...")
+	cl, err := gocan.OpenAdapter(w.ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
 		w.print(e.String())
 	}))
 	if err != nil {
@@ -441,8 +441,9 @@ func (w *Widget) sendRaw(line string) {
 		}
 		data = append(data, byte(b))
 	}
-	frame := gocan.NewFrame(uint32(id), data, gocan.Outgoing)
-	reply, err := w.client.SendAndWait(w.ctx, frame, charTimeout, respID)
+	rctx, cancel := context.WithTimeout(w.ctx, charTimeout)
+	defer cancel()
+	reply, err := w.client.Request(rctx, gocan.NewFrame(uint32(id), data), respID)
 	if err != nil {
 		w.printf("  sent, no reply (%v)", err)
 		return
@@ -451,9 +452,10 @@ func (w *Widget) sendRaw(line string) {
 }
 
 // txWait sends a frame on reqID and waits for one reply on respID.
-func (w *Widget) txWait(data []byte, timeout time.Duration) (*gocan.CANFrame, error) {
-	frame := gocan.NewFrame(reqID, data, gocan.Outgoing)
-	reply, err := w.client.SendAndWait(w.ctx, frame, timeout, respID)
+func (w *Widget) txWait(data []byte, timeout time.Duration) (gocan.Frame, error) {
+	rctx, cancel := context.WithTimeout(w.ctx, timeout)
+	defer cancel()
+	reply, err := w.client.Request(rctx, gocan.NewFrame(reqID, data), respID)
 	if err == nil && w.verbose {
 		w.print("    " + frame2str(reply))
 	}
@@ -461,8 +463,8 @@ func (w *Widget) txWait(data []byte, timeout time.Duration) (*gocan.CANFrame, er
 }
 
 // outChar returns the monitor output byte carried in a reply frame [0xC6, 0x00, char].
-func outChar(f *gocan.CANFrame) (byte, bool) {
-	if len(f.Data) >= 3 {
+func outChar(f gocan.Frame) (byte, bool) {
+	if f.Length >= 3 {
 		return f.Data[2], true
 	}
 	return 0, false
@@ -514,8 +516,8 @@ func render(b []byte) string {
 	return fmt.Sprintf("%-*s %q", 3*len(b), strings.TrimRight(hex.String(), " "), asc.String())
 }
 
-func frame2str(f *gocan.CANFrame) string {
-	return fmt.Sprintf("0x%02X | %s", f.Identifier, render(f.Data))
+func frame2str(f gocan.Frame) string {
+	return fmt.Sprintf("0x%02X | %s", f.ID, render(f.Bytes()))
 }
 
 // historyEntry is a single-line Entry with an in-memory command history

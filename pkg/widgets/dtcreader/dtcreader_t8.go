@@ -5,12 +5,12 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/pkg/gmlan"
+	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/gmlan"
 	"github.com/roffe/txlogger/pkg/dtc"
 )
 
-func (d *DTCReader) readT8DTCS(ctx context.Context, cl *gocan.Client) {
+func (d *DTCReader) readT8DTCS(ctx context.Context, cl *gocan.Bus) {
 	gm := gmlan.New(cl, 0x7e0, 0x7e8)
 
 	if err := gm.InitiateDiagnosticOperation(ctx, gmlan.LEV_DADTC); err != nil {
@@ -42,7 +42,7 @@ func (d *DTCReader) readT8DTCS(ctx context.Context, cl *gocan.Client) {
 	fyne.Do(d.Refresh)
 }
 
-func (d *DTCReader) clearT8DTCS(ctx context.Context, cl *gocan.Client) {
+func (d *DTCReader) clearT8DTCS(ctx context.Context, cl *gocan.Bus) {
 	gm := gmlan.New(cl, 0x7e0, 0x7e8)
 
 	if err := gm.InitiateDiagnosticOperation(ctx, gmlan.LEV_DADTC); err != nil {

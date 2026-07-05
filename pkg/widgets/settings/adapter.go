@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ota"
 )
 
@@ -39,21 +39,16 @@ func (sw *Widget) GetAdapterWithExtraFilters(ecuType string, filters []uint32, o
 		canFilter = filters
 	}
 
-	cfg := &gocan.AdapterConfig{
+	cfg := gocan.Config{
 		Port:         port,
 		PortBaudrate: baudrate,
 		CANRate:      canRate,
 		CANFilter:    canFilter,
 		Debug:        prefDebug.get(),
-		PrintVersion: true,
-	}
-
-	if strings.HasPrefix(adapterName, "J2534") {
-		return gocan.NewGWClient(adapterName, cfg)
 	}
 
 	if adapterName == "txbridge wifi" {
-		cfg.AdditionalConfig = map[string]string{
+		cfg.Extra = map[string]string{
 			"minversion": ota.MinimumtxbridgeVersion,
 		}
 	}

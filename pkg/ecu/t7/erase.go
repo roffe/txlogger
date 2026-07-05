@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/roffe/gocan"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
@@ -24,12 +23,12 @@ func (t *Client) EraseECU(ctx context.Context) error {
 	data[3] = 0
 	i := 0
 	for data[3] != 0x71 && i < 30 {
-		f, err := t.c.SendAndWait(ctx, gocan.NewFrame(0x240, eraseMsg, gocan.ResponseRequired), t.defaultTimeout, 0x258)
+		f, err := t.request(ctx, eraseMsg, t.defaultTimeout)
 		if err != nil {
 			return err
 		}
-		data = f.Data
-		t.Ack(data[0], gocan.Outgoing)
+		data = f.Data[:]
+		t.Ack(ctx, data[0], false)
 		i++
 		progress++
 		t.cfg.OnProgress(float64(progress))
@@ -44,12 +43,12 @@ func (t *Client) EraseECU(ctx context.Context) error {
 	i = 0
 	eraseMsg[4] = kwp2000.RLI_ERASE
 	for data[3] != 0x71 && i < 200 {
-		f, err := t.c.SendAndWait(ctx, gocan.NewFrame(0x240, eraseMsg, gocan.ResponseRequired), t.defaultTimeout, 0x258)
+		f, err := t.request(ctx, eraseMsg, t.defaultTimeout)
 		if err != nil {
 			return err
 		}
-		data = f.Data
-		t.Ack(data[0], gocan.Outgoing)
+		data = f.Data[:]
+		t.Ack(ctx, data[0], false)
 		i++
 		progress++
 		t.cfg.OnProgress(float64(progress))
@@ -64,11 +63,11 @@ func (t *Client) EraseECU(ctx context.Context) error {
 	i = 0
 	for data[3] != 0x7E && i < 10 {
 		time.Sleep(250 * time.Millisecond)
-		f, err := t.c.SendAndWait(ctx, gocan.NewFrame(0x240, confirmMsg, gocan.ResponseRequired), t.defaultTimeout, 0x258)
+		f, err := t.request(ctx, confirmMsg, t.defaultTimeout)
 		if err != nil {
 			return err
 		}
-		data = f.Data
+		data = f.Data[:]
 		i++
 		progress++
 

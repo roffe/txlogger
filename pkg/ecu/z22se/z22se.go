@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/pkg/gmlan"
+	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/gmlan"
 	"github.com/roffe/txlogger/pkg/dtc"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ecu/t8legion"
@@ -29,7 +29,7 @@ func init() {
 }
 
 type Client struct {
-	c              *gocan.Client
+	c              *gocan.Bus
 	defaultTimeout time.Duration
 	legion         *t8legion.Client
 	gm             *gmlan.Client
@@ -41,7 +41,7 @@ func (t *Client) ReadDTC(context.Context) ([]dtc.DTC, error) {
 	return nil, nil
 }
 
-func New(c *gocan.Client, cfg *ecu.Config) ecu.Client {
+func New(c *gocan.Bus, cfg *ecu.Config) ecu.Client {
 	t := &Client{
 		c:              c,
 		cfg:            ecu.LoadConfig(cfg),

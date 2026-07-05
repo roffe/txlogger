@@ -6,7 +6,8 @@ import (
 	"log"
 	"strconv"
 
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2/pkg/serialcommand"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/wbl/aem"
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
@@ -29,7 +30,9 @@ type WBLConfig struct {
 	Txbridge bool
 }
 
-func New(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvider, error) {
+// txbridge WBL config and readings travel as the dongle's 'w' serial
+// commands, reached through the native txbridge adapter's methods.
+func New(ctx context.Context, cl *gocan.Bus, cfg *WBLConfig) (LambdaProvider, error) {
 	if cfg.Log == nil {
 		cfg.Log = func(str string) {
 			log.Println(str)
@@ -63,7 +66,27 @@ func New(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvider,
 	}
 }
 
-func newECUMaster(ctx context.Context, cl *gocan.Client) (LambdaProvider, error) {
+// txbridgeAdapter is the slice of the native txbridge adapter's command
+// surface the WBL readers need.
+type txbridgeAdapter interface {
+	Command(cmd byte, data []byte) error
+	Subscribe(ctx context.Context, cmds ...byte) <-chan *serialcommand.SerialCommand
+}
+
+// txbridgeWBL arms the dongle's wideband reader (command 'w' <type>) and
+// returns the reading subscription.
+func txbridgeWBL(ctx context.Context, cl *gocan.Bus, wblType byte) (<-chan *serialcommand.SerialCommand, error) {
+	tb, ok := cl.Adapter().(txbridgeAdapter)
+	if !ok {
+		return nil, fmt.Errorf("txbridge WBL needs the txbridge adapter")
+	}
+	if err := tb.Command('w', []byte{wblType}); err != nil {
+		return nil, err
+	}
+	return tb.Subscribe(ctx, 'w'), nil
+}
+
+func newECUMaster(ctx context.Context, cl *gocan.Bus) (LambdaProvider, error) {
 	wblClient := ecumaster.NewLambdaToCAN(cl)
 	if err := wblClient.Start(ctx); err != nil {
 		return nil, err
@@ -71,32 +94,31 @@ func newECUMaster(ctx context.Context, cl *gocan.Client) (LambdaProvider, error)
 	return wblClient, nil
 }
 
-func newInnovate(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvider, error) {
+func newInnovate(ctx context.Context, cl *gocan.Bus, cfg *WBLConfig) (LambdaProvider, error) {
 	wblClient, err := innovate.NewISP2Client(cfg.Port, cfg.Log)
 	if err != nil {
 		return nil, err
 	}
+	var ch <-chan *serialcommand.SerialCommand
 	if cfg.Txbridge {
-		if err := cl.Send(gocan.SystemMsg, []byte{'w', 1, 'i', 'i'}, gocan.Outgoing); err != nil {
+		var err error
+		if ch, err = txbridgeWBL(ctx, cl, 'i'); err != nil {
 			return nil, err
 		}
 	}
 	wblClient.Start(ctx)
 	if cfg.Txbridge {
-		wblSub := cl.Subscribe(ctx, gocan.SystemMsgWBLReading)
 		go func() {
-			ch := wblSub.Chan()
 			defer cfg.Log("wbl channel closed")
 			for msg := range ch {
 				wblClient.SetData(msg.Data)
 			}
-
 		}()
 	}
 	return wblClient, nil
 }
 
-func newAEM(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvider, error) {
+func newAEM(ctx context.Context, cl *gocan.Bus, cfg *WBLConfig) (LambdaProvider, error) {
 	wblClient, err := aem.NewAEMuegoClient(cfg.Port, cfg.Log)
 	if err != nil {
 		return nil, err
@@ -104,12 +126,11 @@ func newAEM(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 	switch cfg.Port {
 	case "txbridge":
 		cfg.Log("Starting AEM txbridge client")
-		if err := cl.Send(gocan.SystemMsg, []byte{'w', 1, 'a', 'a'}, gocan.Outgoing); err != nil {
+		ch, err := txbridgeWBL(ctx, cl, 'a')
+		if err != nil {
 			return nil, err
 		}
-		wblSub := cl.Subscribe(ctx, gocan.SystemMsgWBLReading)
 		go func() {
-			ch := wblSub.Chan()
 			defer cfg.Log("wbl reading channel closed")
 			for msg := range ch {
 				// create a float from the message
@@ -125,17 +146,15 @@ func newAEM(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 		}()
 	case "CAN":
 		cfg.Log("Starting AEM CAN client")
-		wblSub := cl.Subscribe(ctx, 0x180)
+		ch := cl.Subscribe(ctx, 0x180)
 		go func() {
-			// defer wblSub.Close()
-			ch := wblSub.Chan()
 			defer cfg.Log("wbl channel closed")
 			for msg := range ch {
 				// We should only get extended frames here
 				if !msg.Extended {
 					continue
 				}
-				wblClient.SetData(msg.Data)
+				wblClient.SetData(msg.Bytes())
 			}
 		}()
 	default:
@@ -147,19 +166,17 @@ func newAEM(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 	return wblClient, nil
 }
 
-func newPLX(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvider, error) {
+func newPLX(ctx context.Context, cl *gocan.Bus, cfg *WBLConfig) (LambdaProvider, error) {
 	wblClient, err := plx.NewIMFDClient(cfg.Port, nil, cfg.Log)
 	if err != nil {
 		return nil, err
 	}
 	if cfg.Txbridge && cfg.Port == "txbridge" {
-		if err := cl.Send(gocan.SystemMsg, []byte{'w', 1, 'p', 'p'}, gocan.Outgoing); err != nil {
+		ch, err := txbridgeWBL(ctx, cl, 'p')
+		if err != nil {
 			return nil, err
 		}
-		wblSub := cl.Subscribe(ctx, gocan.SystemMsgWBLReading)
-
 		go func() {
-			ch := wblSub.Chan()
 			defer cfg.Log("wbl channel closed")
 			for msg := range ch {
 				if err := wblClient.Parse(msg.Data); err != nil {
@@ -175,19 +192,17 @@ func newPLX(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvid
 	return wblClient, nil
 }
 
-func newZeitronix(ctx context.Context, cl *gocan.Client, cfg *WBLConfig) (LambdaProvider, error) {
+func newZeitronix(ctx context.Context, cl *gocan.Bus, cfg *WBLConfig) (LambdaProvider, error) {
 	wblClient, err := zeitronix.NewZeitronixClient(cfg.Port, cfg.Log)
 	if err != nil {
 		return nil, err
 	}
 	if cfg.Txbridge && cfg.Port == "txbridge" {
-		if err := cl.Send(gocan.SystemMsg, []byte{'w', 1, 'z', 'z'}, gocan.Outgoing); err != nil {
+		ch, err := txbridgeWBL(ctx, cl, 'z')
+		if err != nil {
 			return nil, err
 		}
-		wblSub := cl.Subscribe(ctx, gocan.SystemMsgWBLReading)
-
 		go func() {
-			ch := wblSub.Chan()
 			defer cfg.Log("wbl channel closed")
 			for msg := range ch {
 				if err := wblClient.SetData(msg.Data); err != nil {

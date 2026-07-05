@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/pkg/serialcommand"
+	"github.com/roffe/gocan/v2/pkg/serialcommand"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ebus"
 )
 
-func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
+func (c *TxBridge) t5(pctx context.Context, cl *gocan.Bus) error {
 	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
@@ -33,15 +33,14 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 		channels = append(channels, newSysvarChannel(c.sysvars, name))
 	}
 
-	expectedPayloadSize, err := c.configureT5Symbols(cl)
+	expectedPayloadSize, err := c.configureT5Symbols()
 	if err != nil {
 		return fmt.Errorf("error configuring symbols: %w", err)
 	}
 
-	tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
-	defer tx.Close()
+	tx := c.tb.Subscribe(ctx, 'r')
 
-	if err := c.startLogging(cl); err != nil {
+	if err := c.startLogging(); err != nil {
 		return fmt.Errorf("error starting logging: %w", err)
 	}
 
@@ -51,7 +50,7 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 	go func() {
 		defer cl.Close()
 		defer func() {
-			_ = c.stopLogging(cl) // stop the dongle's read loop before closing the connection
+			_ = c.stopLogging() // stop the dongle's read loop before closing the connection
 			time.Sleep(50 * time.Millisecond)
 		}()
 		lastData := time.Now()
@@ -87,14 +86,9 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 					},
 				}
 				read.Address += uint32(toRead)
-				payload, err := cmd.MarshalBinary()
-				if err != nil {
-					c.onError()
-					c.OnMessage(err.Error())
-					continue
-				}
-				frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
-				resp, err := cl.SendAndWait(ctx, frame, 3*time.Second, gocan.SystemMsgDataRequest)
+				rctx, rcancel := context.WithTimeout(ctx, 3*time.Second)
+				resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'R')
+				rcancel()
 				if err != nil {
 					read.Complete(err)
 					continue
@@ -124,21 +118,15 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 				write.Address += uint32(toWrite)
 				write.Length -= toWrite
 
-				payload, err := cmd.MarshalBinary()
+				rctx, rcancel := context.WithTimeout(ctx, 5*time.Second)
+				resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'W', 'e')
+				rcancel()
 				if err != nil {
 					write.Complete(err)
 					continue
 				}
 
-				frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
-
-				resp, err := cl.SendAndWait(ctx, frame, 5*time.Second, gocan.SystemMsgWriteResponse)
-				if err != nil {
-					write.Complete(err)
-					continue
-				}
-
-				if resp.Identifier == gocan.SystemMsgError {
+				if resp.Command == 'e' {
 					write.Complete(fmt.Errorf("error response: % 02X", resp.Data))
 					continue
 				}
@@ -153,16 +141,16 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 				}
 				write.Complete(nil)
 				continue
-			case msg, ok := <-tx.Chan():
+			case msg, ok := <-tx:
 				if !ok {
 					c.OnMessage("txbridge sub closed")
 					return
 				}
 				lastData = time.Now()
 
-				if msg.DLC() != (expectedPayloadSize + 4) {
+				if len(msg.Data) != (expectedPayloadSize + 4) {
 					c.onError()
-					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, msg.DLC()))
+					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, len(msg.Data)))
 					continue
 				}
 
@@ -221,7 +209,7 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Client) error {
 //
 // The stub/table layout (t5GatherStub, buildT5GatherImage) is shared with the
 // generic-adapter fast logger in t5fastlogger.go.
-func (c *TxBridge) enableT5Gather(ctx context.Context, cl *gocan.Client) error {
+func (c *TxBridge) enableT5Gather(ctx context.Context, cl *gocan.Bus) error {
 	image, err := buildT5GatherImage(c.Symbols)
 	if err != nil {
 		return err
@@ -230,7 +218,7 @@ func (c *TxBridge) enableT5Gather(ctx context.Context, cl *gocan.Client) error {
 	if err := c.uploadT5SRAM(ctx, cl, t5GatherStubAddr, image); err != nil {
 		return fmt.Errorf("gather upload: %w", err)
 	}
-	if err := cl.Send(gocan.SystemMsg, []byte("g"), gocan.Outgoing); err != nil {
+	if err := c.tb.Raw([]byte("g")); err != nil {
 		return err
 	}
 	c.OnMessage(fmt.Sprintf("T5 gather enabled (%d symbols, %d byte image)", len(c.Symbols), len(image)))
@@ -245,7 +233,7 @@ func (c *TxBridge) enableT5Gather(ctx context.Context, cl *gocan.Client) error {
 // The index byte is the write offset within the armed block and MUST stay <= 0x7F
 // (the ECU routes a first byte > 0x7F to the command table, not the write path),
 // so chunk into blocks, re-arming at each block's base so the offset restarts at 0.
-func (c *TxBridge) uploadT5SRAM(ctx context.Context, cl *gocan.Client, address uint32, data []byte) error {
+func (c *TxBridge) uploadT5SRAM(ctx context.Context, cl *gocan.Bus, address uint32, data []byte) error {
 	const maxBlock = 112 // 16 frames, max offset 105 (0x69) — well under 0x7F
 	for blkStart := 0; blkStart < len(data); blkStart += maxBlock {
 		blkEnd := min(blkStart+maxBlock, len(data))
@@ -260,11 +248,13 @@ func (c *TxBridge) uploadT5SRAM(ctx context.Context, cl *gocan.Client, address u
 		// is exactly what must never happen on a live engine (see Trionic5.md).
 		arm := []byte{0xA5, byte(blkAddr >> 24), byte(blkAddr >> 16), byte(blkAddr >> 8), byte(blkAddr), byte(len(block)), 0x00, 0x00}
 		if err := retry.Do(func() error {
-			resp, err := cl.SendAndWait(ctx, gocan.NewFrame(0x5, arm, gocan.ResponseRequired), 500*time.Millisecond, 0xC)
+			rctx, rcancel := context.WithTimeout(ctx, 500*time.Millisecond)
+			defer rcancel()
+			resp, err := cl.Request(rctx, gocan.NewFrame(0x5, arm), 0xC)
 			if err != nil {
 				return err
 			}
-			if resp.DLC() < 2 || resp.Data[0] != 0xA5 || resp.Data[1] != 0x00 {
+			if resp.Length < 2 || resp.Data[0] != 0xA5 || resp.Data[1] != 0x00 {
 				return retry.Unrecoverable(fmt.Errorf("rejected (engine must be off to arm): % 02X", resp.Data))
 			}
 			return nil
@@ -279,11 +269,13 @@ func (c *TxBridge) uploadT5SRAM(ctx context.Context, cl *gocan.Client, address u
 				frame[1+i] = block[off+i]
 			}
 			if err := retry.Do(func() error {
-				resp, err := cl.SendAndWait(ctx, gocan.NewFrame(0x5, frame, gocan.ResponseRequired), 250*time.Millisecond, 0xC)
+				rctx, rcancel := context.WithTimeout(ctx, 250*time.Millisecond)
+				defer rcancel()
+				resp, err := cl.Request(rctx, gocan.NewFrame(0x5, frame), 0xC)
 				if err != nil {
 					return err
 				}
-				if resp.DLC() < 2 || resp.Data[0] != byte(off) || resp.Data[1] != 0x00 {
+				if resp.Length < 2 || resp.Data[0] != byte(off) || resp.Data[1] != 0x00 {
 					return retry.Unrecoverable(fmt.Errorf("rejected: % 02X", resp.Data))
 				}
 				return nil
@@ -298,7 +290,7 @@ func (c *TxBridge) uploadT5SRAM(ctx context.Context, cl *gocan.Client, address u
 // t5new is a test variant of t5 that enables the gather fast-logger. Identical to
 // t5 except for the enableT5Gather call before startLogging. Flip the dispatch in
 // txbridgelogger.go (c.t5 -> c.t5new) to try it; merge into t5 once validated.
-func (c *TxBridge) t5new(pctx context.Context, cl *gocan.Client) error {
+func (c *TxBridge) t5new(pctx context.Context, cl *gocan.Bus) error {
 	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
@@ -315,7 +307,7 @@ func (c *TxBridge) t5new(pctx context.Context, cl *gocan.Client) error {
 		channels = append(channels, newSysvarChannel(c.sysvars, name))
 	}
 
-	expectedPayloadSize, err := c.configureT5Symbols(cl) // configure the symbol list in the dongle and get the expected payload size
+	expectedPayloadSize, err := c.configureT5Symbols() // configure the symbol list in the dongle and get the expected payload size
 	if err != nil {
 		return fmt.Errorf("error configuring symbols: %w", err)
 	}
@@ -325,10 +317,9 @@ func (c *TxBridge) t5new(pctx context.Context, cl *gocan.Client) error {
 		return fmt.Errorf("error enabling gather: %w", err)
 	}
 
-	tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
-	defer tx.Close()
+	tx := c.tb.Subscribe(ctx, 'r')
 
-	if err := c.startLogging(cl); err != nil {
+	if err := c.startLogging(); err != nil {
 		return fmt.Errorf("error starting logging: %w", err)
 	}
 
@@ -338,7 +329,7 @@ func (c *TxBridge) t5new(pctx context.Context, cl *gocan.Client) error {
 	go func() {
 		defer cl.Close()
 		defer func() {
-			_ = c.stopLogging(cl)
+			_ = c.stopLogging()
 			time.Sleep(50 * time.Millisecond)
 		}()
 		lastData := time.Now()
@@ -374,14 +365,9 @@ func (c *TxBridge) t5new(pctx context.Context, cl *gocan.Client) error {
 					},
 				}
 				read.Address += uint32(toRead)
-				payload, err := cmd.MarshalBinary()
-				if err != nil {
-					c.onError()
-					c.OnMessage(err.Error())
-					continue
-				}
-				frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
-				resp, err := cl.SendAndWait(ctx, frame, 3*time.Second, gocan.SystemMsgDataRequest)
+				rctx, rcancel := context.WithTimeout(ctx, 3*time.Second)
+				resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'R')
+				rcancel()
 				if err != nil {
 					read.Complete(err)
 					continue
@@ -411,21 +397,15 @@ func (c *TxBridge) t5new(pctx context.Context, cl *gocan.Client) error {
 				write.Address += uint32(toWrite)
 				write.Length -= toWrite
 
-				payload, err := cmd.MarshalBinary()
+				rctx, rcancel := context.WithTimeout(ctx, 5*time.Second)
+				resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'W', 'e')
+				rcancel()
 				if err != nil {
 					write.Complete(err)
 					continue
 				}
 
-				frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
-
-				resp, err := cl.SendAndWait(ctx, frame, 5*time.Second, gocan.SystemMsgWriteResponse)
-				if err != nil {
-					write.Complete(err)
-					continue
-				}
-
-				if resp.Identifier == gocan.SystemMsgError {
+				if resp.Command == 'e' {
 					write.Complete(fmt.Errorf("error response: % 02X", resp.Data))
 					continue
 				}
@@ -440,16 +420,16 @@ func (c *TxBridge) t5new(pctx context.Context, cl *gocan.Client) error {
 				}
 				write.Complete(nil)
 				continue
-			case msg, ok := <-tx.Chan():
+			case msg, ok := <-tx:
 				if !ok {
 					c.OnMessage("txbridge sub closed")
 					return
 				}
 				lastData = time.Now()
 
-				if msg.DLC() != (expectedPayloadSize + 4) {
+				if len(msg.Data) != (expectedPayloadSize + 4) {
 					c.onError()
-					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, msg.DLC()))
+					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, len(msg.Data)))
 					continue
 				}
 
@@ -499,7 +479,7 @@ func (c *TxBridge) t5new(pctx context.Context, cl *gocan.Client) error {
 	return cl.Wait(ctx)
 }
 
-func (c *TxBridge) configureT5Symbols(cl *gocan.Client) (int, error) {
+func (c *TxBridge) configureT5Symbols() (int, error) {
 	var expectedPayloadSize uint16
 	var symbollist []byte
 	for _, sym := range c.Symbols {
@@ -508,15 +488,7 @@ func (c *TxBridge) configureT5Symbols(cl *gocan.Client) (int, error) {
 		expectedPayloadSize += sym.Length
 		// deletelog.Printf("Symbol: %s, offset: %X, length: %d\n", sym.Name, sym.SramOffset, sym.Length)
 	}
-	cmd := &serialcommand.SerialCommand{
-		Command: 'd',
-		Data:    symbollist,
-	}
-	payload, err := cmd.MarshalBinary()
-	if err != nil {
-		return -1, err
-	}
-	if err := cl.Send(gocan.SystemMsg, payload, gocan.Outgoing); err != nil {
+	if err := c.tb.Command('d', symbollist); err != nil {
 		return -1, err
 	}
 	c.OnMessage("Symbol list configured")

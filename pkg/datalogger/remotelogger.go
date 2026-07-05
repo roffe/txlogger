@@ -1,6 +1,7 @@
 package datalogger
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
@@ -24,7 +25,7 @@ func NewRemote(cfg Config, lw LogWriter) (IClient, error) {
 	}, nil
 }
 
-func (c *RemoteClient) Start() error {
+func (c *RemoteClient) Start(ctx context.Context) error {
 	defer c.secondTicker.Stop()
 	defer c.lw.Close()
 
