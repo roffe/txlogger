@@ -10,11 +10,11 @@ go 1.26.0
 replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 
 require (
-	fyne.io/fyne/v2 v2.8.0-rc1.0.20260703210617-147177dcb3bb
+	fyne.io/fyne/v2 v2.8.0-rc1.0.20260704205643-617033b3e69c
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/lusingander/colorpicker v0.7.5
 	github.com/roffe/ecusymbol v1.2.5
-	github.com/roffe/gocan v1.4.7
+	github.com/roffe/gocan v1.4.8
 	go.bug.st/serial v1.7.1
 	golang.org/x/image v0.40.0
 	golang.org/x/mod v0.36.0
@@ -42,7 +42,6 @@ require (
 	github.com/bendikro/dl v0.0.0-20190410215913-e41fdb9069d4 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/ebitengine/purego v0.9.1 // indirect
-	github.com/fatih/color v1.19.0 // indirect
 	github.com/fredbi/uri v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fyne-io/gl-js v0.2.1-0.20260315212741-029c47fd27e8 // indirect
@@ -62,8 +61,6 @@ require (
 	github.com/jeandeaual/go-locale v0.0.0-20250612000132-0ef82f21eade // indirect
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
-	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/mattn/go-runewidth v0.0.17 // indirect
 	github.com/mdlayher/netlink v1.8.0 // indirect
 	github.com/mdlayher/socket v0.5.1 // indirect
