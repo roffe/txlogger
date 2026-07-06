@@ -79,5 +79,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	kernel.org/pub/linux/libs/security/libcap/psx v1.2.78 // indirect
 )
-
-replace github.com/roffe/gocan/v2 => ../gocan/v2
