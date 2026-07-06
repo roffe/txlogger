@@ -400,7 +400,7 @@ func initT7logging(ctx context.Context, kwp *kwp2000.Client, symbols []*symbol.S
 		// log.Println("Define:", sym.String())
 
 		if err := kwp.DynamicallyDefineLocalIdBySymbolNumber(ctx, index, sym.Number); err != nil {
-			return errors.New("failed to define dynamic register")
+			return fmt.Errorf("failed to define dynamic register: %w", err)
 		}
 		index++
 		time.Sleep(12 * time.Millisecond)

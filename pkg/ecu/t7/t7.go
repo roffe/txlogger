@@ -103,60 +103,36 @@ func (t *Client) DataInitialization(ctx context.Context) error {
 	return nil
 }
 
+// GetHeader reads an ECU identification field (KWP2000 service 0x1A).
 func (t *Client) GetHeader(ctx context.Context, id byte) (string, error) {
-	err := retry.Do(
-		func() error {
-			return t.c.Send(gocan.WithExpectedResponses(ctx, 1), gocan.NewFrame(0x240, []byte{0x40, 0xA1, 0x02, 0x1A, id, 0x00, 0x00, 0x00}))
-		},
-		retry.Context(ctx),
-		retry.Attempts(3),
-	)
+	resp, err := t.request(ctx, []byte{0x40, 0xA1, 0x02, 0x1A, id, 0x00, 0x00, 0x00}, t.defaultTimeout)
 	if err != nil {
-		return "", fmt.Errorf("failed getting header: %v", err)
+		return "", fmt.Errorf("failed getting header: %w", err)
+	}
+	if resp.Data[3] == 0x7F {
+		return "", fmt.Errorf("failed getting header: %w", TranslateErrorCode(resp.Data[5]))
 	}
 
-	select {
-	case <-ctx.Done():
-		return "", fmt.Errorf("failed getting header: %v", err)
-	default:
-	}
+	remaining := max(0, int(resp.Data[2])-2) // KWP length minus service + field id echo
+	answer := make([]byte, 0, remaining)
+	n := min(remaining, 3) // first frame carries up to 3 data bytes at index 5
+	answer = append(answer, resp.Data[5:5+n]...)
+	remaining -= n
 
-	var answer []byte
-	var length int
-	for i := 0; i < 10; i++ {
+	// low 6 bits of byte 0 count the frames still to come; each 0x266 ack
+	// is itself a request whose reply is the next 0x258 chunk.
+	for resp.Data[0]&0x3F != 0 {
 		rctx, cancel := context.WithTimeout(ctx, t.defaultTimeout)
-		f, err := t.c.Recv(rctx, 0x258)
+		resp, err = t.c.Request(rctx, gocan.NewFrame(0x266, []byte{0x40, 0xA1, 0x3F, resp.Data[0] &^ 0x40, 0x00, 0x00, 0x00, 0x00}), 0x258)
 		cancel()
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("failed getting header: %w", err)
 		}
-		if f.Data[0]&0x40 == 0x40 {
-			if int(f.Data[2]) > 2 {
-				length = int(f.Data[2]) - 2
-			}
-			for b := 5; b < 8; b++ {
-				if length > 0 {
-					answer = append(answer, f.Data[b])
-				}
-				length--
-			}
-		} else {
-			for c := 0; c < 6; c++ {
-				if length == 0 {
-					break
-				}
-				answer = append(answer, f.Data[2+c])
-				length--
-			}
-		}
-
-		if f.Data[0] == 0x80 || f.Data[0] == 0xC0 {
-			t.Ack(ctx, f.Data[0], false)
-			break
-		} else {
-			t.Ack(ctx, f.Data[0], true)
-		}
+		n := min(remaining, 6)
+		answer = append(answer, resp.Data[2:2+n]...)
+		remaining -= n
 	}
+	t.Ack(ctx, resp.Data[0], false) // final frame acked with no reply expected
 
 	return string(answer), nil
 }
@@ -278,5 +254,9 @@ func calcenCustom(seed int, key1, key2 int) int {
 }
 
 func (t *Client) StopSession(ctx context.Context) error {
-	return t.c.Send(gocan.WithExpectedResponses(ctx, 1), gocan.NewFrame(0x220, []byte{0x40, 0xA1, 0x02, 0x82, 0x00, 0x00, 0x00, 0x00}))
+	// bound the exchange: buffered adapters wait out the ctx deadline for the
+	// hinted reply, and the ECU does not always answer 0x82.
+	rctx, cancel := context.WithTimeout(ctx, t.defaultTimeout)
+	defer cancel()
+	return t.c.Send(gocan.WithExpectedResponses(rctx, 1), gocan.NewFrame(0x220, []byte{0x40, 0xA1, 0x02, 0x82, 0x00, 0x00, 0x00, 0x00}))
 }

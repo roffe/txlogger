@@ -49,6 +49,7 @@ func Start(ctx context.Context, logf func(string)) (*Proxy, []gocan.AdapterInfo,
 	}
 
 	cmd := exec.Command(exe)
+	hideConsole(cmd)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, nil, err
@@ -189,19 +190,27 @@ func (a *Adapter) Open(ctx context.Context, bus *gocan.Bus) error {
 		conn.Close()
 		return err
 	}
-	cmd, payload, err := protocol.Read(conn)
-	if err != nil {
-		conn.Close()
-		return err
-	}
-	switch cmd {
-	case protocol.CmdOpenOK:
-	case protocol.CmdOpenErr:
-		conn.Close()
-		return errors.New(string(payload))
-	default:
-		conn.Close()
-		return fmt.Errorf("unexpected open reply %q", cmd)
+	for {
+		cmd, payload, err := protocol.Read(conn)
+		if err != nil {
+			conn.Close()
+			return err
+		}
+		if cmd == protocol.CmdEvent { // adapter events may precede the open reply
+			if len(payload) >= 1 {
+				bus.Emit(gocan.Event{Type: gocan.EventType(payload[0]), Details: string(payload[1:])})
+			}
+			continue
+		}
+		if cmd == protocol.CmdOpenErr {
+			conn.Close()
+			return errors.New(string(payload))
+		}
+		if cmd != protocol.CmdOpenOK {
+			conn.Close()
+			return fmt.Errorf("unexpected open reply %q", cmd)
+		}
+		break
 	}
 	a.conn = conn
 

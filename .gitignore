@@ -13,6 +13,12 @@ dist
 *.dat
 *.exe
 *.zip
+!pkg/dtc/wis/wis.zip
+
+# raw SAAB WIS dumps used by pkg/dtc/wis/gen.go
+/pkg/dtc/9400/
+/pkg/dtc/9440/
+/pkg/dtc/9600/
 debug.log
 symbols.txt
 *.o

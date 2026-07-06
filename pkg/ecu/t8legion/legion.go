@@ -89,11 +89,24 @@ func (t *Client) request(ctx context.Context, payload []byte, timeout time.Durat
 	return t.c.Request(rctx, gocan.NewFrame(t.canID, payload), t.recvID...)
 }
 
-// recv waits for a single reply on t.recvID, bounded by timeout.
-func (t *Client) recv(ctx context.Context, timeout time.Duration) (gocan.Frame, error) {
-	rctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	return t.c.Recv(rctx, t.recvID...)
+// blockResponse subscribes for the ECU reply on t.recvID and returns a wait
+// func. Call it BEFORE sending a consecutive-frame block: subscribing after
+// the last frame races the reply on fast adapters and loses it.
+func (t *Client) blockResponse(ctx context.Context) func(timeout time.Duration) (gocan.Frame, error) {
+	sctx, cancel := context.WithCancel(ctx)
+	ch := t.c.Subscribe(sctx, t.recvID...)
+	return func(timeout time.Duration) (gocan.Frame, error) {
+		defer cancel()
+		select {
+		case f, ok := <-ch:
+			if !ok {
+				return gocan.Frame{}, gocan.ErrClosed
+			}
+			return f, nil
+		case <-time.After(timeout):
+			return gocan.Frame{}, fmt.Errorf("block response: %w", context.DeadlineExceeded)
+		}
+	}
 }
 
 func (t *Client) StartBootloader(ctx context.Context, startAddress uint32) error {
@@ -126,6 +139,7 @@ func (t *Client) UploadBootloader(ctx context.Context, z22se bool) error {
 		if err := t.gm.TransferData(ctx, 0x00, 0xF0, startAddress); err != nil {
 			return err
 		}
+		wait := t.blockResponse(ctx)
 		var seq byte = 0x21
 		for j := 0; j <= 0x21; j++ {
 			payload := []byte{seq, 0, 0, 0, 0, 0, 0, 0}
@@ -153,7 +167,7 @@ func (t *Client) UploadBootloader(ctx context.Context, z22se bool) error {
 			t.cfg.OnProgress(float64(progress))
 			time.Sleep(500 * time.Microsecond)
 		}
-		resp, err := t.recv(ctx, t.defaultTimeout*2)
+		resp, err := wait(t.defaultTimeout * 2)
 		if err != nil {
 			return err
 		}
@@ -193,7 +207,7 @@ func (t *Client) UploadBootloader(ctx context.Context, z22se bool) error {
 	startAddress += 0x06
 
 	t.cfg.OnProgress(float64(9997))
-	t.cfg.OnMessage(fmt.Sprintf("Done, took: %s", time.Since(start).String()))
+	t.cfg.OnMessage(fmt.Sprintf("Done, took: %s", time.Since(start).Truncate(10*time.Millisecond).String()))
 
 	return nil
 }
@@ -224,6 +238,7 @@ func (t *Client) UploadZ22sePreloader(ctx context.Context) error {
 		if err := t.gm.TransferData(ctx, 0x00, 0xF0, startAddress); err != nil {
 			return err
 		}
+		wait := t.blockResponse(ctx)
 		var seq byte = 0x21
 		for j := 0; j <= 0x21; j++ {
 			payload := []byte{seq, 0, 0, 0, 0, 0, 0, 0}
@@ -254,7 +269,7 @@ func (t *Client) UploadZ22sePreloader(ctx context.Context) error {
 			}
 
 		}
-		resp, err := t.recv(ctx, t.defaultTimeout*2)
+		resp, err := wait(t.defaultTimeout * 2)
 		if err != nil {
 			return err
 		}
@@ -294,7 +309,7 @@ func (t *Client) UploadZ22sePreloader(ctx context.Context) error {
 	startAddress += 0x06
 
 	t.cfg.OnProgress(float64(9997))
-	t.cfg.OnMessage(fmt.Sprintf("Done, took: %s", time.Since(start).String()))
+	t.cfg.OnMessage(fmt.Sprintf("Done, took: %s", time.Since(start).Truncate(10*time.Millisecond).String()))
 
 	return nil
 }
@@ -403,7 +418,7 @@ func (t *Client) GetMD5(ctx context.Context, md5type Command, partition uint16) 
 //	whish:
 //	Which pin to read.
 func (t *Client) IDemand(ctx context.Context, command Command, wish uint16) ([]byte, error) {
-	//log.Println("Legion i demand", command.String()+"!")
+	// log.Println("Legion i demand", command.String()+"!")
 	payload := []byte{0x02, 0xA5, byte(command), 0x00, 0x00, 0x00, byte(wish >> 8), byte(wish)}
 
 	var out []byte
@@ -421,11 +436,11 @@ func (t *Client) IDemand(ctx context.Context, command Command, wish uint16) ([]b
 		switch command {
 		case 0:
 			// Settings correctly received.
-			//log.Println("settings correctly received")
+			// log.Println("settings correctly received")
 			return nil
 		case 1:
 			// Crc-32; complete
-			//log.Println("crc-32 complete")
+			// log.Println("crc-32 complete")
 			out = resp.Data[4:]
 			return nil
 		case 2, 3:
@@ -435,15 +450,15 @@ func (t *Client) IDemand(ctx context.Context, command Command, wish uint16) ([]b
 				return err
 			}
 			out = b
-			//log.Println("md5 complete")
+			// log.Println("md5 complete")
 			return nil
 		case 4:
 			// Secondary loader is alive!
-			//log.Println("Master!, Secondary loader alive")
+			// log.Println("Master!, Secondary loader alive")
 			return nil
 		case 5:
 			// Marriage; Complete
-			//log.Println("Master, the marriage has been completed")
+			// log.Println("Master, the marriage has been completed")
 			return nil
 		case 6:
 			// ADC-read; complete
@@ -603,7 +618,7 @@ func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, f
 	t.cfg.OnMessage("Writing flash")
 	const startAddress = 0x000000
 	var length byte = 0x88
-	var numberOfFrames = 19
+	numberOfFrames := 19
 	var blockNumber int = 0
 	var lastBlockNumber int = (lastAddress / 0x80) - 1
 	var byteswapped bool = false
@@ -634,6 +649,7 @@ func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, f
 			if err := t.gm.TransferData(ctx, 0x00, length, currentAddress); err != nil {
 				problem = true
 			} else {
+				wait := t.blockResponse(ctx)
 				iFrameNumber := 0x21
 				txpnt := 0
 				for i := 0; i < numberOfFrames; i++ {
@@ -644,13 +660,20 @@ func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, f
 					iFrameNumber++
 					iFrameNumber &= 0x2F
 					txpnt += 7
-					if err := t.c.Send(ctx, frame); err != nil {
+					var err error
+					if i == numberOfFrames-1 {
+						// last frame of the block: hint buffered adapters that the ECU replies
+						sctx, cancel := context.WithTimeout(gocan.WithExpectedResponses(ctx, 1), t.defaultTimeout*4)
+						err = t.c.Send(sctx, frame)
+						cancel()
+					} else {
+						err = t.c.Send(ctx, frame)
+					}
+					if err != nil {
 						return err
 					}
 				}
-				rctx, cancel := context.WithTimeout(ctx, time.Millisecond*150)
-				resp, err := t.c.Recv(rctx, 0x7E8)
-				cancel()
+				resp, err := wait(time.Millisecond * 150)
 				if err != nil {
 					problem = true
 					continue
@@ -810,7 +833,6 @@ func demandErr(command Command, d []byte) error {
 			time.Sleep(500 * time.Millisecond)
 			return errors.New("busy marrying")
 		}
-
 	}
 
 	if command == 6 && d[3] != 0x01 {
@@ -820,7 +842,6 @@ func demandErr(command Command, d []byte) error {
 	// Something is wrong or we sent the wrong command.
 	if d[3] == 0xFF {
 		return errors.New("bootloader did what it could and failed. Sorry")
-
 	}
 	return nil
 }
@@ -876,7 +897,7 @@ func (t *Client) ReadDataByLocalIdentifier(ctx context.Context, legionMode bool,
 		if err := t.c.Send(gocan.WithExpectedResponses(ctx, 18), gocan.NewFrame(t.canID, []byte{0x30})); err != nil {
 			return nil, 0, err
 		}
-		var m_nrFrameToReceive = int((length - 4) / 7)
+		m_nrFrameToReceive := int((length - 4) / 7)
 		if (length-4)%7 > 0 {
 			m_nrFrameToReceive++
 		}
@@ -924,7 +945,6 @@ func (t *Client) ReadDataByLocalIdentifier(ctx context.Context, legionMode bool,
 }
 
 func (t *Client) GetMCPVersion(ctx context.Context) (string, error) {
-
 	resp, _, err := t.ReadDataByLocalIdentifier(ctx, true, EcuByte_MCP, 0x8100, 0x80)
 	if err != nil {
 		return "", err

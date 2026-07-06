@@ -93,6 +93,7 @@ func main() {
 
 	// create main window
 	mw := windows.NewMainWindow(tx)
+	mw.SetIcon(fyne.CurrentApp().Icon())
 
 	// install our own signal handler
 	fyne.CurrentApp().Lifecycle().SetOnStarted(func() {
@@ -112,13 +113,6 @@ func main() {
 
 	// show main window
 	mw.ShowAndRun()
-}
-
-func killProcess(p *os.Process) { //nolint:unused // kept for future helpers
-	if p != nil {
-		p.Kill()
-		p.Wait()
-	}
 }
 
 func handleArgs(mw *windows.MainWindow, tx fyne.App) {

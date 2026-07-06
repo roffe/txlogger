@@ -31,7 +31,7 @@ windows:
 	CC=x86_64-w64-mingw32-gcc \
 	GOARCH=amd64 \
 	GOOS=windows \
-	fyne package -os windows -tags=$(BUILDTAGS) --release
+	fyne package --os windows --icon Icon.png -tags=$(BUILDTAGS) --release
 #	go build -tags=$(BUILDTAGS) -ldflags '-s -w' -o txlogger.exe .
 
 run: clean pkg/ota/firmware.bin
@@ -43,4 +43,4 @@ clean:
 	rm -f txlogger
 .PHONY: j2534proxy
 j2534proxy:
-	GOOS=windows GOARCH=386 go build -tags="j2534" -ldflags '-s -w -H=windowsgui' -o j2534proxy.exe ./j2534proxy
+	GOOS=windows GOARCH=386 go build -tags="j2534" -ldflags '-s -w' -o j2534proxy.exe ./j2534proxy

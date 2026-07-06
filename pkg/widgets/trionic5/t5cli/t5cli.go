@@ -35,7 +35,7 @@ const (
 	charTimeout  = 250 * time.Millisecond // wait for a C4 char's ack/echo
 	pollTimeout  = 120 * time.Millisecond // wait for a C6 output char (timeout => FIFO empty)
 	flushTimeout = 40 * time.Millisecond  // shorter probe when flushing residual output
-	maxDrain     = 1 << 32                // safety cap on output chars (S dumps the whole symbol table, ~11 KB)
+	maxDrain     = 1 << 16                // safety cap on output chars (S dumps the whole symbol table, ~11 KB)
 	historySize  = 15                     // commands kept for arrow-up/down recall
 	maxRows      = 300                    // output TextGrid rows kept before trimming the top
 )

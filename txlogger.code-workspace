@@ -11,20 +11,6 @@
 		{
 			"name": "gocan",
 			"path": "../gocan"
-		},
-		{
-			"name": "gocangateway",
-			"path": "../gocangateway"
-		},
-		{
-			"name": "txweb",
-			"path": "../txweb"
-		},
-		{
-			"path": "../../../../../Documents/PlatformIO/Projects/txbridge"
-		},
-		{
-			"path": "../../../../../OneDrive/T7 Source/eu03_erik_org"
 		}
 	],
 	"settings": {

@@ -77,7 +77,9 @@ func (t *Client) readECU(ctx context.Context, addr, length int) ([]byte, error) 
 
 func (t *Client) readMemoryByAddress(ctx context.Context, address, length int) ([]byte, error) {
 	// Jump to read adress
-	t.c.Send(ctx, gocan.NewFrame(0x240, []byte{0x41, 0xA1, 0x08, 0x2C, 0xF0, 0x03, 0x00, byte(length)}))
+	if err := t.c.Send(ctx, gocan.NewFrame(0x240, []byte{0x41, 0xA1, 0x08, 0x2C, 0xF0, 0x03, 0x00, byte(length)})); err != nil {
+		return nil, err
+	}
 	f, err := t.request(ctx, []byte{0x00, 0xA1, byte((address >> 16) & 0xFF), byte((address >> 8) & 0xFF), byte(address & 0xFF), 0x00, 0x00, 0x00}, t.defaultTimeout*3)
 	if err != nil {
 		return nil, err
