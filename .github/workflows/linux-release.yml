@@ -23,8 +23,7 @@ jobs:
       run: sudo apt-get update && sudo apt-get install 7zip gcc libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev libusb-1.0-0-dev libgtk-3-dev libasound2-dev libftdi1 libftdi1-dev
     - name: Install Kvaser CANLIB
       run: |
-        wget --content-disposition "https://www.kvaser.com/downloads-kvaser/?utm_source=software&utm_ean=7330130980754&utm_status=latest"
-        tar xzf linuxcan.tar.gz
+        wget -qO- "https://www.kvaser.com/downloads-kvaser/?utm_source=software&utm_ean=7330130980754&utm_status=latest" | tar xz
         make -C linuxcan/canlib
         sudo make -C linuxcan/canlib install
     - name: Build j2534proxy
