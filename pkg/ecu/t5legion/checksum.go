@@ -8,8 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/roffe/gocan"
 )
 
 func (t *Client) GetECUChecksum(ctx context.Context) ([]byte, error) {
@@ -18,8 +16,7 @@ func (t *Client) GetECUChecksum(ctx context.Context) ([]byte, error) {
 			return nil, err
 		}
 	}
-	frameData := gocan.NewFrame(0x5, []byte{0xC8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frameData, 1*time.Second, 0xC)
+	resp, err := t.request(ctx, []byte{0xC8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, 1*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ECU checksum: %v", err)
 	}

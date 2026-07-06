@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"github.com/roffe/gocan/pkg/gmlan"
+	"github.com/roffe/gocan/v2/gmlan"
 	"github.com/roffe/txlogger/pkg/ecu/t8/t8file"
 	"github.com/roffe/txlogger/pkg/ecu/t8legion"
 	"github.com/roffe/txlogger/pkg/ecu/t8sec"

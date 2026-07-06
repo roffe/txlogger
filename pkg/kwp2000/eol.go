@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"log"
 	"time"
-
-	"github.com/roffe/gocan"
 )
 
 // Start EOL programming session
@@ -16,11 +14,11 @@ func (t *Client) StartEOL(ctx context.Context) error {
 	count := 0
 	payload := []byte{0x40, 0xA1, 0x02, START_ROUTINE_BY_IDENTIFIER, RLI_EOL_START, 0x00, 0x00, 0x00}
 	for data := make([]byte, 8); data[3] != 0x71 && count < 30; {
-		f, err := t.c.SendAndWait(ctx, gocan.NewFrame(REQ_MSG_ID, payload, gocan.ResponseRequired), DefaultTimeout, t.responseID)
+		f, err := t.request(ctx, REQ_MSG_ID, payload, DefaultTimeout, t.responseID)
 		if err != nil {
 			return fmt.Errorf("StartEOL[1]: %w", err)
 		}
-		if err := t.Ack(f.Data[0], gocan.Outgoing); err != nil {
+		if err := t.Ack(ctx, f.Data[0], false); err != nil {
 			return fmt.Errorf("StartEOL[2]: %w", err)
 		}
 		count++
@@ -35,7 +33,7 @@ func (t *Client) StartEOL(ctx context.Context) error {
 func (t *Client) EndEOL(ctx context.Context) error {
 	log.Println("End EOL")
 	payload := []byte{0x40, 0xA1, 0x02, START_ROUTINE_BY_IDENTIFIER, RLI_END_EOL, 0x00, 0x00, 0x00}
-	f, err := t.c.SendAndWait(ctx, gocan.NewFrame(REQ_MSG_ID, payload, gocan.ResponseRequired), DefaultTimeout, t.responseID)
+	f, err := t.request(ctx, REQ_MSG_ID, payload, DefaultTimeout, t.responseID)
 	if err != nil {
 		return fmt.Errorf("EndEOL[1]: %w", err)
 	}

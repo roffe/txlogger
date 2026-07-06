@@ -2,15 +2,16 @@ package dtcreader
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"fyne.io/fyne/v2"
-	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/pkg/gmlan"
+	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/gmlan"
 	"github.com/roffe/txlogger/pkg/dtc"
 )
 
-func (d *DTCReader) readT8DTCS(ctx context.Context, cl *gocan.Client) {
+func (d *DTCReader) readT8DTCS(ctx context.Context, cl *gocan.Bus) {
 	gm := gmlan.New(cl, 0x7e0, 0x7e8)
 
 	if err := gm.InitiateDiagnosticOperation(ctx, gmlan.LEV_DADTC); err != nil {
@@ -32,9 +33,11 @@ func (d *DTCReader) readT8DTCS(ctx context.Context, cl *gocan.Client) {
 	var ddtcs []dtc.DTC
 	for _, d := range dtcs {
 		ddtcs = append(ddtcs, dtc.DTC{
-			ECU:    dtc.ECU_T8,
-			Code:   d.Code,
-			Status: d.Status,
+			ECU: dtc.ECU_T8,
+			// failure type suffix in the same form WIS uses, e.g. "B0165 02"
+			Code:        fmt.Sprintf("%s %02X", d.Code, d.FailureType),
+			FailureType: d.FailureType,
+			Status:      d.Status,
 		})
 	}
 
@@ -42,7 +45,7 @@ func (d *DTCReader) readT8DTCS(ctx context.Context, cl *gocan.Client) {
 	fyne.Do(d.Refresh)
 }
 
-func (d *DTCReader) clearT8DTCS(ctx context.Context, cl *gocan.Client) {
+func (d *DTCReader) clearT8DTCS(ctx context.Context, cl *gocan.Bus) {
 	gm := gmlan.New(cl, 0x7e0, 0x7e8)
 
 	if err := gm.InitiateDiagnosticOperation(ctx, gmlan.LEV_DADTC); err != nil {

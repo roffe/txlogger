@@ -13,13 +13,15 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"github.com/roffe/txlogger/pkg/cangw"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ipc"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/theme"
 	"github.com/roffe/txlogger/pkg/windows"
+
+	_ "github.com/roffe/gocan/v2/adapters/all"
+	_ "github.com/roffe/gocan/v2/adapters/combi"
 )
 
 var (
@@ -76,15 +78,6 @@ func main() {
 		return
 	}
 
-	// start cangateway if not already running
-	p, err := cangw.Start()
-	if p != nil {
-		defer killProcess(p)
-	}
-	if err != nil {
-		debug.Log("cangateway is not ready: " + err.Error())
-	}
-
 	// create app
 	tx := app.NewWithID("com.roffe.txlogger")
 	tx.Settings().SetTheme(&theme.TxTheme{})
@@ -100,6 +93,7 @@ func main() {
 
 	// create main window
 	mw := windows.NewMainWindow(tx)
+	mw.SetIcon(fyne.CurrentApp().Icon())
 
 	// install our own signal handler
 	fyne.CurrentApp().Lifecycle().SetOnStarted(func() {
@@ -119,13 +113,6 @@ func main() {
 
 	// show main window
 	mw.ShowAndRun()
-}
-
-func killProcess(p *os.Process) {
-	if p != nil {
-		p.Kill()
-		p.Wait()
-	}
 }
 
 func handleArgs(mw *windows.MainWindow, tx fyne.App) {

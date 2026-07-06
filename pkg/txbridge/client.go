@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/roffe/gocan/pkg/serialcommand"
+	"github.com/roffe/gocan/v2/pkg/serialcommand"
 )
 
 const DefaultAddress = "192.168.4.1:1337"

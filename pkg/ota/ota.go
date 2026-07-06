@@ -13,7 +13,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
-	"github.com/roffe/gocan/pkg/serialcommand"
+	"github.com/roffe/gocan/v2/pkg/serialcommand"
 	"go.bug.st/serial"
 	"golang.org/x/mod/semver"
 )

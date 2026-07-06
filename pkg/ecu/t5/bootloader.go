@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/srec"
 )
 
@@ -165,7 +165,7 @@ func (t *Client) UploadBootLoader(ctx context.Context) error {
 			}
 
 		case "S9":
-			if err := t.sendBootVectorAddressSRAM(rec.Address); err != nil {
+			if err := t.sendBootVectorAddressSRAM(ctx, rec.Address); err != nil {
 				return fmt.Errorf("failed to start bootloader: %w", err)
 			}
 		}
@@ -198,9 +198,13 @@ func (t *Client) sendBootloaderAddressCommand(ctx context.Context, address uint3
 // bootloader. The firmware does NOT reply to C1 (verified on hardware, it
 // jumps immediately); whether the loader started is confirmed by the first
 // command sent to it after the settle delay.
-func (t *Client) sendBootVectorAddressSRAM(address uint32) error {
-	payload := []byte{0xC1, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address), 0x00, 0x00, 0x00}
-	return t.c.Send(0x5, payload, gocan.Outgoing)
+func (t *Client) sendBootVectorAddressSRAM(ctx context.Context, address uint32) error {
+	payload := gocan.Frame{
+		ID:     0x5,
+		Length: 8,
+		Data:   [8]byte{0xC1, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address), 0x00, 0x00, 0x00},
+	}
+	return t.c.Send(ctx, payload)
 }
 
 // sendBootloaderDataCommand sends one data frame (seq byte + up to 7 data

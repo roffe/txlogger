@@ -7,7 +7,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/t5can"
 )
@@ -20,11 +20,11 @@ func NewT5(cfg Config, lw LogWriter) (IClient, error) {
 	return &T5Client{BaseLogger: NewBaseLogger(cfg, lw)}, nil
 }
 
-func (c *T5Client) Start() error {
+func (c *T5Client) Start(pctx context.Context) error {
 	defer c.secondTicker.Stop()
 	defer c.lw.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
 	eventHandler := func(e gocan.Event) {
@@ -34,7 +34,7 @@ func (c *T5Client) Start() error {
 		}
 	}
 
-	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventFunc(eventHandler))
+	cl, err := gocan.OpenAdapter(ctx, c.Device, gocan.WithEventFunc(eventHandler))
 	if err != nil {
 		return err
 	}
@@ -66,9 +66,6 @@ func (c *T5Client) Start() error {
 	for _, name := range c.appendExtraSysvars(nil) {
 		channels = append(channels, newSysvarChannel(c.sysvars, name))
 	}
-
-	tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
-	defer tx.Close()
 
 	converto := newT5Converter()
 	adscannerConverter := NewWBLInterpolator(c.WidebandConfig)

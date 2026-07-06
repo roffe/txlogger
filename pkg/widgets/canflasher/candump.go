@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ecu"
 )
 
@@ -39,7 +39,7 @@ func (t *CanFlasherWidget) ecuDump(filename string) {
 		fyne.Do(t.Disable)
 		defer fyne.Do(t.Enable)
 
-		c, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
+		c, err := gocan.OpenAdapter(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
 			t.log(e.String())
 		}))
 		if err != nil {

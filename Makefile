@@ -14,34 +14,33 @@ default: txlogger
 pkg/ota/firmware.bin: /home/roffe/Documents/PlatformIO/Projects/txbridge/.pio/build/esp32dev/firmware.bin
 	@cp $< $@
 
-cangateway:
-	go build -tags="j2534" -ldflags '-s -w' -o cangateway ../gocangateway
-
 txlogger:
 	go build -tags=$(BUILDTAGS) -ldflags '-s -w' -o txlogger .
 
 release:
 	fyne package -tags=$(BUILDTAGS) --release
 
-debug: clean cangateway
+debug: clean
 	@echo Using compiler "$(CC)"
 	-go run -tags=$(BUILDTAGS),debug . 2>&1 | tee run.log
 
 windows:
-	CGO_ENABLED=1 CC=x86_64-w64-mingw32-gcc GOARCH=386 GOOS=windows go build -tags="j2534" -ldflags '-s -w' -o cangateway.exe ../gocangateway
 	CGO_CFLAGS="-Ivcpkg/packages/libusb_x64-windows/include/libusb-1.0" \
 	CGO_LDFLAGS="-Lvcpkg/packages/libusb_x64-windows/lib" \
 	CGO_ENABLED=1 \
 	CC=x86_64-w64-mingw32-gcc \
 	GOARCH=amd64 \
 	GOOS=windows \
-	fyne package -os windows -tags=$(BUILDTAGS) --release
+	fyne package --os windows --icon Icon.png -tags=$(BUILDTAGS) --release
 #	go build -tags=$(BUILDTAGS) -ldflags '-s -w' -o txlogger.exe .
 
-run: clean cangateway pkg/ota/firmware.bin
+run: clean pkg/ota/firmware.bin
 	@echo Using compiler "$(CC)"
 	-GOEXPERIMENT=simd go run -tags=$(BUILDTAGS) . 2>&1 | tee run.log
 
 clean:
-	rm -f cangateway
+	rm -f cangateway j2534proxy.exe
 	rm -f txlogger
+.PHONY: j2534proxy
+j2534proxy:
+	GOOS=windows GOARCH=386 go build -tags="j2534" -ldflags '-s -w' -o j2534proxy.exe ./j2534proxy

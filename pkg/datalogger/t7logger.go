@@ -11,7 +11,7 @@ import (
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
@@ -80,29 +80,31 @@ func decodeT7Broadcast(id uint16, data []byte, sysvars *ThreadSafeMap) {
 	}
 }
 
-func t7broadcastListener(ctx context.Context, cl *gocan.Client, sysvars *ThreadSafeMap) {
+func t7broadcastListener(ctx context.Context, cl *gocan.Bus, sysvars *ThreadSafeMap) {
 	ids := make([]uint32, len(t7BroadcastIDs))
 	for i, id := range t7BroadcastIDs {
 		ids[i] = uint32(id)
 	}
 	broadcast := cl.Subscribe(ctx, ids...)
-	defer broadcast.Close()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case msg := <-broadcast.Chan():
-			decodeT7Broadcast(uint16(msg.Identifier), msg.Data, sysvars)
+		case msg, ok := <-broadcast:
+			if !ok {
+				return
+			}
+			decodeT7Broadcast(uint16(msg.ID), msg.Bytes(), sysvars)
 		}
 	}
 }
 
-func (c *T7Client) Start() error {
+func (c *T7Client) Start(pctx context.Context) error {
 	defer c.secondTicker.Stop()
 	defer c.lw.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
 	eventHandler := func(e gocan.Event) {
@@ -112,7 +114,7 @@ func (c *T7Client) Start() error {
 		}
 	}
 
-	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventFunc(eventHandler))
+	cl, err := gocan.OpenAdapter(ctx, c.Device, gocan.WithEventFunc(eventHandler))
 	if err != nil {
 		return fmt.Errorf("failed to create t7 client: %w", err)
 	}
@@ -124,7 +126,7 @@ func (c *T7Client) Start() error {
 	ctx = cl.Context()
 
 	checkBroadcast := true
-	if strings.Contains(c.Device.Name(), "OBDLink") || strings.Contains(c.Device.Name(), "STN") || strings.Contains(c.Device.Name(), "ELM") {
+	if strings.Contains(cl.AdapterName(), "OBDLink") || strings.Contains(cl.AdapterName(), "STN") || strings.Contains(cl.AdapterName(), "ELM") {
 		checkBroadcast = false
 	}
 
@@ -325,22 +327,7 @@ func (c *T7Client) Start() error {
 				for _, va := range c.Symbols {
 
 					if va.Number < 0 {
-						if va.Number <= -1000 {
-							if ca, ok := cl.Adapter().(gocan.ADCCapable); ok {
-								adcNumber := -va.Number - 1000
-								val, err := ca.GetADCValue(ctx, adcNumber)
-								if err != nil {
-									c.onError()
-									c.OnMessage(err.Error())
-									continue
-								}
-								c.sysvars.Set(va.Name, float64(val))
-								ebus.Publish(va.Name, float64(val))
-								continue
-							}
-						} else {
-							ebus.Publish(va.Name, c.sysvars.Get(va.Name))
-						}
+						ebus.Publish(va.Name, c.sysvars.Get(va.Name))
 						continue
 					}
 
@@ -413,7 +400,7 @@ func initT7logging(ctx context.Context, kwp *kwp2000.Client, symbols []*symbol.S
 		// log.Println("Define:", sym.String())
 
 		if err := kwp.DynamicallyDefineLocalIdBySymbolNumber(ctx, index, sym.Number); err != nil {
-			return errors.New("failed to define dynamic register")
+			return fmt.Errorf("failed to define dynamic register: %w", err)
 		}
 		index++
 		time.Sleep(12 * time.Millisecond)

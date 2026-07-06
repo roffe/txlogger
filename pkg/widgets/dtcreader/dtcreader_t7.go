@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/dtc"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
-func (d *DTCReader) readT7DTCS(ctx context.Context, cl *gocan.Client) {
+func (d *DTCReader) readT7DTCS(ctx context.Context, cl *gocan.Bus) {
 	kwp := kwp2000.New(cl)
 	if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
 		d.err(err)
@@ -35,7 +35,7 @@ func (d *DTCReader) readT7DTCS(ctx context.Context, cl *gocan.Client) {
 	fyne.Do(d.Refresh)
 }
 
-func (d *DTCReader) clearT7DTCS(ctx context.Context, cl *gocan.Client) {
+func (d *DTCReader) clearT7DTCS(ctx context.Context, cl *gocan.Bus) {
 	kwp := kwp2000.New(cl)
 
 	if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {

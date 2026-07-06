@@ -30,6 +30,8 @@
   - Filter query language: instead of the visual rules you can type a full query with and/or, () grouping and the same operators, e.g. "if (ActualIn.n_Engine > 3000 and Out.X_AccPedal > 50) or boost ~ 1.2". Series can be compared to numbers, to each other or to arithmetic of them; a non-empty query overrides the rules
   - Save and load configurations as presets (series, dimensions, axis breakpoints, tolerances and filter rules)
 - Added a bunch of TransCal maps under Fueling on T7
+- Replaced gocangateway with a slimmer j2534proxy
+- Rewrote everything to use GoCAN v2
 
 # 2.1.9
 - Updated default T7 preset to include MAF.m_AirFromp_AirInlet

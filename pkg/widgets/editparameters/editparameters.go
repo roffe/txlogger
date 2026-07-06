@@ -12,8 +12,8 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/pkg/gmlan"
+	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/gmlan"
 	"github.com/roffe/txlogger/pkg/ecu/t8"
 	"github.com/roffe/txlogger/pkg/ecu/t8sec"
 )
@@ -193,7 +193,7 @@ func (t *EditParameters) readParameters() {
 		t.err(err)
 		return
 	}
-	cl, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
+	cl, err := gocan.OpenAdapter(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
 		log.Printf("EVENT: %v", e)
 	}))
 	if err != nil {
@@ -280,7 +280,7 @@ func (t *EditParameters) writeParameters() {
 		t.err(err)
 		return
 	}
-	cl, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
+	cl, err := gocan.OpenAdapter(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
 		log.Printf("EVENT: %v", e)
 	}))
 	if err != nil {

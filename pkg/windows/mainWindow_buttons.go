@@ -1,6 +1,7 @@
 package windows
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -12,7 +13,7 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
@@ -271,6 +272,9 @@ func (mw *MainWindow) newLogBtn() *widget.Button {
 			if mw.dlc != nil {
 				mw.dlc.Close()
 			}
+			if mw.dlcCancel != nil {
+				mw.dlcCancel()
+			}
 			return
 		}
 		for _, v := range mw.symbolList.Symbols() {
@@ -381,12 +385,12 @@ func (mw *MainWindow) startLogging() {
 			mw.Error(err)
 			return
 		}
-		deviceName = device.Name()
+		deviceName = gocan.AdapterName(device)
 	}
 
 	if mw.selects.ecuSelect.Selected == "T5" {
-		if strings.Contains(device.Name(), "J2534") || strings.Contains(device.Name(), "ELM327") {
-			mw.Error(fmt.Errorf("%s is not supported for T5", device.Name()))
+		if strings.Contains(deviceName, "J2534") || strings.Contains(deviceName, "ELM327") {
+			mw.Error(fmt.Errorf("%s is not supported for T5", deviceName))
 			return
 		}
 	}
@@ -403,9 +407,12 @@ func (mw *MainWindow) startLogging() {
 	mw.buttons.logBtn.SetText("Stop")
 	mw.Disable()
 	mw.canLED.On()
+	ctx, cancel := context.WithCancel(context.Background())
+	mw.dlcCancel = cancel
 	go func() {
+		defer cancel()
 		mw.Log("Connecting to " + deviceName)
-		if err := mw.dlc.Start(); err != nil {
+		if err := mw.dlc.Start(ctx); err != nil {
 			mw.Error(err)
 		}
 		mw.Log(deviceName + " disconnected")

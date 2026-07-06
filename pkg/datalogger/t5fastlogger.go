@@ -7,7 +7,7 @@ import (
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/t5can"
 )
@@ -68,11 +68,11 @@ func NewT5Fast(cfg Config, lw LogWriter) (IClient, error) {
 	return &T5FastClient{BaseLogger: NewBaseLogger(cfg, lw)}, nil
 }
 
-func (c *T5FastClient) Start() error {
+func (c *T5FastClient) Start(pctx context.Context) error {
 	defer c.secondTicker.Stop()
 	defer c.lw.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
 	eventHandler := func(e gocan.Event) {
@@ -82,7 +82,7 @@ func (c *T5FastClient) Start() error {
 		}
 	}
 
-	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventFunc(eventHandler))
+	cl, err := gocan.OpenAdapter(ctx, c.Device, gocan.WithEventFunc(eventHandler))
 	if err != nil {
 		return err
 	}
@@ -127,9 +127,6 @@ func (c *T5FastClient) Start() error {
 	}
 	c.OnMessage(fmt.Sprintf("T5 fast-logger enabled (%d symbols, %d byte payload)", len(c.Symbols), len(image)))
 
-	tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
-	defer tx.Close()
-
 	converto := newT5Converter()
 	adscannerConverter := NewWBLInterpolator(c.WidebandConfig)
 
@@ -169,7 +166,7 @@ func (c *T5FastClient) Start() error {
 
 				// Call the stub (C1, no reply) to pack symbols into 0x7800, then
 				// read the whole packed buffer in one go.
-				if err := callT5Gather(cl); err != nil {
+				if err := callT5Gather(ctx, cl); err != nil {
 					c.onError()
 					c.OnMessage(err.Error())
 					continue
@@ -222,20 +219,22 @@ func (c *T5FastClient) Start() error {
 
 // armT5Gather sets the ECU's stream-call flag (A5 @ stub addr, len 0). The flag
 // persists, so we only arm once; C1 then calls the stub each cycle.
-func armT5Gather(ctx context.Context, cl *gocan.Client) error {
+func armT5Gather(ctx context.Context, cl *gocan.Bus) error {
 	arm := []byte{0xA5, t5GatherStubAddr >> 24, t5GatherStubAddr >> 16, t5GatherStubAddr >> 8, t5GatherStubAddr & 0xFF, 0x00, 0x00, 0x00}
-	resp, err := cl.SendAndWait(ctx, gocan.NewFrame(0x5, arm, gocan.ResponseRequired), 500*time.Millisecond, 0xC)
+	rctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+	resp, err := cl.Request(rctx, gocan.NewFrame(0x5, arm), 0xC)
 	if err != nil {
 		return err
 	}
-	if resp.DLC() < 2 || resp.Data[0] != 0xA5 || resp.Data[1] != 0x00 {
+	if resp.Length < 2 || resp.Data[0] != 0xA5 || resp.Data[1] != 0x00 {
 		return fmt.Errorf("arm rejected: % 02X", resp.Data)
 	}
 	return nil
 }
 
 // callT5Gather issues the C1 "call address" command for the stub. C1 has no reply.
-func callT5Gather(cl *gocan.Client) error {
+func callT5Gather(ctx context.Context, cl *gocan.Bus) error {
 	c1 := []byte{0xC1, t5GatherStubAddr >> 24, t5GatherStubAddr >> 16, t5GatherStubAddr >> 8, t5GatherStubAddr & 0xFF, 0x00, 0x00, 0x00}
-	return cl.Send(0x5, c1, gocan.Outgoing)
+	return cl.Send(ctx, gocan.NewFrame(0x5, c1))
 }

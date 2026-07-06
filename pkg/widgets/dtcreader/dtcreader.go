@@ -4,6 +4,10 @@ import (
 	"context"
 	"fmt"
 	"image/color"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -12,8 +16,10 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/gmlan"
 	"github.com/roffe/txlogger/pkg/dtc"
+	"github.com/roffe/txlogger/pkg/dtc/wis"
 )
 
 var _ fyne.Widget = (*DTCReader)(nil)
@@ -59,17 +65,49 @@ func (d *DTCReader) render() {
 			code := d.dtcs[i]
 			entry := o.(*DTCEntry)
 			info := code.Info()
-			dtcTitle := code.String()
-			if code.ECU == dtc.ECU_T5 {
-				dtcTitle += fmt.Sprintf(": %d", code.Status)
+
+			var results []wis.Result
+			if models := wisModels(code.ECU); models != nil {
+				results = wis.Search(code.Code, models...)
 			}
-			if info.Name != "" {
+
+			dtcTitle := code.String()
+			switch code.ECU {
+			case dtc.ECU_T5:
+				dtcTitle += fmt.Sprintf(": %d", code.Status)
+			case dtc.ECU_T7:
+				// full wire code (status byte included), then its meaning
+				dtcTitle += fmt.Sprintf(" %02X (%s)", code.Status, dtc.T7StatusString(code.Status))
+			case dtc.ECU_T8:
+				// Code already carries the failure type ("B0165 02"); add
+				// the GMW3110 meaning of that suffix
+				dtcTitle += " (" + gmlan.FailureTypeString(code.FailureType) + ")"
+			}
+			switch {
+			case info.Name != "":
 				dtcTitle += " - " + info.Name
+			case len(results) > 0 && results[0].Title != "":
+				dtcTitle += " - " + results[0].Title
 			}
 			entry.SetTitle(dtcTitle)
-			if info.Description != "" {
-				entry.SetDescription(info.Description)
+
+			desc := "No description available."
+			switch {
+			case info.Description != "":
+				desc = info.Description
+			case len(results) > 0 && results[0].Symptom != "":
+				desc = strings.ReplaceAll(results[0].Symptom, "\n\n", "\n")
 			}
+			entry.SetDescription(desc)
+
+			if len(results) > 0 {
+				entry.SetOnTapped(func() { d.openWIS(entry, results) })
+			} else {
+				entry.SetOnTapped(nil)
+			}
+
+			// rows vary in height with the description text
+			d.list.SetItemHeight(i, entry.MinSize().Height)
 		},
 	)
 
@@ -122,7 +160,7 @@ func (d *DTCReader) Refresh() {
 func (d *DTCReader) ReadDTCS() error {
 	ecu := d.getECU()
 
-	var readDTCSFunc func(context.Context, *gocan.Client)
+	var readDTCSFunc func(context.Context, *gocan.Bus)
 	switch ecu {
 	case "T5":
 		readDTCSFunc = d.readT5DTCS
@@ -148,11 +186,11 @@ func (d *DTCReader) ReadDTCS() error {
 			return
 		}
 
-		d.log("Connecting to device " + dev.Name())
+		d.log("Connecting to device " + gocan.AdapterName(dev))
 
 		// Events (incl. the final fatal) stream to the log; a fatal adapter
 		// failure also aborts any in-flight call below with that error.
-		cl, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
+		cl, err := gocan.OpenAdapter(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
 			d.log(e.String())
 		}))
 		if err != nil {
@@ -168,7 +206,7 @@ func (d *DTCReader) ReadDTCS() error {
 
 func (d *DTCReader) ClearDTCS() error {
 	ecu := d.getECU()
-	var clearDTCSFunc func(context.Context, *gocan.Client)
+	var clearDTCSFunc func(context.Context, *gocan.Bus)
 	switch ecu {
 	case "T5":
 		clearDTCSFunc = d.clearT5DTCS
@@ -191,11 +229,11 @@ func (d *DTCReader) ClearDTCS() error {
 			d.err(err)
 			return
 		}
-		d.log("Connecting to device " + dev.Name())
+		d.log("Connecting to device " + gocan.AdapterName(dev))
 
 		// Events (incl. the final fatal) stream to the log; a fatal adapter
 		// failure also aborts any in-flight call below with that error.
-		cl, err := gocan.NewWithOpts(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
+		cl, err := gocan.OpenAdapter(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
 			d.log(e.String())
 		}))
 		if err != nil {
@@ -209,12 +247,74 @@ func (d *DTCReader) ClearDTCS() error {
 	return nil
 }
 
+// wisModels maps an ECU to the WIS car models it appears in. T5 cars
+// (9000/NG900) are not covered by the WIS archive.
+func wisModels(ecu dtc.ECU) []string {
+	switch ecu {
+	case dtc.ECU_T7:
+		return []string{"9400", "9600"}
+	case dtc.ECU_T8:
+		return []string{"9440"}
+	}
+	return nil
+}
+
+// openWIS opens the fault diagnosis document for a DTC, showing a picker
+// when the code matches in more than one model/system.
+func (d *DTCReader) openWIS(entry fyne.CanvasObject, results []wis.Result) {
+	if len(results) == 1 {
+		d.openWISDoc(results[0])
+		return
+	}
+	items := make([]*fyne.MenuItem, 0, len(results))
+	for _, r := range results {
+		label := fmt.Sprintf("%s %s · %s · %s", wis.ModelName(r.Model), r.Year, r.System, r.Code)
+		items = append(items, fyne.NewMenuItem(label, func() { d.openWISDoc(r) }))
+	}
+	drv := fyne.CurrentApp().Driver()
+	widget.ShowPopUpMenuAtPosition(fyne.NewMenu("", items...),
+		drv.CanvasForObject(entry), drv.AbsolutePositionForObject(entry))
+}
+
+// openWISDoc renders the document to a temp file and opens it in the
+// system browser; fyne has no widget that can display this HTML.
+func (d *DTCReader) openWISDoc(r wis.Result) {
+	html, err := wis.Render(r.Doc)
+	if err != nil {
+		d.err(err)
+		return
+	}
+	f, err := os.CreateTemp("", "txlogger-dtc-*.html")
+	if err != nil {
+		d.err(err)
+		return
+	}
+	_, werr := f.Write(html)
+	if err := f.Close(); werr == nil {
+		werr = err
+	}
+	if werr != nil {
+		d.err(werr)
+		return
+	}
+	p := filepath.ToSlash(f.Name())
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p // windows: file:///C:/...
+	}
+	d.log("Opening WIS document for " + r.Code + " in browser")
+	if err := fyne.CurrentApp().OpenURL(&url.URL{Scheme: "file", Path: p}); err != nil {
+		d.err(err)
+	}
+}
+
 var _ fyne.Widget = (*DTCEntry)(nil)
 
 type DTCEntry struct {
 	widget.BaseWidget
 	title       *widget.Label
 	description *widget.Label
+	info        *widget.Button
+	onTapped    func()
 }
 
 func NewDTCEntry() *DTCEntry {
@@ -225,6 +325,13 @@ func NewDTCEntry() *DTCEntry {
 
 	d.title.Selectable = true
 	d.description.Selectable = true
+
+	d.info = widget.NewButtonWithIcon("", theme.InfoIcon(), func() {
+		if d.onTapped != nil {
+			d.onTapped()
+		}
+	})
+	d.info.Disable()
 
 	d.ExtendBaseWidget(d)
 	return d
@@ -238,11 +345,21 @@ func (d *DTCEntry) SetDescription(desc string) {
 	d.description.SetText(desc)
 }
 
+// SetOnTapped sets the handler for the info button; nil disables it.
+func (d *DTCEntry) SetOnTapped(f func()) {
+	d.onTapped = f
+	if f == nil {
+		d.info.Disable()
+	} else {
+		d.info.Enable()
+	}
+}
+
 func (d *DTCEntry) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(container.NewBorder(
 		nil,
 		canvas.NewLine(color.Black),
-		widget.NewButtonWithIcon("", theme.WarningIcon(), func() {}),
+		d.info,
 		nil,
 		container.NewVBox(
 			d.title,

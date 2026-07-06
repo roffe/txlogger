@@ -1,6 +1,8 @@
 param(
-    [switch]$cangateway,
-    [switch]$nobuildcangateway
+    [Alias("cangateway")]
+    [switch]$j2534proxy,
+    [Alias("nobuildcangateway")]
+    [switch]$nobuildj2534proxy
 )
 
 $current_path = Get-Location
@@ -10,7 +12,7 @@ $env:GOGC = "100"
 $env:CC = "clang.exe"
 $env:CXX = "clang.exe"
 
-if ($cangateway) {
+if ($j2534proxy) {
     # $includes = @(
     #     'C:\Progra~2\Kvaser\Canlib\INC'
     # )
@@ -21,13 +23,16 @@ if ($cangateway) {
     # )
     # $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
 
-    $env:GOARCH = "386"
-    go run -tags="j2534" github.com/roffe/gocangateway $args
+    if (-not (Test-Path -Path ".\j2534proxy.exe")) {
+        & "$current_path\build.ps1" -j2534proxy
+    }
+
+    & "$current_path\j2534proxy.exe" $args
     exit
 }
 
-if (-not $nobuildcangateway) {
-    & "$current_path\build.ps1" -cangateway
+if (-not $nobuildj2534proxy) {
+    & "$current_path\build.ps1" -j2534proxy
 }
 
 $includes = @(

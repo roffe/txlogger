@@ -10,13 +10,13 @@ import (
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/pkg/serialcommand"
+	"github.com/roffe/gocan/v2/pkg/serialcommand"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
-func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
+func (c *TxBridge) t7(pctx context.Context, cl *gocan.Bus) error {
 	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
@@ -28,7 +28,7 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 	// stream, then source those symbols from the folded trailer (decodeT7Broadcast)
 	// instead of the KWP F0 read, rather than parsing a live broadcast flood here.
 	c.OnMessage("Enabling T7 broadcast collection")
-	if err := sendBroadcastCollect(cl, t7BroadcastIDs); err != nil {
+	if err := sendBroadcastCollect(c.tb, t7BroadcastIDs); err != nil {
 		return fmt.Errorf("failed to set broadcast collect: %w", err)
 	}
 	for _, sym := range c.Symbols {
@@ -53,10 +53,9 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 		expectedPayloadSize += sym.Length
 	}
 
-	tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
-	defer tx.Close()
+	tx := c.tb.Subscribe(ctx, 'r')
 
-	if err := c.startLogging(cl); err != nil {
+	if err := c.startLogging(); err != nil {
 		return fmt.Errorf("error starting logging: %w", err)
 	}
 
@@ -94,7 +93,7 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 	go func() {
 		defer cl.Close()
 		defer func() {
-			_ = c.stopLogging(cl) // stop the dongle's read loop before ending the session
+			_ = c.stopLogging() // stop the dongle's read loop before ending the session
 			_ = kwp.StopSession(ctx)
 			time.Sleep(75 * time.Millisecond)
 		}()
@@ -131,14 +130,9 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 					},
 				}
 				read.Address += uint32(toRead)
-				payload, err := cmd.MarshalBinary()
-				if err != nil {
-					c.onError()
-					c.OnMessage(err.Error())
-					continue
-				}
-				frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
-				resp, err := cl.SendAndWait(ctx, frame, 3*time.Second, gocan.SystemMsgDataRequest)
+				rctx, rcancel := context.WithTimeout(ctx, 3*time.Second)
+				resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'R')
+				rcancel()
 				if err != nil {
 					read.Complete(err)
 					continue
@@ -168,21 +162,15 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 				write.Address += uint32(toRead)
 				write.Length -= toRead
 
-				payload, err := cmd.MarshalBinary()
+				rctx, rcancel := context.WithTimeout(ctx, 1*time.Second)
+				resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'W', 'e')
+				rcancel()
 				if err != nil {
 					write.Complete(err)
 					continue
 				}
 
-				frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
-
-				resp, err := cl.SendAndWait(ctx, frame, 1*time.Second, gocan.SystemMsgWriteResponse)
-				if err != nil {
-					write.Complete(err)
-					continue
-				}
-
-				if resp.Identifier == gocan.SystemMsgError {
+				if resp.Command == 'e' {
 					write.Complete(fmt.Errorf("error response"))
 					continue
 				}
@@ -197,7 +185,7 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 				}
 				write.Complete(nil)
 				continue
-			case msg, ok := <-tx.Chan():
+			case msg, ok := <-tx:
 				if !ok {
 					c.OnMessage("txbridge recv channel closed")
 					return
@@ -205,9 +193,9 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 				lastData = time.Now()
 				// timestamp(4) + fixed symbol payload, then a variable broadcast trailer
 				// the dongle folded in (see decodeT7Broadcast), so this is a lower bound.
-				if msg.DLC() < int(expectedPayloadSize+4) {
+				if len(msg.Data) < int(expectedPayloadSize+4) {
 					c.onError()
-					c.OnMessage(fmt.Sprintf("expected at least %d bytes, got %d", expectedPayloadSize+4, msg.DLC()))
+					c.OnMessage(fmt.Sprintf("expected at least %d bytes, got %d", expectedPayloadSize+4, len(msg.Data)))
 					// log.Printf("unexpected data %X", msg.Data)
 					continue
 				}
@@ -235,7 +223,7 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 						continue
 					}
 					if err := va.Read(r); err != nil {
-						log.Printf("data ex %d %X len %d", expectedPayloadSize, msg.Data, msg.DLC())
+						log.Printf("data ex %d %X len %d", expectedPayloadSize, msg.Data, len(msg.Data))
 						c.onError()
 						c.OnMessage(err.Error())
 						readErr = true

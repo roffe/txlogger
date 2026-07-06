@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 )
 
 func (t *Client) StartDiagnosticSession(ctx context.Context) error {
@@ -16,8 +16,9 @@ func (t *Client) StartDiagnosticSession(ctx context.Context) error {
 	err := retry.Do(
 		func() error {
 			data := []byte{0x3F, 0x81, 0x00, 0x11, byte((testerID >> 8) & 0xFF), byte(testerID & 0xFF), 0x00, 0x00}
-			t.c.Send(0x220, data, gocan.ResponseRequired)
-			f, err := t.c.Recv(ctx, t.defaultTimeout, 0x258)
+			rctx, cancel := context.WithTimeout(ctx, t.defaultTimeout)
+			defer cancel()
+			f, err := t.c.Request(rctx, gocan.NewFrame(0x220, data), 0x258)
 			if err != nil {
 				return err
 			}

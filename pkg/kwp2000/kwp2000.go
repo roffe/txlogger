@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/dtc"
 )
@@ -32,14 +32,14 @@ const (
 )
 
 type Client struct {
-	c                 *gocan.Client
+	c                 *gocan.Bus
 	responseID        uint32
 	gotSequrityAccess bool
 }
 
 var DefaultTimeout = 200 * time.Millisecond
 
-func New(c *gocan.Client) *Client {
+func New(c *gocan.Bus) *Client {
 	return &Client{c: c}
 }
 
@@ -47,13 +47,15 @@ func (t *Client) SetResponseID(id uint32) {
 	t.responseID = id
 }
 
+// request sends payload on id and waits for a reply on replyID, bounded by timeout.
+func (t *Client) request(ctx context.Context, id uint32, payload []byte, timeout time.Duration, replyID uint32) (gocan.Frame, error) {
+	rctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return t.c.Request(rctx, gocan.NewFrame(id, payload), replyID)
+}
+
 func (t *Client) StartSession(ctx context.Context, id, responseID uint32) error {
-	frame := &gocan.CANFrame{
-		Identifier: id,
-		Data:       []byte{0x3F, START_COM_REQ, 0x00, 0x11, byte(REQ_MSG_ID >> 8), byte(REQ_MSG_ID & 0xFF)},
-		FrameType:  gocan.ResponseRequired,
-	}
-	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, responseID)
+	resp, err := t.request(ctx, id, []byte{0x3F, START_COM_REQ, 0x00, 0x11, byte(REQ_MSG_ID >> 8), byte(REQ_MSG_ID & 0xFF)}, DefaultTimeout, responseID)
 	if err != nil {
 		return fmt.Errorf("StartSession[1]: %w", err)
 	}
@@ -66,12 +68,7 @@ func (t *Client) StartSession(ctx context.Context, id, responseID uint32) error 
 }
 
 func (t *Client) StartSession2(ctx context.Context, id, responseID uint32) error {
-	frame := &gocan.CANFrame{
-		Identifier: id,
-		Data:       []byte{0x3F, START_COM_REQ, 0x00, 0x11, byte((0x740) >> 8), byte((0x740) & 0xFF)},
-		FrameType:  gocan.ResponseRequired,
-	}
-	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, responseID)
+	resp, err := t.request(ctx, id, []byte{0x3F, START_COM_REQ, 0x00, 0x11, byte((0x740) >> 8), byte((0x740) & 0xFF)}, DefaultTimeout, responseID)
 	if err != nil {
 		return fmt.Errorf("StartSession[1]: %w", err)
 	}
@@ -84,16 +81,11 @@ func (t *Client) StartSession2(ctx context.Context, id, responseID uint32) error
 }
 
 func (t *Client) StopSession(ctx context.Context) error {
-	return t.c.Send(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, STOP_COM_REQ}, gocan.ResponseRequired)
+	return t.c.Send(gocan.WithExpectedResponses(ctx, 1), gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, STOP_COM_REQ}))
 }
 
 func (t *Client) TesterPresent(ctx context.Context) error {
-	frame := &gocan.CANFrame{
-		Identifier: REQ_MSG_ID,
-		Data:       []byte{0x40, 0xA1, 0x01, TESTER_PRESENT},
-		FrameType:  gocan.ResponseRequired,
-	}
-	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, t.responseID)
+	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x01, TESTER_PRESENT}, DefaultTimeout, t.responseID)
 	if err != nil {
 		return fmt.Errorf("TesterPresent: %w", err)
 	}
@@ -105,16 +97,7 @@ func (t *Client) StartRoutineByIdentifier(ctx context.Context, id byte, extra ..
 	payload = append(payload, extra...)
 	payload[2] = byte(len(payload) - 3)
 
-	//payload := append([]byte{0x40, 0xA1, byte(0x02 + len(extra)), START_ROUTINE_BY_IDENTIFIER, id}, extra...)
-	frame := gocan.NewFrame(REQ_MSG_ID, payload, gocan.ResponseRequired)
-
-	//frame := &gocan.CANFrame{
-	//	Identifier: REQ_MSG_ID,
-	//	Data:       []byte{0x40, 0xA1, 0x03, START_ROUTINE_BY_IDENTIFIER, id},
-	//	FrameType:  gocan.ResponseRequired,
-	//}
-
-	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout*2, t.responseID)
+	resp, err := t.request(ctx, REQ_MSG_ID, payload, DefaultTimeout*2, t.responseID)
 	if err != nil {
 		return fmt.Errorf("StartRoutineByIdentifier: %w", err)
 	}
@@ -122,32 +105,26 @@ func (t *Client) StartRoutineByIdentifier(ctx context.Context, id byte, extra ..
 }
 
 func (t *Client) StopRoutineByIdentifier(ctx context.Context, id byte) ([]byte, error) {
-	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, STOP_ROUTINE_BY_IDENTIFIER, id}, gocan.ResponseRequired)
-	log.Println(frame.String())
-	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, t.responseID)
+	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, STOP_ROUTINE_BY_IDENTIFIER, id}, DefaultTimeout, t.responseID)
 	if err != nil {
 		return nil, fmt.Errorf("StopRoutineByIdentifier: %w", err)
 	}
 	log.Println(resp.String())
-	return resp.Data, checkErr(resp)
+	return resp.Bytes(), checkErr(resp)
 }
 
 func (t *Client) RequestRoutineResultsByLocalIdentifier(ctx context.Context, id byte) ([]byte, error) {
-	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, REQUEST_ROUTINE_RESULTS_BY_LOCAL_IDENTIFIER, id}, gocan.ResponseRequired)
-	log.Println(frame.String())
-	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, t.responseID)
+	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, REQUEST_ROUTINE_RESULTS_BY_LOCAL_IDENTIFIER, id}, DefaultTimeout, t.responseID)
 	if err != nil {
 		return nil, fmt.Errorf("RequestRoutineResultsByLocalIdentifier: %w", err)
 	}
 
 	log.Println(resp.String())
-	return resp.Data, checkErr(resp)
+	return resp.Bytes(), checkErr(resp)
 }
 
 func (t *Client) ReadDataByLocalIdentifierMode(ctx context.Context, id, mode byte) ([]byte, error) {
-	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x03, READ_DATA_BY_IDENTIFIER, id, mode}, gocan.ResponseRequired)
-	log.Println(frame.String())
-	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, t.responseID)
+	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x03, READ_DATA_BY_IDENTIFIER, id, mode}, DefaultTimeout, t.responseID)
 	if err != nil {
 		return nil, fmt.Errorf("ReadDataByLocalIdentifier2: %w", err)
 	}
@@ -176,9 +153,7 @@ func (t *Client) ReadDataByLocalIdentifierMode(ctx context.Context, id, mode byt
 
 	for currentChunkNumber != 0 {
 		//log.Printf("current chunk %02X", currentChunkNumber)
-		frame := gocan.NewFrame(RESP_CHUNK_CONF_ID, []byte{0x40, 0xA1, 0x3F, resp.Data[0] &^ 0x40, 0x00, 0x00, 0x00, 0x00}, gocan.ResponseRequired)
-		//log.Println(frame.String())
-		resp, err = t.c.SendAndWait(ctx, frame, DefaultTimeout, t.responseID)
+		resp, err = t.request(ctx, RESP_CHUNK_CONF_ID, []byte{0x40, 0xA1, 0x3F, resp.Data[0] &^ 0x40, 0x00, 0x00, 0x00, 0x00}, DefaultTimeout, t.responseID)
 		if err != nil {
 			return nil, err
 		}
@@ -194,12 +169,7 @@ func (t *Client) ReadDataByLocalIdentifierMode(ctx context.Context, id, mode byt
 	return out.Bytes(), nil
 }
 func (cl *Client) ReadDataByIdentifier(ctx context.Context, id byte) ([]byte, error) {
-	frame := &gocan.CANFrame{
-		Identifier: REQ_MSG_ID,
-		Data:       []byte{0x40, 0xA1, 0x02, READ_DATA_BY_IDENTIFIER, id},
-		FrameType:  gocan.ResponseRequired,
-	}
-	resp, err := cl.c.SendAndWait(ctx, frame, DefaultTimeout, cl.responseID)
+	resp, err := cl.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, READ_DATA_BY_IDENTIFIER, id}, DefaultTimeout, cl.responseID)
 	if err != nil {
 		return nil, fmt.Errorf("ReadDataByIdentifier[1]: %w", err)
 	}
@@ -221,12 +191,7 @@ func (cl *Client) ReadDataByIdentifier(ctx context.Context, id byte) ([]byte, er
 		if resp.Data[0]&0x3F == 0 {
 			break
 		}
-		nextFrame := &gocan.CANFrame{
-			Identifier: RESP_CHUNK_CONF_ID,
-			Data:       []byte{0x40, 0xA1, 0x3F, resp.Data[0] &^ 0x40},
-			FrameType:  gocan.ResponseRequired,
-		}
-		resp, err = cl.c.SendAndWait(ctx, nextFrame, DefaultTimeout, cl.responseID)
+		resp, err = cl.request(ctx, RESP_CHUNK_CONF_ID, []byte{0x40, 0xA1, 0x3F, resp.Data[0] &^ 0x40}, DefaultTimeout, cl.responseID)
 		if err != nil {
 			return nil, fmt.Errorf("ReadDataByIdentifier[2]: %w", err)
 		}
@@ -297,58 +262,64 @@ outer:
 		}
 
 		if b[0] == 0x80 || b[0] == 0xC0 {
-			if err := t.Ack(b[0], gocan.Outgoing); err != nil {
+			if err := t.Ack(ctx, b[0], false); err != nil {
 				return nil, fmt.Errorf("TransferData[2]: %w", err)
 			}
 			break
 		}
 
-		sub := t.c.Subscribe(ctx, 0x258)
-		defer sub.Close()
-		if err := t.Ack(b[0], gocan.ResponseRequired); err != nil {
+		sctx, cancel := context.WithCancel(ctx)
+		ch := t.c.Subscribe(sctx, 0x258)
+		if err := t.Ack(ctx, b[0], true); err != nil {
+			cancel()
 			return nil, fmt.Errorf("TransferData[3]: %w", err)
 		}
 		for toRead > 0 {
 			select {
-			case f := <-sub.Chan():
+			case f, ok := <-ch:
+				if !ok {
+					cancel()
+					return nil, fmt.Errorf("TransferData[4]: subscription closed")
+				}
 				// log.Printf("toRead %d, %X", toRead, d)
 				readThis := int(min(6, toRead))
 				buff.Write(f.Data[2 : 2+readThis])
 				toRead -= byte(readThis)
 				if f.Data[0] == 0x80 || f.Data[0] == 0xC0 {
-					if err := t.Ack(f.Data[0], gocan.Outgoing); err != nil {
+					if err := t.Ack(ctx, f.Data[0], false); err != nil {
+						cancel()
 						return nil, fmt.Errorf("TransferData[4]: %w", err)
 					}
 				} else {
-					if err := t.Ack(f.Data[0], gocan.ResponseRequired); err != nil {
+					if err := t.Ack(ctx, f.Data[0], true); err != nil {
+						cancel()
 						return nil, fmt.Errorf("TransferData[5]: %w", err)
 					}
 				}
 				if buff.Len() == int(length) {
+					cancel()
 					break outer
 				}
 			case <-time.After(250 * time.Millisecond):
+				cancel()
 				return nil, fmt.Errorf("TransferData[6]: timeout waiting for data")
 			}
 		}
+		cancel()
 	}
 	return buff.Bytes(), nil
 }
 
 func (t *Client) transferData(ctx context.Context) ([]byte, error) {
-	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x01, TRANSFER_DATA}, gocan.ResponseRequired)
-	//	log.Println(frame.String())
-	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, t.responseID)
+	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x01, TRANSFER_DATA}, DefaultTimeout, t.responseID)
 	if err != nil {
 		return nil, fmt.Errorf("transferData: %w", err)
 	}
-	return resp.Data, checkErr(resp)
+	return resp.Bytes(), checkErr(resp)
 }
 
 func (t *Client) RequestTransferExit(ctx context.Context) error {
-	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x01, REQUEST_TRANSFER_EXIT}, gocan.ResponseRequired)
-	//	log.Println(frame.String())
-	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, t.responseID)
+	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x01, REQUEST_TRANSFER_EXIT}, DefaultTimeout, t.responseID)
 	if err != nil {
 		return fmt.Errorf("RequestTransferExit: %w", err)
 	}
@@ -366,12 +337,7 @@ func (t *Client) RequestTransferExit(ctx context.Context) error {
 }
 
 func (t *Client) ClearDynamicallyDefineLocalId(ctx context.Context) error {
-	frame := &gocan.CANFrame{
-		Identifier: REQ_MSG_ID,
-		Data:       []byte{0x40, 0xA1, DYNAMICALLY_DEFINE_IDENTIFIER, DM_CDDLI},
-		FrameType:  gocan.ResponseRequired,
-	}
-	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout*2, t.responseID)
+	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, DYNAMICALLY_DEFINE_IDENTIFIER, DM_CDDLI}, DefaultTimeout*2, t.responseID)
 	if err != nil {
 		return fmt.Errorf("ClearDynamicallyDefineLocalId: %w", err)
 	}
@@ -392,12 +358,14 @@ func (t *Client) DynamicallyDefineLocalIdByLocID(ctx context.Context, index int,
 
 func (t *Client) sendDDL(ctx context.Context, payload []byte) error {
 	for _, msg := range t.splitRequest(payload, false) {
-		if msg.FrameType.Type == 1 {
-			if err := t.c.SendFrame(msg); err != nil {
+		if !msg.rr {
+			if err := t.c.Send(ctx, msg.frame); err != nil {
 				return fmt.Errorf("DynamicallyDefineLocalIdRequest[1]: %w", err)
 			}
 		} else {
-			resp, err := t.c.SendAndWait(ctx, msg, DefaultTimeout, REQ_CHUNK_CONF_ID)
+			rctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
+			resp, err := t.c.Request(rctx, msg.frame, REQ_CHUNK_CONF_ID)
+			cancel()
 			if err != nil {
 				return fmt.Errorf("DynamicallyDefineLocalIdRequest[2]: %w", err)
 			}
@@ -431,7 +399,7 @@ func (t *Client) RequestSecurityAccess(ctx context.Context, force bool) (bool, e
 
 func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 	msg := []byte{0x40, 0xA1, 0x02, SECURITY_ACCESS, DEVELOPMENT_PRIORITY}
-	ff, err := t.c.SendAndWait(ctx, gocan.NewFrame(REQ_MSG_ID, msg, gocan.ResponseRequired), DefaultTimeout*2, t.responseID)
+	ff, err := t.request(ctx, REQ_MSG_ID, msg, DefaultTimeout*2, t.responseID)
 	if err != nil {
 		return false, fmt.Errorf("request seed: %v", err)
 	}
@@ -444,7 +412,7 @@ func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 	key := CalcKey(seed, method)
 
 	msgReply := []byte{0x40, 0xA1, 0x04, SECURITY_ACCESS, DEVELOPMENT_PRIORITY + 1, byte(int(key) >> 8), byte(key)}
-	f2, err := t.c.SendAndWait(ctx, gocan.NewFrame(REQ_MSG_ID, msgReply, gocan.ResponseRequired), DefaultTimeout*2, t.responseID)
+	f2, err := t.request(ctx, REQ_MSG_ID, msgReply, DefaultTimeout*2, t.responseID)
 	if err != nil {
 		return false, fmt.Errorf("send seed: %v", err)
 
@@ -458,10 +426,13 @@ func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
 	}
 }
 
-// 266h Send acknowledgement, has 0x3F on 3rd!
-func (t *Client) Ack(val byte, typ gocan.CANFrameType) error {
-	//debug.Log(fmt.Sprintf("Ack: %s", frame.String()))
-	return t.c.Send(0x266, []byte{0x40, 0xA1, 0x3F, val & 0xBF}, typ)
+// 266h Send acknowledgement, has 0x3F on 3rd! expectReply hints buffered
+// (ELM/STN) adapters that another response frame follows this ack.
+func (t *Client) Ack(ctx context.Context, val byte, expectReply bool) error {
+	if expectReply {
+		ctx = gocan.WithExpectedResponses(ctx, 1)
+	}
+	return t.c.Send(ctx, gocan.NewFrame(0x266, []byte{0x40, 0xA1, 0x3F, val & 0xBF}))
 }
 
 func CalcKey(seed int, method int) int {
@@ -497,11 +468,18 @@ func CalcKeyCustom(seed int, xor, minus int) int {
 	return key
 }
 
-func (t *Client) splitRequest(payload []byte, responseRequired bool) []*gocan.CANFrame {
+// kwpFrame is one chunk of a split KWP request; rr marks chunks the ECU
+// confirms on REQ_CHUNK_CONF_ID (v1 ResponseRequired).
+type kwpFrame struct {
+	frame gocan.Frame
+	rr    bool
+}
+
+func (t *Client) splitRequest(payload []byte, responseRequired bool) []kwpFrame {
 	chunkSize := 6
 	msgCount := (len(payload) + chunkSize - 1) / chunkSize
 
-	var results []*gocan.CANFrame
+	var results []kwpFrame
 
 	for i := range msgCount {
 		start := chunkSize * i
@@ -523,11 +501,10 @@ func (t *Client) splitRequest(payload []byte, responseRequired bool) []*gocan.CA
 
 		copy(msgData[2:], payload[start:end])
 
-		if flag&0x80 == 0x80 || responseRequired {
-			results = append(results, gocan.NewFrame(REQ_MSG_ID, msgData, gocan.ResponseRequired))
-		} else {
-			results = append(results, gocan.NewFrame(REQ_MSG_ID, msgData, gocan.Outgoing))
-		}
+		results = append(results, kwpFrame{
+			frame: gocan.NewFrame(REQ_MSG_ID, msgData),
+			rr:    flag&0x80 == 0x80 || responseRequired,
+		})
 	}
 
 	return results
@@ -681,15 +658,14 @@ func (t *Client) ReadFlash(ctx context.Context, addr, length int) ([]byte, error
 
 func (t *Client) ReadMemoryByAddressF0(ctx context.Context, address, length int) ([]byte, error) {
 	// Jump to read adress
-	if err := t.c.Send(REQ_MSG_ID, []byte{0x41, 0xA1, 0x08, DYNAMICALLY_DEFINE_IDENTIFIER, 0xF0, 0x03, 0x00, byte(length)}, gocan.Outgoing); err != nil {
+	if err := t.c.Send(ctx, gocan.NewFrame(REQ_MSG_ID, []byte{0x41, 0xA1, 0x08, DYNAMICALLY_DEFINE_IDENTIFIER, 0xF0, 0x03, 0x00, byte(length)})); err != nil {
 		return nil, fmt.Errorf("failed to set read length: %w", err)
 	}
-	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x00, 0xA1, byte((address >> 16) & 0xFF), byte((address >> 8) & 0xFF), byte(address & 0xFF), 0x00, 0x00, 0x00}, gocan.ResponseRequired)
-	f, err := t.c.SendAndWait(ctx, frame, DefaultTimeout*2, t.responseID)
+	f, err := t.request(ctx, REQ_MSG_ID, []byte{0x00, 0xA1, byte((address >> 16) & 0xFF), byte((address >> 8) & 0xFF), byte(address & 0xFF), 0x00, 0x00, 0x00}, DefaultTimeout*2, t.responseID)
 	if err != nil {
 		return nil, err
 	}
-	if err := t.Ack(f.Data[0], gocan.Outgoing); err != nil {
+	if err := t.Ack(ctx, f.Data[0], false); err != nil {
 		return nil, fmt.Errorf("failed to ack jump to address response: %w", err)
 	}
 
@@ -713,9 +689,11 @@ func (t *Client) recvData(ctx context.Context, length int) ([]byte, error) {
 	out := bytes.NewBuffer(nil) // Simplified buffer initialization
 
 	// Subscribe to responseID and send the start transfer command
-	sub := t.c.Subscribe(ctx, t.responseID)
+	sctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	ch := t.c.Subscribe(sctx, t.responseID)
 	startTransferCmd := []byte{0x40, 0xA1, 0x02, READ_DATA_BY_IDENTIFIER, 0xF0, 0x00, 0x00, 0x00}
-	if err := t.c.Send(REQ_MSG_ID, startTransferCmd, gocan.ResponseRequired); err != nil {
+	if err := t.c.Send(gocan.WithExpectedResponses(ctx, 1), gocan.NewFrame(REQ_MSG_ID, startTransferCmd)); err != nil {
 		return nil, err
 	}
 
@@ -725,7 +703,10 @@ func (t *Client) recvData(ctx context.Context, length int) ([]byte, error) {
 			return nil, ctx.Err()
 		case <-time.After(DefaultTimeout):
 			return nil, fmt.Errorf("timeout")
-		case frame := <-sub.Chan():
+		case frame, ok := <-ch:
+			if !ok {
+				return nil, fmt.Errorf("recvData: subscription closed")
+			}
 			// Handle frame based on control byte
 			if frame.Data[0]&0x40 == 0x40 { // Start or continuation frame
 				// Calculate remaining payload excluding non-payload bytes
@@ -748,10 +729,10 @@ func (t *Client) recvData(ctx context.Context, length int) ([]byte, error) {
 
 			// Check if it's the last frame
 			if frame.Data[0] == 0x80 || frame.Data[0] == 0xC0 {
-				t.Ack(frame.Data[0], gocan.Outgoing)
+				t.Ack(ctx, frame.Data[0], false)
 				return out.Bytes(), nil // Directly return from the case block
 			}
-			t.Ack(frame.Data[0], gocan.ResponseRequired)
+			t.Ack(ctx, frame.Data[0], true)
 		}
 	}
 	return out.Bytes(), nil
@@ -759,8 +740,7 @@ func (t *Client) recvData(ctx context.Context, length int) ([]byte, error) {
 
 // Reset ECU
 func (t *Client) ResetECU(ctx context.Context) error {
-	frame := gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, ECU_RESET, 0x01}, gocan.ResponseRequired)
-	f, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, t.responseID)
+	f, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, ECU_RESET, 0x01}, DefaultTimeout, t.responseID)
 	if err != nil {
 		return err
 	}
@@ -884,16 +864,11 @@ func (t *Client) ReadMemoryByAddress(ctx context.Context, address, length int) (
 // readMemoryByAddressInto reads up to 'length' bytes starting at 'address' directly into dst.
 // It returns the number of bytes written into dst.
 func (t *Client) readMemoryByAddressInto(ctx context.Context, address int, length byte, dst []byte) (int, error) {
-	frame := &gocan.CANFrame{
-		Identifier: REQ_MSG_ID,
-		Data: []byte{
-			0x40, 0xA1, 0x05, READ_MEMORY_BY_ADDRESS,
-			byte(address >> 16), byte(address >> 8), byte(address),
-			length,
-		},
-		FrameType: gocan.ResponseRequired,
-	}
-	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, t.responseID)
+	resp, err := t.request(ctx, REQ_MSG_ID, []byte{
+		0x40, 0xA1, 0x05, READ_MEMORY_BY_ADDRESS,
+		byte(address >> 16), byte(address >> 8), byte(address),
+		length,
+	}, DefaultTimeout, t.responseID)
 	if err != nil {
 		return 0, fmt.Errorf("ReadDataByAddress[1]: %w", err)
 	}
@@ -908,12 +883,7 @@ func (t *Client) readMemoryByAddressInto(ctx context.Context, address int, lengt
 	remaining -= byte(n)
 	// Continue while ECU indicates more chunks (low 6 bits non-zero).
 	for resp.Data[0]&0x3F != 0 && remaining > 0 {
-		ack := gocan.NewFrame(
-			RESP_CHUNK_CONF_ID,
-			[]byte{0x40, 0xA1, 0x3F, resp.Data[0] &^ 0x40},
-			gocan.ResponseRequired,
-		)
-		resp, err = t.c.SendAndWait(ctx, ack, DefaultTimeout, t.responseID)
+		resp, err = t.request(ctx, RESP_CHUNK_CONF_ID, []byte{0x40, 0xA1, 0x3F, resp.Data[0] &^ 0x40}, DefaultTimeout, t.responseID)
 		if err != nil {
 			return n, fmt.Errorf("ReadDataByAddress[2]: %w", err)
 		}
@@ -1002,26 +972,27 @@ func (t *Client) WriteDataByAddress(ctx context.Context, address uint32, data []
 func (t *Client) RequestUpload(ctx context.Context, address, length uint32) error {
 	message := []byte{0x07, REQUEST_UPLOAD, byte(address >> 16), byte(address >> 8), byte(address), byte(length >> 16), byte(length >> 8), byte(length)}
 	for _, msg := range t.splitRequest(message, false) {
-		//		log.Println(msg.String())
-		if msg.FrameType.Type == 1 {
-			resp, err := t.c.SendAndWait(ctx, msg, DefaultTimeout, t.responseID)
+		if !msg.rr {
+			rctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
+			resp, err := t.c.Request(rctx, msg.frame, t.responseID)
+			cancel()
 			if err != nil {
 				return err
 			}
-			//			log.Println(i, resp.String())
 			if err := checkErr(resp); err != nil {
 				return err
 			}
 
 		} else {
-			resp, err := t.c.SendAndWait(ctx, msg, DefaultTimeout, REQ_CHUNK_CONF_ID)
+			rctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
+			resp, err := t.c.Request(rctx, msg.frame, REQ_CHUNK_CONF_ID)
+			cancel()
 			if err != nil {
 				return fmt.Errorf("RequestUpload: %w", err)
 			}
 			if err := TranslateErrorCode(resp.Data[5]); err != nil {
 				return fmt.Errorf("RequestUpload: %w", err)
 			}
-			//			log.Println(i, resp.String())
 		}
 	}
 
@@ -1031,31 +1002,18 @@ func (t *Client) RequestUpload(ctx context.Context, address, length uint32) erro
 func (t *Client) sendLong(ctx context.Context, data []byte) error {
 	messages := t.splitRequest(data, true)
 	for i, msg := range messages {
-		// log.Printf("msg %x: %X", msg.Identifier(), msg.Data())
+		replyID := REQ_CHUNK_CONF_ID
 		if i == len(messages)-1 {
-			// log.Println(msg.Type())
-
-			//if err := t.c.Send(msg); err != nil {
-			//	return err
-			//}
-
-			resp, err := t.c.SendAndWait(ctx, msg, DefaultTimeout, t.responseID)
-			if err != nil {
-				return err
-			}
-			// log.Println(resp.String())
-			if err := checkErr(resp); err != nil {
-				return err
-			}
-		} else {
-			resp, err := t.c.SendAndWait(ctx, msg, DefaultTimeout, REQ_CHUNK_CONF_ID)
-			if err != nil {
-				return fmt.Errorf("%s2: %w", getFunctionName(), err)
-			}
-			if err := checkErr(resp); err != nil {
-				return err
-			}
-			// log.Printf("chunk %d: %X", i, resp.Data())
+			replyID = t.responseID
+		}
+		rctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
+		resp, err := t.c.Request(rctx, msg.frame, replyID)
+		cancel()
+		if err != nil {
+			return fmt.Errorf("%s2: %w", getFunctionName(), err)
+		}
+		if err := checkErr(resp); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -1104,13 +1062,15 @@ func (t *Client) SaveROM(ctx context.Context, address uint32, data []byte) error
 
 	msgs := t.splitRequest2(append([]byte{byte(len(data) + 1), TRANSFER_DATA}, data...))
 	for _, msg := range msgs {
-		log.Println(msg.String())
-		if msg.FrameType.Type == 1 {
-			if err := t.c.SendFrame(msg); err != nil {
+		log.Println(msg.frame.String())
+		if !msg.rr {
+			if err := t.c.Send(ctx, msg.frame); err != nil {
 				return fmt.Errorf("%s1: %w", getFunctionName(), err)
 			}
 		} else {
-			resp, err := t.c.SendAndWait(ctx, msg, DefaultTimeout, REQ_CHUNK_CONF_ID)
+			rctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
+			resp, err := t.c.Request(rctx, msg.frame, REQ_CHUNK_CONF_ID)
+			cancel()
 			if err != nil {
 				return fmt.Errorf("%s2: %w", getFunctionName(), err)
 			}
@@ -1125,11 +1085,11 @@ func (t *Client) SaveROM(ctx context.Context, address uint32, data []byte) error
 	//return t.writeRange(ctx, int(address), int(address)+len(data), data)
 }
 
-func (t *Client) splitRequest2(payload []byte) []*gocan.CANFrame {
+func (t *Client) splitRequest2(payload []byte) []kwpFrame {
 	msgCount := (len(payload) + 6 - 1) / 6
 
 	left := len(payload)
-	var results []*gocan.CANFrame
+	var results []kwpFrame
 
 	msgLen := func() int {
 		if left >= 6 {
@@ -1163,11 +1123,10 @@ func (t *Client) splitRequest2(payload []byte) []*gocan.CANFrame {
 			msgData[2+j] = payload[start+j]
 		}
 
-		if i < msgCount-1 {
-			results = append(results, gocan.NewFrame(REQ_MSG_ID, msgData, gocan.Outgoing))
-		} else if i == msgCount-1 {
-			results = append(results, gocan.NewFrame(REQ_MSG_ID, msgData, gocan.ResponseRequired))
-		}
+		results = append(results, kwpFrame{
+			frame: gocan.NewFrame(REQ_MSG_ID, msgData),
+			rr:    i == msgCount-1,
+		})
 
 		/*
 			if flag&0x80 == 0x80 {
@@ -1183,13 +1142,15 @@ func (t *Client) splitRequest2(payload []byte) []*gocan.CANFrame {
 func (t *Client) RequestDownload(ctx context.Context, address uint32, length uint32) error {
 	message := []byte{0x08, REQUEST_DOWNLOAD, byte(address >> 16), byte(address >> 8), byte(address), 0x00, byte(length >> 16), byte(length >> 8), byte(length)}
 	for _, msg := range t.splitRequest2(message) {
-		log.Println(msg.String())
-		if msg.FrameType.Type == 1 {
-			if err := t.c.SendFrame(msg); err != nil {
+		log.Println(msg.frame.String())
+		if !msg.rr {
+			if err := t.c.Send(ctx, msg.frame); err != nil {
 				return fmt.Errorf("%s1: %w", getFunctionName(), err)
 			}
 		} else {
-			resp, err := t.c.SendAndWait(ctx, msg, DefaultTimeout, t.responseID)
+			rctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
+			resp, err := t.c.Request(rctx, msg.frame, t.responseID)
+			cancel()
 			if err != nil {
 				return fmt.Errorf("%s2: %w", getFunctionName(), err)
 			}
@@ -1214,20 +1175,15 @@ func (t *Client) ReadDTCByStatus(ctx context.Context, status byte) ([]dtc.DTC, e
 	)
 
 	// Initial request: 0xA1 sub-function, length 0x02 (SID + status)
-	req := &gocan.CANFrame{
-		Identifier: REQ_MSG_ID,
-		Data:       []byte{0x40, 0xA1, 0x02, READ_DTC_BY_STATUS, status},
-		FrameType:  gocan.ResponseRequired,
-	}
-	resp, err := t.c.SendAndWait(ctx, req, DefaultTimeout, t.responseID)
+	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, READ_DTC_BY_STATUS, status}, DefaultTimeout, t.responseID)
 	if err != nil {
 		return nil, fmt.Errorf("ReadDTCByStatus[0]: %w", err)
 	}
 	if err := checkErr(resp); err != nil {
 		return nil, err
 	}
-	if len(resp.Data) < 5 {
-		return nil, fmt.Errorf("ReadDTCByStatus[1]: short first response: % X", resp.Data)
+	if resp.Length < 5 {
+		return nil, fmt.Errorf("ReadDTCByStatus[1]: short first response: % X", resp.Bytes())
 	}
 
 	// No DTCs: 02 58 00
@@ -1245,7 +1201,7 @@ func (t *Client) ReadDTCByStatus(ctx context.Context, status byte) ([]dtc.DTC, e
 	dtcData := make([]byte, 0, numDTCs*bytesPerDTC)
 
 	// First frame payload starts at byte 5
-	dtcData = append(dtcData, resp.Data[5:]...)
+	dtcData = append(dtcData, resp.Bytes()[5:]...)
 
 	row := resp.Data[0]
 
@@ -1257,15 +1213,9 @@ func (t *Client) ReadDTCByStatus(ctx context.Context, status byte) ([]dtc.DTC, e
 			return nil, ctx.Err()
 		}
 
-		chunkReq := &gocan.CANFrame{
-			Identifier: RESP_CHUNK_CONF_ID,
-			// 0x3F = "block transfer confirmation"
-			// row &^ 0x40 clears the "first block" bit.
-			Data:      []byte{0x40, 0xA1, 0x3F, row &^ 0x40},
-			FrameType: gocan.ResponseRequired,
-		}
-
-		resp, err = t.c.SendAndWait(ctx, chunkReq, DefaultTimeout, t.responseID)
+		// 0x3F = "block transfer confirmation"
+		// row &^ 0x40 clears the "first block" bit.
+		resp, err = t.request(ctx, RESP_CHUNK_CONF_ID, []byte{0x40, 0xA1, 0x3F, row &^ 0x40}, DefaultTimeout, t.responseID)
 		if err != nil {
 			return nil, fmt.Errorf("ReadDTCByStatus[3]: %w", err)
 		}
@@ -1273,12 +1223,12 @@ func (t *Client) ReadDTCByStatus(ctx context.Context, status byte) ([]dtc.DTC, e
 			return nil, err
 		}
 
-		if len(resp.Data) < 3 {
-			return nil, fmt.Errorf("ReadDTCByStatus[4]: short chunk response: % X", resp.Data)
+		if resp.Length < 3 {
+			return nil, fmt.Errorf("ReadDTCByStatus[4]: short chunk response: % X", resp.Bytes())
 		}
 
 		// Chunk payload starts at Data[2]
-		dtcData = append(dtcData, resp.Data[2:]...)
+		dtcData = append(dtcData, resp.Bytes()[2:]...)
 		row = resp.Data[0]
 	}
 
@@ -1310,12 +1260,7 @@ func (t *Client) ReadDTCByStatus(ctx context.Context, status byte) ([]dtc.DTC, e
 }
 
 func (t *Client) ClearDTCS(ctx context.Context) error {
-	frame := &gocan.CANFrame{
-		Identifier: REQ_MSG_ID,
-		Data:       []byte{0x40, 0xA1, 0x03, CLEAR_DTC, 0xFF, 0x00},
-		FrameType:  gocan.ResponseRequired,
-	}
-	resp, err := t.c.SendAndWait(ctx, frame, DefaultTimeout, t.responseID)
+	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x03, CLEAR_DTC, 0xFF, 0x00}, DefaultTimeout, t.responseID)
 	if err != nil {
 		return fmt.Errorf("ClearDTCS[0]: %w", err)
 	}
@@ -1414,7 +1359,7 @@ func getFunctionNameN(depth int) string {
 
 }
 
-func checkErr(f *gocan.CANFrame) error {
+func checkErr(f gocan.Frame) error {
 	if f.Data[3] == 0x7F {
 		return fmt.Errorf("%s: %s %w", getFunctionNameN(2), TranslateServiceID(f.Data[4]), TranslateErrorCode(f.Data[5]))
 	}

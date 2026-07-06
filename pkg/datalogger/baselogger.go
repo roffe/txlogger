@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/wbl"
 	"github.com/roffe/txlogger/relayserver"
@@ -152,7 +152,7 @@ func (bl *BaseLogger) buildChannels() []Channel {
 	return channels
 }
 
-func (bl *BaseLogger) setupWBL(ctx context.Context, cl *gocan.Client) error {
+func (bl *BaseLogger) setupWBL(ctx context.Context, cl *gocan.Bus) error {
 	cfg := &wbl.WBLConfig{
 		WBLType:  bl.Config.WidebandConfig.Name,
 		Port:     bl.Config.WidebandConfig.Port,

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ecu"
 )
 
@@ -53,7 +53,7 @@ const (
 )
 
 type Client struct {
-	c          *gocan.Client
+	c          *gocan.Bus
 	bootloaded bool
 	chipTypes  []byte
 	footer     []byte
@@ -72,7 +72,7 @@ func (t *Client) RecoverECU(ctx context.Context, bin []byte) error {
 	return t.FlashECU(ctx, bin)
 }
 
-func New(c *gocan.Client, cfg *ecu.Config) ecu.Client {
+func New(c *gocan.Bus, cfg *ecu.Config) ecu.Client {
 	t := &Client{
 		c:   c,
 		cfg: ecu.LoadConfig(cfg),
@@ -84,18 +84,20 @@ func New(c *gocan.Client, cfg *ecu.Config) ecu.Client {
 // full 8 byte DLC and the first byte echoing back what we sent. Status byte
 // (Data[1]) semantics differ per command and are left to the caller.
 func (t *Client) command(ctx context.Context, payload []byte, timeout time.Duration) ([]byte, error) {
-	frame := gocan.NewFrame(0x5, payload, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frame, timeout, 0xC)
+	frame := gocan.NewFrame(0x5, payload)
+	rctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	resp, err := t.c.Request(rctx, frame, 0xC)
 	if err != nil {
 		return nil, err
 	}
-	if resp.DLC() != 8 {
+	if resp.Length != 8 {
 		return nil, fmt.Errorf("short response to command %02X: %X", payload[0], resp.Data)
 	}
 	if resp.Data[0] != payload[0] {
 		return nil, fmt.Errorf("response echo mismatch for command %02X: %X", payload[0], resp.Data)
 	}
-	return resp.Data, nil
+	return resp.Data[:], nil
 }
 
 func (t *Client) GetChipTypes(ctx context.Context) ([]byte, error) {

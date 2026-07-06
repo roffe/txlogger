@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/pkg/gmlan"
+	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/gmlan"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ecu/t8util"
 )
@@ -25,7 +25,7 @@ var (
 )
 
 type Client struct {
-	c                 *gocan.Client
+	c                 *gocan.Bus
 	defaultTimeout    time.Duration
 	legionRunning     bool
 	gm                *gmlan.Client
@@ -35,9 +35,9 @@ type Client struct {
 	cfg               *ecu.Config
 }
 
-func New(c *gocan.Client, cfg *ecu.Config, canID uint32, recvID ...uint32) *Client {
+func New(c *gocan.Bus, cfg *ecu.Config, canID uint32, recvID ...uint32) *Client {
 	var ifl uint16 = 200
-	lower := strings.ToLower(c.Adapter().Name())
+	lower := strings.ToLower(c.AdapterName())
 	switch {
 	case strings.HasPrefix(lower, "txbridge"):
 		ifl = 1100
@@ -65,7 +65,7 @@ func New(c *gocan.Client, cfg *ecu.Config, canID uint32, recvID ...uint32) *Clie
 		ifl = 50
 	}
 
-	log.Println("Using interframe latency " + strconv.Itoa(int(ifl)) + " for " + c.Adapter().Name())
+	log.Println("Using interframe latency " + strconv.Itoa(int(ifl)) + " for " + c.AdapterName())
 
 	return &Client{
 		c:                 c,
@@ -80,6 +80,33 @@ func New(c *gocan.Client, cfg *ecu.Config, canID uint32, recvID ...uint32) *Clie
 
 func (t *Client) IsRunning() bool {
 	return t.legionRunning
+}
+
+// request sends a command frame on t.canID and waits for the reply on t.recvID.
+func (t *Client) request(ctx context.Context, payload []byte, timeout time.Duration) (gocan.Frame, error) {
+	rctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return t.c.Request(rctx, gocan.NewFrame(t.canID, payload), t.recvID...)
+}
+
+// blockResponse subscribes for the ECU reply on t.recvID and returns a wait
+// func. Call it BEFORE sending a consecutive-frame block: subscribing after
+// the last frame races the reply on fast adapters and loses it.
+func (t *Client) blockResponse(ctx context.Context) func(timeout time.Duration) (gocan.Frame, error) {
+	sctx, cancel := context.WithCancel(ctx)
+	ch := t.c.Subscribe(sctx, t.recvID...)
+	return func(timeout time.Duration) (gocan.Frame, error) {
+		defer cancel()
+		select {
+		case f, ok := <-ch:
+			if !ok {
+				return gocan.Frame{}, gocan.ErrClosed
+			}
+			return f, nil
+		case <-time.After(timeout):
+			return gocan.Frame{}, fmt.Errorf("block response: %w", context.DeadlineExceeded)
+		}
+	}
 }
 
 func (t *Client) StartBootloader(ctx context.Context, startAddress uint32) error {
@@ -112,6 +139,7 @@ func (t *Client) UploadBootloader(ctx context.Context, z22se bool) error {
 		if err := t.gm.TransferData(ctx, 0x00, 0xF0, startAddress); err != nil {
 			return err
 		}
+		wait := t.blockResponse(ctx)
 		var seq byte = 0x21
 		for j := 0; j <= 0x21; j++ {
 			payload := []byte{seq, 0, 0, 0, 0, 0, 0, 0}
@@ -120,12 +148,16 @@ func (t *Client) UploadBootloader(ctx context.Context, z22se bool) error {
 				return err
 			}
 			progress += n
-			f := gocan.NewFrame(t.canID, payload, gocan.Outgoing)
+			f := gocan.NewFrame(t.canID, payload)
 			if j == 0x21 {
-				f.Timeout = uint32(t.defaultTimeout * 4)
-				f.FrameType = gocan.ResponseRequired
+				// last frame of the block: hint buffered adapters that the ECU replies
+				sctx, cancel := context.WithTimeout(gocan.WithExpectedResponses(ctx, 1), t.defaultTimeout*4)
+				err = t.c.Send(sctx, f)
+				cancel()
+			} else {
+				err = t.c.Send(ctx, f)
 			}
-			if err := t.c.SendFrame(f); err != nil {
+			if err != nil {
 				return err
 			}
 			seq++
@@ -135,7 +167,7 @@ func (t *Client) UploadBootloader(ctx context.Context, z22se bool) error {
 			t.cfg.OnProgress(float64(progress))
 			time.Sleep(500 * time.Microsecond)
 		}
-		resp, err := t.c.Recv(ctx, t.defaultTimeout*2, t.recvID...)
+		resp, err := wait(t.defaultTimeout * 2)
 		if err != nil {
 			return err
 		}
@@ -158,8 +190,7 @@ func (t *Client) UploadBootloader(ctx context.Context, z22se bool) error {
 		return err
 	}
 
-	f2 := gocan.NewFrame(t.canID, payload, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, f2, t.defaultTimeout, t.recvID...)
+	resp, err := t.request(ctx, payload, t.defaultTimeout)
 	if err != nil {
 		return err
 	}
@@ -176,7 +207,7 @@ func (t *Client) UploadBootloader(ctx context.Context, z22se bool) error {
 	startAddress += 0x06
 
 	t.cfg.OnProgress(float64(9997))
-	t.cfg.OnMessage(fmt.Sprintf("Done, took: %s", time.Since(start).String()))
+	t.cfg.OnMessage(fmt.Sprintf("Done, took: %s", time.Since(start).Truncate(10*time.Millisecond).String()))
 
 	return nil
 }
@@ -207,6 +238,7 @@ func (t *Client) UploadZ22sePreloader(ctx context.Context) error {
 		if err := t.gm.TransferData(ctx, 0x00, 0xF0, startAddress); err != nil {
 			return err
 		}
+		wait := t.blockResponse(ctx)
 		var seq byte = 0x21
 		for j := 0; j <= 0x21; j++ {
 			payload := []byte{seq, 0, 0, 0, 0, 0, 0, 0}
@@ -215,12 +247,16 @@ func (t *Client) UploadZ22sePreloader(ctx context.Context) error {
 				return err
 			}
 			progress += n
-			f := gocan.NewFrame(t.canID, payload, gocan.Outgoing)
+			f := gocan.NewFrame(t.canID, payload)
 			if j == 0x21 {
-				f.Timeout = uint32(t.defaultTimeout * 8)
-				f.FrameType = gocan.ResponseRequired
+				// last frame of the block: hint buffered adapters that the ECU replies
+				sctx, cancel := context.WithTimeout(gocan.WithExpectedResponses(ctx, 1), t.defaultTimeout*8)
+				err = t.c.Send(sctx, f)
+				cancel()
+			} else {
+				err = t.c.Send(ctx, f)
 			}
-			if err := t.c.SendFrame(f); err != nil {
+			if err != nil {
 				return err
 			}
 			seq++
@@ -233,7 +269,7 @@ func (t *Client) UploadZ22sePreloader(ctx context.Context) error {
 			}
 
 		}
-		resp, err := t.c.Recv(ctx, t.defaultTimeout*2, t.recvID...)
+		resp, err := wait(t.defaultTimeout * 2)
 		if err != nil {
 			return err
 		}
@@ -256,8 +292,7 @@ func (t *Client) UploadZ22sePreloader(ctx context.Context) error {
 		return err
 	}
 
-	f2 := gocan.NewFrame(t.canID, payload, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, f2, t.defaultTimeout, t.recvID...)
+	resp, err := t.request(ctx, payload, t.defaultTimeout)
 	if err != nil {
 		return err
 	}
@@ -274,14 +309,13 @@ func (t *Client) UploadZ22sePreloader(ctx context.Context) error {
 	startAddress += 0x06
 
 	t.cfg.OnProgress(float64(9997))
-	t.cfg.OnMessage(fmt.Sprintf("Done, took: %s", time.Since(start).String()))
+	t.cfg.OnMessage(fmt.Sprintf("Done, took: %s", time.Since(start).Truncate(10*time.Millisecond).String()))
 
 	return nil
 }
 
 func (t *Client) Ping(ctx context.Context) error {
-	frame := gocan.NewFrame(t.canID, []byte{0xEF, 0xBE, 0x00, 0x00, 0x00, 0x00, 0x33, 0x66}, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frame, 50*time.Millisecond, t.recvID...)
+	resp, err := t.request(ctx, []byte{0xEF, 0xBE, 0x00, 0x00, 0x00, 0x00, 0x33, 0x66}, 50*time.Millisecond)
 	if err != nil {
 		return errors.New("LegionPing: " + err.Error())
 	}
@@ -298,8 +332,7 @@ func (t *Client) Exit(ctx context.Context) error {
 	payload := make([]byte, 2)
 	payload[0] = 0x01
 	payload[1] = 0x20
-	frame := gocan.NewFrame(t.canID, payload, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout*2, t.recvID...)
+	resp, err := t.request(ctx, payload, t.defaultTimeout*2)
 	if err != nil {
 		return errors.New("LegionExit: " + err.Error())
 	}
@@ -385,30 +418,29 @@ func (t *Client) GetMD5(ctx context.Context, md5type Command, partition uint16) 
 //	whish:
 //	Which pin to read.
 func (t *Client) IDemand(ctx context.Context, command Command, wish uint16) ([]byte, error) {
-	//log.Println("Legion i demand", command.String()+"!")
+	// log.Println("Legion i demand", command.String()+"!")
 	payload := []byte{0x02, 0xA5, byte(command), 0x00, 0x00, 0x00, byte(wish >> 8), byte(wish)}
-	frame := gocan.NewFrame(t.canID, payload, gocan.ResponseRequired)
 
 	var out []byte
 
 	err := retry.Do(func() error {
-		resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.recvID...)
+		resp, err := t.request(ctx, payload, t.defaultTimeout)
 		if err != nil {
 			return fmt.Errorf("IDemand: %w", err)
 		}
 
-		if err := demandErr(command, resp.Data); err != nil {
+		if err := demandErr(command, resp.Data[:]); err != nil {
 			return err
 		}
 
 		switch command {
 		case 0:
 			// Settings correctly received.
-			//log.Println("settings correctly received")
+			// log.Println("settings correctly received")
 			return nil
 		case 1:
 			// Crc-32; complete
-			//log.Println("crc-32 complete")
+			// log.Println("crc-32 complete")
 			out = resp.Data[4:]
 			return nil
 		case 2, 3:
@@ -418,15 +450,15 @@ func (t *Client) IDemand(ctx context.Context, command Command, wish uint16) ([]b
 				return err
 			}
 			out = b
-			//log.Println("md5 complete")
+			// log.Println("md5 complete")
 			return nil
 		case 4:
 			// Secondary loader is alive!
-			//log.Println("Master!, Secondary loader alive")
+			// log.Println("Master!, Secondary loader alive")
 			return nil
 		case 5:
 			// Marriage; Complete
-			//log.Println("Master, the marriage has been completed")
+			// log.Println("Master, the marriage has been completed")
 			return nil
 		case 6:
 			// ADC-read; complete
@@ -586,7 +618,7 @@ func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, f
 	t.cfg.OnMessage("Writing flash")
 	const startAddress = 0x000000
 	var length byte = 0x88
-	var numberOfFrames = 19
+	numberOfFrames := 19
 	var blockNumber int = 0
 	var lastBlockNumber int = (lastAddress / 0x80) - 1
 	var byteswapped bool = false
@@ -617,21 +649,31 @@ func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, f
 			if err := t.gm.TransferData(ctx, 0x00, length, currentAddress); err != nil {
 				problem = true
 			} else {
+				wait := t.blockResponse(ctx)
 				iFrameNumber := 0x21
 				txpnt := 0
 				for i := 0; i < numberOfFrames; i++ {
 					payload := make([]byte, 8)
 					cmd := t8util.GetFrameCmd(iFrameNumber, data2Send, txpnt)
 					binary.LittleEndian.PutUint64(payload, uint64(cmd))
-					frame := gocan.NewFrame(t.canID, payload, gocan.Outgoing)
+					frame := gocan.NewFrame(t.canID, payload)
 					iFrameNumber++
 					iFrameNumber &= 0x2F
 					txpnt += 7
-					if err := t.c.SendFrame(frame); err != nil {
+					var err error
+					if i == numberOfFrames-1 {
+						// last frame of the block: hint buffered adapters that the ECU replies
+						sctx, cancel := context.WithTimeout(gocan.WithExpectedResponses(ctx, 1), t.defaultTimeout*4)
+						err = t.c.Send(sctx, frame)
+						cancel()
+					} else {
+						err = t.c.Send(ctx, frame)
+					}
+					if err != nil {
 						return err
 					}
 				}
-				resp, err := t.c.Recv(ctx, time.Millisecond*150, 0x7E8)
+				resp, err := wait(time.Millisecond * 150)
 				if err != nil {
 					problem = true
 					continue
@@ -661,8 +703,8 @@ func (t *Client) EraseFlash(ctx context.Context, device byte, formatMask uint64)
 	cmd := (tmp<<40 | ((^tmp)&0xFFFF)<<24 | 0x13400) + uint64(device)
 	payload := make([]byte, 8)
 	binary.LittleEndian.PutUint64(payload, uint64(cmd))
-	frame := gocan.NewFrame(t.canID, payload, gocan.Outgoing)
-	if err := t.c.SendFrame(frame); err != nil {
+	frame := gocan.NewFrame(t.canID, payload)
+	if err := t.c.Send(ctx, frame); err != nil {
 		return err
 	}
 
@@ -682,7 +724,7 @@ func (t *Client) EraseFlash(ctx context.Context, device byte, formatMask uint64)
 		if firstPass {
 			if formatbuf[3] != device {
 				time.Sleep(5 * time.Second)
-				if err := t.c.SendFrame(frame); err != nil {
+				if err := t.c.Send(ctx, frame); err != nil {
 					return err
 				}
 			} else {
@@ -791,7 +833,6 @@ func demandErr(command Command, d []byte) error {
 			time.Sleep(500 * time.Millisecond)
 			return errors.New("busy marrying")
 		}
-
 	}
 
 	if command == 6 && d[3] != 0x01 {
@@ -801,21 +842,20 @@ func demandErr(command Command, d []byte) error {
 	// Something is wrong or we sent the wrong command.
 	if d[3] == 0xFF {
 		return errors.New("bootloader did what it could and failed. Sorry")
-
 	}
 	return nil
 }
 
-func checkErr(f *gocan.CANFrame) error {
+func checkErr(f gocan.Frame) error {
 	switch {
 	case f.Data[0] == 0x7E:
 		return errors.New("got 0x7E message as response to 0x21, ReadDataByLocalIdentifier command")
-	case bytes.Equal(f.Data, []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}):
+	case bytes.Equal(f.Data[:], []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}):
 		return errors.New("got blank response message to 0x21, ReadDataByLocalIdentifier")
 	case f.Data[0] == 0x03 && f.Data[1] == 0x7F && f.Data[2] == 0x23:
 		return errors.New("no security access granted")
 	case f.Data[2] != 0x61 && f.Data[1] != 0x61:
-		if bytes.Equal(f.Data, []byte{0x01, 0x7E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}) {
+		if bytes.Equal(f.Data[:], []byte{0x01, 0x7E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}) {
 			return fmt.Errorf("incorrect response to 0x21, sendReadDataByLocalIdentifier.  Byte 2 was %X", f.Data[2])
 		}
 	}
@@ -825,8 +865,7 @@ func checkErr(f *gocan.CANFrame) error {
 func (t *Client) ReadDataByLocalIdentifier(ctx context.Context, legionMode bool, pci byte, address int, length byte) ([]byte, int, error) {
 	retData := make([]byte, length)
 	payload := []byte{pci, 0x21, length, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address), 0x00}
-	frame := gocan.NewFrame(t.canID, payload, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, t.recvID...)
+	resp, err := t.request(ctx, payload, t.defaultTimeout)
 	if err != nil {
 		return nil, 0, fmt.Errorf("ReadDataByLocalIdentifier: %w", err)
 	}
@@ -852,12 +891,13 @@ func (t *Client) ReadDataByLocalIdentifier(ctx context.Context, legionMode bool,
 
 	var seq byte = 0x21
 	if !legionMode || resp.Data[3] == 0x00 {
-		sub := t.c.Subscribe(ctx, t.recvID...)
-		defer sub.Close()
-		if err := t.c.Send(t.canID, []byte{0x30}, gocan.CANFrameType{Type: 2, Responses: 18}); err != nil {
+		sctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		ch := t.c.Subscribe(sctx, t.recvID...)
+		if err := t.c.Send(gocan.WithExpectedResponses(ctx, 18), gocan.NewFrame(t.canID, []byte{0x30})); err != nil {
 			return nil, 0, err
 		}
-		var m_nrFrameToReceive = int((length - 4) / 7)
+		m_nrFrameToReceive := int((length - 4) / 7)
 		if (length-4)%7 > 0 {
 			m_nrFrameToReceive++
 		}
@@ -865,7 +905,10 @@ func (t *Client) ReadDataByLocalIdentifier(ctx context.Context, legionMode bool,
 			select {
 			case <-ctx.Done():
 				return nil, 0, ctx.Err()
-			case resp := <-sub.Chan():
+			case resp, ok := <-ch:
+				if !ok {
+					return nil, 0, errors.New("ReadDataByLocalIdentifier: subscription closed")
+				}
 				if resp.Data[0] != seq {
 					return nil, 0, fmt.Errorf("received invalid sequenced frame 0x%02X, expected 0x%02X", resp.Data[0], seq)
 				}
@@ -875,7 +918,7 @@ func (t *Client) ReadDataByLocalIdentifier(ctx context.Context, legionMode bool,
 				//		rx_cnt++
 				//	}
 				//}
-				dlc := resp.DLC()
+				dlc := int(resp.Length)
 				copy(retData[rx_cnt:], resp.Data[1:dlc])
 				rx_cnt += dlc - 1
 				seq++
@@ -902,7 +945,6 @@ func (t *Client) ReadDataByLocalIdentifier(ctx context.Context, legionMode bool,
 }
 
 func (t *Client) GetMCPVersion(ctx context.Context) (string, error) {
-
 	resp, _, err := t.ReadDataByLocalIdentifier(ctx, true, EcuByte_MCP, 0x8100, 0x80)
 	if err != nil {
 		return "", err

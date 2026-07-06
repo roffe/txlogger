@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/roffe/gocan"
 )
 
 func (t *Client) ResetECU(ctx context.Context) error {
@@ -16,8 +14,7 @@ func (t *Client) ResetECU(ctx context.Context) error {
 	//	}
 	//}
 	//log.Println("Resetting ECU")
-	frame := gocan.NewFrame(0x5, []byte{0x01, 0x20}, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frame, 150*time.Millisecond, 0xC)
+	resp, err := t.request(ctx, []byte{0x01, 0x20}, 150*time.Millisecond)
 	if err != nil {
 		return fmt.Errorf("failed to reset ECU: %v", err)
 	}
