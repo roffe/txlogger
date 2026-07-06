@@ -71,7 +71,7 @@ jobs:
         .\build.ps1 -j2534proxy -txlogger -setup
 
     - name: Creating Zip
-      run: 7z a txlogger.zip txlogger.exe j2534proxy.exe .\debug.bat C:\Progra~2\Kvaser\Canlib\Bin\canlib32.dll .\vcpkg\packages\libusb_x64-windows\bin\libusb-1.0.dll .\canusb\dll64\canusbdrv64.dll
+      run: 7z a txlogger.zip txlogger.exe j2534proxy.exe .\debug.bat C:\Progra~2\Kvaser\Canlib\Bin\canlib32.dll .\vcpkg\packages\libusb_x64-windows\bin\libusb-1.0.dll .\dist\canusbdrv64.dll
 
     - name: Creating Setup Zip
       run: 7z a txlogger_setup.zip txlogger_setup.exe
