@@ -38,7 +38,29 @@ jobs:
       run: |
         go get .
         go install fyne.io/tools/cmd/fyne@latest
-        .\setup_build_env.ps1
+
+    #- name: Install CANUSB SDK
+    #  run: |
+    #    New-Item -ItemType Directory -Path .\canusb -Force | Out-Null
+    #    Invoke-WebRequest -Uri "https://www.canusb.com/files/canusb_dll_driver.zip" -OutFile canusb_dll_driver.zip
+    #    Expand-Archive -Path canusb_dll_driver.zip -DestinationPath .\canusb -Force
+
+    - name: Install CANLIB
+      run: |
+        Invoke-WebRequest -Uri "https://pim.kvaser.com/var/assets/Product_Resources/7330130980150/5.51.461/canlib_5_51_461.exe" -OutFile canlib.exe
+        Start-Process -FilePath .\canlib.exe -ArgumentList "/S" -Wait
+
+    - name: Install llvm-mingw
+      run: |
+        Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20251216/llvm-mingw-20251216-ucrt-x86_64.zip" -OutFile llvm-mingw.zip
+        Expand-Archive -Path llvm-mingw.zip -DestinationPath .\ -Force
+        Rename-Item -Path .\llvm-mingw-20251216-ucrt-x86_64 -NewName llvm-mingw
+
+    - name: Install libusb via vcpkg
+      run: |
+        git clone https://github.com/microsoft/vcpkg.git --depth=1
+        .\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+        .\vcpkg\vcpkg.exe install libusb:x64-windows
     
     - name: Build
       run: |

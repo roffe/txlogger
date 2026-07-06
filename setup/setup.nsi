@@ -77,7 +77,7 @@ Section "txlogger" SecCore
   ;ADD YOUR OWN FILES HERE...
   FILE ..\j2534proxy.exe
   FILE ..\txlogger.exe
-  FILE ..\canusb\dll64\canusbdrv64.dll
+  FILE ..\dist\canusbdrv64.dll
   FILE ..\vcpkg\packages\libusb_x64-windows\bin\libusb-1.0.dll
   FILE C:\Progra~2\Kvaser\Canlib\Bin\canlib32.dll
   FILE ..\debug.bat

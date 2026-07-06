@@ -1,14 +1,13 @@
 .tmp
 tmp
 tmp2
-dist
 .vscode
 *.afr
 *.t7l
 *.t8l
 *.csv
 *.dif
-*.dll
+/*.dll
 /*.json
 *.dat
 *.exe
