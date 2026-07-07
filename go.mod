@@ -10,7 +10,7 @@ go 1.26.0
 replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 
 require (
-	fyne.io/fyne/v2 v2.8.0-rc2
+	fyne.io/fyne/v2 v2.8.0-rc3.0.20260707102740-6f1492f86144
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/lusingander/colorpicker v0.7.5
 	github.com/roffe/ecusymbol v1.2.5
@@ -26,7 +26,7 @@ require (
 	github.com/ebitengine/oto/v3 v3.4.0
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/hajimehoshi/go-mp3 v0.3.4
-	github.com/roffe/gocan/v2 v2.0.0-20260707104819-0e03fdfa76af
+	github.com/roffe/gocan/v2 v2.0.0-20260707222545-e555d944ecf5
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sys v0.46.0
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.78
@@ -48,7 +48,7 @@ require (
 	github.com/fyne-io/image v0.1.1 // indirect
 	github.com/fyne-io/oksvg v0.2.0 // indirect
 	github.com/go-gl/gl v0.0.0-20260331235117-4566fea9a276 // indirect
-	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1.0.20260627172858-eb9c312d9d47 // indirect
+	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1.0.20260707082822-2a407d02d01a // indirect
 	github.com/go-text/render v0.2.1 // indirect
 	github.com/go-text/typesetting v0.3.4 // indirect
 	github.com/golang/mock v1.6.0 // indirect

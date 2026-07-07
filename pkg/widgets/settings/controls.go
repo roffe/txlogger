@@ -171,6 +171,7 @@ func (sw *Widget) newPortRefreshButton() *widget.Button {
 	return widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
 		sw.portSelector.SetOptions(sw.ListPorts())
 		sw.portSelector.Refresh()
+		sw.RefreshAdapters()
 	})
 }
 

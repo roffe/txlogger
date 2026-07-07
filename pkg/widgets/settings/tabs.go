@@ -72,10 +72,11 @@ func (sw *Widget) canTab() *container.TabItem {
 	}
 	return tab("CAN", theme.ComputerIcon(),
 		section("Adapter",
-			container.NewBorder(nil, nil, fixedLabel("Adapter"), sw.debugCheckbox, sw.adapterSelector),
+			container.NewBorder(nil, nil, fixedLabel("Adapter"), nil, sw.adapterSelector),
 			container.NewBorder(nil, nil, fixedLabel("Port"), sw.refreshBtn, sw.portSelector),
 			container.NewBorder(nil, nil, fixedLabel("Info"), nil, sw.portDescription),
 			container.NewBorder(nil, nil, fixedLabel("Speed"), nil, sw.speedSelector),
+			sw.debugCheckbox,
 		),
 	)
 }

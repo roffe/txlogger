@@ -134,7 +134,7 @@ func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	sw.portDescription = widget.NewLabel("")
 	sw.portDescription.Importance = widget.LowImportance
 	sw.speedSelector = sw.newSpeedSelector()
-	sw.debugCheckbox = checkBox("Debug", prefDebug)
+	sw.debugCheckbox = checkBox("Enable CAN Debugging", prefDebug)
 	sw.refreshBtn = sw.newPortRefreshButton()
 
 	sw.adapterSelector.SetOptions(sw.sortedAdapterNames())
@@ -178,11 +178,25 @@ func (sw *Widget) ListPorts() []string {
 	}
 	portsList := make([]string, 0, len(ports))
 	for _, port := range ports {
+		// log.Println(port)
 		portsList = append(portsList, port.Name)
 		portCache[port.Name] = port
 	}
 	sort.Strings(portsList)
 	return portsList
+}
+
+// RefreshAdapters rescans gocan's device scanners and rebuilds the adapter
+// selector, picking up devices plugged in after startup.
+func (sw *Widget) RefreshAdapters() {
+	adapters := gocan.Rescan()
+	sw.mu.Lock()
+	clear(sw.adapters)
+	for _, adapter := range adapters {
+		sw.adapters[adapter.Name] = &adapter
+	}
+	sw.mu.Unlock()
+	sw.adapterSelector.SetOptions(sw.sortedAdapterNames())
 }
 
 // AddAdapters extends the adapter list with adapters discovered after
