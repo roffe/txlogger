@@ -100,10 +100,50 @@ func Start(ctx context.Context, logf func(string)) (*Proxy, []gocan.AdapterInfo,
 		return nil, nil, err
 	}
 
-	registered := make([]gocan.AdapterInfo, 0, len(list))
+	registered := p.toAdapterInfos(list)
+	// A scanner instead of static Register calls: gocan.Rescan re-runs it
+	// (fresh Hello round-trip), so DLLs installed or removed while txlogger
+	// runs are picked up. It also runs once right here, registering the
+	// initial entries.
+	gocan.RegisterScanner(p.scan)
+	if logf != nil {
+		for _, ai := range registered {
+			logf("j2534proxy: " + ai.Name)
+		}
+	}
+
+	go p.keepalive(ctx)
+	return p, registered, nil
+}
+
+// scan does one Hello round-trip on a fresh connection and returns the
+// proxy's current adapter list — nil once the proxy is gone, which drops
+// the entries from the registry on rescan.
+func (p *Proxy) scan() []gocan.AdapterInfo {
+	conn, err := dialProxy(p.addr)
+	if err != nil {
+		return nil
+	}
+	defer conn.Close()
+	if err := protocol.Write(conn, protocol.CmdHello, nil); err != nil {
+		return nil
+	}
+	cmd, payload, err := protocol.Read(conn)
+	if err != nil || cmd != protocol.CmdList {
+		return nil
+	}
+	var list []protocol.AdapterInfo
+	if err := json.Unmarshal(payload, &list); err != nil {
+		return nil
+	}
+	return p.toAdapterInfos(list)
+}
+
+func (p *Proxy) toAdapterInfos(list []protocol.AdapterInfo) []gocan.AdapterInfo {
+	out := make([]gocan.AdapterInfo, 0, len(list))
 	for _, info := range list {
 		name := info.Name
-		ai := gocan.AdapterInfo{
+		out = append(out, gocan.AdapterInfo{
 			Name:        name,
 			Description: info.Description + " (32-bit, via j2534proxy)",
 			Capabilities: gocan.Capabilities{
@@ -114,16 +154,9 @@ func Start(ctx context.Context, logf func(string)) (*Proxy, []gocan.AdapterInfo,
 			New: func(cfg gocan.Config) (gocan.Adapter, error) {
 				return &Adapter{addr: p.addr, name: name, cfg: cfg}, nil
 			},
-		}
-		gocan.Register(ai)
-		registered = append(registered, ai)
-		if logf != nil {
-			logf("j2534proxy: " + name)
-		}
+		})
 	}
-
-	go p.keepalive(ctx)
-	return p, registered, nil
+	return out
 }
 
 // keepalive feeds both proxy lifelines (stdin bytes + protocol pings) until

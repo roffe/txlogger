@@ -115,7 +115,9 @@ func handleConn(conn net.Conn) {
 
 func sendAdapterList(w *connWriter) error {
 	var list []protocol.AdapterInfo
-	for _, info := range gocan.Adapters() {
+	// Rescan so DLLs installed/removed after proxy startup show up; every
+	// Hello returns a fresh list.
+	for _, info := range gocan.Rescan() {
 		list = append(list, protocol.AdapterInfo{
 			Name:        info.Name,
 			Description: info.Description,

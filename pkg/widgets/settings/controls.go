@@ -187,7 +187,13 @@ func (sw *Widget) loadPreferences() {
 	sw.livePreview.SetChecked(prefLivePreview.get())
 	sw.meshView.SetChecked(prefMeshView.get())
 	sw.realtimeBars.SetChecked(prefRealtimeBars.get())
-	sw.logFormat.SetSelected(prefLogFormat.get())
+
+	logFormat := prefLogFormat.get()
+	if logFormat == "TXL" {
+		prefLogFormat.set("CSV") // TXL is no longer supported, reset to CSV
+		logFormat = "CSV"
+	}
+	sw.logFormat.SetSelected(logFormat)
 
 	logPath, err := common.GetLogPath()
 	if err != nil {
