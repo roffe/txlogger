@@ -26,7 +26,7 @@ require (
 	github.com/ebitengine/oto/v3 v3.4.0
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/hajimehoshi/go-mp3 v0.3.4
-	github.com/roffe/gocan/v2 v2.0.0-20260706205501-1b3147d4a019
+	github.com/roffe/gocan/v2 v2.0.0-20260707104819-0e03fdfa76af
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sys v0.46.0
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.78
