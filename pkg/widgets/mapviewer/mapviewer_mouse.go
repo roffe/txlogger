@@ -197,8 +197,8 @@ func (mv *MapViewer) calculateSelectionBounds(eventPos fyne.Position) (int, int)
 	// This accounts for any extra padding or layout adjustments
 	innerViewPos := mv.innerView.Position()
 
-	nselectedX := max(0, min(int((eventPos.X-innerViewPos.X))/int(cellWidth), mv.numColumns-1))
-	nSelectedY := max(0, min(mv.numRows-int((eventPos.Y-innerViewPos.Y))/int(cellHeight)-1, mv.numRows-1))
+	nselectedX := max(0, min(int((eventPos.X-innerViewPos.X)/cellWidth), mv.numColumns-1))
+	nSelectedY := max(0, min(mv.numRows-int((eventPos.Y-innerViewPos.Y)/cellHeight)-1, mv.numRows-1))
 
 	return nselectedX, nSelectedY
 }
