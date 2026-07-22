@@ -253,86 +253,43 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 	}
 
 	w.OnResized = func(direction resizeDirection, ev *fyne.DragEvent) {
-		var newSize fyne.Size
+		// ev.Dragged is the total delta since the drag started; the new rect
+		// is computed fresh from the rect captured at drag start. Clamping
+		// therefore absorbs overshoot: after hitting min size the edge stays
+		// put until the mouse travels back past the point where it clamped,
+		// matching native window behavior.
 		minSize := w.MinSize()
-		currentSize := w.Size()
-		switch direction {
-		case resizeUp:
-			actualDY := ev.Dragged.DY
-			if actualDY > 0 {
-				actualDY = min(actualDY, currentSize.Height-minSize.Height)
-			} else if w.Position().Y+actualDY < 0 {
-				actualDY = -w.Position().Y
-			}
-			newSize = fyne.NewSize(currentSize.Width, currentSize.Height-actualDY)
-			w.Move(w.Position().Add(fyne.NewPos(0, actualDY)))
-		case resizeDown:
-			newSize = currentSize.AddWidthHeight(0, ev.Dragged.DY)
-		case resizeLeft:
-			actualDX := ev.Dragged.DX
-			if actualDX > 0 {
-				// When shrinking (dragging right), limit by remaining width
-				actualDX = min(actualDX, currentSize.Width-minSize.Width)
-			} else if w.Position().X+actualDX < 0 {
-				// Prevent dragging past left edge
-				actualDX = -w.Position().X
-			}
-			newSize = fyne.NewSize(currentSize.Width-actualDX, currentSize.Height)
-			w.Move(w.Position().Add(fyne.NewPos(actualDX, 0)))
-		case resizeRight:
-			newSize = currentSize.AddWidthHeight(ev.Dragged.DX, 0)
-		case resizeUpLeft:
-			actualDY := ev.Dragged.DY
-			if actualDY > 0 {
-				actualDY = min(actualDY, currentSize.Height-minSize.Height)
-			} else if w.Position().Y+actualDY < 0 {
-				actualDY = -w.Position().Y
-			}
-			actualDX := ev.Dragged.DX
-			if actualDX > 0 {
-				// When shrinking (dragging right), limit by remaining width
-				actualDX = min(actualDX, currentSize.Width-minSize.Width)
-			} else if w.Position().X+actualDX < 0 {
-				// Prevent dragging past left edge
-				actualDX = -w.Position().X
-			}
-			newSize = fyne.NewSize(currentSize.Width-actualDX, currentSize.Height-actualDY)
-			w.Move(w.Position().Add(fyne.NewPos(actualDX, actualDY)))
-		case resizeUpRight:
-			actualDY := ev.Dragged.DY
-			if actualDY > 0 {
-				actualDY = min(actualDY, currentSize.Height-minSize.Height)
-			} else if w.Position().Y+actualDY < 0 {
-				actualDY = -w.Position().Y
-			}
-			newSize = fyne.NewSize(currentSize.Width+ev.Dragged.DX, currentSize.Height-actualDY)
-			w.Move(w.Position().Add(fyne.NewPos(0, actualDY)))
-		case resizeDownLeft:
-			actualDX := ev.Dragged.DX
-			if actualDX > 0 {
-				// When shrinking (dragging right), limit by remaining width
-				actualDX = min(actualDX, currentSize.Width-minSize.Width)
-			} else if w.Position().X+actualDX < 0 {
-				// Prevent dragging past left edge
-				actualDX = -w.Position().X
-			}
+		pos := w.dragStartPos
+		size := w.dragStartSize
+		right := pos.X + size.Width
+		bottom := pos.Y + size.Height
 
-			newSize = fyne.NewSize(currentSize.Width-actualDX, currentSize.Height+ev.Dragged.DY)
-			w.Move(w.Position().Add(fyne.NewPos(actualDX, 0)))
-		case resizeDownRight:
-			newSize = currentSize.Add(ev.Dragged)
+		switch direction {
+		case resizeLeft, resizeUpLeft, resizeDownLeft:
+			// Moving edge is the left one: keep the right edge fixed, keep the
+			// window at least minSize wide and never past the viewport's left.
+			pos.X = max(0, min(pos.X+ev.Dragged.DX, right-minSize.Width))
+			size.Width = right - pos.X
+		case resizeRight, resizeUpRight, resizeDownRight:
+			size.Width = max(minSize.Width, size.Width+ev.Dragged.DX)
+		}
+
+		switch direction {
+		case resizeUp, resizeUpLeft, resizeUpRight:
+			pos.Y = max(0, min(pos.Y+ev.Dragged.DY, bottom-minSize.Height))
+			size.Height = bottom - pos.Y
+		case resizeDown, resizeDownLeft, resizeDownRight:
+			size.Height = max(minSize.Height, size.Height+ev.Dragged.DY)
 		}
 
 		if m.LockViewport {
 			contentSize := m.content.Size()
-			pos := w.Position()
-			maxWidth := contentSize.Width - pos.X
-			maxHeight := contentSize.Height - pos.Y
-			newSize.Width = min(newSize.Width, maxWidth)
-			newSize.Height = min(newSize.Height, maxHeight)
+			size.Width = min(size.Width, contentSize.Width-pos.X)
+			size.Height = min(size.Height, contentSize.Height-pos.Y)
 		}
 
-		w.Resize(newSize.Max(minSize))
+		w.Move(pos)
+		w.Resize(size.Max(minSize))
 		w.maximized = false
 	}
 

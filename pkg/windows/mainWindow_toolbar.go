@@ -11,6 +11,7 @@ import (
 
 func (mw *MainWindow) newToolbar() *fyne.Container {
 	toolbar := container.NewHBox(
+		mw.buttons.symbolListBtn,
 		container.NewBorder(
 			nil,
 			nil,
@@ -19,7 +20,6 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 			mw.selects.ecuSelect,
 		),
 		widget.NewSeparator(),
-		mw.buttons.symbolListBtn,
 		mw.buttons.logBtn,
 		mw.buttons.livePlotBtn,
 		mw.buttons.dashboardBtn,

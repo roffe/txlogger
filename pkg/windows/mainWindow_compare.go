@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"sort"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
+	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
@@ -53,64 +55,112 @@ func (mw *MainWindow) openSymbolCompare() {
 }
 
 func (mw *MainWindow) showSymbolCompare(typ symbol.ECUType, otherName string, other symbol.SymbolCollection) {
-	var diffs []string
+	var diffs []symbolcompare.Item
 	for _, s := range mw.fw.Symbols() {
 		o := other.GetByName(s.Name)
 		if o == nil {
 			continue // ponytail: only symbols present in both; added/removed skipped
 		}
 		if !bytes.Equal(s.Bytes(), o.Bytes()) {
-			diffs = append(diffs, s.Name)
+			diffs = append(diffs, symbolcompare.Item{
+				Name:        s.Name,
+				Number:      s.Number,
+				Length:      s.Length,
+				OtherLength: o.Length,
+				Address:     s.Address,
+			})
 		}
 	}
-	sort.Strings(diffs)
+	sort.Slice(diffs, func(i, j int) bool { return diffs[i].Name < diffs[j].Name })
 
 	if len(diffs) == 0 {
 		dialog.ShowInformation("No differences", "The two binaries have identical symbol data", mw)
 		return
 	}
 
+	mapTabs := container.NewDocTabs()
+	previewTab := container.NewTabItem("Preview", widget.NewLabel("Click a symbol to preview it"))
+	mapTabs.Append(previewTab)
 	cmp := symbolcompare.New(&symbolcompare.Config{
-		Diffs:            diffs,
-		OnShowSideBySide: func(name string) { mw.openCompareTabs(typ, otherName, other, name) },
+		Diffs: diffs,
+		OnPreview: func(name string) {
+			for _, ti := range mapTabs.Items {
+				if ti.Text == name {
+					mapTabs.Select(ti)
+					return
+				}
+			}
+			content, err := mw.compareTabContent(typ, otherName, other, name)
+			if err != nil {
+				mw.Error(err)
+				return
+			}
+			previewTab.Text = "Preview: " + name
+			previewTab.Content = content
+			if !slices.Contains(mapTabs.Items, previewTab) {
+				// closed or promoted away; bring it back as the first tab
+				mapTabs.Items = append([]*container.TabItem{previewTab}, mapTabs.Items...)
+			}
+			mapTabs.Select(previewTab)
+			mapTabs.Refresh()
+		},
+		OnOpen: func(name string) {
+			for _, ti := range mapTabs.Items {
+				if ti.Text == name {
+					mapTabs.Select(ti)
+					return
+				}
+			}
+			// the first click of the double-click already built the preview:
+			// promote it to a named tab instead of rebuilding
+			if previewTab.Text == "Preview: "+name && slices.Contains(mapTabs.Items, previewTab) {
+				promoted := previewTab
+				promoted.Text = name
+				previewTab = container.NewTabItem("Preview", widget.NewLabel("Click a symbol to preview it"))
+				mapTabs.Refresh()
+				mapTabs.Select(promoted)
+				return
+			}
+			content, err := mw.compareTabContent(typ, otherName, other, name)
+			if err != nil {
+				mw.Error(err)
+				return
+			}
+			ti := container.NewTabItem(name, content)
+			mapTabs.Append(ti)
+			mapTabs.Select(ti)
+		},
 	})
-	inner := multiwindow.NewInnerWindow("Compare with "+otherName, cmp)
+	split := container.NewHSplit(cmp, mapTabs)
+	split.Offset = 0.3
+	inner := multiwindow.NewInnerWindow("Compare with "+otherName, split)
 	inner.Icon = theme.SearchReplaceIcon()
 	mw.wm.Add(inner)
-	inner.Resize(fyne.NewSize(400, 600))
+	inner.Resize(fyne.NewSize(1200, 700))
 }
 
-// openCompareTabs shows the current and other binary's version of a map plus a
-// per-cell diff in three tabs. ponytail: native AppTabs, no custom wrapper.
-func (mw *MainWindow) openCompareTabs(typ symbol.ECUType, otherName string, other symbol.SymbolCollection, mapName string) {
-	winName := mapName + " - compare"
-	if w := mw.wm.HasWindow(winName); w != nil {
-		mw.wm.Raise(w)
-		return
-	}
+// compareTabContent builds the current and other binary's version of a map
+// plus a per-cell diff as three tabs. ponytail: native AppTabs, no custom
+// wrapper.
+func (mw *MainWindow) compareTabContent(typ symbol.ECUType, otherName string, other symbol.SymbolCollection, mapName string) (fyne.CanvasObject, error) {
 	axis, xData, yData, curZ, xPrec, yPrec, zPrec, err := compareMapData(mw.fw, typ, mapName)
 	if err != nil {
-		mw.Error(err)
-		return
+		return nil, err
 	}
 	_, _, _, othZ, _, _, _, err := compareMapData(other, typ, mapName)
 	if err != nil {
-		mw.Error(err)
-		return
+		return nil, err
 	}
 	if len(curZ) != len(othZ) {
-		mw.Error(fmt.Errorf("%s has different dimensions in the two binaries (%d vs %d)", mapName, len(curZ), len(othZ)))
-		return
+		return nil, fmt.Errorf("%s has different dimensions in the two binaries (%d vs %d)", mapName, len(curZ), len(othZ))
 	}
 	cur, err := mw.readonlyMapViewer(mapName, axis.ZDescription, axis, xData, yData, curZ, xPrec, yPrec, zPrec)
 	if err != nil {
-		mw.Error(err)
-		return
+		return nil, err
 	}
 	oth, err := mw.readonlyMapViewer(mapName, axis.ZDescription, axis, xData, yData, othZ, xPrec, yPrec, zPrec)
 	if err != nil {
-		mw.Error(err)
-		return
+		return nil, err
 	}
 	diff := make([]float64, len(curZ))
 	for i := range curZ {
@@ -118,18 +168,13 @@ func (mw *MainWindow) openCompareTabs(typ symbol.ECUType, otherName string, othe
 	}
 	diffMv, err := mw.readonlyMapViewer(mapName, "Δ "+axis.ZDescription, axis, xData, yData, diff, xPrec, yPrec, zPrec)
 	if err != nil {
-		mw.Error(err)
-		return
+		return nil, err
 	}
-	tabs := container.NewAppTabs(
+	return container.NewAppTabs(
 		container.NewTabItem("Diff", diffMv),
 		container.NewTabItem("Current", cur),
 		container.NewTabItem(otherName, oth),
-	)
-	inner := multiwindow.NewInnerWindow(winName, tabs)
-	inner.Icon = theme.GridIcon()
-	mw.wm.Add(inner)
-	inner.Resize(fyne.NewSize(900, 700))
+	), nil
 }
 
 func (mw *MainWindow) readonlyMapViewer(name, zLabel string, axis symbol.Axis, xData, yData, zData []float64, xPrec, yPrec, zPrec int) (*mapviewer.MapViewer, error) {
