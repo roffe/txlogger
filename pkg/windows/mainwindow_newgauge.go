@@ -172,6 +172,7 @@ func (g *GaugeCreator) onSubmit() {
 		MinSize:             fyne.NewSize(100, 100),
 		SymbolName:          g.entries.symbolName.Selected,
 		SymbolNameSecondary: g.entries.symbolNameSecondary.Selected,
+		Classic:             g.mw.settings.GetClassicGauges(),
 	}
 	switch g.entries.typ.Selected {
 	case "Dial":

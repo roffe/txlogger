@@ -163,6 +163,8 @@ func (mw *MainWindow) LoadLayout(name string) error {
 		}
 
 		if h.GaugeConfig != nil {
+			// Style is a global setting, not part of the saved layout
+			h.GaugeConfig.Classic = mw.settings.GetClassicGauges()
 			gauge, cancelFn, err := gauge.New(h.GaugeConfig)
 			if err != nil {
 				mw.Error(fmt.Errorf("failed to create gauge: %w", err))

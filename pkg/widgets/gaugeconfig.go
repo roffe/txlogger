@@ -2,9 +2,26 @@ package widgets
 
 import (
 	"fmt"
+	"image/color"
 
 	"fyne.io/fyne/v2"
 )
+
+// Shared dial styling for dial and dualdial widgets
+const (
+	DialStartDeg   = -135.0 // matches -common.Pi43 in radians
+	DialEndDeg     = 135.0
+	DialSweepDeg   = DialEndDeg - DialStartDeg
+	DialRingCutout = 0.87 // ring thickness = 13% of radius
+)
+
+// ZoneColor maps a 0..1 fraction of the gauge range to green→yellow→red.
+func ZoneColor(frac float64) color.RGBA {
+	if frac < 0.5 {
+		return color.RGBA{R: byte(255 * frac * 2), G: 255, B: 0, A: 255}
+	}
+	return color.RGBA{R: 255, G: byte(255 * (1 - (frac-0.5)*2)), B: 0, A: 255}
+}
 
 type Gauge interface {
 	GetConfig() *GaugeConfig
@@ -22,6 +39,7 @@ type GaugeConfig struct {
 	MinSize          fyne.Size
 	TextPosition     TextPosition
 	ColorScale       ColorScheme
+	Classic          bool // render dials in the old look: thin outline, colored pips, green readout
 
 	SymbolName          string
 	SymbolNameSecondary string

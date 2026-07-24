@@ -38,6 +38,9 @@ func (sw *Widget) GetMeshRenderer() meshgrid.RenderBackend {
 	return meshgrid.RenderBackend(prefMeshRenderer.get())
 }
 
+// GetClassicGauges reports whether dials should render in the old look.
+func (sw *Widget) GetClassicGauges() bool { return prefGaugeStyle.get() == "Classic" }
+
 // Logging
 func (sw *Widget) GetLogFormat() string { return prefLogFormat.get() }
 

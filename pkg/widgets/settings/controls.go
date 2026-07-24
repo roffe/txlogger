@@ -19,8 +19,9 @@ import (
 )
 
 var (
-	logFormats = []string{"CSV", "BPL" /*"TXL"*/}
-	portSpeeds = []string{"9600", "19200", "38400", "57600", "115200", "230400", "460800", "500000", "921600", "1mbit", "2mbit", "3mbit"}
+	logFormats  = []string{"CSV", "BPL" /*"TXL"*/}
+	portSpeeds  = []string{"9600", "19200", "38400", "57600", "115200", "230400", "460800", "500000", "921600", "1mbit", "2mbit", "3mbit"}
+	gaugeStyles = []string{"Modern", "Classic"}
 )
 
 // --- generic control helpers -----------------------------------------------
@@ -218,6 +219,7 @@ func (sw *Widget) loadPreferences() {
 	// Graphics
 	sw.plotRendererSelect.SetSelectedIndex(prefPlotterRenderer.get())
 	sw.meshRendererSelect.SetSelectedIndex(prefMeshRenderer.get())
+	sw.gaugeStyleSelect.SetSelected(prefGaugeStyle.get())
 
 	// Logging
 	sw.experimentalT5FastLogger.SetChecked(prefExperimentalT5FastLogger.get())

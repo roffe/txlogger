@@ -302,6 +302,7 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 			Logplayer:       false,
 			UseMPH:          mw.settings.GetUseMPH(),
 			SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
+			ClassicGauges:   mw.settings.GetClassicGauges(),
 			High:            1.5,
 			Low:             0.5,
 			WidebandSymbol:  mw.settings.GetWidebandSymbolName(),

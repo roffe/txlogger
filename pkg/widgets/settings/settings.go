@@ -52,6 +52,7 @@ type Widget struct {
 	// Graphics
 	plotRendererSelect *widget.Select
 	meshRendererSelect *widget.Select
+	gaugeStyleSelect   *widget.Select
 
 	// CAN
 	debugCheckbox   *widget.Check
@@ -127,6 +128,7 @@ func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	// Graphics
 	sw.plotRendererSelect = indexSelect([]string{"Software", "Shader"}, prefPlotterRenderer)
 	sw.meshRendererSelect = indexSelect([]string{"Shader", "Polygons", "Software"}, prefMeshRenderer)
+	sw.gaugeStyleSelect = widget.NewSelect(gaugeStyles, prefGaugeStyle.set)
 
 	// CAN
 	sw.adapterSelector = sw.newAdapterSelector()

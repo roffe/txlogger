@@ -1,5 +1,9 @@
 # 2.1.10
-- Added "Compare symbols with other binary" under the Tools menu. Pick a second binary of the same ECU type and get a list of every symbol whose data differs from the currently loaded one. Double-click a row to open that map in three tabs: Current, the other binary, and a Diff tab showing the per-cell difference (current - other). Logging must be stopped while comparing
+- Added "Modern" gauge style selectable under graphics settings
+- Added "Compare symbols with other binary" under the Tools menu. Pick a second binary of the same ECU type and get a list of every symbol whose data differs from the currently loaded one, with symbol number, size and address (size mismatches are flagged). Click a symbol to preview it, double-click to keep it open in its own tab. Each symbol shows three tabs: a Diff tab with the per-cell difference (current - other), Current and the other binary. Logging must be stopped while comparing
+- The refresh button in CAN settings now also rescans for adapters, so devices plugged in (or J2534 drivers installed) after txlogger started are picked up without a restart
+- Fixed the mapviewer grid so all cells and the gaps between them render with consistent sizes
+- Reworked inner window resizing: grab any edge, and the ends of each edge act as diagonal corner resize like native windows
 - Cut a new logfile from a selection in the logplayer: scrub to a spot and press "In" (or the `i` key) to mark the start, scrub again and press "Out" (or `o`) to mark the end, then press the save button to write just that range to a new log next to your other logs. The clip keeps the same format as the source log (csv/bpl/t5l/t7l/t8l). Leaving the In or Out point unset selects from the start or to the end of the log
 - Live tracking marker in the 3d mesh viewer showing where the ECU is reading from, mirroring the crosshair in the map above
 - Fixed the 3d mesh showing one cell less than the table in each direction; values are now cell-centered so an 18x16 map renders 18x16 cells

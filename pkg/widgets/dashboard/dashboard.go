@@ -78,6 +78,7 @@ type Config struct {
 	AirDemToString  func(float64) string
 	UseMPH          bool
 	SwapRPMandSpeed bool
+	ClassicGauges   bool
 	// Low/High set the wideband lambda bar display range (defaults 0.5–1.5).
 	Low            float64
 	High           float64
@@ -112,6 +113,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				Max:     2500,
 				Steps:   20,
 				MinSize: fyne.NewSize(100, 100),
+				Classic: cfg.ClassicGauges,
 			}),
 			speed: dial.New(&widgets.GaugeConfig{
 				Title:           speedometerText,
@@ -121,6 +123,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				DisplayString:   "%.1f",
 				GaugeTextString: "%.0f",
 				MinSize:         fyne.NewSize(100, 100),
+				Classic:         cfg.ClassicGauges,
 			}),
 			rpm: dial.New(&widgets.GaugeConfig{
 				Title:       "RPM",
@@ -129,6 +132,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				Steps:       16,
 				MinSize:     fyne.NewSize(100, 100),
 				GaugeFactor: 0.001,
+				Classic:     cfg.ClassicGauges,
 			}),
 			iat: dial.New(&widgets.GaugeConfig{
 				Title:   "IAT",
@@ -136,6 +140,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				Max:     80,
 				Steps:   16,
 				MinSize: fyne.NewSize(100, 100),
+				Classic: cfg.ClassicGauges,
 			}),
 			pressure: dualdial.New(&widgets.GaugeConfig{
 				Title:           "MAP",
@@ -145,6 +150,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				DisplayString:   "%.2f",
 				GaugeTextString: "%.1f",
 				MinSize:         fyne.NewSize(100, 100),
+				Classic:         cfg.ClassicGauges,
 			}),
 			throttle: vbar.New(&widgets.GaugeConfig{
 				Title:      "TPS",
@@ -163,10 +169,11 @@ func NewDashboard(cfg *Config) *Dashboard {
 				ColorScale: widgets.TraditionalScale,
 			}),
 			engineTemp: dial.New(&widgets.GaugeConfig{
-				Title: "tEng",
-				Min:   -20,
-				Max:   140,
-				Steps: 16,
+				Title:   "tEng",
+				Min:     -20,
+				Max:     140,
+				Steps:   16,
+				Classic: cfg.ClassicGauges,
 			}),
 			wblambda: cbar.New(&widgets.GaugeConfig{
 				Title:           "",

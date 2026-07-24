@@ -26,6 +26,7 @@ type Dial struct {
 	pipLabels []*canvas.Text
 
 	face        *canvas.Arc
+	valueArc    *canvas.Arc
 	center      *canvas.Circle
 	displayText *canvas.Text
 	titleText   *canvas.Text
@@ -39,6 +40,7 @@ type Dial struct {
 	needleOffset, needleLength float32
 	needleRotConst             float64 // = common.Pi15/(Max-Min)
 	lineRotConst               float64 // = common.Pi15/steps
+	invRange                   float64 // = 1/(Max-Min), for value-arc fraction
 
 	// Precomputed trig for pips: angle_i = lineRotConst*float64(i) - common.Pi43
 	pipSin []float32
@@ -88,34 +90,42 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 		totalRange = 1
 	}
 
-	c.face = canvas.NewArc(-135.73, 135.8, 0.985, color.RGBA{0x80, 0x80, 0x80, 0xFF})
-	c.center = &canvas.Circle{FillColor: color.RGBA{R: 0x01, G: 0x0B, B: 0x13, A: 0xFF}}
-	c.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 3}
+	if cfg.Classic {
+		c.face = canvas.NewArc(-135.73, 135.8, 0.985, color.RGBA{0x80, 0x80, 0x80, 0xFF})
+		c.center = &canvas.Circle{FillColor: color.RGBA{R: 0x01, G: 0x0B, B: 0x13, A: 0xFF}}
+		c.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 3}
+	} else {
+		// Track ring: thick, dark, rounded ends. The value arc fills it as the
+		// value rises — no needle or center hub in the modern style.
+		c.face = canvas.NewArc(widgets.DialStartDeg, widgets.DialEndDeg, widgets.DialRingCutout, color.RGBA{R: 0x2E, G: 0x2E, B: 0x35, A: 0xFF})
+		c.valueArc = canvas.NewArc(widgets.DialStartDeg, widgets.DialStartDeg, widgets.DialRingCutout, widgets.ZoneColor(0))
+	}
 
 	c.titleText = &canvas.Text{Text: c.cfg.Title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
 	c.titleText.TextStyle.Monospace = true
 	c.titleText.Alignment = fyne.TextAlignCenter
 
-	c.displayText = &canvas.Text{Text: "0", Color: color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF}, TextSize: 52}
+	displayColor := color.RGBA{R: 0xF5, G: 0xF5, B: 0xF7, A: 0xFF}
+	if cfg.Classic {
+		displayColor = color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF}
+	}
+	c.displayText = &canvas.Text{Text: "0", Color: displayColor, TextSize: 52}
 	c.displayText.Alignment = fyne.TextAlignCenter
 
-	// Pip color gradient
-	// Green to Yellow to Red gradient
-	// 0% - 50% Green to Yellow
-	// 50% - 100% Yellow to Red
-	halfSteps := float64(c.cfg.Steps) / 2.0
-
-	// Build pips + labels once; also track the longest label length
-	var col color.RGBA
+	// Build pips + labels once; also track the longest label length.
+	// Modern ticks are neutral — the value arc carries the green→yellow→red zone
+	// color. Classic keeps the gradient on the pips themselves.
+	majorTick := color.RGBA{R: 0x8A, G: 0x8A, B: 0x92, A: 0xFF}
+	minorTick := color.RGBA{R: 0x55, G: 0x55, B: 0x5C, A: 0xFF}
 	for i := 0; i < c.cfg.Steps+1; i++ {
-		if float64(i) <= halfSteps {
-			// Green to Yellow
-			ratio := float64(i) / halfSteps
-			col = color.RGBA{R: byte(255 * ratio), G: 255, B: 0, A: 255}
-		} else {
-			// Yellow to Red
-			ratio := (float64(i) - halfSteps) / halfSteps
-			col = color.RGBA{R: 255, G: byte(255 * (1 - ratio)), B: 0, A: 255}
+		var col color.RGBA
+		switch {
+		case cfg.Classic:
+			col = widgets.ZoneColor(float64(i) / steps)
+		case i%2 == 0:
+			col = majorTick
+		default:
+			col = minorTick
 		}
 		pip := &canvas.Line{StrokeColor: col, StrokeWidth: 2}
 		c.pips = append(c.pips, pip)
@@ -141,6 +151,7 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 	// Constants
 	c.needleRotConst = common.Pi15 / totalRange
 	c.lineRotConst = common.Pi15 / steps
+	c.invRange = 1 / totalRange
 
 	// Precompute pip sin/cos (size-independent)
 	c.pipSin = make([]float32, c.cfg.Steps+1)
@@ -182,6 +193,20 @@ func (c *Dial) rotateNeedleNoRefresh(hand *canvas.Line, facePosition float64, of
 	c.rotateNoRefresh(hand, c.needleRotConst*normalized-common.Pi43, offset, length)
 }
 
+// syncValueArcNoRefresh recomputes the value arc sweep and color from the
+// current value; reports whether the arc changed.
+func (c *Dial) syncValueArcNoRefresh() bool {
+	frac := (c.value - c.cfg.Min) * c.invRange
+	frac = min(max(frac, 0), 1)
+	end := float32(widgets.DialStartDeg + widgets.DialSweepDeg*frac)
+	if end == c.valueArc.EndAngle {
+		return false
+	}
+	c.valueArc.EndAngle = end
+	c.valueArc.FillColor = widgets.ZoneColor(frac)
+	return true
+}
+
 func (c *Dial) SetValue(value float64) {
 	if value == c.value {
 		return
@@ -189,7 +214,14 @@ func (c *Dial) SetValue(value float64) {
 	c.value = value
 
 	// Update needle position (no immediate refresh)
-	c.rotateNeedleNoRefresh(c.needle, value, c.needleOffset, c.needleLength)
+	if c.needle != nil {
+		c.rotateNeedleNoRefresh(c.needle, value, c.needleOffset, c.needleLength)
+	}
+
+	// Value arc is the indicator in the modern style; color shifts through the zones
+	if c.valueArc != nil && c.syncValueArcNoRefresh() {
+		canvas.Refresh(c.valueArc)
+	}
 
 	// Update text with minimal allocs; skip refresh if formatted output is unchanged
 	c.buf = c.buf[:0]
@@ -203,14 +235,19 @@ func (c *Dial) SetValue(value float64) {
 		c.displayText.Text = string(c.buf)
 	}
 
-	canvas.Refresh(c.needle)
+	if c.needle != nil {
+		canvas.Refresh(c.needle)
+	}
 	if textChanged {
 		canvas.Refresh(c.displayText)
 	}
 }
 
 func (c *Dial) CreateRenderer() fyne.WidgetRenderer {
-	objs := make([]fyne.CanvasObject, 0, len(c.pips)+len(c.pipLabels)+5)
+	objs := make([]fyne.CanvasObject, 0, len(c.pips)+len(c.pipLabels)+6)
+	if c.valueArc != nil {
+		objs = append(objs, c.face, c.valueArc)
+	}
 	for _, v := range c.pips {
 		objs = append(objs, v)
 	}
@@ -219,7 +256,12 @@ func (c *Dial) CreateRenderer() fyne.WidgetRenderer {
 			objs = append(objs, t)
 		}
 	}
-	objs = append(objs, c.face, c.titleText, c.center, c.needle, c.displayText)
+	if c.cfg.Classic {
+		// Classic z-order: the rim arc paints over the pip tips, as before
+		objs = append(objs, c.face, c.titleText, c.center, c.needle, c.displayText)
+	} else {
+		objs = append(objs, c.titleText, c.displayText)
+	}
 	return &DialRenderer{d: c, objects: objs}
 }
 
@@ -242,7 +284,6 @@ func (r *DialRenderer) Layout(space fyne.Size) {
 	c.needleLength = c.radius * 1.14
 
 	// Stroke sizes
-	stroke := c.diameter * common.OneSixthieth
 	midStroke := c.diameter * common.OneEighthieth
 	smallStroke := c.diameter * common.OneTwohundredth
 
@@ -253,28 +294,53 @@ func (r *DialRenderer) Layout(space fyne.Size) {
 	c.titleText.TextSize = float32(int(c.radius * common.OneFourth))
 	c.titleText.Move(c.middle.Add(fyne.NewPos(0, c.diameter*common.OneFourth)))
 
-	// Center element
-	center := c.radius * common.OneFourth
-	c.center.Move(c.middle.SubtractXY(center*common.OneHalf, center*common.OneHalf))
-	c.center.Resize(fyne.Size{Width: center, Height: center})
+	// Center element (classic only)
+	if c.center != nil {
+		center := c.radius * common.OneFourth
+		c.center.Move(c.middle.SubtractXY(center*common.OneHalf, center*common.OneHalf))
+		c.center.Resize(fyne.Size{Width: center, Height: center})
+	}
 
 	// Display text
 	c.displayText.TextSize = float32(int(c.radius * common.OneThird))
 	c.displayText.Move(topleft.AddXY(0, c.diameter*common.OneFifth))
 	c.displayText.Resize(size)
 
-	// Face + needle
-	c.needle.StrokeWidth = stroke
-	c.rotateNeedleNoRefresh(c.needle, c.value, c.needleOffset, c.needleLength)
+	// Needle (classic only)
+	if c.needle != nil {
+		c.needle.StrokeWidth = c.diameter * common.OneSixthieth
+		c.rotateNeedleNoRefresh(c.needle, c.value, c.needleOffset, c.needleLength)
+	}
 
-	c.face.Move(c.middle.SubtractXY(c.radius, c.radius))
-	c.face.Resize(fyne.Size{Width: c.diameter, Height: c.diameter})
+	facePos := c.middle.SubtractXY(c.radius, c.radius)
+	c.face.Move(facePos)
+	c.face.Resize(size)
+	if c.valueArc != nil {
+		ringCorner := c.radius * (1 - widgets.DialRingCutout) * common.OneHalf
+		c.face.CornerRadius = ringCorner
+		c.valueArc.CornerRadius = ringCorner
+		c.valueArc.Move(facePos)
+		c.valueArc.Resize(size)
+		// Layout may run before any SetValue; keep the arc in step with c.value
+		c.syncValueArcNoRefresh()
+	}
 
-	// Pips: reuse precomputed sin/cos, scale with current radii
-	fourthRadius := c.radius * common.OneFourth
-	eightRadius := c.radius * common.OneEight
-	radius43 := c.radius * common.OneFourth * 3
-	radius87 := c.radius * common.OneEight * 7
+	// Pips: reuse precomputed sin/cos, scale with current radii.
+	// Modern ticks live just inside the ring (ring spans 0.87r..1.0r);
+	// classic ticks run out to the rim like before.
+	var majorOffset, majorLen, minorOffset, minorLen float32
+	if c.cfg.Classic {
+		majorLen = c.radius*common.OneFourth - 2
+		minorLen = c.radius*common.OneEight - 2
+		majorOffset = c.radius * common.OneFourth * 3
+		minorOffset = c.radius * common.OneEight * 7
+	} else {
+		tickOuter := c.radius * 0.85
+		majorLen = c.radius * 0.13
+		minorLen = c.radius * 0.06
+		majorOffset = tickOuter - majorLen
+		minorOffset = tickOuter - minorLen
+	}
 
 	// Label padding and cached box dims (avoid lbl.MinSize per label)
 	labelPad := max(float32(6.0), c.radius*0.14)
@@ -291,7 +357,7 @@ func (r *DialRenderer) Layout(space fyne.Size) {
 	for i, p := range c.pips {
 		if i%2 == 0 {
 			p.StrokeWidth = max(2.0, midStroke)
-			c.applySinCos(p, c.pipSin[i], c.pipCos[i], radius43, fourthRadius-2)
+			c.applySinCos(p, c.pipSin[i], c.pipCos[i], majorOffset, majorLen)
 
 			// Label for long pip
 			lbl := c.pipLabels[i]
@@ -299,7 +365,7 @@ func (r *DialRenderer) Layout(space fyne.Size) {
 				lbl.TextSize = labelTextSize
 
 				// Place label on the INSIDE of the gauge
-				labelRadius := radius43 - labelPad
+				labelRadius := majorOffset - labelPad
 				cx := c.middle.X + c.pipSin[i]*labelRadius
 				cy := c.middle.Y - c.pipCos[i]*labelRadius
 
@@ -311,7 +377,7 @@ func (r *DialRenderer) Layout(space fyne.Size) {
 			}
 		} else {
 			p.StrokeWidth = max(2.0, smallStroke)
-			c.applySinCos(p, c.pipSin[i], c.pipCos[i], radius87, eightRadius-2)
+			c.applySinCos(p, c.pipSin[i], c.pipCos[i], minorOffset, minorLen)
 		}
 	}
 }
