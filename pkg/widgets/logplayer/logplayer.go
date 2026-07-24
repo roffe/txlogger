@@ -243,28 +243,36 @@ func (l *Logplayer) render() {
 	l.objs.speedSelect.Selected = "1x"
 
 	l.objs.timeLabel = widget.NewLabel(l.logFile.Start().Format("15:04:05.00"))
+	l.objs.timeLabel.TextStyle.Monospace = true
 
-	l.objs.restartBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
+	l.objs.restartBtn = widget.NewButtonWithIcon("", theme.MediaSkipPreviousIcon(), func() {
 		l.control(&controlMsg{Op: OpSeek, Pos: 0})
 	})
+	l.objs.restartBtn.Importance = widget.LowImportance
 
 	l.objs.rewindBtn = widget.NewButtonWithIcon("", theme.MediaFastRewindIcon(), func() {
 		l.control(&controlMsg{Op: OpPrev})
 	})
+	l.objs.rewindBtn.Importance = widget.LowImportance
 
 	l.objs.playbackToggleBtn = widget.NewButtonWithIcon("", theme.MediaPlayIcon(), func() {
 		l.togglePlayback()
 	})
+	l.objs.playbackToggleBtn.Importance = widget.HighImportance
 
 	l.objs.forwardBtn = widget.NewButtonWithIcon("", theme.MediaFastForwardIcon(), func() {
 		l.control(&controlMsg{Op: OpNext})
 	})
+	l.objs.forwardBtn.Importance = widget.LowImportance
 
 	l.objs.setInBtn = widget.NewButton("In", l.setSelectionStart)
+	l.objs.setInBtn.Importance = widget.LowImportance
 	l.objs.setOutBtn = widget.NewButton("Out", l.setSelectionEnd)
+	l.objs.setOutBtn.Importance = widget.LowImportance
 	l.objs.exportBtn = widget.NewButtonWithIcon("Save selection", theme.DocumentSaveIcon(), l.exportSelection)
 	l.objs.exportBtn.Disable()
 	l.objs.selectionLabel = widget.NewLabel("")
+	l.objs.selectionLabel.TextStyle.Monospace = true
 	l.updateSelectionLabel()
 
 	n := l.logFile.Len()
@@ -310,10 +318,10 @@ func (l *Logplayer) CreateRenderer() fyne.WidgetRenderer {
 		nil,
 		nil,
 		container.NewGridWithColumns(4,
+			l.objs.restartBtn,
 			l.objs.rewindBtn,
 			l.objs.playbackToggleBtn,
 			l.objs.forwardBtn,
-			l.objs.restartBtn,
 		),
 		nil,
 		container.NewBorder(
@@ -321,7 +329,7 @@ func (l *Logplayer) CreateRenderer() fyne.WidgetRenderer {
 			nil,
 			nil,
 			container.NewHBox(
-				layout.NewFixedWidth(85, l.objs.timeLabel),
+				layout.NewFixedWidth(100, l.objs.timeLabel),
 				layout.NewFixedWidth(75, l.objs.speedSelect),
 			),
 			l.objs.positionSlider,

@@ -123,6 +123,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				DisplayString:   "%.1f",
 				GaugeTextString: "%.0f",
 				MinSize:         fyne.NewSize(100, 100),
+				GaugeFactor:     0.1,
 				Classic:         cfg.ClassicGauges,
 			}),
 			rpm: dial.New(&widgets.GaugeConfig{
