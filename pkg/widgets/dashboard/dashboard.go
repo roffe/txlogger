@@ -539,7 +539,7 @@ func (db *Dashboard) layoutIcons(dims *dims) {
 	db.image.taz.Resize(tazSize)
 	db.image.taz.Move(fyne.Position{
 		X: dims.centerX - tazSize.Width*0.58,
-		Y: dims.centerY - tazSize.Height,
+		Y: dims.centerY - tazSize.Height*0.5,
 	})
 
 	tw := dims.sixthWidth * 0.3

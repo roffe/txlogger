@@ -1,5 +1,5 @@
-fyne.io/fyne/v2 v2.8.1-0.20260724134512-ea9f99dff60c h1:OVgLLQjOY7C1BlUvEYvFzgs5znsphx1G4FZ7lP3zWwM=
-fyne.io/fyne/v2 v2.8.1-0.20260724134512-ea9f99dff60c/go.mod h1:JGEhUzkvrySOqyhi1uSMjCl5yWX2Nn+tY/exBbFkpGw=
+fyne.io/fyne/v2 v2.8.1-0.20260726152049-46ebdae155a0 h1:0wVXiX5gjxx9GckB/gJfB0R75DqlIXqMc+1V3f3o0EM=
+fyne.io/fyne/v2 v2.8.1-0.20260726152049-46ebdae155a0/go.mod h1:JGEhUzkvrySOqyhi1uSMjCl5yWX2Nn+tY/exBbFkpGw=
 fyne.io/systray v1.12.2 h1:Y8DZxgLHsVQt6rY9Zrkkg+j67S7vv/1F2viOWKPpVeA=
 fyne.io/systray v1.12.2/go.mod h1:RVwqP9nYMo7h5zViCBHri2FgjXF7H2cub7MAq4NSoLs=
 github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=
@@ -106,6 +106,8 @@ github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9/go.mod h1:9BnoKCcgJ/+SLhf
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 github.com/yuin/goldmark v1.8.2 h1:kEGpgqJXdgbkhcOgBxkC0X0PmoPG1ZyoZ117rDVp4zE=
 github.com/yuin/goldmark v1.8.2/go.mod h1:ip/1k0VRfGynBgxOz0yCqHrbZXhcjxyuS66Brc7iBKg=
+github.com/yuin/gopher-lua v1.1.2 h1:yF/FjE3hD65tBbt0VXLE13HWS9h34fdzJmrWRXwobGA=
+github.com/yuin/gopher-lua v1.1.2/go.mod h1:7aRmXIWl37SqRf0koeyylBEzJ+aPt8A+mmkQ4f1ntR8=
 go.bug.st/serial v1.7.1 h1:5aP8wYL0UjEYOVs3oPAGscjaSfRQLHtCvBFXNN/rwtc=
 go.bug.st/serial v1.7.1/go.mod h1:d0MmS16Qt9b1m06yoYRNUXhRRTJV5Qg2S5EKqQtnayQ=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=

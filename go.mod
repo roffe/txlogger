@@ -10,7 +10,7 @@ go 1.26.0
 replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 
 require (
-	fyne.io/fyne/v2 v2.8.1-0.20260724134512-ea9f99dff60c
+	fyne.io/fyne/v2 v2.8.1-0.20260726152049-46ebdae155a0
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/lusingander/colorpicker v0.7.5
 	github.com/roffe/ecusymbol v1.2.5
@@ -28,6 +28,7 @@ require (
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/roffe/gocan/v2 v2.0.0-20260707232838-0af87a49b848
 	github.com/stretchr/testify v1.11.1
+	github.com/yuin/gopher-lua v1.1.2
 	golang.org/x/sys v0.46.0
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.78
 )
