@@ -17,6 +17,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/numericentry"
 	"github.com/roffe/txlogger/pkg/widgets/vbar"
+	"github.com/roffe/txlogger/pkg/widgets/widebandgauge"
 )
 
 var _ fyne.Widget = (*GaugeCreator)(nil)
@@ -64,7 +65,7 @@ func NewGaugeCreator(mw *MainWindow) *GaugeCreator {
 	g.entries.center.Disable()
 	g.entries.steps = numericentry.New("10")
 
-	g.entries.typ = widget.NewSelect([]string{"Dial", "DualDial", "VBar", "HBar", "CBar"}, func(s string) {
+	g.entries.typ = widget.NewSelect([]string{"Dial", "DualDial", "VBar", "HBar", "CBar", "Wideband"}, func(s string) {
 		switch s {
 		case "Dial":
 			g.entries.symbolNameSecondary.Disable()
@@ -85,6 +86,10 @@ func NewGaugeCreator(mw *MainWindow) *GaugeCreator {
 		case "CBar":
 			g.entries.symbolNameSecondary.Disable()
 			g.entries.center.Enable()
+			g.form.Refresh()
+		case "Wideband":
+			g.entries.symbolNameSecondary.Disable()
+			g.entries.center.Enable() // stoich, colors the lit segment
 			g.form.Refresh()
 		}
 	})
@@ -206,6 +211,12 @@ func (g *GaugeCreator) onSubmit() {
 		cbar := cbar.New(gaugeConfig)
 		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(g.entries.symbolName.Selected, cbar.SetValue))
 		gauge = cbar
+	case "Wideband":
+		gaugeConfig.Type = "Wideband"
+		gaugeConfig.MinSize = fyne.NewSize(150, 150)
+		wb := widebandgauge.New(gaugeConfig)
+		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(g.entries.symbolName.Selected, wb.SetValue))
+		gauge = wb
 	default:
 		g.mw.Error(errors.New("unknown gauge type"))
 		return

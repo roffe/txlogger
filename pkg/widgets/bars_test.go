@@ -76,6 +76,44 @@ func TestVBarFillGrowsFromTrackBottom(t *testing.T) {
 	}
 }
 
+// The peak markers latch the excursion, then bleed back toward center on
+// following samples — including samples that repeat the same value.
+func TestCBarPeaksLatchThenDecay(t *testing.T) {
+	test.NewApp()
+	size := fyne.NewSize(200, 40)
+	c := cbar.New(&widgets.GaugeConfig{Min: -25, Center: 0, Max: 25, Steps: 20, MinSize: size})
+	win := test.NewWindow(c)
+	win.SetPadded(false)
+	win.Resize(size)
+
+	objs := test.WidgetRenderer(c).Objects()
+	peakLo := objs[len(objs)-4].(*canvas.Rectangle)
+	peakHi := objs[len(objs)-3].(*canvas.Rectangle)
+	center := size.Width * 0.5
+
+	c.SetValue(20) // lean spike
+	c.SetValue(-15)
+	c.SetValue(0)
+	if peakHi.Position().X <= center {
+		t.Errorf("high peak at %v, want right of center %v after a +20 spike", peakHi.Position().X, center)
+	}
+	if peakLo.Position().X >= center {
+		t.Errorf("low peak at %v, want left of center %v after a -15 spike", peakLo.Position().X, center)
+	}
+
+	hiBefore, loBefore := peakHi.Position().X, peakLo.Position().X
+	for range 300 { // same value repeatedly: decay must still run
+		c.SetValue(0)
+	}
+	if peakHi.Position().X >= hiBefore || peakLo.Position().X <= loBefore {
+		t.Errorf("peaks froze at %v/%v, want both decayed toward center %v",
+			peakLo.Position().X, peakHi.Position().X, center)
+	}
+	if d := peakHi.Position().X - center; d > 5 {
+		t.Errorf("high peak still %v px right of center after 300 samples at center", d)
+	}
+}
+
 func TestCBarFillAnchoredToCenter(t *testing.T) {
 	test.NewApp()
 	size := fyne.NewSize(200, 40)

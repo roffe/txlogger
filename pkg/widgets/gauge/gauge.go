@@ -11,6 +11,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/dualdial"
 	"github.com/roffe/txlogger/pkg/widgets/hbar"
 	"github.com/roffe/txlogger/pkg/widgets/vbar"
+	"github.com/roffe/txlogger/pkg/widgets/widebandgauge"
 )
 
 func New(cfg *widgets.GaugeConfig) (fyne.CanvasObject, func(), error) {
@@ -40,6 +41,10 @@ func New(cfg *widgets.GaugeConfig) (fyne.CanvasObject, func(), error) {
 		cb := cbar.New(cfg)
 		cancel := ebus.SubscribeFunc(cfg.SymbolName, cb.SetValue)
 		return cb, cancel, nil
+	case "Wideband":
+		wb := widebandgauge.New(cfg)
+		cancel := ebus.SubscribeFunc(cfg.SymbolName, wb.SetValue)
+		return wb, cancel, nil
 	}
 	return nil, nil, errors.New("unknown gauge type")
 }

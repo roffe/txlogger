@@ -170,6 +170,21 @@ func (m *MultipleWindows) Cycle() {
 	}
 }
 
+// CycleBack is the inverse of Cycle: it sends the top window to the bottom,
+// rotating the stack the other way, and raises whatever surfaces.
+func (m *MultipleWindows) CycleBack() {
+	for range m.windows {
+		last := len(m.windows) - 1
+		top := m.windows[last]
+		copy(m.windows[1:], m.windows[:last])
+		m.windows[0] = top
+		if !m.windows[last].minimized {
+			m.Raise(m.windows[last])
+			return
+		}
+	}
+}
+
 func (m *MultipleWindows) Raise(w *InnerWindow) {
 	m.raise(w)
 	if obj, ok := w.content.Objects[0].(fyne.Focusable); ok {

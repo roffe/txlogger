@@ -655,7 +655,7 @@ func (mw *MainWindow) LoadPreset(r io.Reader) error {
 	return nil
 }
 
-func (mw *MainWindow) SavePreset(filename string) error {
+func (mw *MainWindow) ExportPreset(filename string) error {
 	b, err := json.Marshal(mw.symbolList.Symbols())
 	if err != nil {
 		return fmt.Errorf("failed to marshal config file: %w", err)

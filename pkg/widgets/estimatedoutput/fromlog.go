@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/logfile"
@@ -407,7 +408,7 @@ func (w *Widget) loadLog() {
 }
 
 // buildLogOptions is the street-dyno section of the options panel.
-func (w *Widget) buildLogOptions() []fyne.CanvasObject {
+func (w *Widget) buildLogOptions() fyne.CanvasObject {
 	w.logInfo = widget.NewLabel("")
 	w.logInfo.Wrapping = fyne.TextWrapWord
 	w.pullSel = widget.NewSelect(nil, func(string) {
@@ -422,11 +423,6 @@ func (w *Widget) buildLogOptions() []fyne.CanvasObject {
 		widget.NewSeparator(),
 		widget.NewLabelWithStyle("Street dyno from log", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 	}
-	items = append(items, w.numField("Vehicle mass incl. driver (kg)", &w.logPrm.MassKg)...)
-	items = append(items, w.numField("Drivetrain loss (%)", &w.logPrm.LossPct)...)
-	items = append(items, w.numField("Drag coefficient (Cd)", &w.logPrm.Cd)...)
-	items = append(items, w.numField("Frontal area (m²)", &w.logPrm.AreaM2)...)
-	items = append(items, w.numField("Rolling resistance", &w.logPrm.Crr)...)
 	items = append(items,
 		widget.NewButtonWithIcon("Load log", theme.FolderOpenIcon(), w.loadLog),
 		widget.NewButton("Clear log", func() {
@@ -439,5 +435,11 @@ func (w *Widget) buildLogOptions() []fyne.CanvasObject {
 		w.pullSel,
 		w.logInfo,
 	)
-	return items
+	items = append(items, w.numField("dyno_mass", "Vehicle mass incl. driver (kg)", &w.logPrm.MassKg)...)
+	items = append(items, w.numField("dyno_loss", "Drivetrain loss (%)", &w.logPrm.LossPct)...)
+	items = append(items, w.numField("dyno_cd", "Drag coefficient (Cd)", &w.logPrm.Cd)...)
+	items = append(items, w.numField("dyno_area", "Frontal area (m²)", &w.logPrm.AreaM2)...)
+	items = append(items, w.numField("dyno_crr", "Rolling resistance", &w.logPrm.Crr)...)
+
+	return container.NewVBox(items...)
 }

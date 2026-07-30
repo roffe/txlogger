@@ -11,6 +11,12 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
+// peakDecay is how far the hold markers bleed back toward center per sample.
+// Exponential, so it needs no timer — it rides the sample stream itself.
+// ponytail: rate is per-sample, ~1.5 s to fall back at 30 Hz. Make it time-based
+// if log rates ever vary enough for that to feel wrong.
+const peakDecay = 0.02
+
 type CBar struct {
 	widget.BaseWidget
 	face        *canvas.Rectangle
@@ -18,6 +24,11 @@ type CBar struct {
 	titleText   *canvas.Text
 	displayText *canvas.Text
 	bars        []*canvas.Line
+
+	// Peak-hold markers: latch the furthest excursion either side of center so a
+	// value jittering at 10 Hz still shows how far it actually went.
+	peakLo, peakHi       *canvas.Rectangle
+	peakLoVal, peakHiVal float64
 
 	cfg *widgets.GaugeConfig
 
@@ -71,6 +82,8 @@ func New(cfg *widgets.GaugeConfig) *CBar {
 	s := &CBar{
 		cfg:        cfg,
 		value:      cfg.Center,
+		peakLoVal:  cfg.Center,
+		peakHiVal:  cfg.Center,
 		valueRange: cfg.Max - cfg.Min,
 		fmtPrec:    -1,
 		// Modern bars are solid; the classic ones let the ticks show through
@@ -112,6 +125,13 @@ func (s *CBar) initializeVisualElements() {
 	s.bar = &canvas.Rectangle{
 		FillColor: s.colorCenter,
 	}
+
+	peakColor := color.RGBA{0xFF, 0xFF, 0xFF, 0xE0}
+	if s.cfg.Classic {
+		peakColor = color.RGBA{0xFF, 0xFF, 0xFF, 0xA0}
+	}
+	s.peakLo = &canvas.Rectangle{FillColor: peakColor}
+	s.peakHi = &canvas.Rectangle{FillColor: peakColor}
 
 	s.titleText = &canvas.Text{
 		Text:      s.cfg.Title,
@@ -174,16 +194,57 @@ func (s *CBar) applyBar() {
 
 	s.bar.Move(fyne.Position{X: barPosition, Y: 0})
 	s.bar.Resize(fyne.Size{Width: pxWidth, Height: s.barHeight})
+	s.applyPeaks()
+}
+
+// syncPeaks latches the current value into whichever marker it exceeds and
+// decays both back toward center. Reports whether either moved.
+func (s *CBar) syncPeaks() bool {
+	lo, hi := s.peakLoVal, s.peakHiVal
+	if s.value < lo {
+		lo = s.value
+	} else {
+		lo += (s.cfg.Center - lo) * peakDecay
+	}
+	if s.value > hi {
+		hi = s.value
+	} else {
+		hi += (s.cfg.Center - hi) * peakDecay
+	}
+	if lo == s.peakLoVal && hi == s.peakHiVal {
+		return false
+	}
+	s.peakLoVal, s.peakHiVal = lo, hi
+	return true
+}
+
+func (s *CBar) applyPeaks() {
+	width := max(float32(2), s.lastSize.Width*0.008)
+	for _, p := range [2]struct {
+		rect *canvas.Rectangle
+		val  float64
+	}{{s.peakLo, s.peakLoVal}, {s.peakHi, s.peakHiVal}} {
+		x := s.center + float32(p.val-s.cfg.Center)*s.widthFactor - width*0.5
+		x = min(max(x, 0), max(s.lastSize.Width-width, 0))
+		p.rect.Move(fyne.Position{X: x, Y: 0})
+		p.rect.Resize(fyne.Size{Width: width, Height: s.barHeight})
+	}
 }
 
 func (s *CBar) SetValue(value float64) {
 	value = max(s.cfg.Min, min(s.cfg.Max, value))
-	if value == s.value {
-		return
-	}
+	changed := value != s.value
 	s.value = value
 
+	// Peaks keep decaying even when the value is unchanged, so a latched
+	// excursion never freezes on the face.
+	if !s.syncPeaks() && !changed {
+		return
+	}
 	s.applyBar()
+	if !changed {
+		return
+	}
 
 	s.buf = s.buf[:0]
 	if s.fmtPrec >= 0 {
@@ -318,7 +379,7 @@ func (r *CBarRenderer) Objects() []fyne.CanvasObject {
 		if r.cfg.Classic {
 			objs = append(objs, r.bar, r.face)
 		}
-		objs = append(objs, r.titleText, r.displayText)
+		objs = append(objs, r.peakLo, r.peakHi, r.titleText, r.displayText)
 		r.objects = objs
 	}
 	return r.objects

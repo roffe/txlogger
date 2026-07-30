@@ -5,7 +5,17 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
+	"github.com/roffe/txlogger/pkg/assets"
 )
+
+// Themed icons that follow the Fyne default (Material 24x24) style.
+var (
+	exportIcon = theme.NewThemedResource(&fyne.StaticResource{StaticName: "export.svg", StaticContent: assets.ExportBytes})
+	importIcon = theme.NewThemedResource(&fyne.StaticResource{StaticName: "import.svg", StaticContent: assets.ImportBytes})
+)
+
+func ExportIcon() fyne.Resource { return exportIcon }
+func ImportIcon() fyne.Resource { return importIcon }
 
 type TxTheme struct{}
 

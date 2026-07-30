@@ -67,10 +67,11 @@ func New(cfg *Config) *Widget {
 	w.summary.Wrapping = fyne.TextWrapWord
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Graph",
-			container.NewBorder(container.NewHScroll(w.legend), nil, nil, nil, w.graph)),
+			container.NewBorder(nil, container.NewHScroll(w.legend), nil, nil, w.graph),
+		),
 		container.NewTabItem("Table", w.table),
 	)
-	w.content = container.NewBorder(nil, w.summary, w.buildOptions(), nil, tabs)
+	w.content = container.NewBorder(nil, w.summary, w.buildOptions(), w.buildLogOptions(), tabs)
 	w.recalc()
 	return w
 }
@@ -120,19 +121,23 @@ func (w *Widget) buildOptions() fyne.CanvasObject {
 			items = append(items, widget.NewLabel(opt.Label), e)
 		}
 	}
-	items = append(items, w.buildLogOptions()...)
+	// items = append(items, w.buildLogOptions()...)
 	items = append(items, layout.NewSpacer(),
 		widget.NewButtonWithIcon("Refresh", theme.ViewRefreshIcon(), w.recalc))
 	return container.NewVBox(items...)
 }
 
 // numField is a labeled numeric entry bound to a float, recalculating on
-// every valid change.
-func (w *Widget) numField(label string, val *float64) []fyne.CanvasObject {
+// every valid change. The value is remembered between sessions under the
+// preference key, falling back to whatever the float already holds.
+func (w *Widget) numField(key, label string, val *float64) []fyne.CanvasObject {
+	prefs := fyne.CurrentApp().Preferences()
+	*val = prefs.FloatWithFallback(key, *val)
 	e := numericentry.New(strconv.FormatFloat(*val, 'f', -1, 64))
 	e.OnChanged = func(s string) {
 		if v, err := strconv.ParseFloat(s, 64); err == nil {
 			*val = v
+			prefs.SetFloat(key, v)
 			w.recalc()
 		}
 	}

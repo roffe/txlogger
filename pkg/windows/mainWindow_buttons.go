@@ -16,6 +16,7 @@ import (
 	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
+	txtheme "github.com/roffe/txlogger/pkg/theme"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/liveplotter"
 	"github.com/roffe/txlogger/pkg/widgets/msglist"
@@ -92,9 +93,9 @@ func (mw *MainWindow) newSymbolListBtn() *widget.Button {
 				nil,
 				container.NewGridWithColumns(5,
 					widget.NewButtonWithIcon("", theme.DocumentSaveIcon(), mw.savePreset),
-					widget.NewButtonWithIcon("", theme.DocumentCreateIcon(), mw.newPreset),
-					widget.NewButtonWithIcon("", theme.UploadIcon(), mw.exportPreset),
-					widget.NewButtonWithIcon("", theme.DownloadIcon(), mw.importPreset),
+					widget.NewButtonWithIcon("", theme.ContentAddIcon(), mw.newPreset),
+					widget.NewButtonWithIcon("", txtheme.ExportIcon(), mw.exportPreset),
+					widget.NewButtonWithIcon("", txtheme.ImportIcon(), mw.importPreset),
 					widget.NewButtonWithIcon("", theme.DeleteIcon(), mw.deletePreset),
 				),
 				mw.selects.presetSelect,

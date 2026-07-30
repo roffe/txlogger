@@ -28,6 +28,12 @@ var MackanizedBytes []byte
 //go:embed left_corner.svg
 var LeftCornerBytes []byte
 
+//go:embed export.svg
+var ExportBytes []byte
+
+//go:embed import.svg
+var ImportBytes []byte
+
 //go:embed WHATSNEW.md
 var WhatsNew string
 

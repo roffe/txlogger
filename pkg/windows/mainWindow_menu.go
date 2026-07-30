@@ -145,12 +145,18 @@ func (mw *MainWindow) setupMenu() {
 	// Registered as a menu item, not a canvas shortcut: menu shortcuts are
 	// matched before the focused widget gets a shot, so Ctrl+Tab still cycles
 	// while a map viewer or entry has focus.
-	cycleItem := fyne.NewMenuItem("Cycle windows", mw.wm.Cycle)
+	// Closure, not the mw.wm.Cycle method value: the menu is built before mw.wm
+	// is assigned, so a method value would bind a nil receiver.
+	cycleItem := fyne.NewMenuItem("Cycle windows", func() { mw.wm.Cycle() })
 	cycleItem.Shortcut = &desktop.CustomShortcut{KeyName: fyne.KeyTab, Modifier: fyne.KeyModifierControl}
+
+	cycleBackItem := fyne.NewMenuItem("Cycle windows back", func() { mw.wm.CycleBack() })
+	cycleBackItem.Shortcut = &desktop.CustomShortcut{KeyName: fyne.KeyTab, Modifier: fyne.KeyModifierControl | fyne.KeyModifierShift}
 
 	trailing := []*fyne.Menu{
 		fyne.NewMenu("Arrange",
 			cycleItem,
+			cycleBackItem,
 			fyne.NewMenuItemSeparator(),
 			fyne.NewMenuItem("Grid", func() {
 				mw.wm.Arrange(&multiwindow.GridArranger{})
