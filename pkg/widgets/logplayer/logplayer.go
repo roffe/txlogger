@@ -493,7 +493,8 @@ func (l *Logplayer) updateSelectionLabel() {
 	}
 
 	lo, hi := l.selectionRange()
-	l.objs.selectionLabel.SetText(fmt.Sprintf("In %s  Out %s  (%d samples)", inTxt, outTxt, hi-lo+1))
+	dur := l.logFile.RecordAt(hi).Time.Sub(l.logFile.RecordAt(lo).Time).Round(10 * time.Millisecond)
+	l.objs.selectionLabel.SetText(fmt.Sprintf("In %s  Out %s  (%d samples, %s)", inTxt, outTxt, hi-lo+1, dur))
 	l.objs.exportBtn.Enable()
 }
 

@@ -10,7 +10,7 @@ go 1.26.0
 replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 
 require (
-	fyne.io/fyne/v2 v2.8.1-0.20260726152049-46ebdae155a0
+	fyne.io/fyne/v2 v2.8.1-0.20260729193709-b45958fa0660
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/lusingander/colorpicker v0.7.5
 	github.com/roffe/ecusymbol v1.2.5

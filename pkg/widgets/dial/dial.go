@@ -97,7 +97,7 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 	} else {
 		// Track ring: thick, dark, rounded ends. The value arc fills it as the
 		// value rises — no needle or center hub in the modern style.
-		c.face = canvas.NewArc(widgets.DialStartDeg, widgets.DialEndDeg, widgets.DialRingCutout, color.RGBA{R: 0x2E, G: 0x2E, B: 0x35, A: 0xFF})
+		c.face = canvas.NewArc(widgets.DialStartDeg, widgets.DialEndDeg, widgets.DialRingCutout, widgets.TrackColor)
 		c.valueArc = canvas.NewArc(widgets.DialStartDeg, widgets.DialStartDeg, widgets.DialRingCutout, widgets.ZoneColor(0))
 	}
 
@@ -105,7 +105,7 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 	c.titleText.TextStyle.Monospace = true
 	c.titleText.Alignment = fyne.TextAlignCenter
 
-	displayColor := color.RGBA{R: 0xF5, G: 0xF5, B: 0xF7, A: 0xFF}
+	displayColor := widgets.TextPrimary
 	if cfg.Classic {
 		displayColor = color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF}
 	}
@@ -115,17 +115,15 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 	// Build pips + labels once; also track the longest label length.
 	// Modern ticks are neutral — the value arc carries the green→yellow→red zone
 	// color. Classic keeps the gradient on the pips themselves.
-	majorTick := color.RGBA{R: 0x8A, G: 0x8A, B: 0x92, A: 0xFF}
-	minorTick := color.RGBA{R: 0x55, G: 0x55, B: 0x5C, A: 0xFF}
 	for i := 0; i < c.cfg.Steps+1; i++ {
 		var col color.RGBA
 		switch {
 		case cfg.Classic:
 			col = widgets.ZoneColor(float64(i) / steps)
 		case i%2 == 0:
-			col = majorTick
+			col = widgets.TickMajor
 		default:
-			col = minorTick
+			col = widgets.TickMinor
 		}
 		pip := &canvas.Line{StrokeColor: col, StrokeWidth: 2}
 		c.pips = append(c.pips, pip)
@@ -303,7 +301,13 @@ func (r *DialRenderer) Layout(space fyne.Size) {
 
 	// Display text
 	c.displayText.TextSize = float32(int(c.radius * common.OneThird))
-	c.displayText.Move(topleft.AddXY(0, c.diameter*common.OneFifth))
+	if c.cfg.Classic {
+		c.displayText.Move(topleft.AddXY(0, c.diameter*common.OneFifth))
+	} else {
+		// Modern has no needle or hub in the way, so the readout owns the middle.
+		// The text box is the full dial square and fyne centers text inside it.
+		c.displayText.Move(topleft)
+	}
 	c.displayText.Resize(size)
 
 	// Needle (classic only)

@@ -75,6 +75,12 @@ type Plotter struct {
 
 	hilightLine int
 
+	// laneMode stacks each enabled series in its own horizontal band instead
+	// of overlaying them all on the full plot height. laneOf holds the band
+	// index per series, filled by updateLanes.
+	laneMode bool
+	laneOf   []int
+
 	// seekPos is the latest position requested via Seek, which is called from
 	// the playback goroutine; the pending UI refresh reads it back out.
 	seekMu         sync.Mutex
@@ -217,11 +223,17 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		leading,
 		container.NewBorder(
 			nil,
-			widget.NewButton("Toggle visible", func() {
-				for _, ts := range p.legendTexts {
-					ts.Tapped(&fyne.PointEvent{})
-				}
-			}),
+			container.NewVBox(
+				widget.NewCheck("Lanes", func(on bool) {
+					p.laneMode = on
+					p.refreshImage(false)
+				}),
+				widget.NewButton("Toggle visible", func() {
+					for _, ts := range p.legendTexts {
+						ts.Tapped(&fyne.PointEvent{})
+					}
+				}),
+			),
 			nil,
 			nil,
 			container.NewVScroll(p.legend),
@@ -348,6 +360,14 @@ func (p *Plotter) drawImage() {
 		clear(img.Pix) // reset to transparent before redrawing
 	}
 
+	laneCount := p.updateLanes()
+	target := func(n int) *image.RGBA {
+		if laneCount == 0 {
+			return img
+		}
+		return laneImage(img, p.laneOf[n], laneCount)
+	}
+
 	for n := range len(p.ts) {
 		if !p.ts[n].Enabled {
 			continue
@@ -355,14 +375,43 @@ func (p *Plotter) drawImage() {
 		if p.hilightLine == n {
 			continue
 		}
-		p.ts[n].PlotImage(img, p.values, p.plotStartPos, p.dataPointsToShow, 1)
+		p.ts[n].PlotImage(target(n), p.values, p.plotStartPos, p.dataPointsToShow, 1)
 	}
 	if p.hilightLine >= 0 && p.ts[p.hilightLine].Enabled {
-		p.ts[p.hilightLine].PlotImage(img, p.values, p.plotStartPos, p.dataPointsToShow, 4)
+		p.ts[p.hilightLine].PlotImage(target(p.hilightLine), p.values, p.plotStartPos, p.dataPointsToShow, 4)
 		// write the text of the current value in the top left corner of the image
 	}
 
 	p.canvasImage.Image = img
+}
+
+// updateLanes gives every enabled series its own horizontal band and returns
+// the number of bands. 0 means overlay mode: all series share the full height.
+func (p *Plotter) updateLanes() int {
+	if len(p.laneOf) != len(p.ts) {
+		p.laneOf = make([]int, len(p.ts))
+	}
+	if !p.laneMode {
+		return 0
+	}
+	n := 0
+	for i, ts := range p.ts {
+		p.laneOf[i] = n
+		if ts != nil && ts.Enabled {
+			n++
+		}
+	}
+	return n
+}
+
+// laneImage returns band i of n as a sub-image sharing img's pixels, so
+// PlotImage keeps drawing in 0-based coordinates and is clipped to the band
+// for free.
+func laneImage(img *image.RGBA, i, n int) *image.RGBA {
+	h := img.Rect.Dy()
+	y0 := img.Rect.Min.Y + i*h/n
+	y1 := img.Rect.Min.Y + (i+1)*h/n
+	return img.SubImage(image.Rect(img.Rect.Min.X, y0, img.Rect.Max.X, y1)).(*image.RGBA)
 }
 
 func (p *Plotter) refreshImage(goroutine bool) {

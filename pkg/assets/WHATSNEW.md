@@ -1,5 +1,5 @@
 # 2.1.10
-- Added "Modern" gauge style selectable under graphics settings
+- Added "Modern" gauge style selectable under graphics settings. It now covers the bar gauges too: VBar, HBar and CBar get a rounded dark track, a solid green→yellow→red fill and labels moved off the bar so they stay readable
 - Added "Compare symbols with other binary" under the Tools menu. Pick a second binary of the same ECU type and get a list of every symbol whose data differs from the currently loaded one, with symbol number, size and address (size mismatches are flagged). Click a symbol to preview it, double-click to keep it open in its own tab. Each symbol shows three tabs: a Diff tab with the per-cell difference (current - other), Current and the other binary. Logging must be stopped while comparing
 - The refresh button in CAN settings now also rescans for adapters, so devices plugged in (or J2534 drivers installed) after txlogger started are picked up without a restart
 - Fixed the mapviewer grid so all cells and the gaps between them render with consistent sizes

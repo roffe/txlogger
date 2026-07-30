@@ -13,6 +13,17 @@ const (
 	DialEndDeg     = 135.0
 	DialSweepDeg   = DialEndDeg - DialStartDeg
 	DialRingCutout = 0.87 // ring thickness = 13% of radius
+
+	// BarCornerFrac is the corner radius of modern bars as a fraction of bar thickness
+	BarCornerFrac = 0.25
+)
+
+// Shared modern-style palette for all gauge widgets
+var (
+	TrackColor  = color.RGBA{R: 0x2E, G: 0x2E, B: 0x35, A: 0xFF} // unfilled bar/ring
+	TickMajor   = color.RGBA{R: 0x8A, G: 0x8A, B: 0x92, A: 0xFF}
+	TickMinor   = color.RGBA{R: 0x55, G: 0x55, B: 0x5C, A: 0xFF}
+	TextPrimary = color.RGBA{R: 0xF5, G: 0xF5, B: 0xF7, A: 0xFF}
 )
 
 // ZoneColor maps a 0..1 fraction of the gauge range to green→yellow→red.
@@ -39,7 +50,7 @@ type GaugeConfig struct {
 	MinSize          fyne.Size
 	TextPosition     TextPosition
 	ColorScale       ColorScheme
-	Classic          bool // render dials in the old look: thin outline, colored pips, green readout
+	Classic          bool // render gauges in the old look: thin outline, colored pips, translucent bars
 
 	SymbolName          string
 	SymbolNameSecondary string

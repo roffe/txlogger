@@ -332,8 +332,11 @@ func (i *innerWindowRenderer) Layout(size fyne.Size) {
 	padding := th.Size(theme.SizeNamePadding)
 	barHeight := th.Size(theme.SizeNameWindowTitleBarHeight)
 
-	// Shadow and background wrap the full widget rect.
-	i.LayoutShadow(size, fyne.Position{})
+	// Shadow and background wrap the full widget rect. The shadow is inset by
+	// the bg corner radius so its gradients show through the rounded-off
+	// corner notches instead of the bare canvas behind the window.
+	inset := i.bg.CornerRadius
+	i.LayoutShadow(size.SubtractWidthHeight(2*inset, 2*inset), fyne.NewPos(inset, inset))
 	i.bg.Resize(size)
 
 	// Title bar: full width minus a padding inset on each side.

@@ -70,9 +70,10 @@ uniform vec4 bounds;
 
 uniform sampler2D data_tex; // one texel per sample, 16-bit value in RG
 uniform sampler2D mm_tex;   // min/max per 16 samples: RG=min, BA=max
-uniform sampler2D meta_tex; // per series: x0 color, x1 enabled, x2 length
+uniform sampler2D meta_tex; // per series: x0 color, x1 enabled, x2 length, x3 lane
 
 uniform float series_count;
+uniform float lane_count;   // horizontal bands, 0 = overlay on full height
 uniform float highlight;    // hovered series index, -1 for none
 uniform float plot_start;   // first visible sample
 uniform float points_shown; // visible sample count
@@ -115,11 +116,11 @@ vec2 sample_mm(float si, float gidx, float glen) {
     return vec2(decode16(t.r, t.g), decode16(t.b, t.a));
 }
 
-// device y of a normalized value: texel range 0..1 spans one display range
-// of headroom on each side of [Min, Max]
-float val_y(float v, float h_dev) {
+// device y of a normalized value inside the band [y0, y0+h): texel range 0..1
+// spans one display range of headroom on each side of [Min, Max]
+float val_y(float v, float y0, float h) {
     float frac = v * 3.0 - 1.0;
-    return (1.0 - frac) * (h_dev - 1.0);
+    return y0 + (1.0 - frac) * (h - 1.0);
 }
 
 float seg_dist(vec2 p, vec2 a, vec2 b) {
@@ -160,6 +161,18 @@ void main() {
         if (len < 2.0) {
             continue;
         }
+        // stacked lanes: each enabled series owns one horizontal band and is
+        // clipped to it, mirroring the image backend's sub-image draw
+        float lane_y0 = 0.0;
+        float lane_h = h_dev;
+        if (lane_count >= 1.0) {
+            float li = floor(meta_at(3.0, si).r * 255.0 + 0.5);
+            lane_y0 = floor(li * h_dev / lane_count);
+            lane_h = floor((li + 1.0) * h_dev / lane_count) - lane_y0;
+            if (p_dev.y < lane_y0 || p_dev.y > lane_y0 + lane_h) {
+                continue;
+            }
+        }
         // hovered series renders at 4 logical px like PlotImage thickness 4
         float half_w = (abs(si - highlight) < 0.5 ? 2.0 : 0.5) * pix_scale;
 
@@ -173,8 +186,8 @@ void main() {
                 float j = i0 + float(k);
                 float x0 = (j - plot_start) / points_shown * w_dev;
                 float x1 = (j + 1.0 - plot_start) / points_shown * w_dev;
-                float y0 = val_y(sample_val(si, j, len), h_dev);
-                float y1 = val_y(sample_val(si, j + 1.0, len), h_dev);
+                float y0 = val_y(sample_val(si, j, len), lane_y0, lane_h);
+                float y1 = val_y(sample_val(si, j + 1.0, len), lane_y0, lane_h);
                 dmin = min(dmin, seg_dist(p_dev, vec2(x0, y0), vec2(x1, y1)));
             }
             mask = 1.0 - smoothstep(half_w - aa, half_w + aa, dmin);
@@ -209,7 +222,7 @@ void main() {
                     hi = max(hi, mm.y);
                 }
             }
-            float d = max(val_y(hi, h_dev) - p_dev.y, p_dev.y - val_y(lo, h_dev));
+            float d = max(val_y(hi, lane_y0, lane_h) - p_dev.y, p_dev.y - val_y(lo, lane_y0, lane_h));
             mask = 1.0 - smoothstep(half_w - aa, half_w + aa, d);
         }
 
@@ -322,13 +335,14 @@ func encodeSeries(data, mm *image.RGBA, texW, rawRow, mmRow int, ts *TimeSeries,
 }
 
 // updateShaderMeta rebuilds the per-series metadata texture (color, enabled,
-// length). Called when the legend toggles or recolors a series; a fresh image
-// is allocated because the painter re-uploads only when the map entry points
-// at a new image.
+// length, lane). Called when the legend toggles or recolors a series; a fresh
+// image is allocated because the painter re-uploads only when the map entry
+// points at a new image.
 func (p *Plotter) updateShaderMeta() {
 	if p.shader == nil {
 		return
 	}
+	p.shader.Uniforms["lane_count"] = float32(p.updateLanes())
 	meta := image.NewRGBA(image.Rect(0, 0, 4, len(p.ts)))
 	for i, ts := range p.ts {
 		meta.SetRGBA(0, i, ts.Color)
@@ -339,6 +353,7 @@ func (p *Plotter) updateShaderMeta() {
 		meta.SetRGBA(1, i, color.RGBA{R: enabled, A: 0xff})
 		n := len(p.values[ts.Name])
 		meta.SetRGBA(2, i, color.RGBA{R: uint8(n >> 16), G: uint8(n >> 8), B: uint8(n), A: 0xff})
+		meta.SetRGBA(3, i, color.RGBA{R: uint8(p.laneOf[i]), A: 0xff})
 	}
 	p.shader.Textures["meta_tex"] = meta
 }

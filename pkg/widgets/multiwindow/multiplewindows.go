@@ -159,6 +159,17 @@ func (m *MultipleWindows) Refresh() {
 	m.refreshChildren()
 }
 
+// Cycle raises the bottom-most non-minimized window. m.windows is ordered
+// bottom to top, so repeated calls walk round-robin through the stack.
+func (m *MultipleWindows) Cycle() {
+	for _, w := range m.windows {
+		if !w.minimized {
+			m.Raise(w)
+			return
+		}
+	}
+}
+
 func (m *MultipleWindows) Raise(w *InnerWindow) {
 	m.raise(w)
 	if obj, ok := w.content.Objects[0].(fyne.Focusable); ok {

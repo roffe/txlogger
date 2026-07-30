@@ -34,6 +34,9 @@ type CBar struct {
 
 	displayY float32
 
+	// Bar colors: below center / above center / on center
+	colorLow, colorHigh, colorCenter color.RGBA
+
 	// Cache layout calculations
 	middleHeight     float32
 	heightOneThird   float32
@@ -70,6 +73,15 @@ func New(cfg *widgets.GaugeConfig) *CBar {
 		value:      cfg.Center,
 		valueRange: cfg.Max - cfg.Min,
 		fmtPrec:    -1,
+		// Modern bars are solid; the classic ones let the ticks show through
+		colorLow:    color.RGBA{0x26, 0xCC, 0x00, 0xFF},
+		colorHigh:   color.RGBA{0xD0, 0x32, 0x2A, 0xFF},
+		colorCenter: color.RGBA{0xFC, 0xBA, 0x03, 0xFF},
+	}
+	if cfg.Classic {
+		s.colorLow = color.RGBA{0x26, 0xCC, 0x00, 0x80}
+		s.colorHigh = color.RGBA{0xA5, 0x00, 0x00, 0x80}
+		s.colorCenter = color.RGBA{0xFC, 0xBA, 0x03, 0x80}
 	}
 	if n := common.ParseFixedPrec(cfg.DisplayString); n >= 0 {
 		s.fmtPrec = n
@@ -83,19 +95,27 @@ func (s *CBar) GetConfig() *widgets.GaugeConfig {
 }
 
 func (s *CBar) initializeVisualElements() {
-	s.face = &canvas.Rectangle{
-		StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0xFF},
-		FillColor:   color.RGBA{0x00, 0x00, 0x00, 0x00},
-		StrokeWidth: 3,
+	textColor := widgets.TextPrimary
+	if s.cfg.Classic {
+		textColor = color.RGBA{0xF0, 0xF0, 0xF0, 0xFF}
+		// Thin outline around the bar, drawn on top of it
+		s.face = &canvas.Rectangle{
+			StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0xFF},
+			FillColor:   color.RGBA{0x00, 0x00, 0x00, 0x00},
+			StrokeWidth: 3,
+		}
+	} else {
+		// Modern: a dark rounded track the deviation bar fills from the center
+		s.face = &canvas.Rectangle{FillColor: widgets.TrackColor}
 	}
 
 	s.bar = &canvas.Rectangle{
-		FillColor: color.RGBA{0x2C, 0xA5, 0x00, 0x80},
+		FillColor: s.colorCenter,
 	}
 
 	s.titleText = &canvas.Text{
 		Text:      s.cfg.Title,
-		Color:     color.RGBA{0xF0, 0xF0, 0xF0, 0xFF},
+		Color:     textColor,
 		TextSize:  25,
 		TextStyle: fyne.TextStyle{Monospace: true},
 		Alignment: fyne.TextAlignCenter,
@@ -109,19 +129,51 @@ func (s *CBar) initializeVisualElements() {
 	}
 	s.displayText = &canvas.Text{
 		Text:      string(s.buf),
-		Color:     color.RGBA{0xF0, 0xF0, 0xF0, 0xFF},
+		Color:     textColor,
 		TextSize:  float32(s.cfg.DisplayTextSize),
 		TextStyle: fyne.TextStyle{Monospace: true},
 		Alignment: fyne.TextAlignLeading,
 	}
 
 	for i := 0; i <= s.cfg.Steps; i++ {
+		tick := widgets.TickMajor
+		switch {
+		case s.cfg.Classic:
+			tick = color.RGBA{0x00, 0xE5, 0x00, 0xFF}
+		case i%2 != 0:
+			tick = widgets.TickMinor
+		}
 		line := &canvas.Line{
-			StrokeColor: color.RGBA{0x00, 0xE5, 0x00, 0xFF},
+			StrokeColor: tick,
 			StrokeWidth: 2,
 		}
 		s.bars = append(s.bars, line)
 	}
+}
+
+// applyBar positions, sizes and colors the deviation bar from the current value.
+func (s *CBar) applyBar() {
+	barPosition := s.center
+	var pxWidth float32
+	switch {
+	case s.value < s.cfg.Center:
+		s.bar.FillColor = s.colorLow
+		s.barWidth = float32(s.cfg.Center - s.value)
+		pxWidth = s.barWidth * s.widthFactor
+		barPosition -= pxWidth
+	case s.value > s.cfg.Center:
+		s.bar.FillColor = s.colorHigh
+		s.barWidth = float32(s.value - s.cfg.Center)
+		pxWidth = s.barWidth * s.widthFactor
+	default:
+		s.bar.FillColor = s.colorCenter
+		barPosition -= 3
+		s.barWidth = 6 / s.widthFactor
+		pxWidth = 6
+	}
+
+	s.bar.Move(fyne.Position{X: barPosition, Y: 0})
+	s.bar.Resize(fyne.Size{Width: pxWidth, Height: s.barHeight})
 }
 
 func (s *CBar) SetValue(value float64) {
@@ -131,27 +183,7 @@ func (s *CBar) SetValue(value float64) {
 	}
 	s.value = value
 
-	barPosition := s.center
-	var pxWidth float32
-	switch {
-	case s.value < s.cfg.Center:
-		s.bar.FillColor = color.RGBA{0x26, 0xcc, 0x00, 0x80}
-		s.barWidth = float32(s.cfg.Center - s.value)
-		pxWidth = s.barWidth * s.widthFactor
-		barPosition -= pxWidth
-	case s.value > s.cfg.Center:
-		s.bar.FillColor = color.RGBA{0xA5, 0x00, 0x00, 0x80}
-		s.barWidth = float32(s.value - s.cfg.Center)
-		pxWidth = s.barWidth * s.widthFactor
-	default:
-		s.bar.FillColor = color.RGBA{252, 186, 3, 0x80}
-		barPosition -= 3
-		s.barWidth = 6 / s.widthFactor
-		pxWidth = 6
-	}
-
-	s.bar.Move(fyne.Position{X: barPosition, Y: 0})
-	s.bar.Resize(fyne.Size{Width: pxWidth, Height: s.barHeight})
+	s.applyBar()
 
 	s.buf = s.buf[:0]
 	if s.fmtPrec >= 0 {
@@ -230,8 +262,16 @@ func (r *CBarRenderer) Layout(space fyne.Size) {
 	r.barHeight = space.Height
 	r.stepFactor = space.Width / float32(r.cfg.Steps)
 
-	r.face.Move(fyne.NewPos(-2, 0))
-	r.face.Resize(space.AddWidthHeight(3, 0))
+	if r.cfg.Classic {
+		r.face.Move(fyne.NewPos(-2, 0))
+		r.face.Resize(space.AddWidthHeight(3, 0))
+	} else {
+		radius := space.Height * widgets.BarCornerFrac
+		r.face.CornerRadius = radius
+		r.bar.CornerRadius = radius
+		r.face.Move(fyne.Position{})
+		r.face.Resize(space)
+	}
 
 	// Update bar positions
 	for i, line := range r.bars {
@@ -245,23 +285,7 @@ func (r *CBarRenderer) Layout(space fyne.Size) {
 		}
 	}
 
-	barPosition := r.center
-	switch {
-	case r.value < r.cfg.Center:
-		r.bar.FillColor = color.RGBA{0x26, 0xcc, 0x00, 0x80}
-		r.barWidth = float32(r.cfg.Center - r.value)
-		barPosition -= r.barWidth * r.widthFactor
-	case r.value > r.cfg.Center:
-		r.bar.FillColor = color.RGBA{0xA5, 0x00, 0x00, 0x80}
-		r.barWidth = float32(r.value - r.cfg.Center)
-	default:
-		r.bar.FillColor = color.RGBA{252, 186, 3, 0x80}
-		barPosition -= 3
-		r.barWidth = 6 / r.widthFactor
-	}
-
-	r.bar.Move(fyne.Position{X: barPosition, Y: 0})
-	r.bar.Resize(fyne.Size{Width: r.barWidth * r.widthFactor, Height: r.barHeight})
+	r.applyBar()
 
 	r.displayText.TextSize = r.bar.Size().Height - 8
 	r.charWidth = fyne.MeasureText("0", r.displayText.TextSize, r.displayText.TextStyle).Width
@@ -284,10 +308,17 @@ func (r *CBarRenderer) Layout(space fyne.Size) {
 func (r *CBarRenderer) Objects() []fyne.CanvasObject {
 	if r.objects == nil {
 		objs := make([]fyne.CanvasObject, 0, len(r.bars)+4)
+		if !r.cfg.Classic {
+			// Modern: the track sits under the bar, ticks on top of both
+			objs = append(objs, r.face, r.bar)
+		}
 		for _, line := range r.bars {
 			objs = append(objs, line)
 		}
-		objs = append(objs, r.bar, r.face, r.titleText, r.displayText)
+		if r.cfg.Classic {
+			objs = append(objs, r.bar, r.face)
+		}
+		objs = append(objs, r.titleText, r.displayText)
 		r.objects = objs
 	}
 	return r.objects

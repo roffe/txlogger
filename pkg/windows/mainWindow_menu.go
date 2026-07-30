@@ -15,6 +15,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
@@ -28,6 +29,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/canflasher"
 	"github.com/roffe/txlogger/pkg/widgets/dtcreader"
 	"github.com/roffe/txlogger/pkg/widgets/editparameters"
+	"github.com/roffe/txlogger/pkg/widgets/estimatedoutput"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/matrixbuilder"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
@@ -132,6 +134,7 @@ func (mw *MainWindow) setupMenu() {
 			}),
 			fyne.NewMenuItemWithIcon("Compare symbols with other binary", theme.SearchReplaceIcon(), mw.openSymbolCompare),
 			fyne.NewMenuItemWithIcon("Matrix Builder", theme.InfoIcon(), mw.openMatrixBuilder),
+			fyne.NewMenuItemWithIcon("Estimated output", theme.InfoIcon(), mw.openEstimatedOutput),
 			fyne.NewMenuItemWithIcon("T5 CLI", theme.ComputerIcon(), mw.openT5CLI),
 			//fyne.NewMenuItemWithIcon("Rescale AccPedalMap", theme.GridIcon(), func() {
 			//	mw.openRescaler(symbol.ECU_T8, "TrqMastCal.X_AccPedalMAP")
@@ -139,8 +142,16 @@ func (mw *MainWindow) setupMenu() {
 		),
 	}
 
+	// Registered as a menu item, not a canvas shortcut: menu shortcuts are
+	// matched before the focused widget gets a shot, so Ctrl+Tab still cycles
+	// while a map viewer or entry has focus.
+	cycleItem := fyne.NewMenuItem("Cycle windows", mw.wm.Cycle)
+	cycleItem.Shortcut = &desktop.CustomShortcut{KeyName: fyne.KeyTab, Modifier: fyne.KeyModifierControl}
+
 	trailing := []*fyne.Menu{
 		fyne.NewMenu("Arrange",
+			cycleItem,
+			fyne.NewMenuItemSeparator(),
 			fyne.NewMenuItem("Grid", func() {
 				mw.wm.Arrange(&multiwindow.GridArranger{})
 			}),
@@ -177,6 +188,30 @@ func (mw *MainWindow) setupMenu() {
 
 	mw.leadingMenus = leading
 	mw.trailingMenus = trailing
+}
+
+// openEstimatedOutput opens (or raises) the "Estimated output" tool: an
+// offline dyno/airmass estimator over the currently loaded binary.
+func (mw *MainWindow) openEstimatedOutput() {
+	if mw.fw == nil {
+		mw.Error(fmt.Errorf("no binary loaded"))
+		return
+	}
+	ecu := mw.selects.ecuSelect.Selected
+	title := "Estimated output [" + ecu + "]"
+	if w := mw.wm.HasWindow(title); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	eo := estimatedoutput.New(&estimatedoutput.Config{
+		ECU:        ecu,
+		GetFW:      func() symbol.SymbolCollection { return mw.fw },
+		Colorblind: mw.settings.GetColorBlindMode(),
+	})
+	inner := multiwindow.NewInnerWindow(title, eo)
+	inner.Icon = theme.InfoIcon()
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(920, 560))
 }
 
 func (mw *MainWindow) openT5CLI() {

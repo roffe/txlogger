@@ -118,8 +118,8 @@ func NewDashboard(cfg *Config) *Dashboard {
 			speed: dial.New(&widgets.GaugeConfig{
 				Title:           speedometerText,
 				Min:             0,
-				Max:             300,
-				Steps:           30,
+				Max:             260,
+				Steps:           26,
 				DisplayString:   "%.1f",
 				GaugeTextString: "%.0f",
 				MinSize:         fyne.NewSize(100, 100),
@@ -160,6 +160,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				Steps:      20,
 				MinSize:    fyne.NewSize(50, 50),
 				ColorScale: widgets.TraditionalScale,
+				Classic:    cfg.ClassicGauges,
 			}),
 			pwm: vbar.New(&widgets.GaugeConfig{
 				Title:      "PWM",
@@ -168,6 +169,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				Steps:      20,
 				MinSize:    fyne.NewSize(50, 50),
 				ColorScale: widgets.TraditionalScale,
+				Classic:    cfg.ClassicGauges,
 			}),
 			engineTemp: dial.New(&widgets.GaugeConfig{
 				Title:   "tEng",
@@ -186,6 +188,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				DisplayString:   "λ %.2f",
 				DisplayTextSize: 20,
 				TextPosition:    widgets.TextAtTop,
+				Classic:         cfg.ClassicGauges,
 			}),
 			nblambda: cbar.New(&widgets.GaugeConfig{
 				Title:           "",
@@ -197,6 +200,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 				DisplayString:   "%.2f%%",
 				DisplayTextSize: 20,
 				TextPosition:    widgets.TextAtBottom,
+				Classic:         cfg.ClassicGauges,
 			}),
 		},
 		text: Texts{
