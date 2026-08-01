@@ -300,13 +300,14 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 		}
 
 		dbcfg := &dashboard.Config{
-			Logplayer:       false,
-			UseMPH:          mw.settings.GetUseMPH(),
-			SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
-			ClassicGauges:   mw.settings.GetClassicGauges(),
-			High:            1.5,
-			Low:             0.5,
-			WidebandSymbol:  mw.settings.GetWidebandSymbolName(),
+			Logplayer:        false,
+			UseMPH:           mw.settings.GetUseMPH(),
+			SwapRPMandSpeed:  mw.settings.GetSwapRPMandSpeed(),
+			ClassicGauges:    mw.settings.GetClassicGauges(),
+			UseWidebandGauge: mw.settings.GetUseWidebandGauge(),
+			High:             1.5,
+			Low:              0.5,
+			WidebandSymbol:   mw.settings.GetWidebandSymbolName(),
 		}
 
 		switch mw.selects.ecuSelect.Selected {

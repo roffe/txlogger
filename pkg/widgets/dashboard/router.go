@@ -85,7 +85,7 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		//"AD_EGR": db.gauges.wblambda.SetValue, // t5
 		//"DisplProt.LambdaScanner": db.wblambda.SetValue, // t7 & t8
 		//"Lambda.External":     db.wblambda.SetValue,
-		db.cfg.WidebandSymbol: db.gauges.wblambda.SetValue, // Wideband lambda
+		db.cfg.WidebandSymbol: db.setWBLambda, // Wideband lambda
 
 		// NB lambda
 		"Lambda.LambdaInt": db.gauges.nblambda.SetValue, // t7 & t8

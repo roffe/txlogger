@@ -92,6 +92,7 @@ var (
 	// Dashboard
 	prefUseMPH          = boolPref{"useMPH", false}
 	prefSwapRPMandSpeed = boolPref{"swapRPMandSpeed", false}
+	prefWBLGaugeType    = stringPref{"wblGaugeType", "CBar"}
 
 	// Wideband
 	prefWblSource           = stringPref{"wblSource", "None"}

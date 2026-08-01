@@ -3,7 +3,7 @@ module github.com/roffe/txlogger
 go 1.26.0
 
 //replace github.com/roffe/gocan => ../gocan
-//replace github.com/roffe/ecusymbol => ..\ecusymbol
+//replace github.com/roffe/ecusymbol => ../ecusymbol
 //replace fyne.io/fyne/v2 => ../fyne
 //replace go.bug.st/serial => ../../../go.bug.st/serial
 
@@ -13,7 +13,7 @@ require (
 	fyne.io/fyne/v2 v2.8.1-0.20260729193709-b45958fa0660
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/lusingander/colorpicker v0.7.5
-	github.com/roffe/ecusymbol v1.2.5
+	github.com/roffe/ecusymbol v1.2.6-0.20260801112516-31a74272bfb0
 	go.bug.st/serial v1.7.1
 	golang.org/x/image v0.40.0
 	golang.org/x/mod v0.36.0

@@ -61,6 +61,10 @@ func (sw *Widget) GetExperimentalT5FastLogger() bool { return prefExperimentalT5
 func (sw *Widget) GetUseMPH() bool          { return prefUseMPH.get() }
 func (sw *Widget) GetSwapRPMandSpeed() bool { return prefSwapRPMandSpeed.get() }
 
+// GetUseWidebandGauge reports whether the dashboard should show the round
+// wideband gauge instead of the bottom CBar.
+func (sw *Widget) GetUseWidebandGauge() bool { return prefWBLGaugeType.get() == "Gauge" }
+
 // Wideband
 func (sw *Widget) GetADScannerSymbolName() string { return prefWBLADScannerSymbol.get() }
 func (sw *Widget) GetWidebandName() string        { return prefWblSource.get() }

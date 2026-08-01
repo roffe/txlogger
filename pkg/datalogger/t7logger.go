@@ -385,10 +385,10 @@ func initT7logging(ctx context.Context, kwp *kwp2000.Client, symbols []*symbol.S
 
 	// For some fucked up reason this clears DTC's and resets adaptation!!!
 	// Did we stumble on a bug in Trionic 7 ECU's firmware?
-	//if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
-	//	return fmt.Errorf("failed to clear dynamic register: %w", err)
-	//}
-	//onMessage("Cleared dynamic register")
+	if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
+		return fmt.Errorf("failed to clear dynamic register: %w", err)
+	}
+	onMessage("Cleared dynamic register")
 
 	index := 0
 	for _, sym := range symbols {

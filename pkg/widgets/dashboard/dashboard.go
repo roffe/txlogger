@@ -18,6 +18,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/dualdial"
 	"github.com/roffe/txlogger/pkg/widgets/icon"
 	"github.com/roffe/txlogger/pkg/widgets/vbar"
+	"github.com/roffe/txlogger/pkg/widgets/widebandgauge"
 )
 
 //go:embed wheel_left.svg
@@ -71,6 +72,9 @@ type Gauges struct {
 	engineTemp         *dial.Dial
 	nblambda, wblambda *cbar.CBar
 	pressure, airmass  *dualdial.DualDial
+	// wbgauge replaces the wblambda bar in the top right corner when the
+	// "Gauge" wideband display is selected; nil otherwise.
+	wbgauge *widebandgauge.WidebandGauge
 }
 
 type Config struct {
@@ -79,6 +83,9 @@ type Config struct {
 	UseMPH          bool
 	SwapRPMandSpeed bool
 	ClassicGauges   bool
+	// UseWidebandGauge shows the round wideband gauge in the top right corner
+	// instead of the CBar at the bottom.
+	UseWidebandGauge bool
 	// Low/High set the wideband lambda bar display range (defaults 0.5–1.5).
 	Low            float64
 	High           float64
@@ -255,6 +262,20 @@ func NewDashboard(cfg *Config) *Dashboard {
 			wheelRight: canvas.NewImageFromResource(fyne.NewStaticResource("wheelRight.svg", wheelRightIconBytes)),
 		},
 	}
+	if cfg.UseWidebandGauge {
+		db.gauges.wbgauge = widebandgauge.New(&widgets.GaugeConfig{
+			Min:           wbLow,
+			Center:        (wbLow + wbHigh) * 0.5,
+			Max:           wbHigh,
+			Steps:         20,
+			DisplayString: "%.2f",
+			MinSize:       fyne.NewSize(100, 100),
+		})
+		// Still laid out at the bottom as an invisible anchor for the texts
+		// and icons positioned relative to it, just never shown or fed.
+		db.gauges.wblambda.Hide()
+	}
+
 	db.ExtendBaseWidget(db)
 
 	db.metricRouter = db.createRouter()
@@ -280,6 +301,7 @@ func NewDashboard(cfg *Config) *Dashboard {
 	db.image.checkEngine.Hide()
 	db.image.limpMode.Hide()
 	db.image.taz.Hide()
+	db.image.taz.Translucency = 0.75
 	db.image.wheelLeft.Hide()
 	db.image.wheelRight.Hide()
 
@@ -354,12 +376,21 @@ func (db *Dashboard) Set(gauge GaugeType, value float64) {
 	case PWMBar:
 		db.gauges.pwm.SetValue(value)
 	case WBLambdaBar:
-		db.gauges.wblambda.SetValue(value)
+		db.setWBLambda(value)
 	case NBLambdaBar:
 		db.gauges.nblambda.SetValue(value)
 	default:
 		log.Println("Unknown gauge", gauge)
 	}
+}
+
+// setWBLambda feeds whichever wideband display is active.
+func (db *Dashboard) setWBLambda(value float64) {
+	if db.gauges.wbgauge != nil {
+		db.gauges.wbgauge.SetValue(value)
+		return
+	}
+	db.gauges.wblambda.SetValue(value)
 }
 
 func interpol(x0, y0, x1, y1, x float64) float64 {
@@ -444,6 +475,10 @@ func (db *Dashboard) layoutDials(dims *dims) {
 		X: dims.centerX - centerDialSize.Width*0.5,
 		Y: dims.centerY - centerDialSize.Height*0.46,
 	}
+	if db.gauges.wbgauge != nil {
+		// wblambda bottom bar is hidden; reclaim half its space
+		centerDialPos.Y += min(dims.tenthHeight, 50) * 0.5
+	}
 
 	if !db.cfg.SwapRPMandSpeed {
 		db.gauges.rpm.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
@@ -476,8 +511,21 @@ func (db *Dashboard) layoutDials(dims *dims) {
 	// Third dial: pressure
 	db.gauges.pressure.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
 	db.gauges.pressure.Move(fyne.Position{X: 0, Y: spacing*3 + dims.thirdHeight*2}) // After top dial + middle dial + spacing
-	// Right side dials (only 2 dials, different spacing)
 	rightX := db.size.Width - dims.sixthWidth
+
+	if db.gauges.wbgauge != nil {
+		// Wideband gauge on top: the right column mirrors the left one,
+		// three gauges a side.
+		db.gauges.wbgauge.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
+		db.gauges.wbgauge.Move(fyne.Position{X: rightX, Y: 5})
+
+		db.gauges.iat.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
+		db.gauges.iat.Move(fyne.Position{X: rightX, Y: spacing*2 + dims.thirdHeight})
+
+		db.gauges.engineTemp.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
+		db.gauges.engineTemp.Move(fyne.Position{X: rightX, Y: spacing*3 + dims.thirdHeight*2})
+		return
+	}
 
 	// Calculate spacing for right side (only 2 dials)
 	rightSideSpacing := (db.size.Height - (dims.thirdHeight * 2)) / 3 // Three spaces for two dials
@@ -608,9 +656,14 @@ func (db *Dashboard) layoutTexts(dims *dims) {
 
 	// Active air demand text (large)
 	db.text.activeAirDem.TextSize = dims.textSize
+	airDemY := dims.thirdHeight * 1.24
+	if db.gauges.wbgauge != nil {
+		// follow the center dial, which shifts down when the wideband gauge is used
+		airDemY += min(dims.tenthHeight, 50) * 0.5
+	}
 	db.text.activeAirDem.Move(fyne.Position{
 		X: dims.centerX,
-		Y: dims.thirdHeight * 1.24,
+		Y: airDemY,
 	})
 
 	// Cruise text (special size - larger)
@@ -662,7 +715,7 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 
 	// Layout buttons
 	btnWidth := dims.sixthWidth * 0.8
-	btnHeigh := dims.tenthHeight * 0.8
+	btnHeigh := min(dims.tenthHeight*0.8, 40)
 	dr.db.fullscreenBtn.Resize(fyne.NewSize(btnWidth, btnHeigh))
 	dr.db.fullscreenBtn.Move(fyne.NewPos(space.Width-btnWidth, space.Height-btnHeigh))
 
@@ -709,6 +762,10 @@ func (dr *DashboardRenderer) Objects() []fyne.CanvasObject {
 			dr.db.text.cruise,
 			dr.db.image.knockIcon,
 			dr.db.fullscreenBtn,
+		}
+
+		if dr.db.gauges.wbgauge != nil {
+			dr.objects = append(dr.objects, dr.db.gauges.wbgauge)
 		}
 
 		if dr.db.logplayer {

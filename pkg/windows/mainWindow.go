@@ -307,13 +307,14 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 	}
 
 	dbcfg := &dashboard.Config{
-		Logplayer:       true,
-		UseMPH:          mw.settings.GetUseMPH(),
-		SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
-		ClassicGauges:   mw.settings.GetClassicGauges(),
-		High:            1.5,
-		Low:             0.5,
-		WidebandSymbol:  mw.settings.GetWidebandSymbolName(),
+		Logplayer:        true,
+		UseMPH:           mw.settings.GetUseMPH(),
+		SwapRPMandSpeed:  mw.settings.GetSwapRPMandSpeed(),
+		ClassicGauges:    mw.settings.GetClassicGauges(),
+		UseWidebandGauge: mw.settings.GetUseWidebandGauge(),
+		High:             1.5,
+		Low:              0.5,
+		WidebandSymbol:   mw.settings.GetWidebandSymbolName(),
 	}
 
 	rec := logz.Next()

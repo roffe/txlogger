@@ -84,8 +84,8 @@ github.com/nicksnyder/go-i18n/v2 v2.6.1/go.mod h1:Vee0/9RD3Quc/NmwEjzzD7VTZ+Ir7Q
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/roffe/ecusymbol v1.2.5 h1:h1ghjJZcm85+n5P+UjJWCiJDXMgy5BUhaFeKgwRJSss=
-github.com/roffe/ecusymbol v1.2.5/go.mod h1:Y6vMPbT3P6nVXfUetMZBJKc6N4jPuzpNJfk8bHAfx5Q=
+github.com/roffe/ecusymbol v1.2.6-0.20260801112516-31a74272bfb0 h1:onTJj3iz4tVR1h765TmVxkQdOuTW4wwzyuhP5ygegco=
+github.com/roffe/ecusymbol v1.2.6-0.20260801112516-31a74272bfb0/go.mod h1:Y6vMPbT3P6nVXfUetMZBJKc6N4jPuzpNJfk8bHAfx5Q=
 github.com/roffe/gocan/v2 v2.0.0-20260707232838-0af87a49b848 h1:gbEVmho3NrXSp4wxaHV6rBUXB6DXQIv4i40w5riV/ow=
 github.com/roffe/gocan/v2 v2.0.0-20260707232838-0af87a49b848/go.mod h1:wIdEf54Bs+vhhFqyBTAnPmOiEDDLzzqsG5OaJs+sVOI=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=

@@ -4,6 +4,8 @@ func (mw *MainWindow) t7Menu() []MenuItem {
 	return []MenuItem{
 		{Name: "Diagnostics", Children: []MenuItem{
 			{Name: "DTC Reader", Func: mw.openDTCReader},
+			{Name: "J1979", Func: mw.openJ1979},
+			{Name: "PI area editor", Func: mw.openPIAreaEditor},
 			{Name: "F_KnkDetAdap.FKnkCntMap"},
 			{Name: "F_KnkDetAdap.RKnkCntMap"},
 			{Name: "KnkDetAdap.KnkCntMap"},
@@ -88,6 +90,8 @@ func (mw *MainWindow) t7Menu() []MenuItem {
 			{Name: "P factor", Data: "BoostCal.PMap"},
 			{Name: "I factor", Data: "BoostCal.IMap"},
 			{Name: "D factor", Data: "BoostCal.DMap"},
+			{Name: "Boost Temp Compensation", Data: "BoostCal.PWMTempTab"},
+			{Name: "Boost Temp Compensation (Y)", Data: "BoostCal.PWMTempSP"},
 		}},
 		{Name: "Knock", Children: []MenuItem{
 			{Name: "Knock enrichment", Data: "KnkFuelCal.EnrichmentMap"},

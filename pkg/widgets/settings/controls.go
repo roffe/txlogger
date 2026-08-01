@@ -208,6 +208,7 @@ func (sw *Widget) loadPreferences() {
 
 	sw.useMPH.SetChecked(prefUseMPH.get())
 	sw.swapRPMandSpeed.SetChecked(prefSwapRPMandSpeed.get())
+	sw.wblGaugeType.SetSelected(prefWBLGaugeType.get())
 	sw.wblPortSelect.SetSelected(prefWBLPort.get())
 	sw.colorBlindMode.SetSelected(prefColorBlindMode.get())
 

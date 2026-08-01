@@ -30,6 +30,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/dtcreader"
 	"github.com/roffe/txlogger/pkg/widgets/editparameters"
 	"github.com/roffe/txlogger/pkg/widgets/estimatedoutput"
+	"github.com/roffe/txlogger/pkg/widgets/j1979diag"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/matrixbuilder"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
@@ -40,6 +41,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmstatus"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/t5cli"
 	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7esp"
+	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7piarea"
 )
 
 func (mw *MainWindow) setupMenu() {
@@ -257,6 +259,25 @@ func (mw *MainWindow) openDTCReader() {
 	inner.Resize(fyne.Size{Width: 600, Height: 400})
 }
 
+// openJ1979 opens the SAE J1979 (OBD-II) diagnostics window. T7 only: the
+// client speaks the T7 KWP transport, so the adapter is always requested
+// with T7 filters regardless of the ECU selector.
+func (mw *MainWindow) openJ1979() {
+	if w := mw.wm.HasWindow("J1979"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	getAdapter := func() (gocan.Adapter, error) {
+		return mw.settings.GetAdapter("T7")
+	}
+	j := j1979diag.New(getAdapter, mw.Log, mw.Error)
+	inner := multiwindow.NewInnerWindow("J1979", j)
+	inner.Icon = theme.InfoIcon()
+	inner.OnClose = j.Close
+	mw.wm.Add(inner)
+	inner.Resize(fyne.Size{Width: 700, Height: 500})
+}
+
 func (mw *MainWindow) openEditParameters() {
 	if w := mw.wm.HasWindow("Edit Parameters"); w != nil {
 		mw.wm.Raise(w)
@@ -293,6 +314,24 @@ func (mw *MainWindow) openESPCalibration() {
 	inner.Icon = theme.InfoIcon()
 	inner.DisableResize = true
 	mw.wm.Add(inner)
+}
+
+// openPIAreaEditor edits the footer of the loaded binary. Reflash the ECU to
+// apply it.
+func (mw *MainWindow) openPIAreaEditor() {
+	if w := mw.wm.HasWindow("PI area editor"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	t, ok := mw.fw.(*symbol.T7File)
+	if !ok {
+		mw.Error(errors.New("not a T7 file"))
+		return
+	}
+	inner := multiwindow.NewInnerWindow("PI area editor", t7piarea.New(mw.filename, t))
+	inner.Icon = theme.InfoIcon()
+	mw.wm.Add(inner)
+	inner.Resize(fyne.Size{Width: 700, Height: 500})
 }
 
 func (mw *MainWindow) openFirmwareInfoEdit() {

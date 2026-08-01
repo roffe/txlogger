@@ -1,7 +1,7 @@
 // Package widebandgauge renders an aftermarket-style wideband lambda display:
-// a black face, a ring of segments around the top, a scale printed inside them
-// and a large digital readout in the middle. One segment lights at a time to
-// show the current reading.
+// a ring of segments around the top, a scale printed inside them and a large
+// digital readout in the middle. One segment lights at a time to show the
+// current reading.
 package widebandgauge
 
 import (
@@ -21,14 +21,22 @@ const (
 	segInner  = 0.74
 	segOuter  = 0.90
 	segFill   = 0.65 // of the available arc per segment; the rest is the gap
+	arcInner  = 0.72 // background track arc extends slightly past the segments
+	arcOuter  = 0.92
 	maxLabels = 11
+
+	// Degrees of band the rounded arc end curves away at each tip:
+	// corner radius (half band thickness) as an angle at the band's mid radius.
+	arcEndPad = (arcOuter - arcInner) / (arcOuter + arcInner) * (180 / math.Pi)
 )
 
+// The track arc, labels and the readout follow the shared modern gauge
+// palette so the widget sits next to dial/dualdial without standing out;
+// unlit segments recess into the track, the lit segment keeps its own
+// rich/stoich/lean colors.
 var (
-	faceColor = color.RGBA{0x08, 0x08, 0x0A, 0xFF}
-	segDark   = color.RGBA{0x24, 0x24, 0x2A, 0xFF}
-	digitBlue = color.RGBA{0x4C, 0x9A, 0xFF, 0xFF}
-	labelGray = color.RGBA{0xD0, 0xD0, 0xD6, 0xFF}
+	segDark   = color.RGBA{0x17, 0x17, 0x1B, 0xFF} // unlit segment against the track arc
+	labelGray = color.RGBA{0xE0, 0xE0, 0xE0, 0xFF} // same as dial scale labels
 	richAmber = color.RGBA{0xFF, 0xA0, 0x00, 0xFF}
 	stoichGrn = color.RGBA{0x2E, 0xE0, 0x40, 0xFF}
 	leanRed   = color.RGBA{0xE8, 0x2A, 0x1E, 0xFF}
@@ -41,7 +49,7 @@ type WidebandGauge struct {
 	value float64
 	lit   int // index of the currently lit segment
 
-	face        *canvas.Circle
+	arc         *canvas.Arc // background track behind the segments, dial-style
 	segments    []*canvas.Line
 	labels      []*canvas.Text // nil where a segment carries no label
 	displayText *canvas.Text
@@ -93,10 +101,14 @@ func New(cfg *widgets.GaugeConfig) *WidebandGauge {
 		labelPrec = n
 	}
 
-	g.face = &canvas.Circle{FillColor: faceColor}
+	// Track ring like dial/dualdial. The ends are widened by half a segment
+	// plus the corner rounding so the outermost segments sit on full band.
+	endPad := float32(widgets.DialSweepDeg/float64(cfg.Steps)*segFill*0.5 + arcEndPad)
+	g.arc = canvas.NewArc(widgets.DialStartDeg-endPad, widgets.DialEndDeg+endPad, arcInner/arcOuter, widgets.TrackColor)
+
 	g.displayText = &canvas.Text{
 		Text:      "0",
-		Color:     digitBlue,
+		Color:     widgets.TextPrimary,
 		TextStyle: fyne.TextStyle{Monospace: true},
 		Alignment: fyne.TextAlignCenter,
 	}
@@ -185,7 +197,7 @@ func (g *WidebandGauge) SetValue(value float64) {
 
 func (g *WidebandGauge) CreateRenderer() fyne.WidgetRenderer {
 	objs := make([]fyne.CanvasObject, 0, len(g.segments)+len(g.labels)+2)
-	objs = append(objs, g.face)
+	objs = append(objs, g.arc)
 	for _, s := range g.segments {
 		objs = append(objs, s)
 	}
@@ -214,8 +226,11 @@ func (r *renderer) Layout(space fyne.Size) {
 	g.radius = diameter * common.OneHalf
 	g.middle = fyne.NewPos(space.Width*common.OneHalf, space.Height*common.OneHalf)
 
-	g.face.Move(fyne.Position{X: g.middle.X - g.radius, Y: g.middle.Y - g.radius})
-	g.face.Resize(fyne.NewSize(diameter, diameter))
+	// Track arc: rounded ends like the dial ring (corner radius = half band thickness)
+	arcR := g.radius * arcOuter
+	g.arc.CornerRadius = (arcOuter - arcInner) * g.radius * common.OneHalf
+	g.arc.Move(fyne.Position{X: g.middle.X - arcR, Y: g.middle.Y - arcR})
+	g.arc.Resize(fyne.NewSize(arcR*2, arcR*2))
 
 	inner, outer := g.radius*segInner, g.radius*segOuter
 	// Segment thickness fills most of the arc it owns, leaving a visible gap.

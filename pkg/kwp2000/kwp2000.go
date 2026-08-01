@@ -337,11 +337,23 @@ func (t *Client) RequestTransferExit(ctx context.Context) error {
 }
 
 func (t *Client) ClearDynamicallyDefineLocalId(ctx context.Context) error {
-	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, DYNAMICALLY_DEFINE_IDENTIFIER, DM_CDDLI}, DefaultTimeout*2, t.responseID)
+	// Message is [0x2C, 0xF0, DM_CDDLI, pad]: SetupDynamicRegister (YDiagb.c)
+	// requires the register ID 0xF0 after the SID, and the pad byte makes
+	// NoOfBytes (= len-3) 1 so the DM_CDDLI entry loop actually runs and
+	// clears all NREG register slots. Malformed variants of this message get
+	// routed to J1979 mode $04 (clear emission data) and wipe the fuel
+	// adaption — assert the 0x6C echo so that can never pass silently.
+	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x04, DYNAMICALLY_DEFINE_IDENTIFIER, 0xF0, DM_CDDLI, 0x00}, DefaultTimeout*2, t.responseID)
 	if err != nil {
 		return fmt.Errorf("ClearDynamicallyDefineLocalId: %w", err)
 	}
-	return checkErr(resp)
+	if err := checkErr(resp); err != nil {
+		return err
+	}
+	if resp.Data[3] != DYNAMICALLY_DEFINE_IDENTIFIER|0x40 {
+		return fmt.Errorf("ClearDynamicallyDefineLocalId: expected 0x6C, got %02X", resp.Data[3])
+	}
+	return nil
 }
 
 func (t *Client) DynamicallyDefineLocalIdBySymbolNumber(ctx context.Context, index int, symbolNumber int) error {
