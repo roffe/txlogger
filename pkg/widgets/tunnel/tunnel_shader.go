@@ -16,6 +16,19 @@ import (
 //go:embed logo.png
 var logoPNG []byte
 
+// tunnelHLSL is the same shader ported to HLSL for Fyne's Direct3D 11 driver,
+// which is only built with the `directx` tag; see the file header for the
+// porting notes. Every OpenGL target ignores it.
+//
+//go:embed tunnel.hlsl
+var tunnelHLSL []byte
+
+// emptyCrawl stays bound as crawl_tex whenever there are no credits: the
+// DirectX painter assigns texture registers by sorted name, so deleting the
+// map entry would shift logo_tex from t1 to t0 and break the HLSL bindings.
+// crawl_lines == 0 already keeps the shader from sampling it.
+var emptyCrawl = image.NewRGBA(image.Rect(0, 0, 1, 1))
+
 // The whole effect is a single procedural fragment shader: no geometry, no
 // textures, no per-frame CPU work beyond the "time" uniform that
 // canvas.NewShaderAnimation advances. Each pixel reconstructs an infinite
@@ -217,6 +230,7 @@ func (t *Tunnel) initShader() {
 		[]byte(tunnelPreludeGL+tunnelBody),
 		[]byte(tunnelPreludeES+tunnelBody),
 	)
+	t.shader.SourceHLSL = tunnelHLSL
 	t.shader.Uniforms = map[string]float32{
 		"time":         0,
 		"speed":        1.1,
@@ -229,8 +243,9 @@ func (t *Tunnel) initShader() {
 		"crawl_zlines": 3.0,
 		"crawl_speed":  0.8,
 	}
+	t.shader.Textures = map[string]image.Image{"crawl_tex": emptyCrawl}
 	if logo := loadLogo(); logo != nil {
-		t.shader.Textures = map[string]image.Image{"logo_tex": logo}
+		t.shader.Textures["logo_tex"] = logo
 	}
 }
 

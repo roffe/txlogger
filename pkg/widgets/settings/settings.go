@@ -46,8 +46,6 @@ type Widget struct {
 	logFormat             *widget.Select
 	logPath               *widget.Label
 	useMPH                *widget.Check
-	swapRPMandSpeed       *widget.Check
-	wblGaugeType          *widget.Select
 	colorBlindMode        *widget.Select
 
 	// Graphics
@@ -122,8 +120,6 @@ func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	sw.experimentalT5FastLogger = checkBox("Experimental T5 fast logger", prefExperimentalT5FastLogger)
 
 	sw.useMPH = checkBox("Use mph instead of km/h", prefUseMPH)
-	sw.swapRPMandSpeed = checkBox("Swap RPM and speed gauge position", prefSwapRPMandSpeed)
-	sw.wblGaugeType = widget.NewSelect([]string{"CBar", "Gauge"}, prefWBLGaugeType.set)
 	sw.colorBlindMode = sw.newColorBlindMode()
 	sw.wblSelectContainer = sw.newWBLSelector()
 

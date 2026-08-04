@@ -207,8 +207,6 @@ func (sw *Widget) loadPreferences() {
 	setVisible(sw.wblADscanner.Checked && sw.wblSource.Selected == "ECU", sw.wblADScannerSymbol)
 
 	sw.useMPH.SetChecked(prefUseMPH.get())
-	sw.swapRPMandSpeed.SetChecked(prefSwapRPMandSpeed.get())
-	sw.wblGaugeType.SetSelected(prefWBLGaugeType.get())
 	sw.wblPortSelect.SetSelected(prefWBLPort.get())
 	sw.colorBlindMode.SetSelected(prefColorBlindMode.get())
 

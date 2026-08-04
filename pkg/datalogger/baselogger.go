@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -51,6 +52,12 @@ func NewBaseLogger(cfg Config, lw LogWriter) *BaseLogger {
 		readChan:     make(chan *DataRequest, 1),
 		quitChan:     make(chan struct{}),
 		secondTicker: time.NewTicker(time.Second),
+	}
+
+	// User Lua scripts run inside the writer so their outputs land in the same
+	// row they were computed from; see script.go.
+	if sw := newScriptWriter(cfg, lw, bl.sysvars); sw != nil {
+		bl.lw = sw
 	}
 
 	if cfg.RemoteMode == 1 {
@@ -126,6 +133,13 @@ func (bl *BaseLogger) appendExtraSysvars(order []string) []string {
 	}
 	if bl.WidebandConfig.ADScanner && bl.WidebandConfig.Name == "ECU" {
 		order = append(order, LAMBDAADSCANNER)
+	}
+	if sw, ok := bl.lw.(*scriptWriter); ok {
+		for _, name := range sw.outputNames() {
+			if !slices.Contains(order, name) {
+				order = append(order, name)
+			}
+		}
 	}
 	return order
 }

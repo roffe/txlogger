@@ -30,13 +30,12 @@ func (t *Tunnel) SetCredits(lines []string) {
 	}
 	img := renderCrawl(lines)
 	if img == nil {
-		delete(t.shader.Textures, "crawl_tex")
+		// swap the placeholder back in rather than deleting the entry, keeping
+		// the DirectX painter's sorted-name texture registers stable
+		t.shader.Textures["crawl_tex"] = emptyCrawl
 		t.shader.Uniforms["crawl_lines"] = 0
 		t.shader.Refresh()
 		return
-	}
-	if t.shader.Textures == nil {
-		t.shader.Textures = make(map[string]image.Image, 2)
 	}
 	t.shader.Textures["crawl_tex"] = img
 	t.shader.Uniforms["crawl_lines"] = float32(len(lines))

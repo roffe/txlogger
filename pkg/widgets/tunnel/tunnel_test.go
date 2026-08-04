@@ -59,10 +59,11 @@ func TestSetCredits(t *testing.T) {
 		t.Fatalf("crawl_lines = %v, want %d", got, len(lines))
 	}
 
-	// An empty slice removes the crawl again.
+	// An empty slice removes the crawl again: the 1x1 placeholder returns so
+	// the DirectX painter's sorted-name texture registers stay stable.
 	tn.SetCredits(nil)
-	if _, ok := tn.shader.Textures["crawl_tex"]; ok {
-		t.Fatal("crawl texture should be removed for empty credits")
+	if tn.shader.Textures["crawl_tex"] != emptyCrawl {
+		t.Fatal("crawl texture should revert to the placeholder for empty credits")
 	}
 	if got := tn.shader.Uniforms["crawl_lines"]; got != 0 {
 		t.Fatalf("crawl_lines = %v, want 0", got)

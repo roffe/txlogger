@@ -90,9 +90,7 @@ var (
 	prefExperimentalT5FastLogger = boolPref{"experimentalT5FastLogger", false}
 
 	// Dashboard
-	prefUseMPH          = boolPref{"useMPH", false}
-	prefSwapRPMandSpeed = boolPref{"swapRPMandSpeed", false}
-	prefWBLGaugeType    = stringPref{"wblGaugeType", "CBar"}
+	prefUseMPH = boolPref{"useMPH", false}
 
 	// Wideband
 	prefWblSource           = stringPref{"wblSource", "None"}

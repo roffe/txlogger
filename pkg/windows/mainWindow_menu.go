@@ -55,7 +55,7 @@ func (mw *MainWindow) setupMenu() {
 		fyne.NewMenuItemWithIcon("Open log", theme.DocumentIcon(), func() {
 			cb := func(r fyne.URIReadCloser) {
 				defer r.Close()
-				filename := r.URI().Name()
+				filename := r.URI().Path()
 				mw.Log("opening logfile " + filename)
 				sz := mw.Window.Content().Size()
 				p := fyne.NewPos(sz.Width/2, sz.Height/2)
@@ -110,6 +110,7 @@ func (mw *MainWindow) setupMenu() {
 				mw.wm.Add(inner)
 			}),
 			openItem,
+			mw.newRecentMenu(),
 			fyne.NewMenuItemWithIcon("Settings", theme.SettingsIcon(), mw.openSettings),
 			fyne.NewMenuItemWithIcon("What's new", theme.InfoIcon(), mw.showWhatsNew),
 			fyne.NewMenuItemWithIcon("Check for updates", theme.ViewRefreshIcon(), func() {

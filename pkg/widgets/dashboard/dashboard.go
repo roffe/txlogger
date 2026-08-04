@@ -3,7 +3,6 @@ package dashboard
 import (
 	_ "embed"
 	"image/color"
-	"log"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -39,7 +38,25 @@ type Dashboard struct {
 	gauges Gauges
 
 	fullscreenBtn *widget.Button
-	// dbgBar *fyne.Container
+	editBtn       *widget.Button
+
+	// snap-grid layout; see layout.go
+	layout *Layout
+
+	// placed/ready gate the metric router: gauges build their canvas objects
+	// in CreateRenderer, so feeding one that the layout doesn't render (or
+	// that hasn't been laid out yet) panics on nil objects.
+	placed map[string]bool
+	ready  bool
+
+	// edit mode state; see edit.go
+	editMode  bool
+	handles   []*itemHandle
+	gridLines []fyne.CanvasObject
+	toolbar   *fyne.Container
+
+	// gen invalidates the renderer's cached object list on structural change
+	gen int
 
 	logplayer bool
 
@@ -72,21 +89,17 @@ type Gauges struct {
 	engineTemp         *dial.Dial
 	nblambda, wblambda *cbar.CBar
 	pressure, airmass  *dualdial.DualDial
-	// wbgauge replaces the wblambda bar in the top right corner when the
-	// "Gauge" wideband display is selected; nil otherwise.
+	// wbgauge is the round wideband display; the layout's "wblambda" item
+	// style picks between it and the wblambda CBar.
 	wbgauge *widebandgauge.WidebandGauge
 }
 
 type Config struct {
-	Logplayer       bool
-	AirDemToString  func(float64) string
-	UseMPH          bool
-	SwapRPMandSpeed bool
-	ClassicGauges   bool
-	// UseWidebandGauge shows the round wideband gauge in the top right corner
-	// instead of the CBar at the bottom.
-	UseWidebandGauge bool
-	// Low/High set the wideband lambda bar display range (defaults 0.5–1.5).
+	Logplayer      bool
+	AirDemToString func(float64) string
+	UseMPH         bool
+	ClassicGauges  bool
+	// Low/High set the wideband lambda display range (defaults 0.5–1.5).
 	Low            float64
 	High           float64
 	WidebandSymbol string
@@ -113,6 +126,8 @@ func NewDashboard(cfg *Config) *Dashboard {
 	db := &Dashboard{
 		cfg:       cfg,
 		logplayer: cfg.Logplayer,
+		layout:    loadActiveLayout(),
+		placed:    make(map[string]bool, len(itemDefs)),
 		gauges: Gauges{
 			airmass: dualdial.New(&widgets.GaugeConfig{
 				Title:   "mg/c",
@@ -209,6 +224,15 @@ func NewDashboard(cfg *Config) *Dashboard {
 				TextPosition:    widgets.TextAtBottom,
 				Classic:         cfg.ClassicGauges,
 			}),
+			wbgauge: widebandgauge.New(&widgets.GaugeConfig{
+				Title:         "λ",
+				Min:           wbLow,
+				Center:        (wbLow + wbHigh) * 0.5,
+				Max:           wbHigh,
+				Steps:         20,
+				DisplayString: "%.2f",
+				MinSize:       fyne.NewSize(100, 100),
+			}),
 		},
 		text: Texts{
 			cruise: &canvas.Text{
@@ -249,9 +273,6 @@ func NewDashboard(cfg *Config) *Dashboard {
 		},
 		image: Images{
 			checkEngine: canvas.NewImageFromResource(fyne.NewStaticResource("checkengine.png", assets.CheckengineBytes)),
-			// fullscreenBtn: widget.NewButtonWithIcon("Fullscreen", theme.ZoomFitIcon(), func() {
-			// 	cfg.Mw.SetFullScreen(!cfg.Mw.FullScreen())
-			// }),
 			knockIcon: icon.New(&icon.Config{
 				Image:   canvas.NewImageFromResource(fyne.NewStaticResource("knock.png", assets.KnockBytes)),
 				Minsize: fyne.NewSize(90, 90),
@@ -261,19 +282,6 @@ func NewDashboard(cfg *Config) *Dashboard {
 			wheelLeft:  canvas.NewImageFromResource(fyne.NewStaticResource("wheelLeft.svg", wheelLeftIconBytes)),
 			wheelRight: canvas.NewImageFromResource(fyne.NewStaticResource("wheelRight.svg", wheelRightIconBytes)),
 		},
-	}
-	if cfg.UseWidebandGauge {
-		db.gauges.wbgauge = widebandgauge.New(&widgets.GaugeConfig{
-			Min:           wbLow,
-			Center:        (wbLow + wbHigh) * 0.5,
-			Max:           wbHigh,
-			Steps:         20,
-			DisplayString: "%.2f",
-			MinSize:       fyne.NewSize(100, 100),
-		})
-		// Still laid out at the bottom as an invisible anchor for the texts
-		// and icons positioned relative to it, just never shown or fed.
-		db.gauges.wblambda.Hide()
 	}
 
 	db.ExtendBaseWidget(db)
@@ -287,14 +295,12 @@ func NewDashboard(cfg *Config) *Dashboard {
 			db.cfg.FullscreenFunc(isFullscreen)
 		}
 	})
+	db.editBtn = widget.NewButtonWithIcon("", theme.GridIcon(), db.toggleEditMode)
 
 	if db.cfg.Logplayer {
 		db.text.time = canvas.NewText("00:00:00.00", color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF})
 		db.text.time.TextSize = 35
-		db.text.time.Resize(fyne.NewSize(200, 50))
 	}
-
-	// db.dbgBar = db.newDebugBar()
 
 	db.image.knockIcon.Hide()
 	db.text.cruise.Hide()
@@ -307,24 +313,18 @@ func NewDashboard(cfg *Config) *Dashboard {
 
 	db.image.checkEngine.FillMode = canvas.ImageFillContain
 	db.image.checkEngine.ScaleMode = canvas.ImageScaleFastest
-	db.image.checkEngine.SetMinSize(fyne.NewSize(110, 85))
-	db.image.checkEngine.Resize(fyne.NewSize(110, 85))
 
 	db.image.limpMode.FillMode = canvas.ImageFillContain
 	db.image.limpMode.ScaleMode = canvas.ImageScaleFastest
-	db.image.limpMode.SetMinSize(fyne.NewSize(110, 85))
-	db.image.limpMode.Resize(fyne.NewSize(110, 85))
 
 	db.image.taz.FillMode = canvas.ImageFillContain
 	db.image.taz.ScaleMode = canvas.ImageScaleFastest
-	db.image.taz.SetMinSize(fyne.NewSize(110, 85))
-	db.image.taz.Resize(fyne.NewSize(110, 85))
 
 	return db
 }
 
 func (db *Dashboard) CreateRenderer() fyne.WidgetRenderer {
-	return &DashboardRenderer{db: db}
+	return &DashboardRenderer{db: db, gen: -1}
 }
 
 func (db *Dashboard) GetMetricNames() []string {
@@ -353,344 +353,135 @@ func (db *Dashboard) SetValue(key string, value float64) {
 	}
 }
 
-func (db *Dashboard) Set(gauge GaugeType, value float64) {
-	switch gauge {
-	case SpeedDial:
-		db.gauges.speed.SetValue(value)
-	case RpmDial:
-		db.gauges.rpm.SetValue(value)
-	case IatDial:
-		db.gauges.iat.SetValue(value)
-	case EngineTempDial:
-		db.gauges.engineTemp.SetValue(value)
-	case AirmassDialPrimary:
-		db.gauges.airmass.SetValue(value)
-	case AirmassDialSecondary:
-		db.gauges.airmass.SetValue2(value)
-	case PressureDialPrimary:
-		db.gauges.pressure.SetValue(value)
-	case PressureDialSecondary:
-		db.gauges.pressure.SetValue2(value)
-	case ThrottleBar:
-		db.gauges.throttle.SetValue(value)
-	case PWMBar:
-		db.gauges.pwm.SetValue(value)
-	case WBLambdaBar:
-		db.setWBLambda(value)
-	case NBLambdaBar:
-		db.gauges.nblambda.SetValue(value)
-	default:
-		log.Println("Unknown gauge", gauge)
-	}
-}
-
-// setWBLambda feeds whichever wideband display is active.
+// setWBLambda feeds whichever wideband display the layout renders.
 func (db *Dashboard) setWBLambda(value float64) {
-	if db.gauges.wbgauge != nil {
+	if !db.ready || !db.placed["wblambda"] {
+		return
+	}
+	if it := db.layout.item("wblambda"); it != nil && it.Style == StyleGauge {
 		db.gauges.wbgauge.SetValue(value)
 		return
 	}
 	db.gauges.wblambda.SetValue(value)
 }
 
+// gate wraps a gauge setter so values only reach a widget the layout
+// currently renders.
+func (db *Dashboard) gate(id string, set func(float64)) func(float64) {
+	return func(value float64) {
+		if db.ready && db.placed[id] {
+			set(value)
+		}
+	}
+}
+
 func interpol(x0, y0, x1, y1, x float64) float64 {
 	return y0 + (x-x0)*(y1-y0)/(x1-x0)
 }
 
-/*
-	func lambdaToString(v float64) string {
-		switch v {
-		case 0:
-			return "Closed loop activated"
-		case 1:
-			return "Load to high during a specific time"
-		case 2:
-			return "Load to low"
-		case 3:
-			return "Load to high, no knocking"
-		case 4:
-			return "Load to high, knocking"
-		case 5:
-			return "Cooling water temp to low, closed throttle"
-		case 6:
-			return "Cooling water temp to low, open throttle"
-		case 7:
-			return "Engine speed to low"
-		case 8:
-			return "Throttle transient in progress"
-		case 9:
-			return "Throttle transient in progress and low temp"
-		case 10:
-			return "Fuel cut"
-		case 11:
-			return "Load to high and exhaust temperature algorithm decides it is time to enrich."
-		case 12:
-			return "Diagnostic failure that affects the lambda control"
-		case 13:
-			return "Cloosed loop not enabled"
-		case 14:
-			return "Waiting number of combustion before hardware check" //, ie U_lambda_probe < 300mV AND U_lambda_probe > 600mV"
-		case 15:
-			return "Waiting until engine probe is warm"
-		case 16:
-			return "Waiting until number of combustions have past after probe is warm"
-		case 17:
-			return "SAI request open loop"
-		case 18:
-			return "Number of combustion to start closed loop has not passed. Only active when SAI is activated"
-		case 19:
-			return "Lambda integrator is freezed to 0 by SAI Lean Clamp"
-		case 20:
-			return "Catalyst diagnose for V6 controls the fuel"
-		case 21:
-			return "Gas hybrid active, T7 lambdacontrol stopped"
-		case 22:
-			return "Lambda integrator may not decrease below 0 during start"
-		default:
-			return "Unknown"
+// itemObject maps a layout item to its canvas object. Returns nil for items
+// that don't exist in this instance (the time text outside the log player).
+func (db *Dashboard) itemObject(it *Item) fyne.CanvasObject {
+	switch it.ID {
+	case "rpm":
+		return db.gauges.rpm
+	case "speed":
+		return db.gauges.speed
+	case "iat":
+		return db.gauges.iat
+	case "engineTemp":
+		return db.gauges.engineTemp
+	case "airmass":
+		return db.gauges.airmass
+	case "pressure":
+		return db.gauges.pressure
+	case "throttle":
+		return db.gauges.throttle
+	case "pwm":
+		return db.gauges.pwm
+	case "nblambda":
+		return db.gauges.nblambda
+	case "wblambda":
+		if it.Style == StyleGauge {
+			return db.gauges.wbgauge
 		}
+		return db.gauges.wblambda
+	case "ign":
+		return db.text.ign
+	case "ioff":
+		return db.text.ioff
+	case "idc":
+		return db.text.idc
+	case "amul":
+		return db.text.amul
+	case "activeAirDem":
+		return db.text.activeAirDem
+	case "time":
+		if db.text.time == nil {
+			return nil
+		}
+		return db.text.time
+	case "cruise":
+		return db.text.cruise
+	case "checkEngine":
+		return db.image.checkEngine
+	case "limpMode":
+		return db.image.limpMode
+	case "knock":
+		return db.image.knockIcon
+	case "taz":
+		return db.image.taz
 	}
-*/
-
-type dims struct {
-	sixthWidth    float32
-	thirdHeight   float32
-	tenthHeight   float32
-	centerX       float32
-	centerY       float32
-	textSize      float32
-	smallTextSize float32
+	return nil
 }
 
-func (db *Dashboard) layoutDials(dims *dims) {
-	left := db.gauges.pwm.Position().X + db.gauges.pwm.Size().Width
-	right := db.gauges.throttle.Position().X
-	width := right - left
+func (db *Dashboard) cellSize() (float32, float32) {
+	return db.size.Width / float32(db.layout.Cols), db.size.Height / float32(db.layout.Rows)
+}
 
-	centerDialSize := fyne.Size{
-		Width:  width,
-		Height: db.size.Height - 125,
-	}
-	centerDialPos := fyne.Position{
-		X: dims.centerX - centerDialSize.Width*0.5,
-		Y: dims.centerY - centerDialSize.Height*0.46,
-	}
-	if db.gauges.wbgauge != nil {
-		// wblambda bottom bar is hidden; reclaim half its space
-		centerDialPos.Y += min(dims.tenthHeight, 50) * 0.5
-	}
-
-	if !db.cfg.SwapRPMandSpeed {
-		db.gauges.rpm.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
-		db.gauges.rpm.Move(fyne.Position{X: 0, Y: 5})
-		db.gauges.speed.Resize(centerDialSize)
-		db.gauges.speed.Move(centerDialPos)
-	} else {
-		db.gauges.speed.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
-		db.gauges.speed.Move(fyne.Position{X: 0, Y: 5})
-		db.gauges.rpm.Resize(centerDialSize)
-		db.gauges.rpm.Move(centerDialPos)
-	}
-
-	// Calculate dial size
-	// dialWidth := dims.sixthWidth
-	// dialHeight := dims.thirdHeight
-
-	// Calculate total height needed for all dials (3 dials on left side including the main dial)
-	totalDialHeight := dims.thirdHeight * 3 // Three dials on left side (main + 2), two on right
-
-	// Calculate vertical spacing between dials
-	spacing := (db.size.Height - totalDialHeight) / 4 // Divide remaining space into 4 parts for spacing
-
-	// Left side dials positioning
-	// Note: Top dial (speed or rpm) is already positioned by layoutMainDials
-	// Second dial: airmass
-	db.gauges.airmass.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
-	db.gauges.airmass.Move(fyne.Position{X: 0, Y: spacing*2 + dims.thirdHeight}) // After top dial + spacing
-
-	// Third dial: pressure
-	db.gauges.pressure.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
-	db.gauges.pressure.Move(fyne.Position{X: 0, Y: spacing*3 + dims.thirdHeight*2}) // After top dial + middle dial + spacing
-	rightX := db.size.Width - dims.sixthWidth
-
-	if db.gauges.wbgauge != nil {
-		// Wideband gauge on top: the right column mirrors the left one,
-		// three gauges a side.
-		db.gauges.wbgauge.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
-		db.gauges.wbgauge.Move(fyne.Position{X: rightX, Y: 5})
-
-		db.gauges.iat.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
-		db.gauges.iat.Move(fyne.Position{X: rightX, Y: spacing*2 + dims.thirdHeight})
-
-		db.gauges.engineTemp.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
-		db.gauges.engineTemp.Move(fyne.Position{X: rightX, Y: spacing*3 + dims.thirdHeight*2})
+// applyLayout positions every layout item (and the fixed corner buttons)
+// from its grid rect. Safe to call after any layout mutation.
+func (db *Dashboard) applyLayout() {
+	if db.size.Width <= 0 || db.size.Height <= 0 {
 		return
 	}
-
-	// Calculate spacing for right side (only 2 dials)
-	rightSideSpacing := (db.size.Height - (dims.thirdHeight * 2)) / 3 // Three spaces for two dials
-
-	// First dial: IAT
-	db.gauges.iat.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
-	db.gauges.iat.Move(fyne.Position{X: rightX, Y: rightSideSpacing})
-
-	// Second dial: engineTemp
-	db.gauges.engineTemp.Resize(fyne.Size{Width: dims.sixthWidth, Height: dims.thirdHeight})
-	db.gauges.engineTemp.Move(fyne.Position{X: rightX, Y: rightSideSpacing*2 + dims.thirdHeight})
-}
-
-func (db *Dashboard) layoutBars(dims *dims) {
-	// Horizontal bars
-	cbarHeight := min(dims.tenthHeight, 50)
-	cbarSize := fyne.Size{Width: (dims.sixthWidth * 3), Height: cbarHeight}
-	cbarX := dims.sixthWidth * 1.5
-
-	db.gauges.nblambda.Resize(cbarSize)
-	db.gauges.nblambda.Move(fyne.Position{X: cbarX, Y: 0})
-
-	db.gauges.wblambda.Resize(cbarSize)
-	db.gauges.wblambda.Move(fyne.Position{X: cbarX, Y: db.size.Height - cbarHeight})
-
-	// Vertical bars
-	vbarSize := fyne.Size{Width: min(dims.sixthWidth*common.OneThird, 70), Height: db.size.Height - 50}
-
-	db.gauges.pwm.Resize(vbarSize)
-	db.gauges.pwm.Move(fyne.Position{X: dims.sixthWidth + 8, Y: 25})
-
-	db.gauges.throttle.Resize(vbarSize)
-	db.gauges.throttle.Move(fyne.Position{X: db.size.Width - dims.sixthWidth - vbarSize.Width - 8, Y: 25})
-}
-
-func (db *Dashboard) layoutIcons(dims *dims) {
-	// Limp mode icon
-	limpSize := fyne.Size{Width: dims.sixthWidth * .5, Height: dims.thirdHeight * 0.5}
-	db.image.limpMode.Resize(limpSize)
-	db.image.limpMode.Move(fyne.Position{
-		X: dims.centerX - limpSize.Width*0.5,
-		Y: dims.centerY - limpSize.Height*0.5 - (dims.thirdHeight * 0.5),
-	})
-
-	// Check engine icon
-	checkEngineSize := fyne.Size{Width: dims.sixthWidth * 0.5, Height: dims.thirdHeight * 0.5}
-	db.image.checkEngine.Resize(checkEngineSize)
-	db.image.checkEngine.Move(fyne.Position{
-		X: db.size.Width - db.gauges.engineTemp.Size().Width - db.gauges.throttle.Size().Width - checkEngineSize.Width - 15,
-		Y: db.size.Height - checkEngineSize.Height - db.gauges.wblambda.Size().Height,
-	})
-
-	// Knock icon
-	db.image.knockIcon.Move(fyne.Position{
-		X: db.gauges.pwm.Position().X + db.gauges.pwm.Size().Width,
-		Y: dims.centerY - 60,
-	})
-
-	// Taz icon
-	tazMin := min(dims.sixthWidth, dims.thirdHeight)
-	tazSize := fyne.Size{Width: tazMin, Height: tazMin + 16}
-
-	db.image.taz.Resize(tazSize)
-	db.image.taz.Move(fyne.Position{
-		X: dims.centerX - tazSize.Width*0.58,
-		Y: dims.centerY - tazSize.Height*0.5,
-	})
-
-	tw := dims.sixthWidth * 0.3
-
-	// Wheel icons. to the left and right of the center
-	wheelSize := fyne.Size{Width: dims.sixthWidth * 0.25, Height: dims.thirdHeight * 0.5}
-	db.image.wheelLeft.Resize(wheelSize)
-	db.image.wheelLeft.Move(fyne.Position{
-		X: dims.centerX - wheelSize.Width - tw,
-		Y: dims.centerY - wheelSize.Height*0.30,
-	})
-
-	db.image.wheelRight.Resize(wheelSize)
-	db.image.wheelRight.Move(fyne.Position{
-		X: dims.centerX + tw,
-		Y: dims.centerY - wheelSize.Height*0.30,
-	})
-}
-
-func (db *Dashboard) layoutTexts(dims *dims) {
-	// Calculate responsive text sizes based on window dimensions
-	// Use the smaller of width/height to ensure text stays proportional
-	baseSize := min(db.size.Width, db.size.Height)
-
-	// Large text (like IGN, IDC) - ~4.5% of smallest window dimension
-	dims.textSize = baseSize * 0.045
-	// Ensure text size stays within reasonable bounds
-	dims.textSize = min(max(dims.textSize, 24), 44)
-
-	// Small text (like IOFF, AMUL) - ~60% of large text size
-	dims.smallTextSize = dims.textSize * 0.6
-	// Ensure small text size stays within reasonable bounds
-	dims.smallTextSize = min(max(dims.smallTextSize, 18), 28)
-
-	// AMUL text (small)
-	db.text.amul.TextSize = dims.smallTextSize
-	db.text.amul.Move(fyne.Position{
-		X: db.gauges.wblambda.Position().X,
-		Y: db.size.Height - db.gauges.wblambda.Size().Height - db.text.amul.MinSize().Height,
-	})
-
-	// IGN text (large)
-	db.text.ign.TextSize = dims.textSize
-	db.text.ign.Move(fyne.Position{
-		X: db.gauges.nblambda.Position().X,
-		Y: db.gauges.nblambda.Size().Height,
-	})
-
-	// IOFF text (small)
-	db.text.ioff.TextSize = dims.smallTextSize
-	db.text.ioff.Move(fyne.Position{
-		X: db.gauges.nblambda.Position().X,
-		Y: db.text.ign.Position().Y + db.text.ign.MinSize().Height,
-	})
-
-	// IDC text (large)
-	db.text.idc.TextSize = dims.textSize
-	db.text.idc.Move(fyne.Position{
-		X: db.gauges.nblambda.Position().X + db.gauges.nblambda.Size().Width - (db.text.idc.MinSize().Width - 4),
-		Y: db.gauges.nblambda.Size().Height,
-	})
-
-	// Active air demand text (large)
-	db.text.activeAirDem.TextSize = dims.textSize
-	airDemY := dims.thirdHeight * 1.24
-	if db.gauges.wbgauge != nil {
-		// follow the center dial, which shifts down when the wideband gauge is used
-		airDemY += min(dims.tenthHeight, 50) * 0.5
-	}
-	db.text.activeAirDem.Move(fyne.Position{
-		X: dims.centerX,
-		Y: airDemY,
-	})
-
-	// Cruise text (special size - larger)
-	cruiseSize := dims.textSize * 1.1
-	db.text.cruise.TextSize = min(max(cruiseSize, 35), 45)
-	db.text.cruise.Move(fyne.Position{
-		X: dims.sixthWidth * 1.45,
-		Y: db.size.Height - (db.image.checkEngine.Size().Height * 0.6) - db.gauges.wblambda.Size().Height,
-	})
-
-	// Time text for logplayer (small)
-	if db.logplayer {
-		db.text.time.TextSize = dims.smallTextSize
-		db.text.time.Move(fyne.Position{
-			X: dims.centerX - (db.text.time.MinSize().Width * 0.5),
-			Y: db.text.activeAirDem.Position().Y + db.text.time.MinSize().Height + 5,
-		})
+	cw, ch := db.cellSize()
+	clear(db.placed)
+	for i := range db.layout.Items {
+		it := &db.layout.Items[i]
+		obj := db.itemObject(it)
+		if obj == nil {
+			continue
+		}
+		db.placed[it.ID] = true
+		// MinSize() creates the widget renderer if it doesn't exist yet, so
+		// the gauge's canvas objects are ready before any value arrives.
+		obj.MinSize()
+		size := fyne.NewSize(float32(it.W)*cw, float32(it.H)*ch)
+		if t, ok := obj.(*canvas.Text); ok {
+			t.TextSize = common.Clamp(size.Height*0.75, 12, 60)
+			t.Refresh()
+		}
+		obj.Resize(size)
+		obj.Move(fyne.NewPos(float32(it.X)*cw, float32(it.Y)*ch))
 	}
 
-	//if db.logplayer {
-	//	db.text.time.Move(fyne.NewPos(dims.centerX-100, space.Height*common.OneHalfSix))
-	//}
+	btnSize := fyne.NewSize(40, 40)
+	db.fullscreenBtn.Resize(btnSize)
+	db.fullscreenBtn.Move(fyne.NewPos(db.size.Width-btnSize.Width, db.size.Height-btnSize.Height))
+	db.editBtn.Resize(btnSize)
+	db.editBtn.Move(fyne.NewPos(db.size.Width-btnSize.Width*2-4, db.size.Height-btnSize.Height))
+
+	if db.editMode {
+		db.layoutEditOverlay()
+	}
+	db.ready = true
 }
 
 type DashboardRenderer struct {
 	db      *Dashboard
 	objects []fyne.CanvasObject
+	gen     int
 }
 
 func (dr *DashboardRenderer) Layout(space fyne.Size) {
@@ -698,80 +489,44 @@ func (dr *DashboardRenderer) Layout(space fyne.Size) {
 		return
 	}
 	dr.db.size = space
-
-	// Calculate common dimensions
-	dims := &dims{
-		sixthWidth:  space.Width * common.OneSixth,
-		thirdHeight: (space.Height - 50) * .33,
-		tenthHeight: (space.Height - 50) * .1,
-		centerX:     space.Width * 0.5,
-		centerY:     space.Height * 0.5,
+	if dr.db.editMode {
+		dr.db.rebuildGridLines()
 	}
-	// Layout horizontal bars
-	dr.db.layoutBars(dims)
-
-	// Layout dials
-	dr.db.layoutDials(dims)
-
-	// Layout buttons
-	btnWidth := dims.sixthWidth * 0.8
-	btnHeigh := min(dims.tenthHeight*0.8, 40)
-	dr.db.fullscreenBtn.Resize(fyne.NewSize(btnWidth, btnHeigh))
-	dr.db.fullscreenBtn.Move(fyne.NewPos(space.Width-btnWidth, space.Height-btnHeigh))
-
-	// Layout text elements (computes its own textSize/smallTextSize)
-	dr.db.layoutTexts(dims)
-
-	// Layout icons
-	dr.db.layoutIcons(dims)
+	dr.db.applyLayout()
 }
 
 func (dr *DashboardRenderer) MinSize() fyne.Size {
 	return fyne.Size{Width: 480, Height: 300}
 }
 
+// Refresh marks the canvas dirty so a changed object list (items added,
+// removed or restyled, edit mode toggled) is picked up on the next paint.
+// BaseWidget.Refresh only calls this, it does not dirty the canvas itself.
 func (dr *DashboardRenderer) Refresh() {
+	canvas.Refresh(dr.db)
 }
 
 func (dr *DashboardRenderer) Destroy() {
 }
 
 func (dr *DashboardRenderer) Objects() []fyne.CanvasObject {
-	if dr.objects == nil {
-		dr.objects = []fyne.CanvasObject{
-			dr.db.image.wheelLeft,
-			dr.db.image.wheelRight,
-			dr.db.image.limpMode,
-			dr.db.image.taz,
-			dr.db.gauges.rpm,
-			dr.db.gauges.speed,
-			dr.db.gauges.airmass,
-			dr.db.gauges.pressure,
-			dr.db.gauges.iat,
-			dr.db.gauges.engineTemp,
-			dr.db.text.ign,
-			dr.db.text.ioff,
-			dr.db.text.idc,
-			dr.db.text.amul,
-			dr.db.text.activeAirDem,
-			dr.db.gauges.nblambda,
-			dr.db.gauges.wblambda,
-			dr.db.gauges.throttle,
-			dr.db.gauges.pwm,
-			dr.db.image.checkEngine,
-			dr.db.text.cruise,
-			dr.db.image.knockIcon,
-			dr.db.fullscreenBtn,
+	if dr.gen != dr.db.gen || dr.objects == nil {
+		dr.gen = dr.db.gen
+		objs := make([]fyne.CanvasObject, 0, len(dr.db.layout.Items)+len(dr.db.gridLines)+len(dr.db.handles)+3)
+		for i := range dr.db.layout.Items {
+			if obj := dr.db.itemObject(&dr.db.layout.Items[i]); obj != nil {
+				objs = append(objs, obj)
+			}
 		}
-
-		if dr.db.gauges.wbgauge != nil {
-			dr.objects = append(dr.objects, dr.db.gauges.wbgauge)
+		objs = append(objs, dr.db.editBtn, dr.db.fullscreenBtn)
+		if dr.db.editMode {
+			objs = append(objs, dr.db.gridLines...)
+			for _, h := range dr.db.handles {
+				objs = append(objs, h)
+			}
+			objs = append(objs, dr.db.toolbar)
 		}
-
-		if dr.db.logplayer {
-			dr.objects = append(dr.objects, dr.db.text.time)
-		}
+		dr.objects = objs
 	}
-
 	return dr.objects
 }

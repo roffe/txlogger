@@ -9,24 +9,33 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
-// Exactly one segment is lit, and it is the one the value maps to.
+// Exactly one LED is at full brightness, and it is the one the value maps to;
+// all others sit at their dim zone shade.
 func TestOneSegmentLitAtTheRightIndex(t *testing.T) {
 	test.NewApp()
-	g := New(&widgets.GaugeConfig{Min: 0.5, Max: 1.5, Center: 1.0, Steps: 40})
+	g := New(&widgets.GaugeConfig{Min: 0.5, Max: 1.5, Center: 1.0})
 	win := test.NewWindow(g)
 	win.SetPadded(false)
 	win.Resize(fyne.NewSize(200, 200))
 
+	if got := len(g.segments); got != ledsRich+ledsStoich+ledsLean {
+		t.Fatalf("%d LEDs, want %d", got, ledsRich+ledsStoich+ledsLean)
+	}
+
 	for _, tc := range []struct {
 		value float64
 		want  int
-	}{{0.5, 0}, {0.75, 10}, {1.0, 20}, {1.5, 40}, {-5, 0}, {99, 40}} {
+	}{{0.5, 0}, {0.75, 7}, {1.0, 15}, {1.5, 29}, {-5, 0}, {99, 29}} {
 		g.SetValue(tc.value)
 
 		var litIdx []int
 		for i, seg := range g.segments {
-			if seg.StrokeColor != color.Color(segDark) {
+			switch seg.StrokeColor {
+			case color.Color(zoneColor(i)):
 				litIdx = append(litIdx, i)
+			case color.Color(dim(zoneColor(i))):
+			default:
+				t.Fatalf("value %v: segment %d has color %v, neither lit nor dim", tc.value, i, seg.StrokeColor)
 			}
 		}
 		if len(litIdx) != 1 {
@@ -38,26 +47,21 @@ func TestOneSegmentLitAtTheRightIndex(t *testing.T) {
 	}
 }
 
-// Green at stoich, warmer going rich, redder going lean.
-func TestLitColorSplitsRichAndLean(t *testing.T) {
-	g := New(&widgets.GaugeConfig{Min: 0.5, Max: 1.5, Center: 1.0, Steps: 40})
-
-	if got := g.litColor(1.0); got != stoichGrn {
-		t.Errorf("at stoich got %v, want %v", got, stoichGrn)
-	}
-	if got := g.litColor(0.5); got != richAmber {
-		t.Errorf("full rich got %v, want %v", got, richAmber)
-	}
-	if got := g.litColor(1.5); got != leanRed {
-		t.Errorf("full lean got %v, want %v", got, leanRed)
-	}
-	// Equal deviation either side must not look the same: both warm up away from
-	// green, but lean drops toward red far faster than rich drops toward amber.
-	rich, lean := g.litColor(0.8), g.litColor(1.2)
-	if rich.G >= stoichGrn.G || lean.G >= stoichGrn.G {
-		t.Errorf("mid rich %v / mid lean %v did not fade away from green", rich, lean)
-	}
-	if rich.G <= lean.G {
-		t.Errorf("rich %v is not warmer-but-greener than lean %v", rich, lean)
+// Amber over the rich range, green around stoich, red over the lean range.
+func TestZoneColorBands(t *testing.T) {
+	for _, tc := range []struct {
+		idx  int
+		want color.RGBA
+	}{
+		{0, richAmber}, {ledsRich - 1, richAmber},
+		{ledsRich, stoichGrn}, {ledsRich + ledsStoich - 1, stoichGrn},
+		{ledsRich + ledsStoich, leanRed}, {ledsRich + ledsStoich + ledsLean - 1, leanRed},
+	} {
+		if got := zoneColor(tc.idx); got != tc.want {
+			t.Errorf("zoneColor(%d) = %v, want %v", tc.idx, got, tc.want)
+		}
+		if dim(tc.want) == tc.want {
+			t.Errorf("dim(%v) did not darken", tc.want)
+		}
 	}
 }

@@ -31,8 +31,20 @@ windows:
 	CC=x86_64-w64-mingw32-gcc \
 	GOARCH=amd64 \
 	GOOS=windows \
-	fyne package --os windows --icon Icon.png -tags=$(BUILDTAGS) --release
-#	go build -tags=$(BUILDTAGS) -ldflags '-s -w' -o txlogger.exe .
+	fyne package --os windows --icon Icon.png -tags=$(BUILDTAGS) --release \
+	GOARCH=386 \
+	go build -tags=j2534 -ldflags '-s -w' -o j2534proxy.exe ./j2534proxy
+
+windows-dx:
+	CGO_CFLAGS="-Ivcpkg/packages/libusb_x64-windows/include/libusb-1.0" \
+	CGO_LDFLAGS="-Lvcpkg/packages/libusb_x64-windows/lib" \
+	CGO_ENABLED=1 \
+	CC=x86_64-w64-mingw32-gcc \
+	GOARCH=amd64 \
+	GOOS=windows \
+	fyne package --os windows --icon Icon.png --name txlogger-dx.exe -tags=$(BUILDTAGS),directx --release \
+	GOARCH=386 \
+	go build -tags=j2534,dx -ldflags '-s -w' -o j2534proxy.exe ./j2534proxy
 
 run: clean pkg/ota/firmware.bin
 	@echo Using compiler "$(CC)"

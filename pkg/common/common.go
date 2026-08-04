@@ -92,6 +92,15 @@ func GetLayoutPath() (string, error) {
 	return layoutPath, createDirIfNotExists(layoutPath)
 }
 
+func GetDashboardPath() (string, error) {
+	dir, err := GetUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	dashboardPath := GetComponentPath(dir, "dashboards")
+	return dashboardPath, createDirIfNotExists(dashboardPath)
+}
+
 func GetMatrixBuilderPath() (string, error) {
 	dir, err := GetUserHomeDir()
 	if err != nil {
@@ -99,6 +108,15 @@ func GetMatrixBuilderPath() (string, error) {
 	}
 	matrixBuilderPath := GetComponentPath(dir, "matrixbuilder")
 	return matrixBuilderPath, createDirIfNotExists(matrixBuilderPath)
+}
+
+func GetScriptsPath() (string, error) {
+	dir, err := GetUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	scriptsPath := GetComponentPath(dir, "scripts")
+	return scriptsPath, createDirIfNotExists(scriptsPath)
 }
 
 func GetBinPath() (string, error) {
@@ -133,8 +151,14 @@ func CreatetxloggerDirs() error {
 	layouts := filepath.Join(path, "layouts")
 	bins := filepath.Join(path, "bins")
 	adscanner := filepath.Join(path, "adscanner")
+	dashboards := filepath.Join(path, "dashboards")
 
-	for _, p := range []string{logs, layouts, bins, adscanner} {
+	dirs := []string{logs, layouts, bins, adscanner, dashboards}
+	for _, ecu := range EcuList {
+		dirs = append(dirs, filepath.Join(path, "scripts", ecu))
+	}
+
+	for _, p := range dirs {
 		if err := createDirIfNotExists(p); err != nil {
 			return err
 		}

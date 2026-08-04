@@ -62,6 +62,7 @@ type MainWindow struct {
 	fyne.Window
 	app                         fyne.App
 	leadingMenus, trailingMenus []*fyne.Menu
+	recentItem                  *fyne.MenuItem
 	outputData                  binding.StringList
 	selects                     *mainWindowSelects
 	buttons                     *mainWindowButtons
@@ -307,14 +308,12 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 	}
 
 	dbcfg := &dashboard.Config{
-		Logplayer:        true,
-		UseMPH:           mw.settings.GetUseMPH(),
-		SwapRPMandSpeed:  mw.settings.GetSwapRPMandSpeed(),
-		ClassicGauges:    mw.settings.GetClassicGauges(),
-		UseWidebandGauge: mw.settings.GetUseWidebandGauge(),
-		High:             1.5,
-		Low:              0.5,
-		WidebandSymbol:   mw.settings.GetWidebandSymbolName(),
+		Logplayer:      true,
+		UseMPH:         mw.settings.GetUseMPH(),
+		ClassicGauges:  mw.settings.GetClassicGauges(),
+		High:           1.5,
+		Low:            0.5,
+		WidebandSymbol: mw.settings.GetWidebandSymbolName(),
 	}
 
 	rec := logz.Next()
@@ -395,6 +394,7 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 	// w.Show()
 	// mw.wm.Add(iw, p)
 	mw.Log("loaded log file " + filename + " in combined logplayer")
+	mw.addRecent(filename)
 }
 
 func (mw *MainWindow) LoadAS2File(filename string) error {
@@ -423,6 +423,7 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Positio
 	}
 
 	mw.Log("loaded log file " + filename)
+	mw.addRecent(filename)
 
 	lp := logplayer.New(&logplayer.Config{
 		EBus:            ebus.CONTROLLER,
@@ -615,6 +616,7 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	}
 	mw.SetTitle(filepath.Base(filename))
 	mw.app.Preferences().SetString(prefsLastBinFile, filename)
+	mw.addRecent(filename)
 
 	mw.LoadSymbols(symbols, ecuType.String())
 	// mw.selects.ecuSelect.SetSelected(ecuType.String())

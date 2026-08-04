@@ -63,9 +63,7 @@ func (sw *Widget) graphicsTab() *container.TabItem {
 			leftLabeled("Gauge style", sw.gaugeStyleSelect),
 		),
 		section("Dashboard",
-			leftIcon(theme.MoveUpIcon(), sw.swapRPMandSpeed),
 			leftIcon(theme.InfoIcon(), sw.useMPH),
-			leftLabeled("Wideband lambda", sw.wblGaugeType),
 		),
 	)
 }
