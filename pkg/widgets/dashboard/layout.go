@@ -22,6 +22,11 @@ const (
 	StyleBar   = "bar"
 	StyleGauge = "gauge"
 
+	// Align values for text items.
+	AlignLeft   = "left"
+	AlignCenter = "center"
+	AlignRight  = "right"
+
 	prefDashboardLayout = "dashboardLayout"
 )
 
@@ -35,6 +40,9 @@ type Item struct {
 	// Style selects the visualization for items that have more than one,
 	// currently only "wblambda": StyleBar (default) or StyleGauge.
 	Style string `json:"style,omitempty"`
+	// Align sets text alignment for text items: AlignLeft, AlignCenter or
+	// AlignRight. Empty keeps the item's built-in default.
+	Align string `json:"align,omitempty"`
 }
 
 // Layout is a full dashboard arrangement. Items render in slice order, so
@@ -86,33 +94,33 @@ func itemDefByID(id string) *itemDef {
 	return nil
 }
 
-// defaultLayout approximates the classic fixed dashboard arrangement.
+// defaultLayout is the standard dashboard arrangement.
 func defaultLayout() *Layout {
 	return &Layout{
 		Cols: defaultGridCols,
 		Rows: defaultGridRows,
 		Items: []Item{
-			{ID: "speed", X: 7, Y: 2, W: 18, H: 15},
-			{ID: "rpm", X: 0, Y: 0, W: 5, H: 5},
-			{ID: "airmass", X: 0, Y: 6, W: 5, H: 5},
-			{ID: "pressure", X: 0, Y: 12, W: 5, H: 5},
-			{ID: "iat", X: 27, Y: 3, W: 5, H: 5},
-			{ID: "engineTemp", X: 27, Y: 10, W: 5, H: 5},
-			{ID: "pwm", X: 5, Y: 1, W: 2, H: 16},
-			{ID: "throttle", X: 25, Y: 1, W: 2, H: 16},
+			{ID: "speed", X: 0, Y: 1, W: 6, H: 5},
+			{ID: "rpm", X: 7, Y: 2, W: 18, H: 16},
+			{ID: "airmass", X: 0, Y: 6, W: 6, H: 5},
+			{ID: "pressure", X: 0, Y: 11, W: 6, H: 5},
+			{ID: "iat", X: 26, Y: 6, W: 6, H: 5},
+			{ID: "engineTemp", X: 26, Y: 11, W: 6, H: 5},
+			{ID: "pwm", X: 6, Y: 1, W: 1, H: 16},
+			{ID: "throttle", X: 25, Y: 1, W: 1, H: 16},
 			{ID: "nblambda", X: 8, Y: 0, W: 16, H: 1},
-			{ID: "wblambda", X: 8, Y: 17, W: 16, H: 1},
+			{ID: "wblambda", X: 26, Y: 1, W: 6, H: 5, Style: StyleGauge},
 			{ID: "ign", X: 8, Y: 1, W: 4, H: 1},
-			{ID: "ioff", X: 8, Y: 2, W: 3, H: 1},
-			{ID: "idc", X: 21, Y: 1, W: 3, H: 1},
-			{ID: "amul", X: 8, Y: 16, W: 3, H: 1},
-			{ID: "activeAirDem", X: 12, Y: 3, W: 8, H: 1},
+			{ID: "ioff", X: 8, Y: 2, W: 4, H: 1},
+			{ID: "idc", X: 21, Y: 1, W: 4, H: 1},
+			{ID: "amul", X: 14, Y: 17, W: 5, H: 1},
+			{ID: "activeAirDem", X: 12, Y: 12, W: 8, H: 1},
 			{ID: "time", X: 13, Y: 4, W: 6, H: 1},
-			{ID: "cruise", X: 8, Y: 14, W: 4, H: 2},
-			{ID: "taz", X: 14, Y: 7, W: 4, H: 4},
-			{ID: "limpMode", X: 14, Y: 5, W: 3, H: 2},
-			{ID: "checkEngine", X: 21, Y: 15, W: 3, H: 2},
-			{ID: "knock", X: 7, Y: 8, W: 2, H: 2},
+			{ID: "cruise", X: 7, Y: 14, W: 4, H: 2},
+			{ID: "taz", X: 8, Y: 3, W: 3, H: 3},
+			{ID: "limpMode", X: 14, Y: 7, W: 4, H: 2},
+			{ID: "checkEngine", X: 21, Y: 14, W: 4, H: 2},
+			{ID: "knock", X: 21, Y: 2, W: 2, H: 2},
 		},
 	}
 }
@@ -151,6 +159,11 @@ func (l *Layout) sanitize() {
 			continue
 		}
 		seen[it.ID] = true
+		switch it.Align {
+		case AlignLeft, AlignCenter, AlignRight:
+		default:
+			it.Align = ""
+		}
 		it.W = common.Clamp(it.W, 1, l.Cols)
 		it.H = common.Clamp(it.H, 1, l.Rows)
 		it.X = common.Clamp(it.X, 0, l.Cols-it.W)

@@ -460,6 +460,16 @@ func (db *Dashboard) applyLayout() {
 		size := fyne.NewSize(float32(it.W)*cw, float32(it.H)*ch)
 		if t, ok := obj.(*canvas.Text); ok {
 			t.TextSize = common.Clamp(size.Height*0.75, 12, 60)
+			// ponytail: empty Align leaves the last applied alignment in
+			// place; self-heals the next time the user picks one.
+			switch it.Align {
+			case AlignLeft:
+				t.Alignment = fyne.TextAlignLeading
+			case AlignCenter:
+				t.Alignment = fyne.TextAlignCenter
+			case AlignRight:
+				t.Alignment = fyne.TextAlignTrailing
+			}
 			t.Refresh()
 		}
 		obj.Resize(size)

@@ -34,6 +34,8 @@ func init() {
 	flag.StringVar(&workDirectory, "d", "", "working directory")
 	flag.BoolVar(&allowMultipleInstances, "m", false, "allow multiple instances")
 	flag.Parse()
+
+	log.SetFlags(log.Lshortfile | log.Lmicroseconds)
 }
 
 // Unfortunately Fyne installs its own signal handler that needs to be overridden to allow graceful shutdown on SIGINT/SIGTERM.

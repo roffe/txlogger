@@ -27,6 +27,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/boosttuner"
 	"github.com/roffe/txlogger/pkg/widgets/canflasher"
+	"github.com/roffe/txlogger/pkg/widgets/customcolors"
 	"github.com/roffe/txlogger/pkg/widgets/dtcreader"
 	"github.com/roffe/txlogger/pkg/widgets/editparameters"
 	"github.com/roffe/txlogger/pkg/widgets/estimatedoutput"
@@ -42,6 +43,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/t5cli"
 	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7esp"
 	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7piarea"
+	"github.com/roffe/txlogger/pkg/widgets/txconfigurator"
 )
 
 func (mw *MainWindow) setupMenu() {
@@ -98,6 +100,30 @@ func (mw *MainWindow) setupMenu() {
 		}),
 	)
 
+	settingsMenuItem := fyne.NewMenuItemWithIcon("Settings", theme.SettingsIcon(), mw.openSettings)
+	settingsMenuItem.ChildMenu = fyne.NewMenu("Settings",
+		fyne.NewMenuItemWithIcon("General", theme.SettingsIcon(), mw.openSettings),
+		fyne.NewMenuItemWithIcon("Colors", theme.ColorChromaticIcon(), func() {
+			if w := mw.wm.HasWindow("Custom Colors"); w != nil {
+				mw.wm.Raise(w)
+				return
+			}
+			w := multiwindow.NewInnerWindow("Custom Colors", customcolors.New())
+			w.Icon = theme.ColorChromaticIcon()
+			mw.wm.Add(w)
+		}),
+		fyne.NewMenuItemWithIcon("txbridge", theme.SettingsIcon(), func() {
+			// Open txbridge configurator in a new window
+			if w := mw.wm.HasWindow("txbridge"); w != nil {
+				mw.wm.Raise(w)
+				return
+			}
+			inner := multiwindow.NewInnerWindow("txbridge", txconfigurator.NewConfigurator(mw.settings.GetPort))
+			inner.Icon = theme.SettingsIcon()
+			mw.wm.Add(inner)
+		}),
+	)
+
 	leading := []*fyne.Menu{
 		fyne.NewMenu("File",
 			fyne.NewMenuItemWithIcon("About", theme.HelpIcon(), func() {
@@ -111,7 +137,7 @@ func (mw *MainWindow) setupMenu() {
 			}),
 			openItem,
 			mw.newRecentMenu(),
-			fyne.NewMenuItemWithIcon("Settings", theme.SettingsIcon(), mw.openSettings),
+			settingsMenuItem,
 			fyne.NewMenuItemWithIcon("What's new", theme.InfoIcon(), mw.showWhatsNew),
 			fyne.NewMenuItemWithIcon("Check for updates", theme.ViewRefreshIcon(), func() {
 				update.UpdateCheck(mw.app, mw.Window)

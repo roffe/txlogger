@@ -24,6 +24,7 @@ func (sw *Widget) GetLivePreview() bool           { return prefLivePreview.get()
 func (sw *Widget) GetRealtimeBars() bool          { return prefRealtimeBars.get() }
 func (sw *Widget) GetMeshView() bool              { return prefMeshView.get() }
 func (sw *Widget) GetCursorFollowCrosshair() bool { return prefCursorFollowCrosshair.get() }
+func (sw *Widget) GetPort() string                { return prefPort.get() }
 
 func (sw *Widget) GetColorBlindMode() colors.ColorBlindMode {
 	return colors.StringToColorBlindMode(prefColorBlindMode.get())

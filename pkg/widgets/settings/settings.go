@@ -11,10 +11,8 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan/v2"
-	"github.com/roffe/txlogger/pkg/widgets/txconfigurator"
 	"go.bug.st/serial/enumerator"
 )
 
@@ -145,12 +143,13 @@ func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	tabs := container.NewAppTabs()
 	tabs.Append(sw.generalTab())
 	tabs.Append(sw.graphicsTab())
+	// tabs.Append(sw.customColorsTab())
 	tabs.Append(sw.canTab())
 	tabs.Append(sw.loggingTab())
 	tabs.Append(sw.wblTab())
 	tabs.Append(sw.adScannerTab())
 
-	tabs.Append(container.NewTabItemWithIcon("txbridge", theme.DownloadIcon(), txconfigurator.NewConfigurator(prefPort.get)))
+	// tabs.Append(container.NewTabItemWithIcon("txbridge", theme.DownloadIcon(), txconfigurator.NewConfigurator(prefPort.get)))
 
 	sw.loadPreferences()
 	return widget.NewSimpleRenderer(tabs)

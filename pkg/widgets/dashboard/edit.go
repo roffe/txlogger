@@ -168,6 +168,17 @@ func (db *Dashboard) removeItem(id string) {
 	db.Refresh()
 }
 
+func (db *Dashboard) setTextAlign(id, align string) {
+	it := db.layout.item(id)
+	if it == nil {
+		return
+	}
+	it.Align = align
+	db.applyLayout()
+	db.layout.save()
+	db.Refresh()
+}
+
 func (db *Dashboard) setWBLStyle(style string) {
 	it := db.layout.item("wblambda")
 	if it == nil {
@@ -339,6 +350,19 @@ func (h *itemHandle) showMenu(pos fyne.Position) {
 				items = append(items, fyne.NewMenuItem("Show as bar", func() { h.db.setWBLStyle(StyleBar) }))
 			} else {
 				items = append(items, fyne.NewMenuItem("Show as round gauge", func() { h.db.setWBLStyle(StyleGauge) }))
+			}
+		}
+	}
+	if it := h.db.layout.item(h.id); it != nil {
+		if _, isText := h.db.itemObject(it).(*canvas.Text); isText {
+			for _, a := range []struct{ label, val string }{
+				{"Align left", AlignLeft},
+				{"Align center", AlignCenter},
+				{"Align right", AlignRight},
+			} {
+				mi := fyne.NewMenuItem(a.label, func() { h.db.setTextAlign(h.id, a.val) })
+				mi.Checked = it.Align == a.val
+				items = append(items, mi)
 			}
 		}
 	}

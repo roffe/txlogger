@@ -169,7 +169,7 @@ func NewPlotter(values map[string][]float64, opts ...PlotterOpt) *Plotter {
 		onColorUpdate := func(col color.Color) {
 			r, g, b, a := col.RGBA()
 			p.ts[n].Color = color.RGBA{uint8(r), uint8(g), uint8(b), uint8(a)}
-			// log.Printf("\"%s\": {%d, %d, %d, %d},", k, uint8(r), uint8(g), uint8(b), uint8(a))
+			colors.SetCustom(k, p.ts[n].Color)
 			p.refreshImage(false)
 		}
 		// var oldColor color.RGBA
