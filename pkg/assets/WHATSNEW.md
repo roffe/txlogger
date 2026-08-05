@@ -36,6 +36,8 @@
 - Added a bunch of TransCal maps under Fueling on T7
 - Replaced gocangateway with a slimmer j2534proxy
 - Rewrote everything to use GoCAN v2
+- Added color customizer to set custom colors on log plotter series
+- Added edit functionality to dashboard so you can move gauges around freely
 
 # 2.1.9
 - Updated default T7 preset to include MAF.m_AirFromp_AirInlet
