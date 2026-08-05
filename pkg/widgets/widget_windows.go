@@ -7,6 +7,11 @@ func selectFile(desc string, exts ...string) (string, error) {
 	return native.OpenFileDialog("Open file", filter)
 }
 
+func selectFiles(desc string, exts ...string) ([]string, error) {
+	filter := native.FileFilter{Description: desc, Extensions: exts}
+	return native.OpenFilesDialog("Open files", filter)
+}
+
 func saveFile(desc string, ext string) (string, error) {
 	return native.SaveFileDialog("Save "+desc, ext, native.FileFilter{
 		Description: desc,

@@ -1,67 +1,57 @@
 package windows
 
-var T5SymbolsTuningOrder = []string{
-	"Diagnostics",
-	"Options",
-	"Injection [Fuel]",
-	"Ignition",
-	"Turbo control [M]",
-	"Turbo control [A]",
-	"Knock detection",
-	"Warmup",
-	"Idle",
-}
-
-var T5SymbolsTuning = map[string][]string{
-	"Diagnostics": {
-		"DTC Reader",
-		"Pgm_status",
-	},
-	"Options": {
-		"Pgm_mod!",
-	},
-	"Injection [Fuel]": {
-		"VE map - normal|Insp_mat!",
-		"VE map - knock|Fuel_knock_mat!",
-		"Injector scaling|Inj_konst!",
-		"Battery correction map|Batt_korr_tab!",
-		"Fuel cut in overboost|Tryck_vakt_tab!",
-	},
-	"Ignition": {
-		"Ignition normal|Ign_map_0!",
-		"Ignition knock|Ign_map_2!",
-		"Ignition warmup|Ign_map_4!",
-	},
-	"Turbo control [M]": {
-		"Boost request map|Tryck_mat!",
-		"Boost control bias|Reg_kon_mat!",
-		"P factors|P_fors!",
-		"I factors|I_fors!",
-		"D factors|D_fors!",
-		"Boost limit in 1st gear|Regl_tryck_fgm!",
-		"Boost limit in 2nd gear|Regl_tryck_sgm!",
-	},
-	"Turbo control [A]": {
-		"Boost request map|Tryck_mat_a!",
-		"Boost control bias|Reg_kon_mat_a!",
-		"P factors|P_fors_a!",
-		"I factors|I_fors_a!",
-		"D factors|D_fors_a!",
-		"Boost limit in 1st gear|Regl_tryck_fgaut!",
-	},
-	"Knock detection": {
-		"Knock sensitivity map|Knock_ref_matrix!",
-		"Ignition retard limit|Knock_lim_tab!",
-		"Boost reduction map|Apc_knock_tab!",
-	},
-	"Warmup": {
-		"Afterstart enrichment (1)|Eftersta_fak!",
-		"Afterstart enrichment (2)|Eftersta_fak2!",
-	},
-	"Idle": {
-		"Idle target RPM|Idle_rpm_tab!",
-		"Idle ignition|Ign_idle_angle!",
-		"Idle ignition correction|Ign_map_1!",
-		"Idle fuel map|Idle_fuel_korr!",
-	},
+func (mw *MainWindow) t5Menu() []MenuItem {
+	return []MenuItem{
+		{Name: "Diagnostics", Children: []MenuItem{
+			{Name: "DTC Reader", Func: mw.openDTCReader},
+			{Name: "Pgm_status", Func: mw.openPgmStatus},
+		}},
+		{Name: "Options", Children: []MenuItem{
+			{Name: "Pgm_mod!", Func: mw.openPgmMod},
+		}},
+		{Name: "Injection [Fuel]", Children: []MenuItem{
+			{Name: "VE map - normal", Data: "Insp_mat!"},
+			{Name: "VE map - knock", Data: "Fuel_knock_mat!"},
+			{Name: "Injector scaling", Data: "Inj_konst!"},
+			{Name: "Battery correction map", Data: "Batt_korr_tab!"},
+			{Name: "Fuel cut in overboost", Data: "Tryck_vakt_tab!"},
+		}},
+		{Name: "Ignition", Children: []MenuItem{
+			{Name: "Ignition normal", Data: "Ign_map_0!"},
+			{Name: "Ignition knock", Data: "Ign_map_2!"},
+			{Name: "Ignition warmup", Data: "Ign_map_4!"},
+		}},
+		{Name: "Turbo control [M]", Children: []MenuItem{
+			{Name: "Boost request map", Data: "Tryck_mat!"},
+			{Name: "Boost control bias", Data: "Reg_kon_mat!"},
+			{Name: "P factors", Data: "P_fors!"},
+			{Name: "I factors", Data: "I_fors!"},
+			{Name: "D factors", Data: "D_fors!"},
+			{Name: "Boost limit in 1st gear", Data: "Regl_tryck_fgm!"},
+			{Name: "Boost limit in 2nd gear", Data: "Regl_tryck_sgm!"},
+		}},
+		{Name: "Turbo control [A]", Children: []MenuItem{
+			{Name: "Boost request map", Data: "Tryck_mat_a!"},
+			{Name: "Boost control bias", Data: "Reg_kon_mat_a!"},
+			{Name: "P factors", Data: "P_fors_a!"},
+			{Name: "I factors", Data: "I_fors_a!"},
+			{Name: "D factors", Data: "D_fors_a!"},
+			{Name: "Boost limit in 1st gear", Data: "Regl_tryck_fgaut!"},
+		}},
+		{Name: "Knock detection", Children: []MenuItem{
+			{Name: "Knock sensitivity map", Data: "Knock_ref_matrix!"},
+			{Name: "Ignition retard limit", Data: "Knock_lim_tab!"},
+			{Name: "Boost reduction map", Data: "Apc_knock_tab!"},
+		}},
+		{Name: "Warmup", Children: []MenuItem{
+			{Name: "Afterstart enrichment (1)", Data: "Eftersta_fak!"},
+			{Name: "Afterstart enrichment (2)", Data: "Eftersta_fak2!"},
+		}},
+		{Name: "Idle", Children: []MenuItem{
+			{Name: "Idle target RPM", Data: "Idle_rpm_tab!"},
+			{Name: "Idle ignition", Data: "Ign_idle_angle!"},
+			{Name: "Idle ignition correction", Data: "Ign_map_1!"},
+			{Name: "Idle fuel map", Data: "Idle_fuel_korr!"},
+		}},
+	}
 }

@@ -1,6 +1,8 @@
 package layout
 
 import (
+	"math"
+
 	"fyne.io/fyne/v2"
 )
 
@@ -17,23 +19,30 @@ func (g *Grid) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	}
 	g.lastSize = size
 
-	// Pre-calculate common values outside the loops
-	padding2 := g.Padding * 2
-	cellWidth := (size.Width - float32(g.Cols)*padding2) / float32(g.Cols)
-	cellHeight := (size.Height - float32(g.Rows)*padding2) / float32(g.Rows)
-
-	// Calculate base positions once
-	baseY := size.Height - cellHeight - g.Padding
+	// Snap cell boundaries to whole units so every gap between cells sits at
+	// the same subpixel offset and rasterizes identically; the ±1px slack from
+	// rounding goes into the cell sizes instead of the gaps.
+	// ponytail: snaps in fyne units; snap to device pixels via canvas scale if
+	// fractional HiDPI scales still shimmer.
+	colEdge := func(c int) float32 {
+		return float32(math.Round(float64(size.Width) * float64(c) / float64(g.Cols)))
+	}
+	rowEdge := func(r int) float32 {
+		return float32(math.Round(float64(size.Height) * float64(r) / float64(g.Rows)))
+	}
 
 	for i, obj := range objects[:min(len(objects), g.Rows*g.Cols)] {
-		row := i / g.Cols
+		row := i / g.Cols // row 0 is the bottom row
 		col := i % g.Cols
 
-		obj.Move(fyne.NewPos(
-			float32(col)*(cellWidth+padding2)+g.Padding,
-			baseY-float32(row)*(cellHeight+padding2),
-		))
-		obj.Resize(fyne.Size{Width: cellWidth, Height: cellHeight})
+		x0, x1 := colEdge(col), colEdge(col+1)
+		y0, y1 := rowEdge(row), rowEdge(row+1) // measured from the bottom
+
+		obj.Move(fyne.NewPos(x0+g.Padding, size.Height-y1+g.Padding))
+		obj.Resize(fyne.Size{
+			Width:  x1 - x0 - 2*g.Padding,
+			Height: y1 - y0 - 2*g.Padding,
+		})
 	}
 }
 

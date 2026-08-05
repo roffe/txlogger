@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/model"
 )
 
@@ -301,7 +301,7 @@ func (t *Client) RequestECUInfo(ctx context.Context, pid byte) ([]byte, error) {
 }
 
 func (t *Client) SendAckMessageT8() {
-	if err := t.c.Send(0x7E0, []byte{0x30}, gocan.Outgoing); err != nil {
+	if err := t.c.Send(context.Background(), gocan.NewFrame(0x7E0, []byte{0x30})); err != nil {
 		panic(err)
 	}
 }

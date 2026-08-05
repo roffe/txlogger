@@ -1,12 +1,14 @@
 package datalogger
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
+	"github.com/roffe/txlogger/pkg/debug"
 )
 
 var ErrToManyErrors = fmt.Errorf("too many errors, aborting logging")
@@ -17,35 +19,34 @@ const (
 )
 
 type LogWriter interface {
-	Write(sysvars *ThreadSafeMap, sysvarOrder []string, vars []*symbol.Symbol, ts time.Time) error
+	Write(ts time.Time, channels []Channel) error
 	Close() error
 }
 
 type IClient interface {
-	Start() error
+	// Start runs the logging session until ctx is cancelled, Close is
+	// called or a fatal error occurs.
+	Start(ctx context.Context) error
 	SetRAM(address uint32, data []byte) error
 	GetRAM(address uint32, length uint32) ([]byte, error)
 	Close()
 }
 
-type Consumer interface {
-	SetValue(string, float64)
-}
-
 type Config struct {
-	FilenamePrefix string
-	ECU            string
-	Device         gocan.Adapter
-	Symbols        []*symbol.Symbol
-	Rate           int
-	OnMessage      func(string)
-	CaptureCounter func(int)
-	ErrorCounter   func(int)
-	FpsCounter     func(int)
-	LogFormat      string
-	LogPath        string
-	WidebandConfig WidebandConfig
-	RemoteMode     int
+	FilenamePrefix            string
+	ECU                       string
+	Device                    gocan.Adapter
+	Symbols                   []*symbol.Symbol
+	Rate                      int
+	OnMessage                 func(string)
+	CaptureCounter            func(int)
+	ErrorCounter              func(int)
+	FpsCounter                func(int)
+	LogFormat                 string
+	LogPath                   string
+	WidebandConfig            WidebandConfig
+	RemoteMode                int
+	ExperimentalT5FastLogging bool
 }
 
 type Client struct {
@@ -83,7 +84,8 @@ func New(cfg Config) (IClient, string, error) {
 		return datalogger, filename, nil
 	}
 
-	if cfg.Device.Name() == "txbridge wifi" || cfg.Device.Name() == "txbridge bluetooth" {
+	devName := gocan.AdapterName(cfg.Device)
+	if devName == "txbridge wifi" || devName == "txbridge bluetooth" {
 		dc, err := NewTxbridge(cfg, lw)
 		if err != nil {
 			return nil, "", err
@@ -93,7 +95,12 @@ func New(cfg Config) (IClient, string, error) {
 
 	switch cfg.ECU {
 	case "T5":
-		datalogger.IClient, err = NewT5(cfg, lw)
+		if cfg.ExperimentalT5FastLogging {
+			debug.Log("Using experimental T5 fast logger")
+			datalogger.IClient, err = NewT5Fast(cfg, lw)
+		} else {
+			datalogger.IClient, err = NewT5(cfg, lw)
+		}
 		if err != nil {
 			return nil, "", err
 		}
@@ -115,9 +122,9 @@ func New(cfg Config) (IClient, string, error) {
 	return datalogger, filename, nil
 }
 
-func (d *Client) Start() error {
+func (d *Client) Start(ctx context.Context) error {
 	d.cfg.ErrorCounter(0)
 	d.cfg.CaptureCounter(0)
 	d.cfg.FpsCounter(0)
-	return d.IClient.Start()
+	return d.IClient.Start(ctx)
 }

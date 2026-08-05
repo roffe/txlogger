@@ -1,8 +1,10 @@
 package datalogger
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/relayserver"
@@ -23,7 +25,7 @@ func NewRemote(cfg Config, lw LogWriter) (IClient, error) {
 	}, nil
 }
 
-func (c *RemoteClient) Start() error {
+func (c *RemoteClient) Start(ctx context.Context) error {
 	defer c.secondTicker.Stop()
 	defer c.lw.Close()
 
@@ -91,7 +93,7 @@ func (c *RemoteClient) Start() error {
 				for _, va := range values {
 					ebus.Publish(va.Name, va.Value)
 				}
-				c.onCapture()
+				c.onCapture(time.Now())
 			default:
 				log.Println("Unknown message kind:", msg.Kind.String())
 			}

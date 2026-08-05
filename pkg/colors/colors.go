@@ -22,6 +22,9 @@ var colorMap = map[string]color.RGBA{
 }
 
 func GetColor(name string) color.RGBA {
+	if c, ok := getCustom(name); ok {
+		return c
+	}
 	if c, ok := colorMap[name]; ok {
 		return c
 	}

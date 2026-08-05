@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.bug.st/serial"
@@ -15,6 +16,10 @@ import (
 const (
 	ProductString = "Innovate Serial Protocol v2"
 )
+
+// reconnectDelay is how long run() waits between reconnect attempts after the
+// serial port drops (a common occurrence on Windows).
+const reconnectDelay = time.Second
 
 const (
 	ISP2_NORMAL uint8 = iota
@@ -57,7 +62,10 @@ type ISP2Client struct {
 
 	syncBuffer []byte // New field for synchronization
 
-	mu sync.Mutex
+	closeOnce sync.Once
+	closed    atomic.Bool
+	done      chan struct{}
+	mu        sync.Mutex
 
 	log func(string)
 }
@@ -66,37 +74,105 @@ func NewISP2Client(port string, logFunc func(string)) (*ISP2Client, error) {
 	return &ISP2Client{
 		port: port,
 		buff: bytes.NewBuffer(nil),
+		done: make(chan struct{}),
 		log:  logFunc,
 	}, nil
 }
 
 func (c *ISP2Client) Start(ctx context.Context) error {
-	if c.port != "txbridge" {
-		c.log("Starting ISP2 client")
-		mode := &serial.Mode{
-			BaudRate: 9600,
-		}
-		sp, err := serial.Open(c.port, mode)
-		if err != nil {
-			return err
-		}
-		c.sp = sp
-
-		c.sp.SetReadTimeout(20 * time.Millisecond)
-
-		// c.syncBuffer = make([]byte, 4) // Initialize syncBuffer
-		go c.run(ctx)
+	if c.port == "txbridge" {
+		return nil
 	}
+	c.log("Starting ISP2 client")
+	// Fail fast if we can't open the port at all on the initial attempt so the
+	// caller gets immediate feedback. Later drops are handled by run().
+	if err := c.openPort(); err != nil {
+		return err
+	}
+	go c.run(ctx)
 	return nil
 }
 
-func (c *ISP2Client) Stop() {
-	if c.sp != nil {
-		c.log("Stopping ISP2 client")
-		if err := c.sp.Close(); err != nil {
-			c.log(err.Error())
+// openPort opens the serial port and stores it on the client.
+func (c *ISP2Client) openPort() error {
+	mode := &serial.Mode{
+		BaudRate: 19200,
+	}
+	sp, err := serial.Open(c.port, mode)
+	if err != nil {
+		return fmt.Errorf("failed to open serial port: %w", err)
+	}
+	if err := sp.SetReadTimeout(5 * time.Millisecond); err != nil {
+		sp.Close()
+		return fmt.Errorf("failed to set read timeout: %w", err)
+	}
+
+	c.mu.Lock()
+	c.sp = sp
+	c.mu.Unlock()
+	return nil
+}
+
+// getPort returns the current serial port, or nil if none is open.
+func (c *ISP2Client) getPort() serial.Port {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.sp
+}
+
+// closePort closes the current serial port if open. It is safe to call
+// multiple times.
+func (c *ISP2Client) closePort() {
+	c.mu.Lock()
+	sp := c.sp
+	c.sp = nil
+	c.mu.Unlock()
+	if sp != nil {
+		if err := sp.Close(); err != nil {
+			c.log("isp2: failed to close serial port: " + err.Error())
 		}
 	}
+}
+
+// reconnect keeps trying to reopen the serial port until it succeeds or the
+// client is stopped. It returns true when the port was reopened, false when
+// the client is shutting down.
+func (c *ISP2Client) reconnect(ctx context.Context) bool {
+	for {
+		if ctx.Err() != nil || c.closed.Load() {
+			return false
+		}
+		c.log("isp2: reconnecting to " + c.port)
+		if err := c.openPort(); err != nil {
+			c.log("isp2: reconnect failed: " + err.Error())
+			select {
+			case <-ctx.Done():
+				return false
+			case <-c.done:
+				return false
+			case <-time.After(reconnectDelay):
+			}
+			continue
+		}
+		c.log("isp2: reconnected to " + c.port)
+		// Drop any partially-parsed frame from before the drop.
+		c.mu.Lock()
+		c.syncBuffer = nil
+		c.wordIndex = 0
+		c.mu.Unlock()
+		return true
+	}
+}
+
+func (c *ISP2Client) Stop() {
+	c.closeOnce.Do(func() {
+		c.log("Stopping ISP2 client")
+		// Signal run()/reconnect() to stop before closing the port so a port
+		// drop isn't mistaken for a reconnect opportunity.
+		c.closed.Store(true)
+		close(c.done)
+		c.closePort()
+	})
 }
 
 func (c *ISP2Client) SetData(data []byte) {
@@ -163,16 +239,35 @@ func (c *ISP2Client) String() string {
 }
 
 func (c *ISP2Client) run(ctx context.Context) {
+	// Make sure any port we (re)opened gets cleaned up when run() exits.
+	defer c.closePort()
+
 	buf := make([]byte, 16)
 	for {
+		if ctx.Err() != nil || c.closed.Load() {
+			return
+		}
+
+		sp := c.getPort()
+		if sp == nil {
+			if !c.reconnect(ctx) {
+				return
+			}
+			continue
+		}
+
 		// read from serial
-		n, err := c.sp.Read(buf)
-		if ctx.Err() != nil {
+		n, err := sp.Read(buf)
+		if ctx.Err() != nil || c.closed.Load() {
 			return
 		}
 		if err != nil {
 			c.log("isp2: " + err.Error())
-			return
+			c.closePort()
+			if !c.reconnect(ctx) {
+				return
+			}
+			continue
 		}
 		if n == 0 {
 			continue

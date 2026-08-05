@@ -7,9 +7,9 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
-	"github.com/lusingander/colorpicker"
 )
 
 type TappableText struct {
@@ -74,6 +74,17 @@ func (tt *TappableText) Refresh() {
 	tt.text.Refresh()
 }
 
+// Value returns the currently displayed value text.
+func (tt *TappableText) Value() string {
+	return tt.value.Text
+}
+
+// SetValue updates the displayed value text and refreshes it.
+func (tt *TappableText) SetValue(s string) {
+	tt.value.Text = s
+	tt.value.Refresh()
+}
+
 func (tt *TappableText) MouseIn(e *desktop.MouseEvent) {
 	tt.onHover(true)
 }
@@ -114,26 +125,17 @@ func (tt *TappableText) Tapped(*fyne.PointEvent) {
 }
 
 func (tt *TappableText) TappedSecondary(*fyne.PointEvent) {
-	picker := colorpicker.New(250, colorpicker.StyleHueCircle)
-	picker.SetOnChanged(func(c color.Color) {
+	picker := dialog.NewColorPicker("Custom color", tt.text.Text, func(c color.Color) {
 		tt.color = c
 		if tt.enabled {
 			tt.text.Color = c
 			tt.text.Refresh()
 		}
 		tt.onColorUpdate(c)
-	})
-
-	canvas := fyne.CurrentApp().Driver().CanvasForObject(tt.text)
-
-	var modal *widget.PopUp
-	modal = widget.NewModalPopUp(container.NewVBox(
-		picker,
-		widget.NewButton("Close", func() {
-			modal.Hide()
-		}),
-	), canvas)
-	modal.Show()
+	}, fyne.CurrentApp().Driver().AllWindows()[0])
+	picker.Advanced = true
+	picker.SetColor(tt.color)
+	picker.Show()
 }
 
 func (tt *TappableText) CreateRenderer() fyne.WidgetRenderer {

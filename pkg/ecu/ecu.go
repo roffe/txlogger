@@ -6,7 +6,7 @@ import (
 	"log"
 	"sort"
 
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/dtc"
 	"github.com/roffe/txlogger/pkg/model"
 )
@@ -62,7 +62,7 @@ var ecuMap = map[string]*EcuInfo{}
 
 type EcuInfo struct {
 	Name    string
-	NewFunc func(c *gocan.Client, cfg *Config) Client
+	NewFunc func(c *gocan.Bus, cfg *Config) Client
 	CANRate float64
 	Filter  []uint32
 }
@@ -74,7 +74,7 @@ func Register(t *EcuInfo) {
 	ecuMap[t.Name] = t
 }
 
-func New(c *gocan.Client, cfg *Config) (Client, error) {
+func New(c *gocan.Bus, cfg *Config) (Client, error) {
 	if ecu, found := ecuMap[cfg.Name]; found {
 		return ecu.NewFunc(c, cfg), nil
 	}

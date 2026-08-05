@@ -9,12 +9,14 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 )
 
 func (t *Client) Ping(ctx context.Context) error {
-	frame := gocan.NewFrame(0x05, []byte{0xEF, 0xBE, 0x00, 0x00, 0x00, 0x00, 0x33, 0x66}, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, 0x0C)
+	frame := gocan.NewFrame(0x05, []byte{0xEF, 0xBE, 0x00, 0x00, 0x00, 0x00, 0x33, 0x66})
+	rctx, cancel := context.WithTimeout(ctx, t.defaultTimeout)
+	defer cancel()
+	resp, err := t.c.Request(rctx, frame, 0x0C)
 	if err != nil {
 		return errors.New("LegionPing: " + err.Error())
 	}
@@ -56,25 +58,15 @@ func (t *Client) UploadBootLoader(ctx context.Context) error {
 
 		switch payload[0] {
 		case 0xA5:
-			f, err := t.c.SendAndWait(
-				ctx,
-				gocan.NewFrame(0x5, payload, gocan.ResponseRequired),
-				250*time.Millisecond,
-				0xC,
-			)
+			f, err := t.request(ctx, payload, 250*time.Millisecond)
 			if err != nil {
 				return fmt.Errorf("failed to sendBootloaderAddressCommand: %v", err)
 			}
-			if f.DLC() != 8 || f.Data[0] != 0xA5 || f.Data[1] != 0x00 {
+			if f.Length != 8 || f.Data[0] != 0xA5 || f.Data[1] != 0x00 {
 				return fmt.Errorf("invalid response to sendBootloaderAddressCommand")
 			}
 		case 0xC1:
-			f, err := t.c.SendAndWait(
-				ctx,
-				gocan.NewFrame(0x5, payload, gocan.ResponseRequired),
-				250*time.Millisecond,
-				0xC,
-			)
+			f, err := t.request(ctx, payload, 250*time.Millisecond)
 			if err != nil {
 				return err
 			}
@@ -82,12 +74,7 @@ func (t *Client) UploadBootLoader(ctx context.Context) error {
 				return fmt.Errorf("invalid response to sendBootloaderDataCommand: %X", f.Data)
 			}
 		default:
-			resp, err := t.c.SendAndWait(
-				ctx,
-				gocan.NewFrame(0x5, payload, gocan.ResponseRequired),
-				150*time.Millisecond,
-				0xC,
-			)
+			resp, err := t.request(ctx, payload, 150*time.Millisecond)
 			if err != nil {
 				return err
 			}
@@ -97,7 +84,7 @@ func (t *Client) UploadBootLoader(ctx context.Context) error {
 				return nil
 			}
 
-			if resp.DLC() != 8 || resp.Data[1] != 0x00 {
+			if resp.Length != 8 || resp.Data[1] != 0x00 {
 				return fmt.Errorf("failed to upload bootloader: %X", resp.Data)
 			}
 		}
@@ -113,13 +100,10 @@ func (t *Client) UploadBootLoader(ctx context.Context) error {
 func (t *Client) readDataByLocalIdentifier(ctx context.Context, pci byte, address int, length byte) ([]byte, int, error) {
 	retData := make([]byte, length)
 	payload := []byte{pci, 0x21, length, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address), 0x00}
-	frame := gocan.NewFrame(0x05, payload, gocan.ResponseRequired)
-	//log.Println(frame.ColorString())
-	resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, 0x0C)
+	resp, err := t.request(ctx, payload, t.defaultTimeout)
 	if err != nil {
 		return nil, 0, err
 	}
-	//log.Println(resp.(*gocan.Frame).ColorString())
 
 	if resp.Data[0] == 0x7E {
 		return nil, 0, errors.New("got 0x7E message as response to 0x21, ReadDataByLocalIdentifier command")
@@ -137,17 +121,21 @@ func (t *Client) readDataByLocalIdentifier(ctx context.Context, pci byte, addres
 	copy(retData, resp.Data[4:])
 	rx_cnt += 4
 
-	sub := t.c.Subscribe(ctx, 0x0C)
-	defer sub.Close()
+	sctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	ch := t.c.Subscribe(sctx, 0x0C)
 
-	if err := t.c.Send(0x05, []byte{0x30}, gocan.CANFrameType{Type: 2, Responses: 19}); err != nil {
+	if err := t.c.Send(gocan.WithExpectedResponses(ctx, 19), gocan.NewFrame(0x05, []byte{0x30})); err != nil {
 		return nil, 0, err
 	}
 
 	var seq byte = 0x21
 	for rx_cnt < int(length) {
 		select {
-		case resp := <-sub.Chan():
+		case resp, ok := <-ch:
+			if !ok {
+				return nil, 0, errors.New("subscription closed")
+			}
 			if resp.Data[0] != seq {
 				return nil, 0, fmt.Errorf("got unexpected sequence number %02X, expected %02X", resp.Data[0], seq)
 			}
@@ -160,7 +148,6 @@ func (t *Client) readDataByLocalIdentifier(ctx context.Context, pci byte, addres
 		case <-time.After(1 * time.Second):
 			return nil, 0, errors.New("timeout")
 		}
-
 	}
 
 	return retData, 0, nil
@@ -168,16 +155,11 @@ func (t *Client) readDataByLocalIdentifier(ctx context.Context, pci byte, addres
 
 func (t *Client) sendBootloaderAddressCommand(ctx context.Context, address uint32, len byte) error {
 	payload := []byte{0xA5, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address), len, 0x00, 0x00}
-	f, err := t.c.SendAndWait(
-		ctx,
-		gocan.NewFrame(0x5, payload, gocan.ResponseRequired),
-		250*time.Millisecond,
-		0xC,
-	)
+	f, err := t.request(ctx, payload, 250*time.Millisecond)
 	if err != nil {
 		return fmt.Errorf("failed to sendBootloaderAddressCommand: %v", err)
 	}
-	if f.DLC() != 8 || f.Data[0] != 0xA5 || f.Data[1] != 0x00 {
+	if f.Length != 8 || f.Data[0] != 0xA5 || f.Data[1] != 0x00 {
 		return fmt.Errorf("invalid response to sendBootloaderAddressCommand")
 	}
 	return nil
@@ -191,8 +173,7 @@ func (t *Client) sendBootVectorAddressSRAM(address uint32) error {
 */
 
 func (t *Client) sendBootloaderDataCommand(ctx context.Context, data []byte, length byte) error {
-	frame := gocan.NewFrame(0x5, data, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frame, 150*time.Millisecond, 0xC)
+	resp, err := t.request(ctx, data, 150*time.Millisecond)
 	if err != nil {
 		return fmt.Errorf("failed SBLDC: %v", err)
 	}
@@ -250,32 +231,30 @@ func (t *Client) RetrieveSystemInformation(ctx context.Context) (*SystemInformat
 		FlashSize:    flash_size,
 		FlashID:      flash_id,
 	}, nil
-
 }
 
 func (t *Client) IDemand(ctx context.Context, command Command, wish uint16) ([]byte, error) {
-	//log.Println("Legion i demand", command.String()+"!")
+	// log.Println("Legion i demand", command.String()+"!")
 	payload := []byte{0x02, 0xA5, byte(command), 0x00, 0x00, 0x00, byte(wish >> 8), byte(wish)}
-	frame := gocan.NewFrame(0x5, payload, gocan.ResponseRequired)
 
 	var out []byte
 
 	err := retry.Do(func() error {
-		resp, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, 0xC)
+		resp, err := t.request(ctx, payload, t.defaultTimeout)
 		if err != nil {
 			return err
 		}
-		if err := demandErr(command, resp.Data); err != nil {
+		if err := demandErr(command, resp.Data[:]); err != nil {
 			return err
 		}
 		switch command {
 		case 0:
 			// Settings correctly received.
-			//log.Println("settings correctly received")
+			// log.Println("settings correctly received")
 			return nil
 		case 1:
 			// Crc-32; complete
-			//log.Println("crc-32 complete")
+			// log.Println("crc-32 complete")
 			out = resp.Data[4:]
 			return nil
 		case 2, 3:
@@ -348,7 +327,6 @@ func demandErr(command Command, d []byte) error {
 			time.Sleep(500 * time.Millisecond)
 			return errors.New("busy marrying")
 		}
-
 	}
 
 	if command == 6 && d[3] != 0x01 {
@@ -358,7 +336,6 @@ func demandErr(command Command, d []byte) error {
 	// Something is wrong or we sent the wrong command.
 	if d[3] == 0xFF {
 		return errors.New("bootloader did what it could and failed. Sorry")
-
 	}
 	return nil
 }

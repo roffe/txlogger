@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/roffe/gocan"
 )
 
 func (t *Client) EraseECU(ctx context.Context) error {
@@ -19,8 +17,7 @@ func (t *Client) EraseECU(ctx context.Context) error {
 	t.cfg.OnMessage("Erasing FLASH...")
 
 	cmd := []byte{0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-	frame := gocan.NewFrame(0x005, cmd, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frame, 20*time.Second, 0xC)
+	resp, err := t.request(ctx, cmd, 20*time.Second)
 	if err != nil {
 		return err
 	}

@@ -5,50 +5,40 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"log"
-	"sort"
 	"time"
 
-	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/pkg/serialcommand"
+	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/gocan/v2/pkg/serialcommand"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
-func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
+func (c *TxBridge) t7(pctx context.Context, cl *gocan.Bus) error {
 	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
-	bctx, bcancel := context.WithCancel(ctx)
-	defer bcancel()
-	go t7broadcastListener(bctx, cl, c.sysvars)
-
-	c.OnMessage("Watching for broadcast messages")
-	<-time.After(1550 * time.Millisecond)
-	sysvarOrder := c.sysvars.Keys()
-	sort.StringSlice(sysvarOrder).Sort()
-	c.OnMessage(fmt.Sprintf("Found %s", sysvarOrder))
-
-	if len(sysvarOrder) == 0 {
-		bcancel()
-	}
-
 	if c.lamb != nil {
 		defer c.lamb.Stop()
-		sysvarOrder = append(sysvarOrder, EXTERNALWBLSYM)
 	}
 
-	if c.WidebandConfig.ADScanner && c.WidebandConfig.Name == "ECU" {
-		sysvarOrder = append(sysvarOrder, LAMBDAADSCANNER)
+	// Tell the dongle to collect the T7 broadcast frames and fold them into the log
+	// stream, then source those symbols from the folded trailer (decodeT7Broadcast)
+	// instead of the KWP F0 read, rather than parsing a live broadcast flood here.
+	c.OnMessage("Enabling T7 broadcast collection")
+	if err := sendBroadcastCollect(c.tb, t7BroadcastIDs); err != nil {
+		return fmt.Errorf("failed to set broadcast collect: %w", err)
 	}
-
 	for _, sym := range c.Symbols {
-		if c.sysvars.Exists(sym.Name) {
+		if _, ok := t7BroadcastSymbols[sym.Name]; ok {
 			log.Println("Skipping", sym.Name, "in broadcast")
 			sym.Number = -1
-			continue
 		}
 	}
+
+	channels := c.buildChannels()
 
 	kwp := kwp2000.New(cl)
 	if err := initT7logging(ctx, kwp, c.Symbols, c.OnMessage); err != nil {
@@ -63,21 +53,51 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 		expectedPayloadSize += sym.Length
 	}
 
-	tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
-	defer tx.Close()
+	tx := c.tb.Subscribe(ctx, 'r')
 
-	if err := c.startLogging(cl); err != nil {
+	if err := c.startLogging(); err != nil {
 		return fmt.Errorf("error starting logging: %w", err)
 	}
 
 	adConverter := NewWBLInterpolator(c.WidebandConfig)
 
+	router := map[string]func(s *symbol.Symbol) bool{
+		"IgnKnk.fi_Offset": func(s *symbol.Symbol) bool {
+			data := s.Bytes()
+			if len(data) != 8 {
+				return false
+			}
+
+			ioffCyl1 := int16(binary.BigEndian.Uint16(data[0:2]))
+			ioffCyl2 := int16(binary.BigEndian.Uint16(data[2:4]))
+			ioffCyl3 := int16(binary.BigEndian.Uint16(data[4:6]))
+			ioffCyl4 := int16(binary.BigEndian.Uint16(data[6:8]))
+
+			ebus.Publish("IgnKnk.fi_Offset.Cyl1", float64(ioffCyl1)/10)
+			ebus.Publish("IgnKnk.fi_Offset.Cyl2", float64(ioffCyl2)/10)
+			ebus.Publish("IgnKnk.fi_Offset.Cyl3", float64(ioffCyl3)/10)
+			ebus.Publish("IgnKnk.fi_Offset.Cyl4", float64(ioffCyl4)/10)
+			return true
+		},
+	}
+
+	if c.WidebandConfig.ADScanner {
+		router[c.WidebandConfig.ADScannerSymbol] = func(s *symbol.Symbol) bool {
+			lambda := adConverter(s.Int())
+			c.sysvars.Set(LAMBDAADSCANNER, lambda)
+			ebus.Publish(LAMBDAADSCANNER, lambda)
+			return true
+		}
+	}
+
 	go func() {
 		defer cl.Close()
 		defer func() {
+			_ = c.stopLogging() // stop the dongle's read loop before ending the session
 			_ = kwp.StopSession(ctx)
 			time.Sleep(75 * time.Millisecond)
 		}()
+		lastData := time.Now()
 		for {
 			select {
 			case <-ctx.Done():
@@ -89,6 +109,10 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 				c.FpsCounter(c.capturePerSecond)
 				if c.errPerSecond > 5 {
 					c.OnMessage("too many errors, aborting logging")
+					return
+				}
+				if time.Since(lastData) > dataTimeout {
+					c.OnMessage("no data for 5s, aborting logging")
 					return
 				}
 				c.resetPerSecond()
@@ -106,14 +130,9 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 					},
 				}
 				read.Address += uint32(toRead)
-				payload, err := cmd.MarshalBinary()
-				if err != nil {
-					c.onError()
-					c.OnMessage(err.Error())
-					continue
-				}
-				frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
-				resp, err := cl.SendAndWait(ctx, frame, 3*time.Second, gocan.SystemMsgDataRequest)
+				rctx, rcancel := context.WithTimeout(ctx, 3*time.Second)
+				resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'R')
+				rcancel()
 				if err != nil {
 					read.Complete(err)
 					continue
@@ -143,21 +162,15 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 				write.Address += uint32(toRead)
 				write.Length -= toRead
 
-				payload, err := cmd.MarshalBinary()
+				rctx, rcancel := context.WithTimeout(ctx, 1*time.Second)
+				resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'W', 'e')
+				rcancel()
 				if err != nil {
 					write.Complete(err)
 					continue
 				}
 
-				frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
-
-				resp, err := cl.SendAndWait(ctx, frame, 1*time.Second, gocan.SystemMsgWriteResponse)
-				if err != nil {
-					write.Complete(err)
-					continue
-				}
-
-				if resp.Identifier == gocan.SystemMsgError {
+				if resp.Command == 'e' {
 					write.Complete(fmt.Errorf("error response"))
 					continue
 				}
@@ -172,17 +185,19 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 				}
 				write.Complete(nil)
 				continue
-			case msg, ok := <-tx.Chan():
+			case msg, ok := <-tx:
 				if !ok {
 					c.OnMessage("txbridge recv channel closed")
 					return
 				}
-				if msg.DLC() != int(expectedPayloadSize+4) {
+				lastData = time.Now()
+				// timestamp(4) + fixed symbol payload, then a variable broadcast trailer
+				// the dongle folded in (see decodeT7Broadcast), so this is a lower bound.
+				if len(msg.Data) < int(expectedPayloadSize+4) {
 					c.onError()
-					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, msg.DLC()))
+					c.OnMessage(fmt.Sprintf("expected at least %d bytes, got %d", expectedPayloadSize+4, len(msg.Data)))
 					// log.Printf("unexpected data %X", msg.Data)
 					continue
-					// return fmt.Errorf("expected %d bytes, got %d", expectedPayloadSize, len(databuff))
 				}
 
 				r := bytes.NewReader(msg.Data)
@@ -200,28 +215,53 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 
 				timeStamp := c.calculateCompensatedTimestamp()
 
+				// Read the fixed symbol payload first; broadcast (-1) symbols carry no
+				// bytes here — they come from the trailer parsed just below.
+				readErr := false
 				for _, va := range c.Symbols {
 					if va.Number == -1 {
-						ebus.Publish(va.Name, c.sysvars.Get(va.Name))
 						continue
 					}
 					if err := va.Read(r); err != nil {
-						log.Printf("data ex %d %X len %d", expectedPayloadSize, msg.Data, msg.DLC())
+						log.Printf("data ex %d %X len %d", expectedPayloadSize, msg.Data, len(msg.Data))
 						c.onError()
 						c.OnMessage(err.Error())
+						readErr = true
 						break
 					}
-					if c.WidebandConfig.ADScanner && va.Name == c.WidebandConfig.ADScannerSymbol {
-						lambda := adConverter(va.Int())
-						c.sysvars.Set(LAMBDAADSCANNER, lambda)
-						ebus.Publish(LAMBDAADSCANNER, lambda)
+
+					if fn, ok := router[va.Name]; ok && fn(va) {
+						continue
 					}
 
 					ebus.Publish(va.Name, va.Float64())
 				}
+				if readErr {
+					continue // r is misaligned; skip the trailer for this frame
+				}
 
-				if r.Len() > 0 {
-					c.OnMessage(fmt.Sprintf("%d leftover bytes!", r.Len()))
+				// Drain the folded broadcast trailer: [idHi, idLo, dlc, data...] per
+				// collected frame -> update sysvars via the shared T7 decoder.
+				var bcbuf [8]byte
+				for r.Len() >= 3 {
+					idHi, _ := r.ReadByte()
+					idLo, _ := r.ReadByte()
+					dlc, _ := r.ReadByte()
+					if dlc > 8 || r.Len() < int(dlc) {
+						c.OnMessage("malformed broadcast trailer")
+						break
+					}
+					if _, err := io.ReadFull(r, bcbuf[:dlc]); err != nil {
+						break
+					}
+					decodeT7Broadcast(uint16(idHi)<<8|uint16(idLo), bcbuf[:dlc], c.sysvars)
+				}
+
+				// Publish the broadcast-sourced symbols from the freshly updated sysvars.
+				for _, va := range c.Symbols {
+					if va.Number == -1 {
+						ebus.Publish(va.Name, c.sysvars.Get(va.Name))
+					}
 				}
 
 				if c.lamb != nil {
@@ -230,11 +270,11 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Client) error {
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				if err := c.lw.Write(c.sysvars, sysvarOrder, c.Symbols, timeStamp); err != nil {
+				if err := c.lw.Write(timeStamp, channels); err != nil {
 					c.onError()
 					c.OnMessage("failed to write log: " + err.Error())
 				}
-				c.onCapture()
+				c.onCapture(timeStamp)
 			}
 		}
 	}()

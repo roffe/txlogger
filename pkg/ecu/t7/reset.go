@@ -3,8 +3,6 @@ package t7
 import (
 	"context"
 	"fmt"
-
-	"github.com/roffe/gocan"
 )
 
 // Noop command to satisfy interface
@@ -13,8 +11,7 @@ func (t *Client) ResetECU2(ctx context.Context) error {
 }
 
 func (t *Client) ResetECU(ctx context.Context) error {
-	frame := gocan.NewFrame(0x240, []byte{0x40, 0xA1, 0x02, 0x11, 0x01}, gocan.ResponseRequired)
-	f, err := t.c.SendAndWait(ctx, frame, t.defaultTimeout, 0x258)
+	f, err := t.request(ctx, []byte{0x40, 0xA1, 0x02, 0x11, 0x01}, t.defaultTimeout)
 	if err != nil {
 		return err
 	}

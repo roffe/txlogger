@@ -46,9 +46,17 @@ func buildPortalFilters(filters []FileFilter) dbus.Variant {
 }
 
 func portalCall(method string, options map[string]dbus.Variant, args ...interface{}) (string, error) {
+	paths, err := portalCallMulti(method, options, args...)
+	if err != nil {
+		return "", err
+	}
+	return paths[0], nil
+}
+
+func portalCallMulti(method string, options map[string]dbus.Variant, args ...interface{}) ([]string, error) {
 	conn, err := dbus.SessionBus()
 	if err != nil {
-		return "", fmt.Errorf("failed to connect to session bus: %w", err)
+		return nil, fmt.Errorf("failed to connect to session bus: %w", err)
 	}
 	defer conn.Close()
 
@@ -65,7 +73,7 @@ func portalCall(method string, options map[string]dbus.Variant, args ...interfac
 
 	var handle dbus.ObjectPath
 	if err := obj.Call(method, 0, callArgs...).Store(&handle); err != nil {
-		return "", fmt.Errorf("portal call %s failed: %w", method, err)
+		return nil, fmt.Errorf("portal call %s failed: %w", method, err)
 	}
 
 	if err := conn.AddMatchSignal(
@@ -73,7 +81,7 @@ func portalCall(method string, options map[string]dbus.Variant, args ...interfac
 		dbus.WithMatchInterface("org.freedesktop.portal.Request"),
 		dbus.WithMatchMember("Response"),
 	); err != nil {
-		return "", fmt.Errorf("failed to add match signal: %w", err)
+		return nil, fmt.Errorf("failed to add match signal: %w", err)
 	}
 
 	c := make(chan *dbus.Signal, 10)
@@ -85,27 +93,35 @@ func portalCall(method string, options map[string]dbus.Variant, args ...interfac
 			continue
 		}
 		if len(sig.Body) < 2 {
-			return "", errors.New("unexpected signal body")
+			return nil, errors.New("unexpected signal body")
 		}
 		response, ok := sig.Body[0].(uint32)
 		if !ok {
-			return "", fmt.Errorf("unexpected response type: %T", sig.Body[0])
+			return nil, fmt.Errorf("unexpected response type: %T", sig.Body[0])
 		}
 		if response != 0 {
-			return "", ErrCancelled
+			return nil, ErrCancelled
 		}
 		results, ok := sig.Body[1].(map[string]dbus.Variant)
 		if !ok {
-			return "", fmt.Errorf("unexpected results type: %T", sig.Body[1])
+			return nil, fmt.Errorf("unexpected results type: %T", sig.Body[1])
 		}
 		uris, ok := results["uris"].Value().([]string)
 		if !ok || len(uris) == 0 {
-			return "", errors.New("no files selected")
+			return nil, errors.New("no files selected")
 		}
-		return uriToPath(uris[0])
+		paths := make([]string, 0, len(uris))
+		for _, uri := range uris {
+			p, err := uriToPath(uri)
+			if err != nil {
+				return nil, err
+			}
+			paths = append(paths, p)
+		}
+		return paths, nil
 	}
 
-	return "", errors.New("signal channel closed unexpectedly")
+	return nil, errors.New("signal channel closed unexpectedly")
 }
 
 func uriToPath(uri string) (string, error) {
@@ -125,6 +141,21 @@ func OpenFileDialog(title string, filters ...FileFilter) (string, error) {
 		options["filters"] = buildPortalFilters(filters)
 	}
 	return portalCall(
+		"org.freedesktop.portal.FileChooser.OpenFile",
+		options,
+		title,
+	)
+}
+
+func OpenFilesDialog(title string, filters ...FileFilter) ([]string, error) {
+	options := map[string]dbus.Variant{
+		"handle_token": dbus.MakeVariant(GenerateDBusToken()),
+		"multiple":     dbus.MakeVariant(true),
+	}
+	if len(filters) > 0 {
+		options["filters"] = buildPortalFilters(filters)
+	}
+	return portalCallMulti(
 		"org.freedesktop.portal.FileChooser.OpenFile",
 		options,
 		title,

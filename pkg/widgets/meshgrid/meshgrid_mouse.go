@@ -18,8 +18,9 @@ func (m *Meshgrid) MouseMoved(event *desktop.MouseEvent) {
 	dy := float64(event.Position.Y - m.lastMouseY)
 	if m.dragging {
 		if event.Button&desktop.MouseButtonPrimary == desktop.MouseButtonPrimary {
-			//m.orbit(dx*rotationScale, -dy*rotationScale)
-			m.rotateMeshgrid(-dy*rotationScale, dx*rotationScale, 0)
+			// Drag left spins clockwise, drag right counter-clockwise;
+			// drag up tilts backwards, drag down tilts forward.
+			m.orbit(-dx*rotationScale, -dy*rotationScale)
 			m.throttledRefresh()
 		} else if event.Button&desktop.MouseButtonSecondary == desktop.MouseButtonSecondary {
 			roll := (dx + dy) * rollScale

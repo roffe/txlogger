@@ -13,14 +13,15 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"github.com/roffe/txlogger/pkg/cangw"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ipc"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/theme"
 	"github.com/roffe/txlogger/pkg/windows"
-	// _ "net/http/pprof"
+
+	_ "github.com/roffe/gocan/v2/adapters/all"
+	_ "github.com/roffe/gocan/v2/adapters/combi"
 )
 
 var (
@@ -33,6 +34,8 @@ func init() {
 	flag.StringVar(&workDirectory, "d", "", "working directory")
 	flag.BoolVar(&allowMultipleInstances, "m", false, "allow multiple instances")
 	flag.Parse()
+
+	log.SetFlags(log.Lshortfile | log.Lmicroseconds)
 }
 
 // Unfortunately Fyne installs its own signal handler that needs to be overridden to allow graceful shutdown on SIGINT/SIGTERM.
@@ -77,15 +80,6 @@ func main() {
 		return
 	}
 
-	// start cangateway if not already running
-	p, err := cangw.Start()
-	if p != nil {
-		defer killProcess(p)
-	}
-	if err != nil {
-		debug.Log("cangateway is not ready: " + err.Error())
-	}
-
 	// create app
 	tx := app.NewWithID("com.roffe.txlogger")
 	tx.Settings().SetTheme(&theme.TxTheme{})
@@ -101,6 +95,7 @@ func main() {
 
 	// create main window
 	mw := windows.NewMainWindow(tx)
+	mw.SetIcon(fyne.CurrentApp().Icon())
 
 	// install our own signal handler
 	fyne.CurrentApp().Lifecycle().SetOnStarted(func() {
@@ -120,21 +115,6 @@ func main() {
 
 	// show main window
 	mw.ShowAndRun()
-}
-
-/*
-func startpprof() {
-	go func() {
-		debug.Log(http.ListenAndServe("localhost:6060", nil))
-	}()
-}
-*/
-
-func killProcess(p *os.Process) {
-	if p != nil {
-		p.Kill()
-		p.Wait()
-	}
 }
 
 func handleArgs(mw *windows.MainWindow, tx fyne.App) {

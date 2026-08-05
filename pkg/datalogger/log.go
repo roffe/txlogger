@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/common"
 )
 
@@ -37,7 +36,7 @@ func NewWriter(cfg Config) (string, LogWriter, error) {
 
 func createLog(path, prefix, extension string) (*os.File, string, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if err := os.Mkdir(path, 0755); err != nil {
+		if err := os.Mkdir(path, 0o755); err != nil {
 			if err != os.ErrExist {
 				return nil, "", fmt.Errorf("failed to create logs dir: %w", err)
 			}
@@ -49,28 +48,9 @@ func createLog(path, prefix, extension string) (*os.File, string, error) {
 
 	fullFilename := filepath.Join(path, filename)
 
-	file, err := os.OpenFile(fullFilename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	file, err := os.OpenFile(fullFilename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to open file: %w", err)
 	}
 	return file, fullFilename, nil
-}
-
-func replaceDot(s string) string {
-	return strings.Replace(s, ".", ",", 1)
-}
-
-type TXBinWriter struct {
-	file *os.File
-}
-
-func NewTXBinWriter(f *os.File) *TXBinWriter {
-	return &TXBinWriter{
-		file: f,
-	}
-}
-
-func (t *TXBinWriter) Write(sysvars *ThreadSafeMap, sysvarOrder []string, vars []*symbol.Symbol, ts time.Time) error {
-
-	return nil
 }

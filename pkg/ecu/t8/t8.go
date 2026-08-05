@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/pkg/gmlan"
+	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/gmlan"
 	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ecu/t8legion"
 	"github.com/roffe/txlogger/pkg/ecu/t8sec"
@@ -27,7 +27,7 @@ func init() {
 }
 
 type Client struct {
-	c              *gocan.Client
+	c              *gocan.Bus
 	defaultTimeout time.Duration
 	legion         *t8legion.Client
 	legionRecovery *t8legion.Client
@@ -36,7 +36,7 @@ type Client struct {
 	cfg            *ecu.Config
 }
 
-func New(c *gocan.Client, cfg *ecu.Config) ecu.Client {
+func New(c *gocan.Bus, cfg *ecu.Config) ecu.Client {
 	t := &Client{
 		c:              c,
 		cfg:            ecu.LoadConfig(cfg),

@@ -17,6 +17,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/numericentry"
 	"github.com/roffe/txlogger/pkg/widgets/vbar"
+	"github.com/roffe/txlogger/pkg/widgets/widebandgauge"
 )
 
 var _ fyne.Widget = (*GaugeCreator)(nil)
@@ -58,19 +59,13 @@ func NewGaugeCreator(mw *MainWindow) *GaugeCreator {
 	g.entries.symbolNameSecondary = widget.NewSelect(symbols, func(s string) {})
 	g.entries.symbolNameSecondary.Disable()
 
-	g.entries.min = numericentry.New()
-	g.entries.min.SetText("0")
-	g.entries.max = numericentry.New()
-	g.entries.max.SetText("100")
-
-	g.entries.center = numericentry.New()
-	g.entries.center.SetText("50")
+	g.entries.min = numericentry.New("0")
+	g.entries.max = numericentry.New("100")
+	g.entries.center = numericentry.New("50")
 	g.entries.center.Disable()
+	g.entries.steps = numericentry.New("10")
 
-	g.entries.steps = numericentry.New()
-	g.entries.steps.SetText("10")
-
-	g.entries.typ = widget.NewSelect([]string{"Dial", "DualDial", "VBar", "HBar", "CBar"}, func(s string) {
+	g.entries.typ = widget.NewSelect([]string{"Dial", "DualDial", "VBar", "HBar", "CBar", "Wideband"}, func(s string) {
 		switch s {
 		case "Dial":
 			g.entries.symbolNameSecondary.Disable()
@@ -91,6 +86,10 @@ func NewGaugeCreator(mw *MainWindow) *GaugeCreator {
 		case "CBar":
 			g.entries.symbolNameSecondary.Disable()
 			g.entries.center.Enable()
+			g.form.Refresh()
+		case "Wideband":
+			g.entries.symbolNameSecondary.Disable()
+			g.entries.center.Enable() // stoich, colors the lit segment
 			g.form.Refresh()
 		}
 	})
@@ -178,6 +177,7 @@ func (g *GaugeCreator) onSubmit() {
 		MinSize:             fyne.NewSize(100, 100),
 		SymbolName:          g.entries.symbolName.Selected,
 		SymbolNameSecondary: g.entries.symbolNameSecondary.Selected,
+		Classic:             g.mw.settings.GetClassicGauges(),
 	}
 	switch g.entries.typ.Selected {
 	case "Dial":
@@ -211,6 +211,12 @@ func (g *GaugeCreator) onSubmit() {
 		cbar := cbar.New(gaugeConfig)
 		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(g.entries.symbolName.Selected, cbar.SetValue))
 		gauge = cbar
+	case "Wideband":
+		gaugeConfig.Type = "Wideband"
+		gaugeConfig.MinSize = fyne.NewSize(150, 150)
+		wb := widebandgauge.New(gaugeConfig)
+		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(g.entries.symbolName.Selected, wb.SetValue))
+		gauge = wb
 	default:
 		g.mw.Error(errors.New("unknown gauge type"))
 		return

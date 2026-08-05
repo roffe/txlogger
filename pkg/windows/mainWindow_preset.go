@@ -18,7 +18,7 @@ func (mw *MainWindow) reloadPresets() {
 
 func (mw *MainWindow) savePreset() {
 	if mw.selects.presetSelect.Selected == "Select preset" {
-		//dialog.ShowInformation("No preset selected", "Use 'New' to create a new preset", mw)
+		// dialog.ShowInformation("No preset selected", "Use 'New' to create a new preset", mw)
 		mw.newPreset()
 		return
 	}
@@ -77,7 +77,7 @@ func (mw *MainWindow) exportPreset() {
 		if !strings.HasSuffix(filename, ".txp") {
 			filename += ".txp"
 		}
-		if err := mw.SavePreset(filename); err != nil {
+		if err := mw.ExportPreset(filename); err != nil {
 			mw.Error(err)
 			return
 		}
@@ -91,7 +91,7 @@ func (mw *MainWindow) deletePreset() {
 		return
 	}
 
-	if strings.EqualFold(mw.selects.presetSelect.Selected, "T7 Dash") || strings.EqualFold(mw.selects.presetSelect.Selected, "T8 Dash") {
+	if presets.IsSystem(mw.selects.presetSelect.Selected) {
 		mw.Error(fmt.Errorf("can't delete built-in preset"))
 		return
 	}

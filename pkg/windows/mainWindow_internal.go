@@ -1,8 +1,6 @@
 package windows
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"os"
 	"path"
@@ -13,11 +11,8 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
-	xwidget "fyne.io/x/fyne/widget"
-	"github.com/roffe/gocan/proto"
 	"github.com/roffe/txlogger/pkg/common"
-	"github.com/roffe/txlogger/pkg/ebus"
-	"github.com/roffe/txlogger/pkg/widgets/ebusmonitor"
+	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
 
@@ -54,15 +49,6 @@ func (mw *MainWindow) Close() {
 		mw.dlc.Close()
 		time.Sleep(250 * time.Millisecond)
 	}
-	if mw.gwclient != nil {
-		mw.Log("Sending quit command to cangateway")
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		_, err := mw.gwclient.SendCommand(ctx, &proto.Command{Data: []byte("quit")})
-		if err != nil {
-			mw.Error(fmt.Errorf("error sending quit to cangateway: %w", err))
-		}
-	}
 	mw.Window.Close()
 	time.Sleep(200 * time.Millisecond)
 	os.Exit(0)
@@ -73,6 +59,10 @@ func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
 	for _, u := range uris {
 		filename := u.Path()
 		switch strings.ToLower(path.Ext(filename)) {
+		case ".as2":
+			if err := mw.LoadAS2File(filename); err != nil {
+				mw.Error(err)
+			}
 		case ".bin":
 			if err := mw.LoadSymbolsFromFile(filename); err != nil {
 				mw.Error(err)
@@ -126,27 +116,6 @@ func listLayouts() []string {
 	return opts
 }
 
-func (mw *MainWindow) openEBUSMonitor() {
-	if w := mw.wm.HasWindow("EBUS Monitor"); w != nil {
-		mw.wm.Raise(w)
-		return
-	}
-	mon := ebusmonitor.New()
-	eb := multiwindow.NewSystemWindow("EBUS Monitor", mon)
-	eb.Icon = theme.ComputerIcon()
-	ebus.SetOnMessage(
-		func(topic string, data float64) {
-			fyne.Do(func() {
-				mon.SetText(topic, data)
-			})
-		},
-	)
-	eb.OnClose = func() {
-		ebus.SetOnMessage(nil)
-	}
-	mw.wm.Add(eb)
-}
-
 func (mw *MainWindow) openSettings() {
 	if w := mw.wm.HasWindow("Settings"); w != nil {
 		mw.wm.Raise(w)
@@ -185,7 +154,7 @@ func (mw *MainWindow) loadPrefs() {
 }
 
 func (mw *MainWindow) newSymbolnameTypeahead() {
-	mw.selects.symbolLookup = xwidget.NewCompletionEntry([]string{})
+	mw.selects.symbolLookup = widgets.NewCompletionEntry([]string{})
 	mw.selects.symbolLookup.PlaceHolder = "Search for symbol"
 	mw.selects.symbolLookup.OnChanged = func(s string) {
 		if mw.fw == nil {

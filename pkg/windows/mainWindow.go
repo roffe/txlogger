@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -18,25 +19,23 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	xwidget "fyne.io/x/fyne/widget"
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/proto"
+	"github.com/roffe/ecusymbol/as2"
+	"github.com/roffe/txlogger/j2534proxy/client"
 	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/update"
+	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/ledicon"
 	"github.com/roffe/txlogger/pkg/widgets/logplayer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
-	"github.com/roffe/txlogger/pkg/widgets/secrettext"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -61,33 +60,37 @@ func (s *SecretText) MouseUp(e *desktop.MouseEvent) {
 
 type MainWindow struct {
 	fyne.Window
-	app             fyne.App
-	menu            *MainMenu
-	outputData      binding.StringList
-	selects         *mainWindowSelects
-	buttons         *mainWindowButtons
-	counters        *mainWindowCounters
-	loggingRunning  bool
-	filename        string
-	symbolList      *symbollist.Widget
-	fw              symbol.SymbolCollection
+	app                         fyne.App
+	leadingMenus, trailingMenus []*fyne.Menu
+	recentItem                  *fyne.MenuItem
+	outputData                  binding.StringList
+	selects                     *mainWindowSelects
+	buttons                     *mainWindowButtons
+	counters                    *mainWindowCounters
+	loggingRunning              bool
+	filename                    string
+	symbolList                  *symbollist.Widget
+
+	as2 *as2.File
+	fw  symbol.SymbolCollection
+
 	dlc             datalogger.IClient
-	gwclient        proto.GocanClient
+	dlcCancel       context.CancelFunc
 	buttonsDisabled bool
 	settings        *settings.Widget
-	statusText      *secrettext.SecretText
+	statusText      *widget.Label
 	wm              *multiwindow.MultipleWindows
 	content         *fyne.Container
 	startup         bool
 
-	gocanGatewayLED *ledicon.Widget
-	canLED          *ledicon.Widget
+	j2534LED *ledicon.Widget
+	canLED   *ledicon.Widget
 
 	previewFeatures bool
 }
 
 type mainWindowSelects struct {
-	symbolLookup *xwidget.CompletionEntry
+	symbolLookup *widgets.CompletionEntry
 	ecuSelect    *widget.Select
 	presetSelect *widget.Select
 	layoutSelect *widget.Select
@@ -105,6 +108,7 @@ type mainWindowButtons struct {
 	layoutRefreshBtn *widget.Button
 	symbolListBtn    *widget.Button
 	addGaugeBtn      *widget.Button
+	livePlotBtn      *widget.Button
 }
 
 type mainWindowCounters struct {
@@ -128,14 +132,10 @@ func NewMainWindow(app fyne.App) *MainWindow {
 
 		symbolList: symbollist.New(symbolListConfig),
 
-		gocanGatewayLED: ledicon.New("Gateway"),
+		j2534LED:        ledicon.New("J2534"),
 		canLED:          ledicon.New("CAN"),
-		statusText:      secrettext.New("Harder, Better, Faster, Stronger"),
-		previewFeatures: app.Preferences().BoolWithFallback("enable_preview_features", false),
-	}
-
-	mw.statusText.SecretFunc = func() {
-		mw.app.Preferences().SetBool("enable_preview_features", true)
+		statusText:      widget.NewLabel("Harder, Better, Faster, Stronger"),
+		previewFeatures: app.Preferences().BoolWithFallback("enable_preview_features1337", false),
 	}
 
 	ebus.SubscribeFunc(ebus.TOPIC_COLORBLINDMODE, func(v float64) {
@@ -183,7 +183,7 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	mw.startup = false
 
 	if !fyne.CurrentApp().Driver().Device().IsMobile() {
-		mw.gocanGatewayClient()
+		mw.startJ2534Proxy()
 	}
 
 	mw.updateCheck()
@@ -213,22 +213,26 @@ func (mw *MainWindow) updateCheck() {
 	}
 }
 
-func (mw *MainWindow) gocanGatewayClient() {
-	_, client, err := gocan.NewGRPCClient()
-	if err != nil {
-		mw.Error(fmt.Errorf("failed to connect to gocan gateway: %w", err))
-		mw.gocanGatewayLED.Off()
+// startJ2534Proxy launches the 32-bit J2534 helper next to the executable
+// and folds the DLL adapters it serves into the settings adapter list. The
+// proxy keeps itself alive only as long as txlogger runs (stdin lifeline +
+// pings), so there is nothing to tear down on exit.
+func (mw *MainWindow) startJ2534Proxy() {
+	if runtime.GOOS != "windows" {
 		return
 	}
-
-	mw.gocanGatewayLED.On()
-	res, err := client.GetAdapters(context.Background(), &emptypb.Empty{})
-	if err != nil {
-		mw.Error(fmt.Errorf("failed to get adapters from gocan gateway: %w", err))
-		return
-	}
-	mw.settings.AddAdapters(res.Adapters)
-	mw.gwclient = client
+	go func() {
+		_, adapters, err := client.Start(context.Background(), debug.Log)
+		if err != nil {
+			debug.Log("j2534proxy: " + err.Error())
+			fyne.Do(mw.j2534LED.Off)
+			return
+		}
+		fyne.Do(func() {
+			mw.j2534LED.On()
+			mw.settings.AddAdapters(adapters)
+		})
+	}()
 }
 
 func (mw *MainWindow) setupShortcuts() {
@@ -271,22 +275,15 @@ func (mw *MainWindow) render() {
 	footer := container.NewBorder(
 		nil,
 		nil,
-		container.NewBorder(
-			nil,
-			nil,
-			nil,
-			mw.buttons.layoutRefreshBtn,
-			mw.selects.layoutSelect,
-		),
+		nil,
 		container.NewHBox(
 			container.NewHBox(
-				mw.gocanGatewayLED,
+				mw.j2534LED,
 				mw.canLED,
 				mw.counters.capturedCounterLabel,
 				mw.counters.errorCounterLabel,
 				mw.counters.fpsCounterLabel,
 			),
-			widget.NewButtonWithIcon("", theme.ComputerIcon(), mw.openEBUSMonitor),
 			mw.buttons.debugBtn,
 		),
 		mw.statusText,
@@ -311,12 +308,12 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 	}
 
 	dbcfg := &dashboard.Config{
-		Logplayer:       true,
-		UseMPH:          mw.settings.GetUseMPH(),
-		SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
-		High:            0.5,
-		Low:             1.5,
-		WidebandSymbol:  mw.settings.GetWidebandSymbolName(),
+		Logplayer:      true,
+		UseMPH:         mw.settings.GetUseMPH(),
+		ClassicGauges:  mw.settings.GetClassicGauges(),
+		High:           1.5,
+		Low:            0.5,
+		WidebandSymbol: mw.settings.GetWidebandSymbolName(),
 	}
 
 	rec := logz.Next()
@@ -397,6 +394,17 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 	// w.Show()
 	// mw.wm.Add(iw, p)
 	mw.Log("loaded log file " + filename + " in combined logplayer")
+	mw.addRecent(filename)
+}
+
+func (mw *MainWindow) LoadAS2File(filename string) error {
+	f, err := as2.Load(filename)
+	if err != nil {
+		return fmt.Errorf("failed to load AS2 file: %w", err)
+	}
+	mw.as2 = f
+	mw.Log("Loaded AS2 file " + filename)
+	return nil
 }
 
 func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Position) {
@@ -415,10 +423,28 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Positio
 	}
 
 	mw.Log("loaded log file " + filename)
+	mw.addRecent(filename)
 
 	lp := logplayer.New(&logplayer.Config{
-		EBus:    ebus.CONTROLLER,
-		Logfile: logz,
+		EBus:            ebus.CONTROLLER,
+		Logfile:         logz,
+		PlotterRenderer: mw.settings.GetPlotterRenderer(),
+		OnExport: func(records []logfile.Record) {
+			ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(fp)), ".")
+			prefix := strings.TrimSuffix(fp, filepath.Ext(fp)) + "-clip"
+			logPath := mw.settings.GetLogPath()
+			go func() {
+				path, err := datalogger.ExportRecords(logPath, prefix, ext, records)
+				fyne.Do(func() {
+					if err != nil {
+						mw.Error(fmt.Errorf("failed to export selection: %w", err))
+						return
+					}
+					mw.Log(fmt.Sprintf("exported %d samples to %s", len(records), path))
+					dialog.ShowInformation("Selection exported", fmt.Sprintf("Saved %d samples to\n%s", len(records), path), mw)
+				})
+			}()
+		},
 	})
 	/*
 		content := container.NewBorder(
@@ -590,6 +616,7 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	}
 	mw.SetTitle(filepath.Base(filename))
 	mw.app.Preferences().SetString(prefsLastBinFile, filename)
+	mw.addRecent(filename)
 
 	mw.LoadSymbols(symbols, ecuType.String())
 	// mw.selects.ecuSelect.SetSelected(ecuType.String())
@@ -631,7 +658,7 @@ func (mw *MainWindow) LoadPreset(r io.Reader) error {
 	return nil
 }
 
-func (mw *MainWindow) SavePreset(filename string) error {
+func (mw *MainWindow) ExportPreset(filename string) error {
 	b, err := json.Marshal(mw.symbolList.Symbols())
 	if err != nil {
 		return fmt.Errorf("failed to marshal config file: %w", err)

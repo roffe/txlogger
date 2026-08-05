@@ -35,11 +35,12 @@ func New(cols, rows int) *Grid {
 }
 
 func (g *Grid) CreateRenderer() fyne.WidgetRenderer {
-	return &gridRenderer{g}
+	return &gridRenderer{G: g}
 }
 
 type gridRenderer struct {
-	*Grid
+	G       *Grid
+	objects []fyne.CanvasObject
 }
 
 func (g *gridRenderer) MinSize() fyne.Size {
@@ -47,17 +48,17 @@ func (g *gridRenderer) MinSize() fyne.Size {
 }
 
 func (g *gridRenderer) Layout(size fyne.Size) {
-	if size == g.lastSize {
+	if size == g.G.lastSize {
 		return
 	}
-	g.lastSize = size
+	g.G.lastSize = size
 
-	cellWidth := size.Width / float32(g.cols)
-	cellHeight := size.Height / float32(g.rows)
+	cellWidth := size.Width / float32(g.G.cols)
+	cellHeight := size.Height / float32(g.G.rows)
 
 	// update vertical lines
-	for i := 0; i < g.cols; i++ {
-		l := g.lines[i]
+	for i := 0; i < g.G.cols; i++ {
+		l := g.G.lines[i]
 		x := float32(i) * cellWidth
 		l.Position1 = fyne.NewPos(x, 0)
 		l.Position2 = fyne.NewPos(x, size.Height)
@@ -65,9 +66,9 @@ func (g *gridRenderer) Layout(size fyne.Size) {
 	}
 
 	// update horizontal lines
-	offset := g.cols
-	for i := 0; i < g.rows; i++ {
-		l := g.lines[offset+i]
+	offset := g.G.cols
+	for i := 0; i < g.G.rows; i++ {
+		l := g.G.lines[offset+i]
 		y := float32(i) * cellHeight
 		l.Position1 = fyne.NewPos(0, y)
 		l.Position2 = fyne.NewPos(size.Width, y)
@@ -82,9 +83,11 @@ func (g *gridRenderer) Destroy() {
 }
 
 func (g *gridRenderer) Objects() []fyne.CanvasObject {
-	objs := make([]fyne.CanvasObject, len(g.lines))
-	for i, l := range g.lines {
-		objs[i] = l
+	if g.objects == nil {
+		g.objects = make([]fyne.CanvasObject, len(g.G.lines))
+		for i, l := range g.G.lines {
+			g.objects[i] = l
+		}
 	}
-	return objs
+	return g.objects
 }

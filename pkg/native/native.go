@@ -22,6 +22,7 @@ type FileRequest struct {
 }
 
 type FileResponse struct {
-	Path string
-	Err  string
+	Path  string
+	Paths []string
+	Err   string
 }

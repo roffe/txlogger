@@ -6,7 +6,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 )
 
 const (
@@ -19,16 +19,23 @@ const (
 )
 
 type Client struct {
-	c *gocan.Client
+	c *gocan.Bus
 
 	defaultTimeout time.Duration
 }
 
-func NewClient(c *gocan.Client) *Client {
+func NewClient(c *gocan.Bus) *Client {
 	return &Client{
 		c:              c,
 		defaultTimeout: 200 * time.Millisecond,
 	}
+}
+
+// request sends a command frame on canID and waits for the reply on replyID.
+func request(ctx context.Context, c *gocan.Bus, payload []byte, timeout time.Duration) (gocan.Frame, error) {
+	rctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return c.Request(rctx, gocan.NewFrame(canID, payload), replyID)
 }
 
 func (c *Client) ReadRam(ctx context.Context, address, length uint32) ([]byte, error) {
@@ -50,17 +57,19 @@ func (c *Client) ReadRam(ctx context.Context, address, length uint32) ([]byte, e
 
 func (c *Client) sendReadCommand(ctx context.Context, address uint32) ([]byte, error) {
 	const cmdByte = 0xC7
-	frame := gocan.NewFrame(0x05, []byte{cmdByte, 0x00, 0x00, byte(address >> 8), byte(address)}, gocan.ResponseRequired)
-	resp, err := c.c.SendAndWait(ctx, frame, c.defaultTimeout, 0x0C)
+	resp, err := request(ctx, c.c, []byte{cmdByte, 0x00, 0x00, byte(address >> 8), byte(address)}, c.defaultTimeout)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(resp.Data) < 8 { // need at least cmd + ? + 6 data bytes
-		return nil, fmt.Errorf("short response: got %d bytes", len(resp.Data))
+	if resp.Length < 8 { // need at least cmd + ? + 6 data bytes
+		return nil, fmt.Errorf("short response: got %d bytes", resp.Length)
 	}
 	if resp.Data[0] != cmdByte {
 		return nil, fmt.Errorf("invalid response: expected 0x%X, got 0x%X", cmdByte, resp.Data[0])
+	}
+	if resp.Data[1] != respOK { // D2 code: 4 = error (e.g. address out of range)
+		return nil, fmt.Errorf("read error at 0x%X: code 0x%02X", address, resp.Data[1])
 	}
 
 	data := append([]byte(nil), resp.Data[2:8]...) // copy slice
@@ -122,21 +131,17 @@ func (c *Client) sendBlock(ctx context.Context, addr uint32, block []byte, maxBl
 	}
 
 	// 1) Set address
-	frame := gocan.NewFrame(canID,
-		[]byte{
-			0xA5,
-			byte(addr >> 24), byte(addr >> 16), byte(addr >> 8), byte(addr),
-			byte(len(block)),
-			0x00, 0x00,
-		},
-		gocan.ResponseRequired,
-	)
-	addrResp, err := c.c.SendAndWait(ctx, frame, c.defaultTimeout, replyID)
+	addrResp, err := request(ctx, c.c, []byte{
+		0xA5,
+		byte(addr >> 24), byte(addr >> 16), byte(addr >> 8), byte(addr),
+		byte(len(block)),
+		0x00, 0x00,
+	}, c.defaultTimeout)
 	if err != nil {
 		return fmt.Errorf("set-address send failed: %w", err)
 	}
-	if len(addrResp.Data) < 2 {
-		return fmt.Errorf("set-address short response: %d bytes", len(addrResp.Data))
+	if addrResp.Length < 2 {
+		return fmt.Errorf("set-address short response: %d bytes", addrResp.Length)
 	}
 	if addrResp.Data[1] != respOK {
 		return fmt.Errorf("set-address NACK: 0x%02X", addrResp.Data[1])
@@ -162,13 +167,12 @@ func (c *Client) sendBlock(ctx context.Context, addr uint32, block []byte, maxBl
 		}
 		copy(payload[1:], block[offset:offset+n])
 
-		dataFrame := gocan.NewFrame(canID, payload[:], gocan.ResponseRequired)
-		dataResp, err := c.c.SendAndWait(ctx, dataFrame, c.defaultTimeout, replyID)
+		dataResp, err := request(ctx, c.c, payload[:], c.defaultTimeout)
 		if err != nil {
 			return fmt.Errorf("data send failed at offset %d: %w", offset, err)
 		}
-		if len(dataResp.Data) < 2 {
-			return fmt.Errorf("data short response at offset %d: %d bytes", offset, len(dataResp.Data))
+		if dataResp.Length < 2 {
+			return fmt.Errorf("data short response at offset %d: %d bytes", offset, dataResp.Length)
 		}
 		if dataResp.Data[1] != respOK {
 			return fmt.Errorf("data NACK at offset %d: 0x%02X", offset, dataResp.Data[1])
@@ -180,10 +184,9 @@ func (c *Client) sendBlock(ctx context.Context, addr uint32, block []byte, maxBl
 	return nil
 }
 
-func sendCommand(ctx context.Context, c *gocan.Client, cmd []byte, timeout time.Duration) error {
+func sendCommand(ctx context.Context, c *gocan.Bus, cmd []byte, timeout time.Duration) error {
 	for _, cmdByte := range cmd {
-		frame := gocan.NewFrame(0x05, []byte{0xC4, cmdByte}, gocan.ResponseRequired)
-		resp, err := c.SendAndWait(ctx, frame, timeout, 0xC)
+		resp, err := request(ctx, c, []byte{0xC4, cmdByte}, timeout)
 		if err != nil {
 			return err
 		}

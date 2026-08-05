@@ -1,6 +1,7 @@
 package common
 
 import (
+	"cmp"
 	"fmt"
 	"math"
 	"os"
@@ -29,6 +30,8 @@ const (
 	OneSixth        = 1.0 / 6.0    // 0.16666666666666666
 	OneSeventh      = 1.0 / 7.0    // 0.14285714285714285
 	OneEight        = 1.0 / 8.0    // 0.125
+	OneTenth        = 1.0 / 10.0   // 0.1
+	OneTwelfth      = 1.0 / 12.0   // 0.08333333333333333
 	OneTwentieth    = 1.0 / 20.0   // 0.05
 	OneTwentyFifth  = 1.0 / 25.0   // 0.04
 	OneSixthieth    = 1.0 / 60.0   // 0.016666666666666666
@@ -89,6 +92,33 @@ func GetLayoutPath() (string, error) {
 	return layoutPath, createDirIfNotExists(layoutPath)
 }
 
+func GetDashboardPath() (string, error) {
+	dir, err := GetUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	dashboardPath := GetComponentPath(dir, "dashboards")
+	return dashboardPath, createDirIfNotExists(dashboardPath)
+}
+
+func GetMatrixBuilderPath() (string, error) {
+	dir, err := GetUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	matrixBuilderPath := GetComponentPath(dir, "matrixbuilder")
+	return matrixBuilderPath, createDirIfNotExists(matrixBuilderPath)
+}
+
+func GetScriptsPath() (string, error) {
+	dir, err := GetUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	scriptsPath := GetComponentPath(dir, "scripts")
+	return scriptsPath, createDirIfNotExists(scriptsPath)
+}
+
 func GetBinPath() (string, error) {
 	dir, err := GetUserHomeDir()
 	if err != nil {
@@ -121,8 +151,14 @@ func CreatetxloggerDirs() error {
 	layouts := filepath.Join(path, "layouts")
 	bins := filepath.Join(path, "bins")
 	adscanner := filepath.Join(path, "adscanner")
+	dashboards := filepath.Join(path, "dashboards")
 
-	for _, p := range []string{logs, layouts, bins, adscanner} {
+	dirs := []string{logs, layouts, bins, adscanner, dashboards}
+	for _, ecu := range EcuList {
+		dirs = append(dirs, filepath.Join(path, "scripts", ecu))
+	}
+
+	for _, p := range dirs {
 		if err := createDirIfNotExists(p); err != nil {
 			return err
 		}
@@ -175,4 +211,43 @@ func SameTextBytes(s string, b []byte) bool {
 		}
 	}
 	return true
+}
+
+func Abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
+type Number interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~float32 | ~float64
+}
+
+// Generic function that works with any numeric type
+func FindMinMax[T Number](data []T) (T, T) {
+	if len(data) == 0 {
+		panic("empty slice")
+	}
+
+	min, max := data[0], data[0]
+	for _, v := range data {
+		if v < min {
+			min = v
+		}
+		if v > max {
+			max = v
+		}
+	}
+	return min, max
+}
+
+func Clamp[T cmp.Ordered](value, min, max T) T {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }

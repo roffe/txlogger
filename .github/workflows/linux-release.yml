@@ -17,18 +17,23 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v6.4.0
       with:
-        go-version: '1.26.3'
+        go-version: '1.26.4'
         cache: false
     - name: Get dependencies
       run: sudo apt-get update && sudo apt-get install 7zip gcc libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev libusb-1.0-0-dev libgtk-3-dev libasound2-dev libftdi1 libftdi1-dev
-    - name: Build CanGateway
-      run: GOPATH=$PWD/go go install -tags="j2534" github.com/roffe/gocangateway@latest; mv go/bin/gocangateway cangateway
+    - name: Install Kvaser CANLIB
+      run: |
+        wget -qO- "https://www.kvaser.com/downloads-kvaser/?utm_source=software&utm_ean=7330130980754&utm_status=latest" | tar xz
+        make -C linuxcan/canlib
+        sudo make -C linuxcan/canlib install
+    - name: Build j2534proxy
+      run: make j2534proxy
     - name: Get Go dependencies
       run: go get .
     - name: Build txlogger
       run: make txlogger
     - name: Archive
-      run: 7z a txloger_ubuntu_x64.7z cangateway txlogger
+      run: 7z a txloger_ubuntu_x64.7z j2534proxy.exe txlogger
     - name: Release
       uses: softprops/action-gh-release@v3
       if: github.ref_type == 'tag'

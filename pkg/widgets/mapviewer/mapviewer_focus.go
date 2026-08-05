@@ -123,19 +123,9 @@ func (mv *MapViewer) TypedKey(key *fyne.KeyEvent) {
 		mv.updateCells()
 		refresh = true
 	case "+", "A":
-		increment := math.Pow(10, -float64(mv.cfg.ZPrecision))
-		for _, cell := range mv.selectedCells {
-			mv.cfg.ZData[cell] += increment
-		}
-		mv.updateCells()
-		refresh = true
+		mv.stepSelected(1)
 	case "-", "Z":
-		increment := math.Pow(10, -float64(mv.cfg.ZPrecision))
-		for _, cell := range mv.selectedCells {
-			mv.cfg.ZData[cell] -= increment
-		}
-		mv.updateCells()
-		refresh = true
+		mv.stepSelected(-1)
 	case "Up":
 		mv.SelectedY++
 		if mv.SelectedY >= mv.numRows {

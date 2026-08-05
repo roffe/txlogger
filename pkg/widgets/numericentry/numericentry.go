@@ -11,9 +11,10 @@ type Widget struct {
 	widget.Entry
 }
 
-func New() *Widget {
+func New(text string) *Widget {
 	entry := &Widget{}
 	entry.ExtendBaseWidget(entry)
+	entry.SetText(text)
 	return entry
 }
 

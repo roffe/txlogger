@@ -58,7 +58,7 @@ func (p *Plotter) onZoom(value float64) {
 	if p.plotStartPos < 0 {
 		p.plotStartPos = 0
 	}
-	p.widthFactor = p.canvasImage.Size().Width / float32(p.dataPointsToShow)
+	p.widthFactor = p.plotObj.Size().Width / float32(p.dataPointsToShow)
 	p.updateCursor(false)
 	p.refreshImage(false)
 }

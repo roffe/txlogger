@@ -24,6 +24,7 @@ func runFileChild() {
 	}
 
 	var path string
+	var paths []string
 	switch req.Op {
 	case "select_folder":
 		path, err = native.OpenFolderDialog(req.Title)
@@ -37,6 +38,11 @@ func runFileChild() {
 			Description: req.Desc,
 			Extensions:  req.Exts,
 		})
+	case "open_files":
+		paths, err = native.OpenFilesDialog(req.Title, native.FileFilter{
+			Description: req.Desc,
+			Extensions:  req.Exts,
+		})
 	case "quit":
 		return
 	default:
@@ -44,7 +50,7 @@ func runFileChild() {
 		return
 	}
 
-	resp := native.FileResponse{Path: path}
+	resp := native.FileResponse{Path: path, Paths: paths}
 	if err != nil {
 		resp.Err = err.Error()
 	}

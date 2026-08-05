@@ -2,6 +2,7 @@ package native
 
 import (
 	"fmt"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"syscall"
@@ -26,12 +27,13 @@ var (
 )
 
 const (
-	MAX_PATH            = 260
-	OFN_EXPLORER        = 0x00080000
-	OFN_FILEMUSTEXIST   = 0x00001000
-	OFN_PATHMUSTEXIST   = 0x00000800
-	OFN_OVERWRITEPROMPT = 0x00000002
-	OFN_NOCHANGEDIR     = 0x00000008
+	MAX_PATH             = 260
+	OFN_EXPLORER         = 0x00080000
+	OFN_FILEMUSTEXIST    = 0x00001000
+	OFN_PATHMUSTEXIST    = 0x00000800
+	OFN_OVERWRITEPROMPT  = 0x00000002
+	OFN_NOCHANGEDIR      = 0x00000008
+	OFN_ALLOWMULTISELECT = 0x00000200
 )
 
 type openfilenameW struct {
@@ -106,6 +108,86 @@ func OpenFileDialog(title string, filters ...FileFilter) (string, error) {
 	}
 
 	return windows.UTF16PtrToString(ofn.lpstrFile), nil
+}
+
+// OpenFilesDialog shows a native open dialog allowing multiple selections and
+// returns the chosen paths.
+func OpenFilesDialog(title string, filters ...FileFilter) ([]string, error) {
+	// Multi-select needs a large buffer: the result holds the directory plus
+	// every selected filename, NUL-separated, terminated by a double NUL.
+	fileBuf := make([]uint16, 64*1024)
+
+	var filter []uint16
+	for _, filt := range filters {
+		desc := fmt.Sprintf("%s (%s)", filt.Description, strings.Join(filt.Extensions, ","))
+		filter = append(filter, utf16.Encode([]rune(desc))...)
+		filter = append(filter, 0x00)
+		for _, ext := range filt.Extensions {
+			s := fmt.Sprintf("*.%s;", ext)
+			filter = append(filter, utf16.Encode([]rune(s))...)
+		}
+		filter = append(filter, 0x00)
+	}
+
+	filterPtr := utf16ptr(filter)
+	titlePtr, err := windows.UTF16PtrFromString(title)
+	if err != nil {
+		return nil, err
+	}
+
+	ofn := openfilenameW{
+		lStructSize:  uint32(unsafe.Sizeof(openfilenameW{})),
+		lpstrFilter:  filterPtr,
+		lpstrFile:    &fileBuf[0],
+		nMaxFile:     uint32(len(fileBuf)),
+		lpstrTitle:   titlePtr,
+		Flags:        OFN_EXPLORER | OFN_ALLOWMULTISELECT | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR,
+		nFilterIndex: 1,
+	}
+
+	ret, _, err := procGetOpenFileNameW.Call(uintptr(unsafe.Pointer(&ofn)))
+	if ret == 0 {
+		if err != syscall.Errno(0) {
+			return nil, err
+		}
+		return nil, ErrCancelled
+	}
+
+	paths := parseMultiSelect(fileBuf)
+	if len(paths) == 0 {
+		return nil, ErrCancelled
+	}
+	return paths, nil
+}
+
+// parseMultiSelect decodes the OFN_ALLOWMULTISELECT result buffer. When a single
+// file is chosen the buffer holds its full path; when several are chosen the
+// first entry is the directory and the rest are bare filenames to join onto it.
+func parseMultiSelect(buf []uint16) []string {
+	var parts []string
+	start := 0
+	for i := 0; i < len(buf); i++ {
+		if buf[i] == 0 {
+			if i == start {
+				break // empty entry => terminating double NUL
+			}
+			parts = append(parts, string(utf16.Decode(buf[start:i])))
+			start = i + 1
+		}
+	}
+	switch len(parts) {
+	case 0:
+		return nil
+	case 1:
+		return parts
+	default:
+		dir := parts[0]
+		out := make([]string, 0, len(parts)-1)
+		for _, name := range parts[1:] {
+			out = append(out, filepath.Join(dir, name))
+		}
+		return out
+	}
 }
 
 type browseinfoW struct {

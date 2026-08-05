@@ -5,20 +5,21 @@ import (
 )
 
 type plotterRenderer struct {
-	*Plotter
+	PL      *Plotter
+	objects []fyne.CanvasObject
 }
 
 func (p *plotterRenderer) MinSize() fyne.Size {
-	return p.split.MinSize()
+	return p.PL.split.MinSize()
 }
 
 func (p *plotterRenderer) Layout(size fyne.Size) {
-	if p.size == size {
+	if p.PL.size == size {
 		return
 	}
-	p.size = size
+	p.PL.size = size
 
-	p.split.Resize(size)
+	p.PL.split.Resize(size)
 }
 
 func (p *plotterRenderer) Refresh() {
@@ -28,10 +29,14 @@ func (p *plotterRenderer) Destroy() {
 }
 
 func (p *plotterRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{p.split,
-		p.overlayText,
-		p.cursor,
+	if p.objects == nil {
+		p.objects = []fyne.CanvasObject{
+			p.PL.split,
+			p.PL.overlayText,
+			p.PL.cursor,
+		}
 	}
+	return p.objects
 }
 
 type plotLayout struct {
@@ -47,7 +52,7 @@ func (t *plotLayout) Layout(_ []fyne.CanvasObject, plotSize fyne.Size) {
 
 	t.p.overlayText.Move(fyne.NewPos(t.p.zoom.Size().Width, 20))
 
-	t.p.canvasImage.Resize(plotSize) // Calculate new plot dimensions
+	t.p.plotObj.Resize(plotSize) // Calculate new plot dimensions
 	t.p.plotResolution = fyne.NewSize(plotSize.Width*t.p.plotResolutionFactor, plotSize.Height*t.p.plotResolutionFactor)
 	// Update width factor based on the new size
 	t.p.widthFactor = plotSize.Width / float32(t.p.dataPointsToShow)

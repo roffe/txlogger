@@ -7,8 +7,7 @@ import (
 	"math"
 	"time"
 
-	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/t5can"
 )
@@ -21,11 +20,11 @@ func NewT5(cfg Config, lw LogWriter) (IClient, error) {
 	return &T5Client{BaseLogger: NewBaseLogger(cfg, lw)}, nil
 }
 
-func (c *T5Client) Start() error {
+func (c *T5Client) Start(pctx context.Context) error {
 	defer c.secondTicker.Stop()
 	defer c.lw.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
 	eventHandler := func(e gocan.Event) {
@@ -35,20 +34,26 @@ func (c *T5Client) Start() error {
 		}
 	}
 
-	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventHandler(eventHandler))
+	cl, err := gocan.OpenAdapter(ctx, c.Device, gocan.WithEventFunc(eventHandler))
 	if err != nil {
 		return err
 	}
 	defer cl.Close()
 
+	// Drive everything below off the client's context so a fatal adapter error
+	// (or Close) cancels the polling loop and aborts in-flight requests directly.
+	ctx = cl.Context()
+
 	t := time.NewTicker(time.Second / time.Duration(c.Rate))
 	defer t.Stop()
 	t5 := t5can.NewClient(cl)
 
-	sysvarOrder := make([]string, len(c.Symbols))
-	for n, s := range c.Symbols {
-		sysvarOrder[n] = s.Name
+	// T5 decodes every value into sysvars (see newT5Converter), so all columns
+	// are sysvar channels.
+	channels := make([]Channel, 0, len(c.Symbols)+2)
+	for _, s := range c.Symbols {
 		s.Correctionfactor = 0.1
+		channels = append(channels, newSysvarChannel(c.sysvars, s.Name))
 	}
 
 	if err := c.setupWBL(ctx, cl); err != nil {
@@ -57,15 +62,10 @@ func (c *T5Client) Start() error {
 
 	if c.lamb != nil {
 		defer c.lamb.Stop()
-		sysvarOrder = append(sysvarOrder, EXTERNALWBLSYM)
 	}
-
-	if c.WidebandConfig.ADScanner && c.WidebandConfig.Name == "ECU" {
-		sysvarOrder = append(sysvarOrder, LAMBDAADSCANNER)
+	for _, name := range c.appendExtraSysvars(nil) {
+		channels = append(channels, newSysvarChannel(c.sysvars, name))
 	}
-
-	tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
-	defer tx.Close()
 
 	converto := newT5Converter()
 	adscannerConverter := NewWBLInterpolator(c.WidebandConfig)
@@ -131,11 +131,11 @@ func (c *T5Client) Start() error {
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				if err := c.lw.Write(c.sysvars, sysvarOrder, []*symbol.Symbol{}, ts); err != nil {
+				if err := c.lw.Write(ts, channels); err != nil {
 					c.OnMessage("failed to write log: " + err.Error())
 					return
 				}
-				c.onCapture()
+				c.onCapture(ts)
 			}
 		}
 	}()

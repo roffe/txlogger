@@ -24,6 +24,9 @@ type HBar struct {
 	value float64
 	size  fyne.Size
 
+	// Vertical band the bar occupies; modern reserves a text row above it
+	barY, barH float32
+
 	layoutValues struct {
 		middle       float32
 		titleX       float32
@@ -76,6 +79,11 @@ func New(cfg *widgets.GaugeConfig) *HBar {
 		s.strokeCache[idx] = stroke
 	}
 
+	if !cfg.Classic {
+		// Modern bars are solid; the translucent classic fill washes out on the dark track
+		copy(s.fillCache, s.strokeCache)
+	}
+
 	s.ExtendBaseWidget(s)
 	return s
 }
@@ -118,8 +126,8 @@ func (s *HBar) SetValue(value float64) {
 	}
 
 	norm := s.clampNorm(value)
-	barWidth := norm * float32(s.size.Width)
-	s.bar.Resize(fyne.Size{Width: barWidth, Height: s.size.Height})
+	barWidth := norm * s.size.Width
+	s.bar.Resize(fyne.Size{Width: barWidth, Height: s.barH})
 
 	iv := int(value)
 	if !s.hasLastDisplay || iv != s.lastDisplayInt {
@@ -130,19 +138,23 @@ func (s *HBar) SetValue(value float64) {
 	}
 }
 
-func (s *HBar) SetValue2(value float64) {
-	s.SetValue(value)
-}
-
 func (s *HBar) Value() float64 {
 	return s.value
 }
 
 func (s *HBar) CreateRenderer() fyne.WidgetRenderer {
-	s.face = &canvas.Rectangle{
-		StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0xFF},
-		FillColor:   color.RGBA{0x00, 0x00, 0x00, 0x00},
-		StrokeWidth: 3,
+	textColor := widgets.TextPrimary
+	if s.cfg.Classic {
+		textColor = color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}
+		// Thin outline around the bar, drawn on top of it
+		s.face = &canvas.Rectangle{
+			StrokeColor: color.RGBA{0x80, 0x80, 0x80, 0xFF},
+			FillColor:   color.RGBA{0x00, 0x00, 0x00, 0x00},
+			StrokeWidth: 3,
+		}
+	} else {
+		// Modern: a dark rounded track the value bar fills
+		s.face = &canvas.Rectangle{FillColor: widgets.TrackColor}
 	}
 
 	s.bar = &canvas.Rectangle{
@@ -152,7 +164,7 @@ func (s *HBar) CreateRenderer() fyne.WidgetRenderer {
 
 	s.titleText = &canvas.Text{
 		Text:     s.cfg.Title,
-		Color:    color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF},
+		Color:    textColor,
 		TextSize: 25,
 	}
 	s.titleText.TextStyle.Monospace = true
@@ -160,11 +172,17 @@ func (s *HBar) CreateRenderer() fyne.WidgetRenderer {
 
 	s.displayText = &canvas.Text{
 		Text:     "0",
-		Color:    color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF},
+		Color:    textColor,
 		TextSize: 25,
 	}
 	s.displayText.TextStyle.Monospace = true
 	s.displayText.Alignment = fyne.TextAlignCenter
+
+	if !s.cfg.Classic {
+		// Modern splits the labels to opposite ends of the bar
+		s.titleText.Alignment = fyne.TextAlignLeading
+		s.displayText.Alignment = fyne.TextAlignTrailing
+	}
 
 	s.layoutValues.titleX = -s.titleText.Size().Width * 0.5
 	s.layoutValues.displayTextX = -s.displayText.Size().Width * 0.5
@@ -173,14 +191,21 @@ func (s *HBar) CreateRenderer() fyne.WidgetRenderer {
 	s.lines = make([]*canvas.Line, maxSteps)
 
 	for i := 0; i < int(maxSteps); i++ {
-		t := float64(i) / float64(maxSteps-1)
-		ci := int(t * float64(len(s.strokeCache)-1))
-		if ci < 0 {
-			ci = 0
-		} else if ci >= len(s.strokeCache) {
-			ci = len(s.strokeCache) - 1
+		// Modern ticks are neutral, the bar carries the color. Classic tints them.
+		strokeColor := widgets.TickMinor
+		if i%2 == 0 {
+			strokeColor = widgets.TickMajor
 		}
-		strokeColor := s.strokeCache[ci]
+		if s.cfg.Classic {
+			t := float64(i) / float64(maxSteps-1)
+			ci := int(t * float64(len(s.strokeCache)-1))
+			if ci < 0 {
+				ci = 0
+			} else if ci >= len(s.strokeCache) {
+				ci = len(s.strokeCache) - 1
+			}
+			strokeColor = s.strokeCache[ci]
+		}
 		line := &canvas.Line{
 			StrokeColor: strokeColor,
 			StrokeWidth: 2,
@@ -188,7 +213,7 @@ func (s *HBar) CreateRenderer() fyne.WidgetRenderer {
 		s.lines[i] = line
 	}
 
-	return &HBarRenderer{s}
+	return &HBarRenderer{HBar: s}
 }
 
 // getColorForValue returns fill & stroke color for an arbitrary gauge value.
@@ -221,6 +246,12 @@ func (s *HBar) getColorForValue(value float64) (fillColor, strokeColor color.RGB
 			color.RGBA{R: r, G: g, B: 0x33, A: 0xFF}
 	}
 
+	if !s.cfg.Classic {
+		// Modern bars share the bright dial zone gradient: green -> yellow -> red
+		c := widgets.ZoneColor(ratio)
+		return c, c
+	}
+
 	// default green -> red
 	rr := uint8(0xA5 * ratio)
 	gg := uint8(0xA5 * (1 - ratio))
@@ -229,11 +260,12 @@ func (s *HBar) getColorForValue(value float64) (fillColor, strokeColor color.RGB
 }
 
 type HBarRenderer struct {
-	*HBar
+	HBar    *HBar
+	objects []fyne.CanvasObject
 }
 
 func (r *HBarRenderer) MinSize() fyne.Size {
-	return r.cfg.MinSize
+	return r.HBar.cfg.MinSize
 }
 
 func (r *HBarRenderer) Refresh() {
@@ -245,41 +277,65 @@ func (r *HBarRenderer) Destroy() {
 }
 
 func (r *HBarRenderer) Layout(space fyne.Size) {
-	if r.size == space {
+	if r.HBar.size == space {
 		return
 	}
-	r.size = space
+	r.HBar.size = space
 
-	r.layoutValues.middle = space.Height * 0.5
+	stepFactor := space.Width / float32(r.HBar.cfg.Steps)
 
-	stepFactor := float32(space.Width) / float32(r.cfg.Steps)
+	if r.HBar.cfg.Classic {
+		r.HBar.barY, r.HBar.barH = 0, space.Height
 
-	// Face layout
-	r.face.Move(fyne.Position{X: -2, Y: 0})
-	r.face.Resize(space.AddWidthHeight(3, 1))
+		r.HBar.face.Move(fyne.Position{X: -2, Y: 0})
+		r.HBar.face.Resize(space.AddWidthHeight(3, 1))
 
-	// Title centered horizontally, just below bar
-	titleMinSize := r.titleText.MinSize()
-	r.titleText.Resize(fyne.Size{Width: space.Width, Height: titleMinSize.Height})
-	r.titleText.Move(fyne.Position{
-		X: 0,
-		Y: space.Height - titleMinSize.Height,
-	})
+		// Title centered horizontally, just below bar
+		titleMinSize := r.HBar.titleText.MinSize()
+		r.HBar.titleText.Resize(fyne.Size{Width: space.Width, Height: titleMinSize.Height})
+		r.HBar.titleText.Move(fyne.Position{
+			X: 0,
+			Y: space.Height - titleMinSize.Height,
+		})
 
-	// Display text in the middle, centered vertically
-	displayMinSize := r.displayText.MinSize()
-	r.displayText.Resize(fyne.Size{Width: space.Width, Height: displayMinSize.Height})
-	r.displayText.Move(fyne.Position{
-		X: 0,
-		Y: r.layoutValues.middle - displayMinSize.Height*0.5,
-	})
+		// Display text in the middle, centered vertically
+		displayMinSize := r.HBar.displayText.MinSize()
+		r.HBar.displayText.Resize(fyne.Size{Width: space.Width, Height: displayMinSize.Height})
+		r.HBar.displayText.Move(fyne.Position{
+			X: 0,
+			Y: space.Height*0.5 - displayMinSize.Height*0.5,
+		})
+	} else {
+		// Modern: a text row on top (title left, value right), the bar band below
+		// it, so the readout never sits on the colored fill
+		textSize := min(float32(25), space.Height*0.42)
+		r.HBar.titleText.TextSize = textSize
+		r.HBar.displayText.TextSize = textSize
 
-	// Tick lines layout (vertical lines across width)
-	oneThird := space.Height * common.OneThird
-	oneSeventh := space.Height * common.OneSeventh
-	middle := r.layoutValues.middle
+		textHeight := r.HBar.displayText.MinSize().Height
+		box := fyne.Size{Width: space.Width, Height: textHeight}
+		r.HBar.titleText.Resize(box)
+		r.HBar.titleText.Move(fyne.Position{})
+		r.HBar.displayText.Resize(box)
+		r.HBar.displayText.Move(fyne.Position{})
 
-	for i, line := range r.lines {
+		r.HBar.barY = textHeight
+		r.HBar.barH = space.Height - textHeight
+
+		radius := r.HBar.barH * widgets.BarCornerFrac
+		r.HBar.face.CornerRadius = radius
+		r.HBar.bar.CornerRadius = radius
+		r.HBar.face.Move(fyne.Position{X: 0, Y: r.HBar.barY})
+		r.HBar.face.Resize(fyne.Size{Width: space.Width, Height: r.HBar.barH})
+	}
+
+	// Tick lines layout (vertical lines across the bar band)
+	middle := r.HBar.barY + r.HBar.barH*0.5
+	r.HBar.layoutValues.middle = middle
+	oneThird := r.HBar.barH * common.OneThird
+	oneSeventh := r.HBar.barH * common.OneSeventh
+
+	for i, line := range r.HBar.lines {
 		x := float32(i) * stepFactor
 		if i%2 == 0 {
 			line.Position1 = fyne.Position{X: x, Y: middle - oneThird}
@@ -290,20 +346,29 @@ func (r *HBarRenderer) Layout(space fyne.Size) {
 		}
 	}
 
-	// Bar position is fixed at origin; set once here so SetValue can skip it.
-	r.bar.Move(fyne.Position{X: 0, Y: 0})
+	// Bar X is fixed; set position once here so SetValue only resizes.
+	r.HBar.bar.Move(fyne.Position{X: 0, Y: r.HBar.barY})
 
 	// Recompute bar geometry for current value using new size
-	norm := r.clampNorm(r.value)
-	barWidth := norm * float32(r.size.Width)
-	r.bar.Resize(fyne.Size{Width: barWidth, Height: r.size.Height})
+	norm := r.HBar.clampNorm(r.HBar.value)
+	r.HBar.bar.Resize(fyne.Size{Width: norm * space.Width, Height: r.HBar.barH})
 }
 
 func (r *HBarRenderer) Objects() []fyne.CanvasObject {
-	objs := make([]fyne.CanvasObject, 0, len(r.lines)+4)
-	for _, line := range r.lines {
-		objs = append(objs, line)
+	if r.objects == nil {
+		objs := make([]fyne.CanvasObject, 0, len(r.HBar.lines)+4)
+		if !r.HBar.cfg.Classic {
+			// Modern: the track sits under the bar, ticks on top of both
+			objs = append(objs, r.HBar.face, r.HBar.bar)
+		}
+		for _, line := range r.HBar.lines {
+			objs = append(objs, line)
+		}
+		if r.HBar.cfg.Classic {
+			objs = append(objs, r.HBar.bar, r.HBar.face)
+		}
+		objs = append(objs, r.HBar.titleText, r.HBar.displayText)
+		r.objects = objs
 	}
-	objs = append(objs, r.bar, r.face, r.titleText, r.displayText)
-	return objs
+	return r.objects
 }

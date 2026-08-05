@@ -1,8 +1,43 @@
 # 2.1.10
-- Performance optimization for the log plotter and meshgrid
-- force layouts to be loaded and saved in users home directory under the txlogger folder
-- update ecusymbol to be able to read T5 versions
+- Added "Modern" gauge style selectable under graphics settings. It now covers the bar gauges too: VBar, HBar and CBar get a rounded dark track, a solid green→yellow→red fill and labels moved off the bar so they stay readable
+- Added "Compare symbols with other binary" under the Tools menu. Pick a second binary of the same ECU type and get a list of every symbol whose data differs from the currently loaded one, with symbol number, size and address (size mismatches are flagged). Click a symbol to preview it, double-click to keep it open in its own tab. Each symbol shows three tabs: a Diff tab with the per-cell difference (current - other), Current and the other binary. Logging must be stopped while comparing
+- The refresh button in CAN settings now also rescans for adapters, so devices plugged in (or J2534 drivers installed) after txlogger started are picked up without a restart
+- Fixed the mapviewer grid so all cells and the gaps between them render with consistent sizes
+- Reworked inner window resizing: grab any edge, and the ends of each edge act as diagonal corner resize like native windows
+- Cut a new logfile from a selection in the logplayer: scrub to a spot and press "In" (or the `i` key) to mark the start, scrub again and press "Out" (or `o`) to mark the end, then press the save button to write just that range to a new log next to your other logs. The clip keeps the same format as the source log (csv/bpl/t5l/t7l/t8l). Leaving the In or Out point unset selects from the start or to the end of the log
+- Live tracking marker in the 3d mesh viewer showing where the ECU is reading from, mirroring the crosshair in the map above
+- Fixed the 3d mesh showing one cell less than the table in each direction; values are now cell-centered so an 18x16 map renders 18x16 cells
+- Performance optimization for the meshgrid
+- Force layouts to be loaded and saved in users home directory under the txlogger folder
+- Update ecusymbol to be able to read T5 versions
 - Added new config widget for AD scanner WBL settings inspired by T7's DisplAdap.LamScannerTab
+- Refactored the bus implementation to use less CPU and have less allocations
+- Added support for BPL files ( binary packed logfile )
+- Removed support for creating legacy TXL log files. (you can still load them but might cause crashes)
+- Removed ebusmonitor, it has served it's purpose
+- Improved drag handler in logplayer, when zoomed in we drag fewer frames increasing as we zoom out
+- We now have 3 render modes for viewing 3d maps, Solid Wireframe, Solid & Wireframe. Press the little square icon in the mesh viewer to switch between them
+- WBL reconnect COM port while logging. If the COM port dies for a reason during logging it will try to re-connect
+- Performance improvements in many widget to allow slower computers to run txlogger better
+- Improved camera handling in the 3d mesh viewer - now behaves like the t5/7/8 suites
+- Added 2D graph for viewing flat maps
+- Rewrote logplayer plotter to use about 50% less CPU on zoomed out views
+- Big refactor of the log writing logic to be simpler to maintain and be more performant
+- Improved cell selection in mapviewer
+- Improved copy paste in mapviewer, added paste here function
+- Added a Matrix builder from logfiles. It learns a 2D map from one or more logs: pick which series drives the X axis, the Y axis and supplies the Z value, and every sample that lands on a cell is averaged into it. The result is shown live in a mapviewer (colored grid + 3D mesh) and the cells can be edited by hand
+  - Load and merge multiple log files at once (t5l, t7l, t8l, csv, bpl); series are row-aligned across files
+  - Pick X/Y/Z from a dropdown of the loaded series or type a name by hand
+  - Adjustable column/row counts and fully editable axis breakpoints, with an "Auto" button that spreads a series' min..max evenly across an axis
+  - Per-axis Z-hit tolerance sliders: reject samples that sit too far from a breakpoint so only values close to a cell count toward it
+  - Visual filter / query builder: add rules like "if <series> <op> <value>" and a sample only counts as a hit when it satisfies every rule. Operators: >, >=, <, <=, ==, != and ~ (approximately equal)
+  - Filter query language: instead of the visual rules you can type a full query with and/or, () grouping and the same operators, e.g. "if (ActualIn.n_Engine > 3000 and Out.X_AccPedal > 50) or boost ~ 1.2". Series can be compared to numbers, to each other or to arithmetic of them; a non-empty query overrides the rules
+  - Save and load configurations as presets (series, dimensions, axis breakpoints, tolerances and filter rules)
+- Added a bunch of TransCal maps under Fueling on T7
+- Replaced gocangateway with a slimmer j2534proxy
+- Rewrote everything to use GoCAN v2
+- Added color customizer to set custom colors on log plotter series
+- Added edit functionality to dashboard so you can move gauges around freely
 
 # 2.1.9
 - Updated default T7 preset to include MAF.m_AirFromp_AirInlet

@@ -1,64 +1,96 @@
 package t5
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"time"
-
-	"github.com/roffe/gocan"
+	"strconv"
 )
 
+// GetECUChecksum runs the bootloader C8 command. MyBooty calculates the
+// checksum over [ROM_Offset .. Code_End] (both read from the flash footer)
+// and compares it against the value stored in the last 4 bytes of flash.
+// Status 0x01 means the checksum did NOT match (or the footer is unreadable);
+// no value is returned in that case.
 func (t *Client) GetECUChecksum(ctx context.Context) ([]byte, error) {
 	if !t.bootloaded {
 		if err := t.UploadBootLoader(ctx); err != nil {
 			return nil, err
 		}
 	}
-	frameData := gocan.NewFrame(0x5, []byte{0xC8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frameData, 1*time.Second, 0xC)
+	data, err := t.command(ctx, []byte{0xC8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, checksumTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ECU checksum: %v", err)
+		return nil, fmt.Errorf("failed to get ECU checksum: %w", err)
 	}
-	data := resp.Data[2:6]
-	return data, nil
-}
-
-func (t *Client) CalculateBinChecksum(bin []byte) ([]byte, error) {
-	codeLen := getCodeLength(bin)
-	if codeLen < 0 {
-		return nil, errors.New("could not find end marker in bin")
-	}
-	var calculated uint32
-	for pos := 0; int64(pos) <= codeLen; pos++ {
-		calculated += uint32(bin[pos])
+	if data[1] != 0x00 {
+		return nil, errors.New("ECU reports FLASH checksum mismatch")
 	}
 	out := make([]byte, 4)
-	binary.BigEndian.PutUint32(out, calculated)
-
+	copy(out, data[2:6])
 	return out, nil
 }
 
-// Find the end marker in bin and report back the code length
-func getCodeLength(bin []byte) int64 {
-	ix := 0
-	search := []byte{0x4E, 0xFA, 0xFB, 0xCC}
-	r := bufio.NewReader(bytes.NewReader(bin))
-	offset := int64(0)
-	for ix < len(search) {
-		b, err := r.ReadByte()
-		if err != nil {
-			return -1
-		}
-		if search[ix] == b {
-			ix++
-		} else {
-			ix = 0
-		}
-		offset++
+// CalculateBinChecksum calculates the checksum of a bin the same way MyBooty
+// does in flash: sum of the bytes from file start through Code_End (both
+// ROM_Offset and Code_End are read from the footer at the end of the bin).
+func (t *Client) CalculateBinChecksum(bin []byte) ([]byte, error) {
+	end, err := binCodeEnd(bin)
+	if err != nil {
+		return nil, err
 	}
-	return offset - int64(len(search)) + 3
+	var calculated uint32
+	for _, b := range bin[:end+1] {
+		calculated += uint32(b)
+	}
+	out := make([]byte, 4)
+	binary.BigEndian.PutUint32(out, calculated)
+	return out, nil
+}
+
+// ValidateBinChecksum verifies a bin before flashing: the calculated checksum
+// must match the one stored in the last 4 bytes, exactly like the ECU will
+// verify it with the C8 command after flashing.
+func (t *Client) ValidateBinChecksum(bin []byte) error {
+	calculated, err := t.CalculateBinChecksum(bin)
+	if err != nil {
+		return err
+	}
+	stored := bin[len(bin)-4:]
+	if binary.BigEndian.Uint32(stored) != binary.BigEndian.Uint32(calculated) {
+		return fmt.Errorf("bin checksum mismatch: stored %X, calculated %X", stored, calculated)
+	}
+	return nil
+}
+
+// binCodeEnd returns the file offset of the last byte included in the
+// checksum, derived from the ROM_Offset (0xFD) and Code_End (0xFE) footer
+// fields just like MyBooty's Get_Checksum routine.
+func binCodeEnd(bin []byte) (int64, error) {
+	if len(bin) < 0x100 {
+		return -1, errors.New("bin too small")
+	}
+	romOffsetStr := GetIdentifierFromFooter(bin, ROMoffset)
+	codeEndStr := GetIdentifierFromFooter(bin, CodeEnd)
+	if romOffsetStr == "" || codeEndStr == "" {
+		return -1, errors.New("could not read ROM offset / code end from bin footer")
+	}
+	romOffset, err := strconv.ParseInt(romOffsetStr, 16, 64)
+	if err != nil {
+		return -1, fmt.Errorf("invalid ROM offset %q in footer: %w", romOffsetStr, err)
+	}
+	codeEnd, err := strconv.ParseInt(codeEndStr, 16, 64)
+	if err != nil {
+		return -1, fmt.Errorf("invalid code end %q in footer: %w", codeEndStr, err)
+	}
+	end := codeEnd - romOffset
+	if codeEnd <= romOffset || end >= int64(len(bin))-4 {
+		return -1, errors.New("code end outside of bin")
+	}
+	// MyBooty sums two bytes per loop iteration and only stops on an exact
+	// address match: an odd byte count makes the ECU hang in the C8 command.
+	if (end+1)%2 != 0 {
+		return -1, errors.New("unaligned code end, ECU would hang calculating checksum")
+	}
+	return end, nil
 }

@@ -25,7 +25,9 @@ func (mv *MapViewer) TypedShortcut(shortcut fyne.Shortcut) {
 	case "Copy":
 		mv.copy()
 	case "Paste":
-		mv.paste()
+		// Ctrl+V pastes at the current cursor/selection position rather than
+		// the coordinates the data was originally copied from.
+		mv.pasteHere()
 	}
 }
 
@@ -52,18 +54,22 @@ func (mv *MapViewer) copy() {
 	fyne.CurrentApp().Clipboard().SetContent(copyString.String())
 }
 
-func (mv *MapViewer) paste() {
-	if !mv.cfg.Editable {
-		return
-	}
-	cb := fyne.CurrentApp().Clipboard().Content()
+type clipboardCell struct {
+	x, y  int // storage coordinates (y already converted to storage row)
+	value float64
+}
+
+// parseClipboardCells parses the internal copy format into cells with storage
+// coordinates. The first cell is the anchor; its x carries the +20/+200 marker,
+// which is stripped here.
+func (mv *MapViewer) parseClipboardCells(cb string) []clipboardCell {
 	split := strings.Split(cb, copyPasteSeparator)
+	cells := make([]clipboardCell, 0, len(split))
 	for i, part := range split {
 		if len(part) < 3 {
 			continue
 		}
 		pp := strings.Split(part, ":")
-
 		if len(pp) < 3 {
 			continue
 		}
@@ -73,7 +79,6 @@ func (mv *MapViewer) paste() {
 			log.Println(err)
 			continue
 		}
-
 		if i == 0 && x >= 200 {
 			x -= 200
 		} else if i == 0 && x >= 20 {
@@ -85,27 +90,87 @@ func (mv *MapViewer) paste() {
 			log.Println(err)
 			continue
 		}
-		value, err := strconv.Atoi(pp[2])
+		value, err := strconv.ParseFloat(pp[2], 64)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		y = mv.numRows - 1 - y
+		cells = append(cells, clipboardCell{x: x, y: mv.numRows - 1 - y, value: value})
+	}
+	return cells
+}
 
-		index := y*mv.numColumns + x
-		if index < 0 || index >= len(mv.cfg.ZData) {
-			log.Printf("Index out of range: %d", index)
+// applyPaste writes the parsed cells into ZData, offset by shiftX/shiftY. Cells
+// that fall outside the map bounds are skipped. When bounds is non-nil, only
+// destination cells present in the set are written, so the paste stays inside
+// the current selection.
+func (mv *MapViewer) applyPaste(cells []clipboardCell, shiftX, shiftY int, bounds map[int]struct{}) {
+	changed := false
+	for _, c := range cells {
+		x := c.x + shiftX
+		y := c.y + shiftY
+		if x < 0 || x >= mv.numColumns || y < 0 || y >= mv.numRows {
 			continue
 		}
-		mv.cfg.ZData[index] = float64(value)
-		//if len(split) < 30 {
-		//	mv.cfg.UpdateECUFunc(index, []float64{mv.cfg.ZData[index]})
-		//}
+		index := y*mv.numColumns + x
+		if index < 0 || index >= len(mv.cfg.ZData) {
+			continue
+		}
+		if bounds != nil {
+			if _, ok := bounds[index]; !ok {
+				continue
+			}
+		}
+		mv.cfg.ZData[index] = c.value
+		changed = true
 	}
-	//if len(split) >= 30 {
-	//	mv.cfg.SaveECUFunc(mv.cfg.ZData)
-	//}
-	mv.Refresh()
+	if changed {
+		mv.Refresh()
+	}
+}
+
+// paste writes the clipboard back to the same coordinates it was copied from.
+func (mv *MapViewer) paste() {
+	if !mv.cfg.Editable {
+		return
+	}
+	cells := mv.parseClipboardCells(fyne.CurrentApp().Clipboard().Content())
+	mv.applyPaste(cells, 0, 0, nil)
+}
+
+// pasteHere writes the clipboard with its anchor cell landing on the currently
+// selected cell, so the block is pasted starting where the user right-clicked.
+func (mv *MapViewer) pasteHere() {
+	if !mv.cfg.Editable {
+		return
+	}
+	cells := mv.parseClipboardCells(fyne.CurrentApp().Clipboard().Content())
+	if len(cells) == 0 {
+		return
+	}
+	// Anchor on the visual top-left of the copied block (smallest column,
+	// topmost row). Data row 0 is drawn at the bottom, so the topmost row is the
+	// largest storage y. This makes the block fill down and to the right from
+	// the clicked cell, matching the on-screen orientation.
+	minX, maxY := cells[0].x, cells[0].y
+	for _, c := range cells[1:] {
+		if c.x < minX {
+			minX = c.x
+		}
+		if c.y > maxY {
+			maxY = c.y
+		}
+	}
+	// When more than a single cell is selected, confine the paste to that
+	// selection so values can't spill outside the highlighted block.
+	var bounds map[int]struct{}
+	if len(mv.selectedCells) > 1 {
+		bounds = make(map[int]struct{}, len(mv.selectedCells))
+		for _, cell := range mv.selectedCells {
+			bounds[cell] = struct{}{}
+		}
+	}
+	mv.applyPaste(cells, mv.selectedX-minX, mv.SelectedY-maxY, bounds)
 }
 
 func (mv *MapViewer) smooth() {
@@ -136,20 +201,23 @@ func (mv *MapViewer) smooth() {
 	mv.Refresh()
 }
 
+// updateCursor collapses the selection to the single cell at selectedX/SelectedY
+// and redraws the overlay highlight. Used by keyboard navigation and the
+// crosshair-follow cursor. Pass goroutine=true when called off the main thread.
 func (mv *MapViewer) updateCursor(goroutine bool) {
-	mv.selectedCells = []int{mv.SelectedY*mv.numColumns + mv.selectedX}
-	xPosFactor := float32(mv.selectedX)
-	yPosFactor := float32(float64(mv.numRows-1) - float64(mv.SelectedY))
-	xPos := xPosFactor * mv.widthFactor
-	yPos := yPosFactor * mv.heightFactor
+	cell := mv.SelectedY*mv.numColumns + mv.selectedX
+	if len(mv.selectedCells) == 1 && mv.selectedCells[0] == cell {
+		return
+	}
+	apply := func() {
+		mv.clearSelectionVisual()
+		mv.selectedCells = append(mv.selectedCells[:0], cell)
+		mv.drawSelectionVisual()
+	}
 	if goroutine {
-		fyne.Do(func() {
-			mv.selectionRect.Resize(fyne.Size{Width: mv.widthFactor + 1, Height: mv.heightFactor + 1})
-			mv.selectionRect.Move(fyne.Position{X: xPos - 1, Y: yPos - 1})
-		})
+		fyne.Do(apply)
 	} else {
-		mv.selectionRect.Resize(fyne.Size{Width: mv.widthFactor + 1, Height: mv.heightFactor + 1})
-		mv.selectionRect.Move(fyne.Position{X: xPos - 1, Y: yPos - 1})
+		apply()
 	}
 }
 

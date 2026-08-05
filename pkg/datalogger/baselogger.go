@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
+	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/wbl"
 	"github.com/roffe/txlogger/relayserver"
 )
@@ -52,6 +54,12 @@ func NewBaseLogger(cfg Config, lw LogWriter) *BaseLogger {
 		secondTicker: time.NewTicker(time.Second),
 	}
 
+	// User Lua scripts run inside the writer so their outputs land in the same
+	// row they were computed from; see script.go.
+	if sw := newScriptWriter(cfg, lw, bl.sysvars); sw != nil {
+		bl.lw = sw
+	}
+
 	if cfg.RemoteMode == 1 {
 		if err := bl.runRelay(); err != nil {
 			log.Println(err.Error())
@@ -90,13 +98,15 @@ func (bl *BaseLogger) GetRAM(address uint32, length uint32) ([]byte, error) {
 	return req.Data, req.Wait()
 }
 
-// update capture counters
-func (bl *BaseLogger) onCapture() {
+// update capture counters and emit the per-frame tick so live consumers can
+// sample every symbol with this frame's real timestamp.
+func (bl *BaseLogger) onCapture(t time.Time) {
 	bl.captureCount++
 	bl.capturePerSecond++
 	if bl.captureCount%15 == 0 {
 		bl.CaptureCounter(bl.captureCount)
 	}
+	ebus.PublishFrame(t)
 }
 
 func (bl *BaseLogger) onError() {
@@ -114,7 +124,49 @@ func (bl *BaseLogger) calculateCompensatedTimestamp() time.Time {
 	return bl.firstTime.Add(time.Duration(bl.currtimestamp-bl.firstTimestamp) * time.Millisecond)
 }
 
-func (bl *BaseLogger) setupWBL(ctx context.Context, cl *gocan.Client) error {
+// appendExtraSysvars appends the wideband and AD scanner pseudo-symbol names to
+// a sysvar order slice when they are active, in the same order they are
+// written to the log.
+func (bl *BaseLogger) appendExtraSysvars(order []string) []string {
+	if bl.lamb != nil {
+		order = append(order, EXTERNALWBLSYM)
+	}
+	if bl.WidebandConfig.ADScanner && bl.WidebandConfig.Name == "ECU" {
+		order = append(order, LAMBDAADSCANNER)
+	}
+	if sw, ok := bl.lw.(*scriptWriter); ok {
+		for _, name := range sw.outputNames() {
+			if !slices.Contains(order, name) {
+				order = append(order, name)
+			}
+		}
+	}
+	return order
+}
+
+// buildChannels assembles the standard log layout: every current sysvar
+// (broadcast/derived values plus the active wideband / AD scanner pseudo-symbols)
+// becomes an asynchronous sysvar channel, followed by every polled symbol
+// (Number >= 0) as a symbol channel. Symbols with a negative number are either
+// replaced by a broadcast/derived sysvar or sourced elsewhere and are not log
+// columns. Column order is whatever the channel slice yields; the writer is
+// consistent across the header and every row because it iterates this slice.
+func (bl *BaseLogger) buildChannels() []Channel {
+	order := bl.appendExtraSysvars(bl.sysvars.Keys())
+	channels := make([]Channel, 0, len(order)+len(bl.Symbols))
+	for _, name := range order {
+		channels = append(channels, newSysvarChannel(bl.sysvars, name))
+	}
+	for _, sym := range bl.Symbols {
+		if sym.Number < 0 {
+			continue
+		}
+		channels = append(channels, newSymbolChannel(sym))
+	}
+	return channels
+}
+
+func (bl *BaseLogger) setupWBL(ctx context.Context, cl *gocan.Bus) error {
 	cfg := &wbl.WBLConfig{
 		WBLType:  bl.Config.WidebandConfig.Name,
 		Port:     bl.Config.WidebandConfig.Port,

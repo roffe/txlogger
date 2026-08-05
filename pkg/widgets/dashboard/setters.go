@@ -1,8 +1,8 @@
 package dashboard
 
 import (
-	"fmt"
 	"image/color"
+	"math"
 	"strconv"
 	"time"
 
@@ -139,13 +139,24 @@ func textSetter(obj *canvas.Text, text, unit string, precision int) func(float64
 }
 
 func idcSetter(obj *canvas.Text, text string) func(float64) {
+	var buf []byte
 	oldValue := -1.0
 	return func(value float64) {
 		if value == oldValue {
 			return
 		}
 		oldValue = value
-		obj.Text = fmt.Sprintf(text+": %02.0f%%", value)
+		buf = buf[:0]
+		buf = append(buf, text...)
+		buf = append(buf, ": "...)
+		// Matches the old "%02.0f%%" format: rounded, zero-padded to two digits.
+		iv := int64(math.Round(value))
+		if iv >= 0 && iv < 10 {
+			buf = append(buf, '0')
+		}
+		buf = strconv.AppendInt(buf, iv, 10)
+		buf = append(buf, '%')
+		obj.Text = string(buf)
 		switch {
 		case value > 60 && value < 85:
 			obj.Color = color.RGBA{R: 0xFF, G: 0xA5, B: 0, A: 0xFF}

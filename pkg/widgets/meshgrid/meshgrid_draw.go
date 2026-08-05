@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/roffe/txlogger/pkg/colors"
+	"github.com/roffe/txlogger/pkg/common"
 )
 
 // lineSegment indexes into the precomputed projected/color slices so we don't
@@ -33,14 +34,18 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 		img = image.NewRGBA(image.Rect(0, 0, w, h))
 		m.scratchImg = img
 	} else {
-		clearPix(img.Pix)
+		clear(img.Pix)
 	}
+
+	// Vertices sit on cell corners, so the grid is one larger than the data
+	// in each direction (one quad per table cell).
+	vRows, vCols := m.rows+1, m.cols+1
 
 	// Find min/max of the view-space Z for depth shading.
 	minZ, maxZ := math.Inf(1), math.Inf(-1)
-	for i := 0; i < m.rows; i++ {
+	for i := 0; i < vRows; i++ {
 		row := m.vertices[i]
-		for j := 0; j < m.cols; j++ {
+		for j := 0; j < vCols; j++ {
 			z := row[j].Z
 			if z < minZ {
 				minZ = z
@@ -56,7 +61,7 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 	}
 
 	// Precompute screen-space projection and color for each vertex once.
-	n := m.rows * m.cols
+	n := vRows * vCols
 	if cap(m.scratchProjX) < n {
 		m.scratchProjX = make([]int, n)
 		m.scratchProjY = make([]int, n)
@@ -68,31 +73,39 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 
 	cx := float64(m.size.Width) * 0.5
 	cy := float64(m.size.Height) * 0.5
-	for i := 0; i < m.rows; i++ {
+	for i := 0; i < vRows; i++ {
 		row := m.vertices[i]
-		base := i * m.cols
-		for j := 0; j < m.cols; j++ {
+		base := i * vCols
+		for j := 0; j < vCols; j++ {
 			v := row[j]
 			idx := base + j
 			projX[idx] = int(cx + v.X)
 			projY[idx] = int(cy + v.Y)
 			depth := (v.Z - minZ) / zRange
-			vertCol[idx] = m.getColorWithDepth(m.values[idx], depth)
+			vertCol[idx] = m.getColorWithDepth(v.V, depth)
 		}
+	}
+
+	mode := m.renderMode
+
+	if mode != RenderModeWireframe {
+		m.drawSurface(img, projX, projY, vertCol, mode == RenderModeSolidWireframe)
+		m.drawAxisScales(img)
+		return img
 	}
 
 	// Collect line segments using cached projections.
 	segs := m.scratchLines[:0]
-	for i := 0; i < m.rows; i++ {
-		for j := 0; j < m.cols; j++ {
-			idx := i*m.cols + j
+	for i := 0; i < vRows; i++ {
+		for j := 0; j < vCols; j++ {
+			idx := i*vCols + j
 			x1, y1 := projX[idx], projY[idx]
 			// neighbors: (+1,0) down, (0,+1) right, (+1,-1) diagonal
 			tryAddSeg := func(ni, nj int) {
-				if ni >= m.rows || nj < 0 || nj >= m.cols {
+				if ni >= vRows || nj < 0 || nj >= vCols {
 					return
 				}
-				nidx := ni*m.cols + nj
+				nidx := ni*vCols + nj
 				x2, y2 := projX[nidx], projY[nidx]
 				dx, dy := x2-x1, y2-y1
 				if dx*dx+dy*dy < 4 {
@@ -105,7 +118,7 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 					y1:       y1,
 					x2:       x2,
 					y2:       y2,
-					depth:    -(m.vertices[i][j].Z + m.vertices[ni][nj].Z) * 0.5,
+					depth:    (m.vertices[i][j].Z + m.vertices[ni][nj].Z) * 0.5,
 					diagonal: x1 != x2 && y1 != y2,
 				})
 			}
@@ -138,21 +151,87 @@ func (m *Meshgrid) drawMeshgridLines() *image.RGBA {
 		drawBresenhamLine(img, s.x1, s.y1, s.x2, s.y2, c1, c2)
 	}
 
-	m.drawAxisIndicator(img)
+	m.drawAxisScales(img)
 
 	return img
 }
 
-func clearPix(p []uint8) {
-	for i := range p {
-		p[i] = 0
+// cursorScreenPosition projects the tracking-marker cell position set by
+// SetCursor onto the screen so the marker rides the surface the shader draws.
+func (m *Meshgrid) cursorScreenPosition() (float32, float32) {
+	if m.dataVertexMode() {
+		// The shader's vertices are the cell values themselves, so the marker
+		// rides the triangulated data surface: project the cell-centered data
+		// point at the (fractional) cursor, with the same Ox/Oy convention the
+		// axis uses. SetCursor clamps the indices to the data grid.
+		cw, ch := float64(m.cellWidth), float64(m.cellHeight)
+		ox := (m.cursorX + 0.5) * cw
+		oy := (float64(m.rows) + 0.5 - m.cursorY) * ch
+		zr := m.zrange
+		if zr == 0 {
+			zr = 1
+		}
+		oz := (m.sampleValue(m.cursorX, m.cursorY) - m.zmin) / zr * m.depth
+		sx, sy, _ := m.projectOriginal(ox, oy, oz)
+		return sx, sy
 	}
+
+	// Corner-averaged fallback: MapViewer indices are cell-centered while mesh
+	// vertices sit on cell corners; +0.5 lands the marker mid-cell on the corner
+	// grid. The camera transform is linear, so bilinearly interpolating the
+	// transformed corners lands on the same point as transforming the
+	// interpolated one.
+	sx := m.cursorX + 0.5
+	sy := m.cursorY + 0.5
+
+	x0 := int(sx)
+	y0 := int(sy)
+	x1 := min(x0+1, m.cols)
+	y1 := min(y0+1, m.rows)
+	fx := sx - float64(x0)
+	fy := sy - float64(y0)
+
+	v00 := m.vertices[y0][x0]
+	v01 := m.vertices[y0][x1]
+	v10 := m.vertices[y1][x0]
+	v11 := m.vertices[y1][x1]
+
+	vx := (1-fy)*((1-fx)*v00.X+fx*v01.X) + fy*((1-fx)*v10.X+fx*v11.X)
+	vy := (1-fy)*((1-fx)*v00.Y+fx*v01.Y) + fy*((1-fx)*v10.Y+fx*v11.Y)
+
+	return float32(float64(m.size.Width)*0.5 + vx), float32(float64(m.size.Height)*0.5 + vy)
+}
+
+// sampleValue bilinearly interpolates the cell values at the fractional cell
+// index (fx = column, fy = row), clamped to the data grid.
+func (m *Meshgrid) sampleValue(fx, fy float64) float64 {
+	cx0 := min(max(int(math.Floor(fx)), 0), m.cols-1)
+	cy0 := min(max(int(math.Floor(fy)), 0), m.rows-1)
+	cx1 := min(cx0+1, m.cols-1)
+	cy1 := min(cy0+1, m.rows-1)
+	tx := fx - float64(cx0)
+	if tx < 0 {
+		tx = 0
+	} else if tx > 1 {
+		tx = 1
+	}
+	ty := fy - float64(cy0)
+	if ty < 0 {
+		ty = 0
+	} else if ty > 1 {
+		ty = 1
+	}
+	v00 := m.values[cy0*m.cols+cx0]
+	v01 := m.values[cy0*m.cols+cx1]
+	v10 := m.values[cy1*m.cols+cx0]
+	v11 := m.values[cy1*m.cols+cx1]
+	return (1-ty)*((1-tx)*v00+tx*v01) + ty*((1-tx)*v10+tx*v11)
 }
 
 // getColorWithDepth combines color interpolation and depth enhancement in one step
 func (m *Meshgrid) getColorWithDepth(value, depthFactor float64) color.RGBA {
 	// Get base color from value
-	//baseColor := m.getColorInterpolation(value)
+	// baseColor := m.getColorInterpolation(value)
 	baseColor := colors.GetColorInterpolation(
 		m.zmin,
 		m.zmax,
@@ -184,13 +263,15 @@ func (m *Meshgrid) getColorWithDepth(value, depthFactor float64) color.RGBA {
 	}
 }
 
-// Fade a color by a factor (used for diagonals)
+// Fade a color by a factor (used for diagonals). Alpha is left untouched:
+// the buffer uses straight alpha, so dimming RGB and A together would fade
+// the line twice over once composited.
 func fadeColor(c color.RGBA, factor float64) color.RGBA {
 	return color.RGBA{
 		R: uint8(float64(c.R) * factor),
 		G: uint8(float64(c.G) * factor),
 		B: uint8(float64(c.B) * factor),
-		A: uint8(float64(c.A) * factor),
+		A: c.A,
 	}
 }
 
@@ -201,14 +282,17 @@ func drawBresenhamLine(img *image.RGBA, x0, y0, x1, y1 int, c1, c2 color.RGBA) {
 		return // fully outside
 	}
 
-	// Translate to image origin for indexing
-	ox, oy := r.Min.X, r.Min.Y
+	// Translate to image origin once so the pixel loop indexes directly.
+	x0 -= r.Min.X
+	x1 -= r.Min.X
+	y0 -= r.Min.Y
+	y1 -= r.Min.Y
 	stride := img.Stride
 	pix := img.Pix
 
 	// Bresenham setup
-	dx := abs(x1 - x0)
-	dy := -abs(y1 - y0)
+	dx := common.Abs(x1 - x0)
+	dy := -common.Abs(y1 - y0)
 	sx := 1
 	if x0 > x1 {
 		sx = -1
@@ -225,7 +309,7 @@ func drawBresenhamLine(img *image.RGBA, x0, y0, x1, y1 int, c1, c2 color.RGBA) {
 		total = -dy
 	}
 	if total == 0 {
-		setPix(pix, stride, x0-ox, y0-oy, c1)
+		setPix(pix, stride, x0, y0, c1)
 		return
 	}
 
@@ -242,7 +326,7 @@ func drawBresenhamLine(img *image.RGBA, x0, y0, x1, y1 int, c1, c2 color.RGBA) {
 
 	// Draw
 	for i := 0; ; i++ {
-		setPixRGBAFixed(pix, stride, x0-ox, y0-oy, accR, accG, accB, accA)
+		setPixRGBAFixed(pix, stride, x0, y0, accR, accG, accB, accA)
 
 		if x0 == x1 && y0 == y1 {
 			break
@@ -349,11 +433,4 @@ func clipCohenSutherland(x0, y0, x1, y1 *int, xmin, ymin, xmax, ymax int) bool {
 	}
 	*x0, *y0, *x1, *y1 = x0i, y0i, x1i, y1i
 	return true
-}
-
-func abs(v int) int {
-	if v < 0 {
-		return -v
-	}
-	return v
 }

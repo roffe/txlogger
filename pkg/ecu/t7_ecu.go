@@ -10,12 +10,12 @@ import (
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
 func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (symbol.SymbolCollection, error) {
-	cl, err := gocan.NewWithOpts(context.TODO(), dev)
+	cl, err := gocan.OpenAdapter(context.TODO(), dev)
 	if err != nil {
 		return nil, err
 	}

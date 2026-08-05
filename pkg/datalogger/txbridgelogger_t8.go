@@ -6,30 +6,23 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
-	"sort"
 	"time"
 
-	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/pkg/gmlan"
-	"github.com/roffe/gocan/pkg/serialcommand"
+	"github.com/roffe/gocan/v2/pkg/serialcommand"
+	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/gmlan"
 	"github.com/roffe/txlogger/pkg/ebus"
 )
 
-func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
+func (c *TxBridge) t8(pctx context.Context, cl *gocan.Bus) error {
 	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
-	order := c.sysvars.Keys()
 	if c.lamb != nil {
 		defer c.lamb.Stop()
-		order = append(order, EXTERNALWBLSYM)
 	}
 
-	if c.WidebandConfig.ADScanner && c.WidebandConfig.Name == "ECU" {
-		order = append(order, LAMBDAADSCANNER)
-	}
-
-	sort.StringSlice(order).Sort()
+	channels := c.buildChannels()
 
 	gm := gmlan.New(cl, 0x7e0, 0x7e8)
 
@@ -56,10 +49,9 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 		}
 	}
 
-	tx := cl.Subscribe(ctx, gocan.SystemMsgDataResponse)
-	defer tx.Close()
+	tx := c.tb.Subscribe(ctx, 'r')
 
-	if err := c.startLogging(cl); err != nil {
+	if err := c.startLogging(); err != nil {
 		return fmt.Errorf("error starting logging: %w", err)
 	}
 
@@ -69,10 +61,12 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 		adConverter := NewWBLInterpolator(c.WidebandConfig)
 
 		defer func() {
+			_ = c.stopLogging() // stop the dongle's read loop before ending the session
 			_ = gm.ReturnToNormalMode(ctx)
 			time.Sleep(100 * time.Millisecond)
 		}()
 
+		lastData := time.Now()
 		for {
 			select {
 			case <-ctx.Done():
@@ -86,23 +80,28 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 					c.OnMessage("too many errors, aborting logging")
 					return
 				}
+				if time.Since(lastData) > dataTimeout {
+					c.OnMessage("no data for 5s, aborting logging")
+					return
+				}
 				c.resetPerSecond()
 			case read := <-c.readChan:
-				if err := c.handleReadTxbridge(ctx, cl, read); err != nil {
+				if err := c.handleReadTxbridge(ctx, read); err != nil {
 					read.Complete(err)
 				}
 			case upd := <-c.writeChan:
 				log.Printf("Updating RAM 0x%X", upd.Address)
-				if err := c.handleWriteTxbridge(ctx, cl, upd); err != nil {
+				if err := c.handleWriteTxbridge(ctx, upd); err != nil {
 					upd.Complete(err)
 				}
-			case msg, ok := <-tx.Chan():
+			case msg, ok := <-tx:
 				if !ok {
 					c.OnMessage("txbridge recv channel closed")
 					return
 				}
-				if msg.DLC() != int(expectedPayloadSize+4) {
-					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, msg.DLC()))
+				lastData = time.Now()
+				if len(msg.Data) != int(expectedPayloadSize+4) {
+					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, len(msg.Data)))
 					return
 				}
 
@@ -145,11 +144,11 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				if err := c.lw.Write(c.sysvars, order, c.Symbols, timeStamp); err != nil {
+				if err := c.lw.Write(timeStamp, channels); err != nil {
 					c.onError()
 					c.OnMessage("failed to write log: " + err.Error())
 				}
-				c.onCapture()
+				c.onCapture(timeStamp)
 				testerPresent()
 			}
 		}
@@ -157,7 +156,7 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Client) error {
 	return cl.Wait(ctx)
 }
 
-func (c *TxBridge) handleReadTxbridge(ctx context.Context, cl *gocan.Client, read *DataRequest) error {
+func (c *TxBridge) handleReadTxbridge(ctx context.Context, read *DataRequest) error {
 	toRead := min(235, read.Length)
 	// log.Printf("Reading RAM $%X:%d", read.Address, toRead)
 	cmd := serialcommand.SerialCommand{
@@ -170,13 +169,9 @@ func (c *TxBridge) handleReadTxbridge(ctx context.Context, cl *gocan.Client, rea
 			byte(toRead),
 		},
 	}
-	payload, err := cmd.MarshalBinary()
-	if err != nil {
-		return err
-	}
-
-	frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
-	resp, err := cl.SendAndWait(ctx, frame, 4*time.Second, gocan.SystemMsgDataRequest)
+	rctx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
+	resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'R')
 	if err != nil {
 		return err
 	}
@@ -191,7 +186,7 @@ func (c *TxBridge) handleReadTxbridge(ctx context.Context, cl *gocan.Client, rea
 	return nil
 }
 
-func (c *TxBridge) handleWriteTxbridge(ctx context.Context, cl *gocan.Client, write *DataRequest) error {
+func (c *TxBridge) handleWriteTxbridge(ctx context.Context, write *DataRequest) error {
 	toWrite := min(write.Length, 235)
 	// log.Printf("Writing RAM $%X:%d", write.Address, toWrite)
 	cmd := serialcommand.SerialCommand{
@@ -207,16 +202,13 @@ func (c *TxBridge) handleWriteTxbridge(ctx context.Context, cl *gocan.Client, wr
 
 	cmd.Data = append(cmd.Data, write.Data[:toWrite]...)
 
-	payload, err := cmd.MarshalBinary()
+	rctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	defer cancel()
+	resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'W', 'e')
 	if err != nil {
 		return err
 	}
-	frame := gocan.NewFrame(gocan.SystemMsg, payload, gocan.Outgoing)
-	resp, err := cl.SendAndWait(ctx, frame, 1*time.Second, gocan.SystemMsgWriteResponse, gocan.SystemMsgError)
-	if err != nil {
-		return err
-	}
-	if resp.Identifier == gocan.SystemMsgError {
+	if resp.Command == 'e' {
 		return fmt.Errorf("error: %X", resp.Data)
 	}
 	write.Address += uint32(toWrite)

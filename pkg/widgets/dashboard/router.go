@@ -10,16 +10,30 @@ import (
 )
 
 func (db *Dashboard) createRouter() map[string]func(float64) {
+	// Gauges build their canvas objects in CreateRenderer, so every gauge
+	// setter goes through db.gate: a gauge the layout doesn't place is never
+	// fed. Text and image elements need no gating.
+	setRPM := db.gate("rpm", db.gauges.rpm.SetValue)
+	setIAT := db.gate("iat", db.gauges.iat.SetValue)
+	setEngineTemp := db.gate("engineTemp", db.gauges.engineTemp.SetValue)
+	setAirmass := db.gate("airmass", db.gauges.airmass.SetValue)
+	setAirmassReq := db.gate("airmass", db.gauges.airmass.SetValue2)
+	setPressure := db.gate("pressure", db.gauges.pressure.SetValue)
+	setPressureBefThrottle := db.gate("pressure", db.gauges.pressure.SetValue2)
+	setThrottle := db.gate("throttle", db.gauges.throttle.SetValue)
+	setPWM := db.gate("pwm", db.gauges.pwm.SetValue)
+	setNBLambda := db.gate("nblambda", db.gauges.nblambda.SetValue)
+
 	var rpm float64
 	t5rpmSetter := func(value float64) {
 		rpm = value
-		db.gauges.rpm.SetValue(value)
+		setRPM(value)
 	}
 
 	idcSetterT5 := func(obj *canvas.Text, text string) func(float64) {
-		idcc := idcSetter(obj, text)
+		idcSetter := idcSetter(obj, text)
 		return func(value float64) {
-			idcc((value * rpm) * rpmIDCconstant)
+			idcSetter((value * rpm) * rpmIDCconstant)
 		}
 	}
 
@@ -27,56 +41,57 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 
 	// activeAirDem := db.activeAirDemSetter(db.text.activeAirDem)
 
-	setVehicleSpeed := db.gauges.speed.SetValue
+	setVehicleSpeed := db.gate("speed", db.gauges.speed.SetValue)
 	if db.cfg.UseMPH {
+		setSpeed := setVehicleSpeed
 		setVehicleSpeed = func(value float64) {
-			db.gauges.speed.SetValue(value * 0.621371)
+			setSpeed(value * 0.621371)
 		}
 	}
 
 	t5throttle := func(value float64) {
 		// value should be 0-100% input is 0 - 192
 		valuePercent := min(192, value) / 192 * 100
-		db.gauges.throttle.SetValue(valuePercent)
+		setThrottle(valuePercent)
 	}
 
 	t5setnbl := func(value float64) {
 		if value < 128 {
 			// Interpolate in the range 0 to 128, mapping to -25 to 0.
-			db.gauges.nblambda.SetValue(interpol(0, -25, 128, 0, value))
+			setNBLambda(interpol(0, -25, 128, 0, value))
 			return
 		}
 		// Interpolate in the range 128 to 255, mapping to 0 to 25.
-		db.gauges.nblambda.SetValue(interpol(128, 0, 255, 25, value))
+		setNBLambda(interpol(128, 0, 255, 25, value))
 	}
 
 	router := map[string]func(float64){
 		"In.v_Vehicle": setVehicleSpeed, // t7 & t8
 		"Bil_hast":     setVehicleSpeed, // t5
 
-		"ActualIn.n_Engine": db.gauges.rpm.SetValue,
+		"ActualIn.n_Engine": setRPM,
 		"Rpm":               t5rpmSetter, // t5
 
-		"ActualIn.T_AirInlet": db.gauges.iat.SetValue,
-		"Lufttemp":            db.gauges.iat.SetValue, // t5
+		"ActualIn.T_AirInlet": setIAT,
+		"Lufttemp":            setIAT, // t5
 
-		"ActualIn.T_Engine": db.gauges.engineTemp.SetValue,
-		"Kyl_temp":          db.gauges.engineTemp.SetValue, // t5
+		"ActualIn.T_Engine": setEngineTemp,
+		"Kyl_temp":          setEngineTemp, // t5
 
-		"P_medel":             db.gauges.pressure.SetValue, // t5
-		"In.p_AirInlet":       db.gauges.pressure.SetValue,
-		"ActualIn.p_AirInlet": db.gauges.pressure.SetValue,
+		"P_medel":             setPressure, // t5
+		"In.p_AirInlet":       setPressure,
+		"ActualIn.p_AirInlet": setPressure,
 
-		"Max_tryck":                 db.gauges.pressure.SetValue2, // t5
-		"In.p_AirBefThrottle":       db.gauges.pressure.SetValue2,
-		"ActualIn.p_AirBefThrottle": db.gauges.pressure.SetValue2,
+		"Max_tryck":                 setPressureBefThrottle, // t5
+		"In.p_AirBefThrottle":       setPressureBefThrottle,
+		"ActualIn.p_AirBefThrottle": setPressureBefThrottle,
 
-		"Medeltrot":      t5throttle,                  // t5
-		"Out.X_AccPedal": db.gauges.throttle.SetValue, // t7
-		"Out.X_AccPos":   db.gauges.throttle.SetValue, // t8
+		"Medeltrot":      t5throttle,  // t5
+		"Out.X_AccPedal": setThrottle, // t7
+		"Out.X_AccPos":   setThrottle, // t8
 
-		"Out.PWM_BoostCntrl": db.gauges.pwm.SetValue, // t7 & t8
-		"PWM_ut10":           db.gauges.pwm.SetValue, // t5
+		"Out.PWM_BoostCntrl": setPWM, // t7 & t8
+		"PWM_ut10":           setPWM, // t5
 
 		//"AdpFuelProt.MulFuelAdapt": amulSetter(db.text.amul, "Amul"), // t7
 		"AdpFuelProt.MulFuelAdapt": textSetter(db.text.amul, "Amul", "%", 2), // t7
@@ -85,15 +100,15 @@ func (db *Dashboard) createRouter() map[string]func(float64) {
 		//"AD_EGR": db.gauges.wblambda.SetValue, // t5
 		//"DisplProt.LambdaScanner": db.wblambda.SetValue, // t7 & t8
 		//"Lambda.External":     db.wblambda.SetValue,
-		db.cfg.WidebandSymbol: db.gauges.wblambda.SetValue, // Wideband lambda
+		db.cfg.WidebandSymbol: db.setWBLambda, // Wideband lambda
 
 		// NB lambda
-		"Lambda.LambdaInt": db.gauges.nblambda.SetValue, // t7 & t8
-		"Lambdaint":        t5setnbl,                    // t5
+		"Lambda.LambdaInt": setNBLambda, // t7 & t8
+		"Lambdaint":        t5setnbl,    // t5
 
-		"MAF.m_AirInlet":        db.gauges.airmass.SetValue,  // t7 & t8
-		"m_Request":             db.gauges.airmass.SetValue2, // t7
-		"AirMassMast.m_Request": db.gauges.airmass.SetValue2, // t8
+		"MAF.m_AirInlet":        setAirmass,    // t7 & t8
+		"m_Request":             setAirmassReq, // t7
+		"AirMassMast.m_Request": setAirmassReq, // t8
 
 		"Out.fi_Ignition": textSetter(db.text.ign, "Ign", "", 1),
 		"Ign_angle":       textSetter(db.text.ign, "Ign", "", 1),

@@ -3,14 +3,14 @@ package t5
 import (
 	"bytes"
 	"context"
-	"errors"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"strings"
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/srec"
 )
 
@@ -129,8 +129,8 @@ func (t *Client) UploadBootLoader(ctx context.Context) error {
 
 			r := bytes.NewReader(rec.Data)
 			framecount := int(1 + (rec.Length-3)/7)
-			seq := byte(0x00)
 			for frameNo := 0; frameNo < framecount; frameNo++ {
+				seq := byte(frameNo * 7)
 				payload := []byte{seq, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 				for i := 1; i < 8; i++ {
 					b, err := r.ReadByte()
@@ -144,70 +144,94 @@ func (t *Client) UploadBootLoader(ctx context.Context) error {
 					progress++
 				}
 
-				resp, err := t.c.SendAndWait(
-					ctx,
-					gocan.NewFrame(0x5, payload, gocan.ResponseRequired),
-					150*time.Millisecond,
-					0xC,
-				)
+				data, err := t.command(ctx, payload, generalTimeout)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to upload bootloader: %w", err)
 				}
-				if resp.Data[0] == 0x1C && resp.Data[1] == 0x01 && resp.Data[2] == 0x00 {
+				// MyBooty is already running: its A5 handler accepted the RAM
+				// address 0x5000 but Flash_Programming range-checks it against
+				// the flash start and reports a programming error (status 01)
+				// on the final frame (seq 0x1C) of the first S1 record. The
+				// firmware's RAM upload handler replies 00 here instead.
+				if data[0] == 0x1C && data[1] == 0x01 && data[2] == 0x00 {
 					t.cfg.OnMessage("Bootloader already running")
 					t.bootloaded = true
 					return nil
 				}
-
-				if resp.DLC() != 8 || resp.Data[0] != byte(frameNo*7) || resp.Data[1] != 0x00 {
-					return fmt.Errorf("failed to upload bootloader: %X", resp.Data)
+				if data[1] != 0x00 {
+					return fmt.Errorf("failed to upload bootloader: %X", data)
 				}
 				t.cfg.OnProgress(progress)
-				seq += 7
 			}
 
 		case "S9":
-			if err := t.sendBootVectorAddressSRAM(rec.Address); err != nil {
-				return fmt.Errorf("failed to sendBootVectorAddressSRAM")
+			if err := t.sendBootVectorAddressSRAM(ctx, rec.Address); err != nil {
+				return fmt.Errorf("failed to start bootloader: %w", err)
 			}
 		}
 	}
-	//fmt.Printf("took: %s\n", time.Since(start).Round(time.Millisecond).String())
-	t.cfg.OnMessage(fmt.Sprintf("Done, took: %s", time.Since(start).Round(time.Millisecond).String()))
 	t.bootloaded = true
+	// Give MyBooty time to run its Preparation routine (clock sync, chip
+	// select remap) before the first command. TrionicCANLib waits 200 ms.
+	select {
+	case <-time.After(200 * time.Millisecond):
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	t.cfg.OnMessage(fmt.Sprintf("Done, took: %s", time.Since(start).Round(time.Millisecond).String()))
 	return nil
 }
 
-func (t *Client) sendBootloaderAddressCommand(ctx context.Context, address uint32, len byte) error {
-	payload := []byte{0xA5, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address), len, 0x00, 0x00}
-	f, err := t.c.SendAndWait(
-		ctx,
-		gocan.NewFrame(0x5, payload, gocan.ResponseRequired),
-		250*time.Millisecond,
-		0xC,
-	)
+func (t *Client) sendBootloaderAddressCommand(ctx context.Context, address uint32, length byte) error {
+	payload := []byte{0xA5, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address), length, 0x00, 0x00}
+	data, err := t.command(ctx, payload, generalTimeout)
 	if err != nil {
-		return fmt.Errorf("failed to sendBootloaderAddressCommand: %v", err)
+		return fmt.Errorf("failed to sendBootloaderAddressCommand: %w", err)
 	}
-	if f.DLC() != 8 || f.Data[0] != 0xA5 || f.Data[1] != 0x00 {
-		return fmt.Errorf("invalid response to sendBootloaderAddressCommand")
+	if data[1] != 0x00 {
+		return fmt.Errorf("invalid response to sendBootloaderAddressCommand: %X", data)
 	}
 	return nil
 }
 
-func (t *Client) sendBootVectorAddressSRAM(address uint32) error {
-	data := []byte{0xC1, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address), 0x00, 0x00, 0x00}
-	return t.c.Send(0x5, data, gocan.Outgoing)
+// sendBootVectorAddressSRAM tells the firmware to jump to the uploaded
+// bootloader. The firmware does NOT reply to C1 (verified on hardware, it
+// jumps immediately); whether the loader started is confirmed by the first
+// command sent to it after the settle delay.
+func (t *Client) sendBootVectorAddressSRAM(ctx context.Context, address uint32) error {
+	payload := gocan.Frame{
+		ID:     0x5,
+		Length: 8,
+		Data:   [8]byte{0xC1, byte(address >> 24), byte(address >> 16), byte(address >> 8), byte(address), 0x00, 0x00, 0x00},
+	}
+	return t.c.Send(ctx, payload)
 }
 
-func (t *Client) sendBootloaderDataCommand(ctx context.Context, data []byte, length byte) error {
-	frame := gocan.NewFrame(0x5, data, gocan.ResponseRequired)
-	resp, err := t.c.SendAndWait(ctx, frame, 150*time.Millisecond, 0xC)
+// sendBootloaderDataCommand sends one data frame (seq byte + up to 7 data
+// bytes). Data frames are offset-addressed and idempotent so callers may
+// safely retry on transport errors. A status of 0x01 means MyBooty failed to
+// program the FLASH; the failing address is reported in bytes 2-5.
+func (t *Client) sendBootloaderDataCommand(ctx context.Context, payload []byte) error {
+	data, err := t.command(ctx, payload, generalTimeout)
 	if err != nil {
-		return fmt.Errorf("failed SBLDC: %v", err)
+		return fmt.Errorf("failed to send data frame %02X: %w", payload[0], err)
 	}
-	if resp.Data[1] != 0x00 {
-		return errors.New("failed to write")
+	if data[1] == 0x01 {
+		return &flashProgramError{address: binary.BigEndian.Uint32(data[2:6])}
+	}
+	if data[1] != 0x00 {
+		return fmt.Errorf("unexpected response to data frame: %X", data)
 	}
 	return nil
+}
+
+// flashProgramError is a programming failure reported by the bootloader
+// itself (bad chip / 25 internal retries exhausted) as opposed to a
+// transport error. Retrying the transfer will not help.
+type flashProgramError struct {
+	address uint32
+}
+
+func (e *flashProgramError) Error() string {
+	return fmt.Sprintf("bootloader failed to program FLASH at 0x%06X", e.address)
 }

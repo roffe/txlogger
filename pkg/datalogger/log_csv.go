@@ -2,12 +2,9 @@ package datalogger
 
 import (
 	"encoding/csv"
-	"math"
 	"os"
-	"strconv"
 	"time"
 
-	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/logfile"
 )
 
@@ -22,46 +19,27 @@ type CSVWriter struct {
 	file          *os.File
 	headerWritten bool
 	cw            *csv.Writer
-	precission    int
 }
 
-func (c *CSVWriter) Write(sysvars *ThreadSafeMap, sysvarOrder []string, vars []*symbol.Symbol, ts time.Time) error {
+func (c *CSVWriter) Write(ts time.Time, channels []Channel) error {
 	if !c.headerWritten {
-		if err := c.writeHeader(vars, sysvarOrder); err != nil {
+		if err := c.writeHeader(channels); err != nil {
 			return err
 		}
 	}
-	var record []string
+	record := make([]string, 0, len(channels)+1)
 	record = append(record, ts.Format(logfile.ISONICO))
-	for _, k := range sysvarOrder {
-		val := sysvars.Get(k)
-		if val == math.Trunc(val) {
-			c.precission = 0
-		} else if k == "Lambda.External" {
-			c.precission = 3
-		} else {
-			c.precission = 2
-		}
-		record = append(record, strconv.FormatFloat(val, 'f', c.precission, 64))
-	}
-	for _, va := range vars {
-		if va.Number < 0 {
-			continue
-		}
-		record = append(record, va.StringValue())
+	for i := range channels {
+		record = append(record, channels[i].String())
 	}
 	return c.cw.Write(record)
 }
 
-func (c *CSVWriter) writeHeader(vars []*symbol.Symbol, sysvarOrder []string) error {
-	var header []string
+func (c *CSVWriter) writeHeader(channels []Channel) error {
+	header := make([]string, 0, len(channels)+1)
 	header = append(header, "Time")
-	header = append(header, sysvarOrder...)
-	for _, va := range vars {
-		if va.Number < 0 {
-			continue
-		}
-		header = append(header, va.Name)
+	for i := range channels {
+		header = append(header, channels[i].Name)
 	}
 	c.headerWritten = true
 	return c.cw.Write(header)

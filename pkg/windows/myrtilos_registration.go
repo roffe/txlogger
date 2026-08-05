@@ -12,7 +12,7 @@ import (
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
@@ -106,7 +106,7 @@ func (mr *MyrtilosRegistration) register(key []byte) error {
 		return err
 	}
 	ctx := context.Background()
-	c, err := gocan.NewWithOpts(ctx, adapter)
+	c, err := gocan.OpenAdapter(ctx, adapter)
 	if err != nil {
 		return err
 	}

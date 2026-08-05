@@ -10,7 +10,7 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 )
 
 type T7Extras struct {
@@ -68,7 +68,7 @@ func (t *T7Extras) resetECU() error {
 		return err
 	}
 	ctx := context.Background()
-	c, err := gocan.NewWithOpts(ctx, adapter)
+	c, err := gocan.OpenAdapter(ctx, adapter)
 	if err != nil {
 		return err
 	}
@@ -89,8 +89,9 @@ func (t *T7Extras) resetECU() error {
 
 	   	time.Sleep(100 * time.Millisecond) */
 
-	frame := gocan.NewFrame(0x240, []byte{0x40, 0xA1, 0x02, 0x11, 0x01}, gocan.ResponseRequired)
-	f, err := c.SendAndWait(ctx, frame, 400*time.Millisecond, 0x258)
+	rctx, cancel := context.WithTimeout(ctx, 400*time.Millisecond)
+	defer cancel()
+	f, err := c.Request(rctx, gocan.NewFrame(0x240, []byte{0x40, 0xA1, 0x02, 0x11, 0x01}), 0x258)
 	if err != nil {
 		return err
 	}

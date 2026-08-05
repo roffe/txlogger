@@ -32,7 +32,7 @@ func (mw *MainWindow) createSelects() {
 		mw.app.Preferences().SetString(prefsSelectedECU, s)
 		idx := symbol.ECUTypeFromString(s)
 		ebus.Publish(ebus.TOPIC_ECU, float64(idx))
-		mw.SetMainMenu(mw.menu.GetMenu(s))
+		mw.SetMainMenu(mw.GetMenu(s))
 		pres := mw.app.Preferences().StringWithFallback(s+prefsSelectedPreset, s+" Dash")
 		mw.selects.presetSelect.SetSelected(pres)
 	})

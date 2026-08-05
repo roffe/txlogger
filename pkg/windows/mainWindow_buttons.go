@@ -1,20 +1,24 @@
 package windows
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
+	txtheme "github.com/roffe/txlogger/pkg/theme"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
+	"github.com/roffe/txlogger/pkg/widgets/liveplotter"
 	"github.com/roffe/txlogger/pkg/widgets/msglist"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
@@ -31,6 +35,33 @@ func (mw *MainWindow) createButtons() {
 	mw.buttons.debugBtn = mw.newDebugBtn()
 	mw.buttons.symbolListBtn = mw.newSymbolListBtn()
 	mw.buttons.addGaugeBtn = mw.newaddGaugeBtn()
+	mw.buttons.livePlotBtn = mw.newLivePlotBtn()
+}
+
+func (mw *MainWindow) newLivePlotBtn() *widget.Button {
+	return widget.NewButtonWithIcon("Live plot", theme.MediaSkipNextIcon(), func() {
+		if w := mw.wm.HasWindow("Live plot"); w != nil {
+			mw.wm.Raise(w)
+			return
+		}
+
+		names := mw.symbolList.Names()
+		if len(names) == 0 {
+			mw.Error(fmt.Errorf("no symbols selected to plot"))
+			return
+		}
+
+		lp := liveplotter.New(&liveplotter.Config{
+			Order:  names,
+			Window: 120 * time.Second,
+		})
+
+		lpw := multiwindow.NewInnerWindow("Live plot", lp)
+		lpw.Icon = theme.MediaSkipNextIcon()
+		lpw.OnClose = lp.Close
+		mw.wm.Add(lpw)
+		lpw.Resize(fyne.NewSize(900, 500))
+	})
 }
 
 func (mw *MainWindow) newaddGaugeBtn() *widget.Button {
@@ -62,9 +93,9 @@ func (mw *MainWindow) newSymbolListBtn() *widget.Button {
 				nil,
 				container.NewGridWithColumns(5,
 					widget.NewButtonWithIcon("", theme.DocumentSaveIcon(), mw.savePreset),
-					widget.NewButtonWithIcon("", theme.DocumentCreateIcon(), mw.newPreset),
-					widget.NewButtonWithIcon("", theme.UploadIcon(), mw.exportPreset),
-					widget.NewButtonWithIcon("", theme.DownloadIcon(), mw.importPreset),
+					widget.NewButtonWithIcon("", theme.ContentAddIcon(), mw.newPreset),
+					widget.NewButtonWithIcon("", txtheme.ExportIcon(), mw.exportPreset),
+					widget.NewButtonWithIcon("", txtheme.ImportIcon(), mw.importPreset),
 					widget.NewButtonWithIcon("", theme.DeleteIcon(), mw.deletePreset),
 				),
 				mw.selects.presetSelect,
@@ -147,6 +178,10 @@ func (mw *MainWindow) addSymbolBtnFunc() *widget.Button {
 		if mw.selects.symbolLookup.Text == "" {
 			return
 		}
+		if mw.fw == nil {
+			mw.Error(fmt.Errorf("Cannot add symbol, no binary loaded"))
+			return
+		}
 		/*
 			switch mw.selects.symbolLookup.Text {
 			case "ADC1":
@@ -189,7 +224,7 @@ func (mw *MainWindow) addSymbolBtnFunc() *widget.Button {
 
 		sym := mw.fw.GetByName(mw.selects.symbolLookup.Text)
 		if sym == nil {
-			mw.Error(fmt.Errorf("%q not found", mw.selects.symbolLookup.Text))
+			mw.Error(fmt.Errorf("%q not found in binary", mw.selects.symbolLookup.Text))
 			return
 		}
 		mw.symbolList.Add(sym)
@@ -238,6 +273,9 @@ func (mw *MainWindow) newLogBtn() *widget.Button {
 			if mw.dlc != nil {
 				mw.dlc.Close()
 			}
+			if mw.dlcCancel != nil {
+				mw.dlcCancel()
+			}
 			return
 		}
 		for _, v := range mw.symbolList.Symbols() {
@@ -262,12 +300,12 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 		}
 
 		dbcfg := &dashboard.Config{
-			Logplayer:       false,
-			UseMPH:          mw.settings.GetUseMPH(),
-			SwapRPMandSpeed: mw.settings.GetSwapRPMandSpeed(),
-			High:            1.5,
-			Low:             0.5,
-			WidebandSymbol:  mw.settings.GetWidebandSymbolName(),
+			Logplayer:      false,
+			UseMPH:         mw.settings.GetUseMPH(),
+			ClassicGauges:  mw.settings.GetClassicGauges(),
+			High:           1.5,
+			Low:            0.5,
+			WidebandSymbol: mw.settings.GetWidebandSymbolName(),
 		}
 
 		switch mw.selects.ecuSelect.Selected {
@@ -312,7 +350,7 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 				mw.Window.SetContent(db)
 				mw.SetFullScreen(true)
 			} else {
-				mw.SetMainMenu(mw.menu.GetMenu(mw.selects.ecuSelect.Selected))
+				mw.SetMainMenu(mw.GetMenu(mw.selects.ecuSelect.Selected))
 				mw.Window.SetContent(mw.content)
 				dbw.Close()
 				mw.buttons.dashboardBtn.OnTapped()
@@ -348,12 +386,12 @@ func (mw *MainWindow) startLogging() {
 			mw.Error(err)
 			return
 		}
-		deviceName = device.Name()
+		deviceName = gocan.AdapterName(device)
 	}
 
 	if mw.selects.ecuSelect.Selected == "T5" {
-		if strings.Contains(device.Name(), "J2534") || strings.Contains(device.Name(), "ELM327") {
-			mw.Error(fmt.Errorf("%s is not supported for T5", device.Name()))
+		if strings.Contains(deviceName, "J2534") || strings.Contains(deviceName, "ELM327") {
+			mw.Error(fmt.Errorf("%s is not supported for T5", deviceName))
 			return
 		}
 	}
@@ -370,9 +408,12 @@ func (mw *MainWindow) startLogging() {
 	mw.buttons.logBtn.SetText("Stop")
 	mw.Disable()
 	mw.canLED.On()
+	ctx, cancel := context.WithCancel(context.Background())
+	mw.dlcCancel = cancel
 	go func() {
+		defer cancel()
 		mw.Log("Connecting to " + deviceName)
-		if err := mw.dlc.Start(); err != nil {
+		if err := mw.dlc.Start(ctx); err != nil {
 			mw.Error(err)
 		}
 		mw.Log(deviceName + " disconnected")
@@ -422,6 +463,7 @@ func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, st
 			LambdaValues:    mw.settings.GetWBLLambdaValues(),
 		},
 		// Remote: mw.selects.remoteSelect.Selected == "Remote",
-		RemoteMode: mw.selects.remoteSelect.SelectedIndex(),
+		RemoteMode:                mw.selects.remoteSelect.SelectedIndex(),
+		ExperimentalT5FastLogging: mw.settings.GetExperimentalT5FastLogger(),
 	})
 }

@@ -6,7 +6,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/roffe/gocan/pkg/w32"
+	"github.com/roffe/gocan/v2/pkg/w32"
 )
 
 const (

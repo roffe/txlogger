@@ -5,6 +5,8 @@ import (
 	"image"
 	"image/color"
 	"log"
+	"math"
+	"os"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -13,12 +15,44 @@ import (
 	"github.com/roffe/txlogger/pkg/colors"
 )
 
+// Vertex is a corner of the mesh. Values are cell-centered (one per table
+// cell) while vertices sit on cell corners, so the vertex grid is one larger
+// than the data grid in each direction and V holds the average of the
+// adjacent cell values.
 type Vertex struct {
 	Ox, Oy, Oz float64 // Original coordinates
 	X, Y, Z    float64 // Transformed coordinates for rendering
+	V          float64 // Data value at this corner (average of adjacent cells)
 }
 
 var _ fyne.Widget = (*Meshgrid)(nil)
+
+// renderBackend selects how the mesh is drawn. The GPU shader is the
+// default; TXLOGGER_MESH_RENDERER=poly|image selects the older paths.
+type RenderBackend int
+
+const (
+	// backendShader ray-casts the whole mesh in one fragment shader
+	// (meshgrid_shader.go); per-frame CPU cost is a uniform update.
+	BackendShader RenderBackend = iota
+	// backendPolygons draws one canvas.ArbitraryPolygon per cell
+	// (meshgrid_poly.go).
+	BackendPolygons
+	// backendImage rasterizes on the CPU into a canvas.Image
+	// (meshgrid_draw.go).
+	BackendImage
+)
+
+func backendFromEnv() RenderBackend {
+	switch os.Getenv("TXLOGGER_MESH_RENDERER") {
+	case "poly":
+		return BackendPolygons
+	case "image":
+		return BackendImage
+	default:
+		return BackendShader
+	}
+}
 
 type Meshgrid struct {
 	widget.BaseWidget
@@ -40,6 +74,34 @@ type Meshgrid struct {
 	scratchProjY  []int
 	scratchColors []color.RGBA
 	scratchLines  []lineSegment
+	scratchQuads  []quadRef
+
+	// Scratch geometry for the axis-scale overlay, rebuilt each refresh by
+	// computeAxisGeometry and consumed by either the canvas pools or the raster.
+	scratchAxisSegs   []axisSeg
+	scratchAxisLabels []axisLabel
+
+	backend RenderBackend
+
+	// Shader backend (meshgrid_shader.go): the whole mesh in one object.
+	shader *canvas.Shader
+
+	// Polygon backend (meshgrid_poly.go): one reusable
+	// canvas.ArbitraryPolygon per cell instead of rasterizing into an image.
+	polys       []*canvas.ArbitraryPolygon
+	polyObjects []fyne.CanvasObject
+	scratchFX   []float32
+	scratchFY   []float32
+
+	// Axis-scale overlay shared by the shader and polygon backends (the image
+	// backend draws the same geometry into the raster). The line pool holds the
+	// three labeled box edges plus a tick mark per visible tick; the text pool
+	// holds a value label per visible tick plus the three axis-name labels.
+	// Both pools are sized to the worst case at init and Show/Hide per frame.
+	axisLinePool []*canvas.Line
+	axisTextPool []*canvas.Text
+
+	renderMode RenderMode
 
 	lastMouseX, lastMouseY float32
 
@@ -52,11 +114,32 @@ type Meshgrid struct {
 	rotationMatrix Matrix3x3
 	scale          float64
 
+	// fitted is set once the widget has received its first real size and the
+	// mesh has been auto-scaled to fit. Subsequent resizes scale relative to
+	// the size change so the user's manual zoom is preserved.
+	fitted bool
+
 	cameraRotation Matrix3x3  // Camera's rotation matrix
 	cameraPosition [3]float64 // Camera's position in world space
 	mousePosition  image.Point
 
+	// Live tracking marker (fractional cell indices), mirroring the
+	// mapviewer crosshair. Hidden until SetCursor is first called. The marker
+	// is a canvas primitive overlaid on the mesh image so moving it only
+	// repaints the scene instead of re-rasterizing the whole mesh.
+	cursorX, cursorY float64
+	showCursor       bool
+	cursor           *canvas.Circle
+
 	xlabel, ylabel, zlabel string
+
+	// Axis tick values (one per column / row) and their display precision,
+	// used to draw the T7Suite-style scales along the mesh edges. xData has
+	// cols entries, yData has rows; either may be nil/short, in which case that
+	// axis' value labels are skipped. zPrec formats the height (Z) scale, whose
+	// values run from zmin to zmax.
+	xData, yData        []float64
+	xPrec, yPrec, zPrec int
 
 	refreshPending bool
 
@@ -67,10 +150,24 @@ type Meshgrid struct {
 	OnMouseDown func()
 }
 
+// Marker colors match the mapviewer crosshair so the two tracking
+// indicators read as the same thing.
+var (
+	cursorFillColor = color.RGBA{R: 165, G: 55, B: 253, A: 255}
+	cursorRingColor = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+)
+
+const cursorRadius = 6
+
 // NewMeshgrid creates a new Meshgrid given width, height, depth and spacing.
-func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int, colorBlindMode colors.ColorBlindMode) (*Meshgrid, error) {
+// xData/yData carry the per-column/row axis tick values (with xPrec/yPrec/zPrec
+// display precision) used to draw the axis scales along the mesh edges; either
+// may be nil to skip that axis' value labels.
+func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int, xData, yData []float64, xPrec, yPrec, zPrec int, colorBlindMode colors.ColorBlindMode, backend RenderBackend) (*Meshgrid, error) {
+	cols = max(1, cols)
+	rows = max(1, rows)
 	// Check if the provided values slice has the correct number of elements
-	if len(values) != max(1, cols)*max(1, rows) {
+	if len(values) != cols*rows {
 		return nil, fmt.Errorf("the number of Z values does not match the meshgrid dimensions")
 	}
 	// Find min and max Z values for normalization
@@ -98,17 +195,30 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 		ylabel: ylabel,
 		zlabel: zlabel,
 
+		xData: xData,
+		yData: yData,
+		xPrec: xPrec,
+		yPrec: yPrec,
+		zPrec: zPrec,
+
 		colorMode: colorBlindMode,
+
+		backend: backend,
 	}
 
-	m.createVertices(fyne.Max(float32(m.cols), 1), fyne.Max(float32(m.rows), 1))
+	m.createVertices()
 
 	m.scaleMeshgrid(0.3)
 
 	if cols == 1 {
 		m.rotateMeshgrid(0, 90, 0)
 	} else {
-		m.rotateMeshgrid(60, 0, -30)
+		// T7Suite-style starting view: ~30° elevation (pitch 60° from
+		// top-down) with the mesh spun 35° around its vertical axis. Starting
+		// from identity, the RotZ term is a model-space turntable spin (the
+		// same composition orbit() applies), not a camera roll.
+		m.cameraRotation = RotationMatrixX(60).Multiply(m.cameraRotation).Multiply(RotationMatrixZ(-35))
+		m.updateVertexPositions()
 	}
 
 	m.ExtendBaseWidget(m)
@@ -118,17 +228,59 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 	m.image.FillMode = canvas.ImageFillOriginal
 	m.image.ScaleMode = canvas.ImageScaleFastest
 
+	m.cursor = &canvas.Circle{
+		// Position2 sets the bounds directly; Resize would trigger a canvas
+		// refresh before the widget is even shown.
+		Position2:   fyne.NewPos(cursorRadius*2, cursorRadius*2),
+		FillColor:   cursorFillColor,
+		StrokeColor: cursorRingColor,
+		StrokeWidth: 2,
+		Hidden:      true,
+	}
+
+	m.initAxisObjects()
+	switch m.backend {
+	case BackendShader:
+		m.initShader()
+	case BackendPolygons:
+		m.initPolygons()
+	}
+
 	return m, nil
+}
+
+// SetRenderMode switches between solid surface, solid+wireframe and pure
+// wireframe rendering.
+func (m *Meshgrid) SetRenderMode(mode RenderMode) {
+	if m.renderMode != mode {
+		m.renderMode = mode
+		m.refresh()
+	}
+}
+
+func (m *Meshgrid) RenderMode() RenderMode {
+	return m.renderMode
+}
+
+// CycleRenderMode steps to the next render mode (surface → solid → wireframe).
+func (m *Meshgrid) CycleRenderMode() {
+	m.renderMode = (m.renderMode + 1) % renderModeCount
+	m.refresh()
 }
 
 func (m *Meshgrid) SetColorBlindMode(mode colors.ColorBlindMode) {
 	if m.colorMode != mode {
 		m.colorMode = mode
+		m.updateShaderColormap()
 	}
 	m.refresh()
 }
 
-func (m *Meshgrid) createVertices(width, height float32) {
+// createVertices builds the corner-vertex grid: one quad per table cell, so
+// the mesh shows exactly cols x rows cells like the map above. The grid is
+// (rows+1) x (cols+1); each corner takes the average of the 1-4 cell values
+// touching it.
+func (m *Meshgrid) createVertices() {
 	// Guard against a zero range (e.g. all values identical / all zero) so we
 	// produce a flat mesh at Z=0 instead of NaN from a div-by-zero.
 	zrange := m.zrange
@@ -136,16 +288,19 @@ func (m *Meshgrid) createVertices(width, height float32) {
 		zrange = 1
 	}
 
-	vertices := make([][]Vertex, 0, m.rows)
-	valueIndex := 0
+	vRows, vCols := m.rows+1, m.cols+1
+	vertices := make([][]Vertex, 0, vRows)
 	var sumX, sumY, sumZ float64
 	var count int
-	for i := m.rows; i > 0; i-- {
-		row := make([]Vertex, 0, m.cols)
-		for j := 0; j < m.cols; j++ {
-			x := -float64(width)*.5 + float64(j)*float64(m.cellWidth)
-			y := -float64(height)*.5 + float64(i)*float64(m.cellHeight)
-			z := ((m.values[valueIndex] - m.zmin) / zrange) * m.depth
+	for i := 0; i < vRows; i++ {
+		row := make([]Vertex, 0, vCols)
+		for j := 0; j < vCols; j++ {
+			value := m.cornerValue(i, j)
+			x := float64(j) * float64(m.cellWidth)
+			// Data row 0 is the bottom row in the map; keep it at the high-Y
+			// end of the mesh like before, so the orientation is unchanged.
+			y := float64(vRows-i) * float64(m.cellHeight)
+			z := ((value - m.zmin) / zrange) * m.depth
 			row = append(row, Vertex{
 				Ox: x,
 				Oy: y,
@@ -153,12 +308,12 @@ func (m *Meshgrid) createVertices(width, height float32) {
 				X:  x,
 				Y:  y,
 				Z:  z,
+				V:  value,
 			})
 			sumX += x
 			sumY += y
 			sumZ += z
 			count++
-			valueIndex++
 		}
 		vertices = append(vertices, row)
 	}
@@ -172,19 +327,151 @@ func (m *Meshgrid) createVertices(width, height float32) {
 	}
 }
 
+// cornerValue averages the cell values adjacent to corner (vi, vj): four in
+// the interior, two along edges and one at the outer corners.
+func (m *Meshgrid) cornerValue(vi, vj int) float64 {
+	r0 := max(vi-1, 0)
+	r1 := min(vi, m.rows-1)
+	c0 := max(vj-1, 0)
+	c1 := min(vj, m.cols-1)
+
+	var sum float64
+	var n int
+	for r := r0; r <= r1; r++ {
+		for c := c0; c <= c1; c++ {
+			sum += m.values[r*m.cols+c]
+			n++
+		}
+	}
+	return sum / float64(n)
+}
+
 func (m *Meshgrid) scaleMeshgrid(factor float64) {
 	m.scale = m.scale * factor
 	m.updateVertexPositions()
 }
 
-// orbit performs a Fusion 360-style "turntable" orbit. Yaw is applied around
-// the world Y axis (right-multiplied so it rotates the world before the
-// camera), pitch is applied around the camera-local X axis (left-multiplied).
-// Composing the two this way prevents roll from sneaking in on diagonal drags.
-func (m *Meshgrid) orbit(yawDelta, pitchDelta float64) {
+// fitMargin leaves a border around the mesh so it isn't drawn flush to the
+// widget edges (and so the axis indicator, which extends past the mesh, has
+// some room).
+const fitMargin = 0.85
+
+// projectedBounds returns the min/max of the mesh's current projected
+// (orthographic) screen positions. Both reflect the current scale, rotation
+// and pan.
+func (m *Meshgrid) projectedBounds() (minX, maxX, minY, maxY float64) {
+	minX, maxX = math.Inf(1), math.Inf(-1)
+	minY, maxY = math.Inf(1), math.Inf(-1)
+	for i := range m.vertices {
+		row := m.vertices[i]
+		for j := range row {
+			v := &row[j]
+			if v.X < minX {
+				minX = v.X
+			}
+			if v.X > maxX {
+				maxX = v.X
+			}
+			if v.Y < minY {
+				minY = v.Y
+			}
+			if v.Y > maxY {
+				maxY = v.Y
+			}
+		}
+	}
+	return
+}
+
+// projectedExtent returns the width and height, in logical pixels, of the
+// mesh's current projected bounding box. It reflects the current scale and
+// rotation; panning shifts every vertex equally so the extent is
+// pan-invariant.
+func (m *Meshgrid) projectedExtent() (w, h float64) {
+	minX, maxX, minY, maxY := m.projectedBounds()
+	if math.IsInf(minX, 0) || math.IsInf(minY, 0) {
+		return 0, 0
+	}
+	return maxX - minX, maxY - minY
+}
+
+// centerInView pans the camera so the mesh's projected bounding box is
+// centered in the widget. Used on the initial fit only; the camera offset it
+// produces scales with the mesh on later resizes, so the centering (and any
+// user pan applied on top) is preserved.
+func (m *Meshgrid) centerInView() {
+	minX, maxX, minY, maxY := m.projectedBounds()
+	if math.IsInf(minX, 0) || math.IsInf(minY, 0) {
+		return
+	}
+	// v.{X,Y} = base - cam, so adding the current box center to the camera
+	// moves the box center to the view origin (which maps to screen center).
+	m.cameraPosition[0] += (minX + maxX) / 2
+	m.cameraPosition[1] += (minY + maxY) / 2
+	m.updateVertexPositions()
+}
+
+// fitScaleForSize returns the m.scale value that makes the mesh's projected
+// bounding box fill the given widget size (minus fitMargin) at the current
+// rotation. The bounding box is linear in m.scale, so it is normalized to a
+// unit scale first.
+func (m *Meshgrid) fitScaleForSize(size fyne.Size) float64 {
+	w, h := m.projectedExtent()
+	if w <= 0 || h <= 0 || m.scale == 0 {
+		return m.scale
+	}
+	wPer := w / m.scale
+	hPer := h / m.scale
+	sx := float64(size.Width) * fitMargin / wPer
+	sy := float64(size.Height) * fitMargin / hPer
+	return math.Min(sx, sy)
+}
+
+// adaptZoom keeps the mesh sized to the widget across layout changes. The
+// first real layout fits the mesh to the view and centers it; later resizes
+// scale the mesh (and the camera pan) by the ratio of the new fit-scale to
+// the old. This grows and shrinks the mesh with the window while preserving
+// whatever zoom and pan the user has applied — it adjusts the existing scale
+// and pan multiplicatively rather than resetting them.
+func (m *Meshgrid) adaptZoom(oldSize, newSize fyne.Size) {
+	if newSize.Width <= 0 || newSize.Height <= 0 {
+		return
+	}
+	if !m.fitted {
+		m.scale = m.fitScaleForSize(newSize)
+		m.fitted = true
+		m.updateVertexPositions()
+		m.centerInView()
+		return
+	}
+	if oldSize.Width <= 0 || oldSize.Height <= 0 {
+		return
+	}
+	oldFit := m.fitScaleForSize(oldSize)
+	if oldFit == 0 {
+		return
+	}
+	ratio := m.fitScaleForSize(newSize) / oldFit
+	if ratio <= 0 || math.IsInf(ratio, 0) || math.IsNaN(ratio) {
+		return
+	}
+	m.scale *= ratio
+	// Pan lives in the same scaled view space, so scale it alongside the mesh
+	// to keep the centering and any user pan in the same relative spot.
+	m.cameraPosition[0] *= ratio
+	m.cameraPosition[1] *= ratio
+	m.updateVertexPositions()
+}
+
+// orbit performs a Fusion 360-style "turntable" orbit. Spin is applied around
+// the mesh's own vertical axis — data Z, the height axis (right-multiplied so
+// it rotates the model before the camera) — pitch around the camera-local X
+// axis (left-multiplied). Composing the two this way prevents roll from
+// sneaking in on diagonal drags.
+func (m *Meshgrid) orbit(spinDelta, pitchDelta float64) {
 	pitchRot := RotationMatrixX(pitchDelta)
-	yawRot := RotationMatrixY(yawDelta)
-	m.cameraRotation = pitchRot.Multiply(m.cameraRotation).Multiply(yawRot)
+	spinRot := RotationMatrixZ(spinDelta)
+	m.cameraRotation = pitchRot.Multiply(m.cameraRotation).Multiply(spinRot)
 	m.updateVertexPositions()
 }
 
@@ -230,40 +517,90 @@ func (m *Meshgrid) updateVertexPositions() {
 	}
 }
 
-func (m *Meshgrid) SetFloat64(idx int, value float64) {
-	log.Println("SetFloat64", idx, value)
-	m.values[idx] = value
-	m.zmin, m.zmax, m.zrange = findMinMaxRange(m.values)
-	zrange := m.zrange
-	if zrange == 0 {
-		zrange = 1
-	}
-	m.vertices[idx/m.cols][idx%m.cols].Z = ((value - m.zmin) / zrange) * m.depth
-	m.refresh()
+// projectOriginal maps a point in the mesh's original (untransformed) coordinate
+// space to screen pixels, applying the same camera transform as
+// updateVertexPositions and the same screen mapping as cursorScreenPosition /
+// updatePolygons. It returns the screen x/y and the view-space depth (z), where
+// a larger z is nearer the viewer. This lets the axis overlay project arbitrary
+// box-edge points, not just stored vertices.
+func (m *Meshgrid) projectOriginal(ox, oy, oz float64) (sx, sy, vz float32) {
+	vx := (ox - m.centerX) * m.scale
+	vy := (oy - m.centerY) * m.scale
+	vz3 := (oz - m.centerZ) * m.scale
+	r := m.cameraRotation
+	x := r[0][0]*vx + r[0][1]*vy + r[0][2]*vz3 - m.cameraPosition[0]
+	y := r[1][0]*vx + r[1][1]*vy + r[1][2]*vz3 - m.cameraPosition[1]
+	z := r[2][0]*vx + r[2][1]*vy + r[2][2]*vz3 - m.cameraPosition[2]
+	return float32(float64(m.size.Width)*0.5 + x), float32(float64(m.size.Height)*0.5 + y), float32(z)
 }
 
-func (m *Meshgrid) SetFloat642(idx int, value float64) {
+// SetFloat64 updates a single cell value. The whole mesh is rebuilt since a
+// new value can shift zmin/zmax and with it every vertex's normalized height.
+func (m *Meshgrid) SetFloat64(idx int, value float64) {
+	if idx < 0 || idx >= len(m.values) {
+		return
+	}
 	m.values[idx] = value
 	m.zmin, m.zmax, m.zrange = findMinMaxRange(m.values)
-	m.createVertices(fyne.Max(float32(m.cols), 1), fyne.Max(float32(m.rows), 1))
+	m.createVertices()
 	m.updateVertexPositions()
+	m.updateShaderData()
 	m.refresh()
 }
 
 // Update LoadFloat64s to use the new vertex position update method
 func (m *Meshgrid) LoadFloat64s(min, max float64, floats []float64) {
+	if len(floats) != m.rows*m.cols {
+		log.Printf("meshgrid: LoadFloat64s got %d values, want %d (%dx%d)", len(floats), m.rows*m.cols, m.cols, m.rows)
+		return
+	}
 	m.zmin = min
 	m.zmax = max
 	m.zrange = m.zmax - m.zmin
 
 	m.values = floats
-	if len(floats) == 0 {
+
+	m.createVertices()
+	m.updateVertexPositions()
+	m.updateShaderData()
+	m.refresh()
+}
+
+// SetCursor positions the tracking marker at the (fractional) cell index,
+// mirroring the crosshair in the map above. The marker rides on the mesh
+// surface, interpolated between the four surrounding vertices.
+func (m *Meshgrid) SetCursor(xIdx, yIdx float64) {
+	if xIdx < 0 {
+		xIdx = 0
+	} else if max := float64(m.cols - 1); xIdx > max {
+		xIdx = max
+	}
+	if yIdx < 0 {
+		yIdx = 0
+	} else if max := float64(m.rows - 1); yIdx > max {
+		yIdx = max
+	}
+	if m.showCursor && xIdx == m.cursorX && yIdx == m.cursorY {
 		return
 	}
+	m.cursorX = xIdx
+	m.cursorY = yIdx
+	m.showCursor = true
+	m.moveCursor()
+}
 
-	m.createVertices(fyne.Max(float32(m.cols), 1), fyne.Max(float32(m.rows), 1))
-	m.updateVertexPositions()
-	m.refresh()
+// moveCursor repositions the overlay marker on the projected surface point.
+// Moving a canvas primitive only repaints the scene from cached textures,
+// so cursor updates don't re-rasterize the mesh.
+func (m *Meshgrid) moveCursor() {
+	if !m.showCursor {
+		return
+	}
+	px, py := m.cursorScreenPosition()
+	m.cursor.Move(fyne.NewPos(px-cursorRadius, py-cursorRadius))
+	if m.cursor.Hidden {
+		m.cursor.Show()
+	}
 }
 
 // returns the min, max and range across the data
@@ -280,22 +617,33 @@ func findMinMaxRange(values []float64) (float64, float64, float64) {
 	return minZ, maxZ, maxZ - minZ
 }
 
-func (m *Meshgrid) project(v Vertex) (int, int) {
-	centerX := float64(m.size.Width) * 0.5
-	centerY := float64(m.size.Height) * 0.5
-	screenX := centerX + v.X
-	screenY := centerY + v.Y
-	return int(screenX), int(screenY)
-}
-
 func (m *Meshgrid) Refresh() {
 	m.refresh()
 }
 
 func (m *Meshgrid) refresh() {
-	m.image.Image = m.drawMeshgridLines()
-	m.image.Resize(m.size)
-	m.image.Refresh()
+	switch m.backend {
+	case BackendShader:
+		// All per-frame state lives in shader uniforms; the GPU re-renders
+		// from them on the next paint. Only the overlays move on the CPU.
+		m.updateShaderUniforms()
+		m.updateAxisObjects()
+		m.moveCursor()
+		canvas.Refresh(m)
+	case BackendPolygons:
+		// Geometry/color updates on the reusable polygons; the canvas.Refresh
+		// marks the scene dirty so color-only changes repaint too.
+		m.updatePolygons()
+		m.moveCursor()
+		canvas.Refresh(m)
+	default:
+		m.image.Image = m.drawMeshgridLines()
+		m.image.Resize(m.size)
+		m.image.Refresh()
+		// Rotation, scale, resize and data changes all move the projected
+		// surface point under the marker.
+		m.moveCursor()
+	}
 }
 
 func (m *Meshgrid) throttledRefresh() {
@@ -304,24 +652,46 @@ func (m *Meshgrid) throttledRefresh() {
 	}
 	m.refreshPending = true
 	time.AfterFunc(10*time.Millisecond, func() { // ~100fps
-		m.refresh()
-		m.refreshPending = false
+		// AfterFunc fires on a timer goroutine; hop back to the fyne thread.
+		// refreshPending is then only ever touched on the fyne thread.
+		fyne.Do(func() {
+			m.refresh()
+			m.refreshPending = false
+		})
 	})
 }
+
 func (m *Meshgrid) CreateRenderer() fyne.WidgetRenderer {
-	return &meshgridRenderer{m}
+	return &meshgridRenderer{MG: m}
 }
 
 type meshgridRenderer struct {
-	*Meshgrid
+	MG      *Meshgrid
+	objects []fyne.CanvasObject
 }
 
 func (m *meshgridRenderer) Layout(size fyne.Size) {
-	if size == m.size {
+	if size == m.MG.size {
 		return
 	}
-	m.size = size
-	m.throttledRefresh()
+	// A collapsed split pane (toggling the mesh off) lays us out at zero height.
+	// Letting that become the baseline breaks adaptZoom's reversible scaling and
+	// the mesh creeps more zoomed-in on every toggle, so keep the last good size.
+	if size.Width <= 0 || size.Height <= 0 {
+		return
+	}
+	oldSize := m.MG.size
+	m.MG.size = size
+	// Auto-fit on the first real size and scale with the window thereafter,
+	// preserving any zoom the user has applied.
+	m.MG.adaptZoom(oldSize, size)
+	switch m.MG.backend {
+	case BackendShader:
+		m.MG.shader.Resize(size)
+	case BackendImage:
+		m.MG.image.Resize(size)
+	}
+	m.MG.throttledRefresh()
 }
 
 func (m *meshgridRenderer) MinSize() fyne.Size {
@@ -329,12 +699,38 @@ func (m *meshgridRenderer) MinSize() fyne.Size {
 }
 
 func (m *meshgridRenderer) Refresh() {
-	m.Meshgrid.refresh()
+	m.MG.refresh()
 }
 
 func (m *meshgridRenderer) Destroy() {
 }
 
 func (m *meshgridRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{m.image}
+	switch m.MG.backend {
+	case BackendShader:
+		if m.objects == nil {
+			m.MG.updateAxisObjects()
+			objs := []fyne.CanvasObject{m.MG.shader}
+			for _, l := range m.MG.axisLinePool {
+				objs = append(objs, l)
+			}
+			for _, t := range m.MG.axisTextPool {
+				objs = append(objs, t)
+			}
+			m.objects = append(objs, m.MG.cursor)
+		}
+		return m.objects
+	case BackendPolygons:
+		// updatePolygons rebuilds the list in painter's order every frame;
+		// populate it here for the first paint.
+		if len(m.MG.polyObjects) == 0 {
+			m.MG.updatePolygons()
+		}
+		return m.MG.polyObjects
+	default:
+		if m.objects == nil {
+			m.objects = []fyne.CanvasObject{m.MG.image, m.MG.cursor}
+		}
+		return m.objects
+	}
 }

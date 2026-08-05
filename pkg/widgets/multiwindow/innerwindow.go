@@ -30,6 +30,9 @@ const (
 	modeIcon
 )
 
+// minimizedWidth is the fixed width of a window collapsed into the bottom tray.
+const minimizedWidth float32 = 200
+
 type resizeDirection int
 
 const (
@@ -52,9 +55,12 @@ type InnerWindow struct {
 	// The default is widget.ButtonAlignCenter which will auto select based on the OS.
 	//	- On Darwin this will be `widget.ButtonAlignLeading`
 	//	- On all other OS this will be `widget.ButtonAlignTrailing`
-	Alignment                                           widget.ButtonAlign
-	OnClose                                             func()                                 `json:"-"`
-	OnDragged                                           func(*fyne.DragEvent)                  `json:"-"`
+	Alignment widget.ButtonAlign
+	OnClose   func()                `json:"-"`
+	OnDragged func(*fyne.DragEvent) `json:"-"`
+	// OnResized is called while a border resize drag is in progress. The
+	// event's Dragged field holds the TOTAL delta since the drag started, not
+	// the per-event delta; combine it with dragStartPos/dragStartSize.
 	OnResized                                           func(resizeDirection, *fyne.DragEvent) `json:"-"`
 	OnMinimized, OnMaximized, OnTappedBar, OnTappedIcon func()                                 `json:"-"`
 	OnMouseDown                                         func()                                 `json:"-"`
@@ -64,7 +70,7 @@ type InnerWindow struct {
 	Persist       bool // Persist through layout changes
 	IgnoreSave    bool // Ignore saving to layout
 
-	//minBtn, maxBtn, closeBtn *borderButton
+	// minBtn, maxBtn, closeBtn *borderButton
 
 	title       string
 	bg          *canvas.Rectangle
@@ -72,10 +78,19 @@ type InnerWindow struct {
 	content     *fyne.Container
 
 	maximized bool
+	minimized bool
 	active    bool
 
 	preMaximizedSize fyne.Size
 	preMaximizedPos  fyne.Position
+
+	preMinimizedSize fyne.Size
+	preMinimizedPos  fyne.Position
+
+	// window rect at the start of the current border-resize drag; OnResized
+	// computes the new rect from these plus the total drag delta.
+	dragStartPos  fyne.Position
+	dragStartSize fyne.Size
 
 	onClose func() `json:"-"`
 }
@@ -218,12 +233,12 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 	if isLeading {
 		// Left side (darwin default or explicit left alignment)
 		buttons = container.NewHBox(close, min, max)
-		//bar = container.NewBorder(nil, nil, buttons, borderIcon, title)
+		// bar = container.NewBorder(nil, nil, buttons, borderIcon, title)
 		bar = container.NewBorder(nil, nil, buttons, borderIcon, container.New(layout.NewCustomPaddedLayout(topPad, 0, 0, 0), title))
 	} else {
 		// Right side (Windows/Linux default and explicit right alignment)
 		buttons = container.NewHBox(min, max, close)
-		//bar = container.NewBorder(nil, nil, borderIcon, buttons, title)
+		// bar = container.NewBorder(nil, nil, borderIcon, buttons, title)
 		bar = container.NewBorder(nil, nil, borderIcon, buttons, container.New(layout.NewCustomPaddedLayout(topPad, 0, 0, 0), title))
 	}
 
@@ -232,8 +247,8 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 	w.bg.CornerRadius = 4
 	contentBG := canvas.NewRectangle(th.Color(theme.ColorNameBackground, v))
 
-	var leftTopCorner, rightTopCorner, leftBottomCorner, rightBottomCorner *draggableCorner
 	var topBorder, bottomBorder, leftBorder, rightBorder *draggableBorder
+	var borders []fyne.CanvasObject
 
 	objects := []fyne.CanvasObject{w.bg, contentBG, bar, w.content}
 
@@ -242,30 +257,25 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 		bottomBorder = newDraggableBorder(w, resizeDown)
 		leftBorder = newDraggableBorder(w, resizeLeft)
 		rightBorder = newDraggableBorder(w, resizeRight)
-		leftTopCorner = newDraggableCorner(w, resizeUpLeft)
-		rightTopCorner = newDraggableCorner(w, resizeUpRight)
-		leftBottomCorner = newDraggableCorner(w, resizeDownLeft)
-		rightBottomCorner = newDraggableCorner(w, resizeDownRight)
 
-		// objects = append(objects, leftCorner, rightCorner)
-		objects = append(objects, topBorder, bottomBorder, leftBorder, rightBorder, leftTopCorner, rightTopCorner, leftBottomCorner, rightBottomCorner)
+		borders = []fyne.CanvasObject{topBorder, bottomBorder, leftBorder, rightBorder}
+		objects = append(objects, borders...)
 	}
 
 	r := &innerWindowRenderer{
 		ShadowingRenderer: NewShadowingRenderer(objects, SubmergedContentLevel),
 		win:               w,
 		bar:               bar,
+		title:             title,
 		buttons:           []*borderButton{min, max, close},
 		bg:                w.bg,
 		topBorder:         topBorder,
 		bottomBorder:      bottomBorder,
 		leftBorder:        leftBorder,
 		rightBorder:       rightBorder,
-		leftTopCorner:     leftTopCorner,
-		rightTopCorner:    rightTopCorner,
-		leftBottomCorner:  leftBottomCorner,
-		rightBottomCorner: rightBottomCorner,
-		contentBG:         contentBG}
+		borders:           borders,
+		contentBG:         contentBG,
+	}
 	r.Layout(w.Size())
 	return r
 }
@@ -299,6 +309,7 @@ var _ fyne.WidgetRenderer = (*innerWindowRenderer)(nil)
 type innerWindowRenderer struct {
 	win     *InnerWindow
 	bar     *fyne.Container
+	title   *draggableLabel
 	buttons []*borderButton
 
 	bg, contentBG *canvas.Rectangle
@@ -308,82 +319,111 @@ type innerWindowRenderer struct {
 	leftBorder   fyne.CanvasObject
 	rightBorder  fyne.CanvasObject
 
-	leftTopCorner     fyne.CanvasObject
-	rightTopCorner    fyne.CanvasObject
-	leftBottomCorner  fyne.CanvasObject
-	rightBottomCorner fyne.CanvasObject
+	borders []fyne.CanvasObject // all border handles, for show/hide
 
 	*ShadowingRenderer
 }
 
+// Layout arranges the window chrome. The visible window (bg) fills the widget
+// rect exactly: the resize strips straddle its edges, the shadow hugs it, and
+// the title bar and content sit inside with symmetric padding insets.
 func (i *innerWindowRenderer) Layout(size fyne.Size) {
-	// Calculate padding and base size
-	padding := i.win.Theme().Size(theme.SizeNamePadding)
-	contentSize := size.Subtract(fyne.NewSquareSize(padding))
+	th := i.win.Theme()
+	padding := th.Size(theme.SizeNamePadding)
+	barHeight := th.Size(theme.SizeNameWindowTitleBarHeight)
 
-	doublePadd := padding * 2
-	// Pre-calculate commonly used dimensions
-	adjustedWidth := contentSize.Width - doublePadd
+	// Shadow and background wrap the full widget rect. The shadow is inset by
+	// the bg corner radius so its gradients show through the rounded-off
+	// corner notches instead of the bare canvas behind the window.
+	inset := i.bg.CornerRadius
+	i.LayoutShadow(size.SubtractWidthHeight(2*inset, 2*inset), fyne.NewPos(inset, inset))
+	i.bg.Resize(size)
 
-	// Layout shadow and background
-	i.LayoutShadow(size.SubtractWidthHeight(2, 2), fyne.Position{})
-	i.bg.Resize(contentSize)
-
-	// Layout title bar
-	barHeight := i.win.Theme().Size(theme.SizeNameWindowTitleBarHeight)
+	// Title bar: full width minus a padding inset on each side.
 	i.bar.Move(fyne.NewPos(padding, 0))
-	i.bar.Resize(fyne.NewSize(size.Width-doublePadd, barHeight))
+	i.bar.Resize(fyne.NewSize(size.Width-2*padding, barHeight))
 
-	// Layout main content area
+	// When minimized only the title bar is shown (tray-style).
+	if i.win.minimized {
+		i.contentBG.Hide()
+		i.win.content.Hide()
+		i.setBordersVisible(false)
+		return
+	}
+	i.contentBG.Show()
+	i.win.content.Show()
+
+	// Content: below the bar, padding inset on the left, right and bottom.
 	contentPos := fyne.NewPos(padding, barHeight)
-	contentDimensions := fyne.NewSize(adjustedWidth, contentSize.Height-padding-barHeight)
+	contentDimensions := fyne.NewSize(size.Width-2*padding, size.Height-barHeight-padding)
 
 	i.contentBG.Move(contentPos)
 	i.contentBG.Resize(contentDimensions)
 	i.win.content.Move(contentPos)
 	i.win.content.Resize(contentDimensions)
 
-	// Layout corners
+	// Layout resize handles
 	if !i.win.DisableResize {
-		i.layoutCorners(size)
+		i.setBordersVisible(true)
+		i.layoutResizeHandles(size)
 	}
 }
 
-// Helper method to handle corner layout
-func (i *innerWindowRenderer) layoutCorners(size fyne.Size) {
-	cornerSize := fyne.NewSize(10, 10)
-
-	i.topBorder.Move(fyne.Position{X: 10, Y: -3})
-	i.topBorder.Resize(fyne.NewSize(size.Width-20, 6))
-
-	i.bottomBorder.Move(fyne.Position{X: 10, Y: size.Height - 3})
-	i.bottomBorder.Resize(fyne.NewSize(size.Width-20, 6))
-
-	i.leftBorder.Move(fyne.Position{X: -3, Y: 10})
-	i.leftBorder.Resize(fyne.NewSize(6, size.Height-20))
-
-	i.rightBorder.Move(fyne.Position{X: size.Width - 3, Y: 10})
-	i.rightBorder.Resize(fyne.NewSize(6, size.Height-20))
-
-	i.leftTopCorner.Move(fyne.Position{X: 0, Y: 0})
-	i.leftTopCorner.Resize(cornerSize)
-
-	i.rightTopCorner.Move(fyne.Position{X: size.Width - cornerSize.Width, Y: 0})
-	i.rightTopCorner.Resize(cornerSize)
-
-	i.leftBottomCorner.Move(fyne.Position{X: 0, Y: size.Height - cornerSize.Height})
-	i.leftBottomCorner.Resize(cornerSize)
-
-	i.rightBottomCorner.Move(fyne.Position{X: size.Width - cornerSize.Width, Y: size.Height - cornerSize.Height})
-	i.rightBottomCorner.Resize(cornerSize)
+func (i *innerWindowRenderer) setBordersVisible(visible bool) {
+	for _, b := range i.borders { // empty when DisableResize
+		if visible {
+			b.Show()
+		} else {
+			b.Hide()
+		}
+	}
 }
 
+// Resize handle geometry. Each window edge gets one strip, centered on the
+// edge. Like native Windows, the last resizeCornerZone units at either end of
+// a strip act as a diagonal (corner) resize. These two constants are the only
+// knobs — everything in layoutResizeHandles is derived from them.
+const (
+	resizeBorderThickness float32 = 8
+	resizeCornerZone      float32 = 20
+)
+
+// layoutResizeHandles positions the four edge drag handles. Top and bottom
+// strips span the full width; left and right fill the space between them so
+// no two strips overlap.
+func (i *innerWindowRenderer) layoutResizeHandles(size fyne.Size) {
+	const (
+		t        = resizeBorderThickness
+		overhang = t / 2 // strips straddle the window edge
+	)
+	hEdge := fyne.NewSize(size.Width, t)
+	vEdge := fyne.NewSize(t, size.Height-2*t)
+
+	i.topBorder.Move(fyne.Position{X: 0, Y: -overhang})
+	i.topBorder.Resize(hEdge)
+
+	i.bottomBorder.Move(fyne.Position{X: 0, Y: size.Height - overhang})
+	i.bottomBorder.Resize(hEdge)
+
+	i.leftBorder.Move(fyne.Position{X: -overhang, Y: t - overhang})
+	i.leftBorder.Resize(vEdge)
+
+	i.rightBorder.Move(fyne.Position{X: size.Width - overhang, Y: t - overhang})
+	i.rightBorder.Resize(vEdge)
+}
+
+// MinSize mirrors Layout: bar height plus content height plus the bottom
+// padding inset, and the wider of bar/content plus the side insets. At this
+// size the content gets exactly its own MinSize.
 func (i *innerWindowRenderer) MinSize() fyne.Size {
 	th := i.win.Theme()
 	pad := th.Size(theme.SizeNamePadding)
-	contentMin := i.win.content.MinSize()
 	barHeight := th.Size(theme.SizeNameWindowTitleBarHeight)
-	innerWidth := fyne.Max(i.bar.MinSize().Width, contentMin.Width)
+	if i.win.minimized {
+		return fyne.NewSize(minimizedWidth, barHeight)
+	}
+	contentMin := i.win.content.MinSize()
+	innerWidth := max(i.bar.MinSize().Width, contentMin.Width)
 	return fyne.NewSize(innerWidth+pad*2, contentMin.Height+pad+barHeight)
 }
 
@@ -399,14 +439,17 @@ func (i *innerWindowRenderer) Refresh() {
 		b.setTheme(th, i.win.active)
 	}
 	i.bar.Refresh()
-	title := i.bar.Objects[0].(*fyne.Container).Objects[0].(*draggableLabel)
-	title.SetText(i.win.title)
+	if i.title.Text != i.win.title {
+		i.title.SetText(i.win.title)
+	}
 	i.ShadowingRenderer.RefreshShadow()
 }
 
-var _ desktop.Mouseable = (*draggableLabel)(nil)
-var _ fyne.Draggable = (*draggableLabel)(nil)
-var _ fyne.Focusable = (*draggableLabel)(nil)
+var (
+	_ desktop.Mouseable = (*draggableLabel)(nil)
+	_ fyne.Draggable    = (*draggableLabel)(nil)
+	_ fyne.Focusable    = (*draggableLabel)(nil)
+)
 
 type draggableLabel struct {
 	widget.Label
@@ -476,49 +519,6 @@ func (d *draggableLabel) MouseUp(*desktop.MouseEvent) {
 
 func (d *draggableLabel) labelMinSize() fyne.Size {
 	return d.Label.MinSize()
-}
-
-var _ desktop.Cursorable = (*draggableCorner)(nil)
-
-type draggableCorner struct {
-	widget.BaseWidget
-	win       *InnerWindow
-	resizeDir resizeDirection
-}
-
-func newDraggableCorner(w *InnerWindow, resizeDir resizeDirection) *draggableCorner {
-	d := &draggableCorner{win: w, resizeDir: resizeDir}
-	d.ExtendBaseWidget(d)
-	return d
-}
-
-func (c *draggableCorner) CreateRenderer() fyne.WidgetRenderer {
-	prop := canvas.NewRectangle(color.RGBA{0, 0, 0, 0})
-	return widget.NewSimpleRenderer(prop)
-}
-
-func (c *draggableCorner) Cursor() desktop.Cursor {
-	return desktop.PointerCursor
-}
-
-func (c *draggableCorner) Dragged(ev *fyne.DragEvent) {
-	if f := c.win.OnResized; f != nil {
-		c.win.OnResized(c.resizeDir, ev)
-	}
-}
-
-// MouseDown is called when the user presses the mouse button on the draggable corner.
-func (c *draggableCorner) MouseDown(*desktop.MouseEvent) {
-	if f := c.win.OnMouseDown; f != nil {
-		f()
-	}
-}
-
-// MouseUp is called when the user releases the mouse button on the draggable corner.
-func (c *draggableCorner) MouseUp(*desktop.MouseEvent) {
-}
-
-func (c *draggableCorner) DragEnd() {
 }
 
 type borderButton struct {
@@ -595,39 +595,71 @@ func (b *buttonTheme) Size(n fyne.ThemeSizeName) float32 {
 		//n = theme.SizeNameWindowButtonRadius
 		return 4
 	case theme.SizeNameInlineIcon:
-		//n = theme.SizeNameWindowButtonIcon
+		// n = theme.SizeNameWindowButtonIcon
 		return 20
 	}
 
 	return b.Theme.Size(n)
 }
 
+var (
+	_ desktop.Cursorable = (*draggableBorder)(nil)
+	_ desktop.Hoverable  = (*draggableBorder)(nil)
+	_ fyne.Draggable     = (*draggableBorder)(nil)
+)
+
+// draggableBorder is one resize strip along a window edge. The ends of the
+// strip (resizeCornerZone units) resize diagonally, like native Windows
+// borders; the middle resizes along the edge's axis only.
 type draggableBorder struct {
 	widget.BaseWidget
-	win       *InnerWindow
-	rect      *canvas.Rectangle
-	resizeDir resizeDirection
-	cursor    desktop.StandardCursor
+	win      *InnerWindow
+	rect     *canvas.Rectangle
+	edge     resizeDirection // resizeUp/Down/Left/Right: which window edge this strip sits on
+	dir      resizeDirection // current direction, updated on hover, locked while dragging
+	dragging bool
+	pressAbs fyne.Position // mouse position at drag start, anchor for total-delta resizing
 }
 
-func newDraggableBorder(w *InnerWindow, resizeDir resizeDirection) *draggableBorder {
-	d := &draggableBorder{win: w, resizeDir: resizeDir}
+func newDraggableBorder(w *InnerWindow, edge resizeDirection) *draggableBorder {
+	d := &draggableBorder{win: w, edge: edge, dir: edge}
 	d.ExtendBaseWidget(d)
 	d.rect = canvas.NewRectangle(color.RGBA{0, 0, 0, 0})
-
-	switch d.resizeDir {
-	case resizeUp, resizeDown:
-		d.cursor = desktop.VResizeCursor
-	case resizeLeft, resizeRight:
-		d.cursor = desktop.HResizeCursor
-	case resizeDownLeft, resizeUpRight:
-		d.cursor = desktop.PointerCursor
-	case resizeDownRight, resizeUpLeft:
-		d.cursor = desktop.PointerCursor
-	default:
-		d.cursor = desktop.DefaultCursor
-	}
 	return d
+}
+
+// dirAt maps a position within the strip to a resize direction: the edge's own
+// direction in the middle, a diagonal within resizeCornerZone of either end.
+func (d *draggableBorder) dirAt(pos fyne.Position) resizeDirection {
+	switch d.edge {
+	case resizeUp, resizeDown:
+		if pos.X < resizeCornerZone {
+			if d.edge == resizeUp {
+				return resizeUpLeft
+			}
+			return resizeDownLeft
+		}
+		if pos.X > d.Size().Width-resizeCornerZone {
+			if d.edge == resizeUp {
+				return resizeUpRight
+			}
+			return resizeDownRight
+		}
+	case resizeLeft, resizeRight:
+		if pos.Y < resizeCornerZone {
+			if d.edge == resizeLeft {
+				return resizeUpLeft
+			}
+			return resizeUpRight
+		}
+		if pos.Y > d.Size().Height-resizeCornerZone {
+			if d.edge == resizeLeft {
+				return resizeDownLeft
+			}
+			return resizeDownRight
+		}
+	}
+	return d.edge
 }
 
 func (d *draggableBorder) CreateRenderer() fyne.WidgetRenderer {
@@ -635,16 +667,55 @@ func (d *draggableBorder) CreateRenderer() fyne.WidgetRenderer {
 }
 
 func (d *draggableBorder) Cursor() desktop.Cursor {
-	return d.cursor
+	switch d.dir {
+	case resizeUp, resizeDown:
+		return desktop.VResizeCursor
+	case resizeLeft, resizeRight:
+		return desktop.HResizeCursor
+	case resizeDownLeft, resizeUpRight:
+		return desktop.NESWResizeCursor
+	case resizeDownRight, resizeUpLeft:
+		return desktop.NWSEResizeCursor
+	}
+	return desktop.DefaultCursor
 }
 
-func (d *draggableBorder) Dragged(ev *fyne.DragEvent) {
-	if f := d.win.OnResized; f != nil {
-		d.win.OnResized(d.resizeDir, ev)
+func (d *draggableBorder) MouseIn(ev *desktop.MouseEvent) {
+	d.MouseMoved(ev)
+}
+
+func (d *draggableBorder) MouseMoved(ev *desktop.MouseEvent) {
+	if !d.dragging {
+		d.dir = d.dirAt(ev.Position)
 	}
 }
 
-// MouseDown is called when the user presses the mouse button on the draggable corner.
+func (d *draggableBorder) MouseOut() {
+}
+
+func (d *draggableBorder) Dragged(ev *fyne.DragEvent) {
+	if !d.dragging {
+		d.dragging = true // lock dir so the corner grab survives leaving the zone
+		// Anchor the resize at the press point and the window rect at that
+		// moment. Reporting total travel from this anchor (instead of
+		// per-event deltas) makes min-size clamping absorb overshoot: after
+		// shrinking past the limit the edge won't move again until the mouse
+		// comes back to where the limit was hit, like native window borders.
+		d.pressAbs = fyne.NewPos(ev.AbsolutePosition.X-ev.Dragged.DX, ev.AbsolutePosition.Y-ev.Dragged.DY)
+		d.win.dragStartPos = d.win.Position()
+		d.win.dragStartSize = d.win.Size()
+	}
+	if f := d.win.OnResized; f != nil {
+		total := *ev
+		total.Dragged = fyne.Delta{
+			DX: ev.AbsolutePosition.X - d.pressAbs.X,
+			DY: ev.AbsolutePosition.Y - d.pressAbs.Y,
+		}
+		f(d.dir, &total)
+	}
+}
+
+// MouseDown is called when the user presses the mouse button on the border.
 func (d *draggableBorder) MouseDown(*desktop.MouseEvent) {
 	if f := d.win.OnMouseDown; f != nil {
 		f()
@@ -655,4 +726,5 @@ func (d *draggableBorder) MouseUp(*desktop.MouseEvent) {
 }
 
 func (d *draggableBorder) DragEnd() {
+	d.dragging = false
 }

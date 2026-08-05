@@ -12,6 +12,14 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets"
 )
 
+// Modern twin-ring geometry, as fractions of the dial radius: the outer,
+// thinner ring shows the secondary value; the inner, thicker ring the primary.
+const (
+	innerScale  = 0.89 // outer radius of the inner (primary) ring
+	innerCutout = 1 - 0.13/innerScale
+	outerCutout = 0.92
+)
+
 type DualDial struct {
 	widget.BaseWidget
 
@@ -29,8 +37,11 @@ type DualDial struct {
 	pips      []*canvas.Line
 	pipLabels []*canvas.Text
 
-	face   *canvas.Arc
-	center *canvas.Circle
+	face      *canvas.Arc // classic rim, or modern inner (primary) track
+	valueArc  *canvas.Arc // modern inner (primary) value arc
+	face2     *canvas.Arc // modern outer (secondary) track
+	valueArc2 *canvas.Arc // modern outer (secondary) value arc
+	center    *canvas.Circle
 
 	displayText  *canvas.Text
 	displayText2 *canvas.Text
@@ -47,6 +58,7 @@ type DualDial struct {
 	needleOffset, needleLength float32
 	needleRotConst             float64
 	lineRotConst               float64
+	invRange                   float64 // = 1/(Max-Min), for value-arc fraction
 
 	// cached sin/cos for pips (angle_i = lineRotConst*i - common.Pi43)
 	pipSin []float32
@@ -94,36 +106,47 @@ func New(cfg *widgets.GaugeConfig) *DualDial {
 
 	s.factor = s.cfg.Max / s.steps
 
-	s.face = canvas.NewArc(-135.73, 135.8, 0.985, color.RGBA{0x80, 0x80, 0x80, 0xFF})
-	s.center = &canvas.Circle{FillColor: color.RGBA{R: 0x01, G: 0x0B, B: 0x13, A: 0xFF}}
-	s.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 2}
-	s.needle2 = &canvas.Line{StrokeColor: color.RGBA{R: 249, G: 27, B: 2, A: 255}, StrokeWidth: 2}
+	if cfg.Classic {
+		s.face = canvas.NewArc(-135.73, 135.8, 0.985, color.RGBA{0x80, 0x80, 0x80, 0xFF})
+		s.center = &canvas.Circle{FillColor: color.RGBA{R: 0x01, G: 0x0B, B: 0x13, A: 0xFF}}
+		s.needle = &canvas.Line{StrokeColor: color.RGBA{R: 0xFF, G: 0x67, B: 0, A: 0xFF}, StrokeWidth: 2}
+		s.needle2 = &canvas.Line{StrokeColor: color.RGBA{R: 249, G: 27, B: 2, A: 255}, StrokeWidth: 2}
+	} else {
+		// Twin track rings, no needles or center hub: the inner thick ring fills
+		// with the primary value (zone colored), the outer thin ring with the
+		// secondary value (red, matching its readout).
+		trackColor := widgets.TrackColor
+		s.face = canvas.NewArc(widgets.DialStartDeg, widgets.DialEndDeg, innerCutout, trackColor)
+		s.valueArc = canvas.NewArc(widgets.DialStartDeg, widgets.DialStartDeg, innerCutout, widgets.ZoneColor(0))
+		s.face2 = canvas.NewArc(widgets.DialStartDeg, widgets.DialEndDeg, outerCutout, trackColor)
+		s.valueArc2 = canvas.NewArc(widgets.DialStartDeg, widgets.DialStartDeg, outerCutout, color.RGBA{R: 249, G: 27, B: 2, A: 255})
+	}
 
 	s.titleText = &canvas.Text{Text: s.cfg.Title, Color: color.RGBA{R: 0xF0, G: 0xF0, B: 0xF0, A: 0xFF}, TextSize: 25}
 	s.titleText.TextStyle.Monospace = true
 	s.titleText.Alignment = fyne.TextAlignCenter
 
-	s.displayText = &canvas.Text{Text: "0", Color: color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF}, TextSize: 52}
+	displayColor := widgets.TextPrimary
+	if cfg.Classic {
+		displayColor = color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF}
+	}
+	s.displayText = &canvas.Text{Text: "0", Color: displayColor, TextSize: 52}
 	s.displayText.Alignment = fyne.TextAlignCenter
 
 	s.displayText2 = &canvas.Text{Text: "0", Color: color.RGBA{R: 0xff, G: 0x0, B: 0, A: 0xFF}, TextSize: 35}
 	s.displayText2.Alignment = fyne.TextAlignCenter
 
-	// Pip color gradient
-	// Green to Yellow to Red gradient
-	// 0% - 50% Green to Yellow
-	// 50% - 100% Yellow to Red
-	halfSteps := float64(s.cfg.Steps) / 2.0
-	var col color.RGBA
+	// Modern ticks are neutral — the value arc carries the green→yellow→red zone
+	// color. Classic keeps the gradient on the pips themselves.
 	for i := 0; i <= int(s.steps); i++ {
-		if float64(i) <= halfSteps {
-			// Green to Yellow
-			ratio := float64(i) / halfSteps
-			col = color.RGBA{R: byte(255 * ratio), G: 255, B: 0, A: 255}
-		} else {
-			// Yellow to Red
-			ratio := (float64(i) - halfSteps) / halfSteps
-			col = color.RGBA{R: 255, G: byte(255 * (1 - ratio)), B: 0, A: 255}
+		var col color.RGBA
+		switch {
+		case cfg.Classic:
+			col = widgets.ZoneColor(float64(i) / s.steps)
+		case i%2 == 0:
+			col = widgets.TickMajor
+		default:
+			col = widgets.TickMinor
 		}
 		pip := &canvas.Line{StrokeColor: col, StrokeWidth: 2}
 		s.pips = append(s.pips, pip)
@@ -152,6 +175,7 @@ func New(cfg *widgets.GaugeConfig) *DualDial {
 	}
 	s.needleRotConst = common.Pi15 / totalRange
 	s.lineRotConst = common.Pi15 / s.steps
+	s.invRange = 1 / totalRange
 
 	// precompute pip trig (size independent)
 	s.pipSin = make([]float32, int(s.steps)+1)
@@ -188,13 +212,37 @@ func (c *DualDial) applySinCos(hand *canvas.Line, sinRot, cosRot float32, offset
 	hand.Position2 = fyne.Position{X: midxOffX + x2, Y: midY + y2}
 }
 
+// syncArcNoRefresh recomputes a value arc's sweep from value; zone also updates
+// the fill color through the green→yellow→red gradient. Reports whether the
+// arc changed.
+func (c *DualDial) syncArcNoRefresh(arc *canvas.Arc, value float64, zone bool) bool {
+	frac := (value - c.cfg.Min) * c.invRange
+	frac = min(max(frac, 0), 1)
+	end := float32(widgets.DialStartDeg + widgets.DialSweepDeg*frac)
+	if end == arc.EndAngle {
+		return false
+	}
+	arc.EndAngle = end
+	if zone {
+		arc.FillColor = widgets.ZoneColor(frac)
+	}
+	return true
+}
+
 func (c *DualDial) SetValue(value float64) {
 	if value == c.value {
 		return
 	}
 	c.value = value
 
-	c.rotateNeedleNoRefresh(c.needle, value, c.needleOffset, c.needleLength)
+	if c.needle != nil {
+		c.rotateNeedleNoRefresh(c.needle, value, c.needleOffset, c.needleLength)
+	}
+
+	// Value arc is the primary indicator in the modern style
+	if c.valueArc != nil && c.syncArcNoRefresh(c.valueArc, value, true) {
+		canvas.Refresh(c.valueArc)
+	}
 
 	c.buf1 = c.buf1[:0]
 	if c.fmtPrec >= 0 {
@@ -207,7 +255,9 @@ func (c *DualDial) SetValue(value float64) {
 		c.displayText.Text = string(c.buf1)
 	}
 
-	canvas.Refresh(c.needle)
+	if c.needle != nil {
+		canvas.Refresh(c.needle)
+	}
 	if textChanged {
 		canvas.Refresh(c.displayText)
 	}
@@ -219,7 +269,14 @@ func (c *DualDial) SetValue2(value float64) {
 	}
 	c.value2 = value
 
-	c.rotateNeedleNoRefresh(c.needle2, value, c.needleOffset, c.needleLength)
+	if c.needle2 != nil {
+		c.rotateNeedleNoRefresh(c.needle2, value, c.needleOffset, c.needleLength)
+	}
+
+	// Outer arc is the secondary indicator in the modern style
+	if c.valueArc2 != nil && c.syncArcNoRefresh(c.valueArc2, value, false) {
+		canvas.Refresh(c.valueArc2)
+	}
 
 	c.buf2 = c.buf2[:0]
 	if c.fmtPrec >= 0 {
@@ -232,33 +289,55 @@ func (c *DualDial) SetValue2(value float64) {
 		c.displayText2.Text = string(c.buf2)
 	}
 
-	canvas.Refresh(c.needle2)
+	if c.needle2 != nil {
+		canvas.Refresh(c.needle2)
+	}
 	if textChanged {
 		canvas.Refresh(c.displayText2)
 	}
 }
 
-func (c *DualDial) CreateRenderer() fyne.WidgetRenderer { return &DualDialRenderer{DualDial: c} }
+func (c *DualDial) CreateRenderer() fyne.WidgetRenderer {
+	objs := make([]fyne.CanvasObject, 0, len(c.pips)+len(c.pipLabels)+9)
+	if c.valueArc != nil {
+		objs = append(objs, c.face, c.valueArc, c.face2, c.valueArc2)
+	}
+	for _, v := range c.pips {
+		objs = append(objs, v)
+	}
+	for _, v := range c.pipLabels {
+		if v != nil {
+			objs = append(objs, v)
+		}
+	}
+	if c.cfg.Classic {
+		// Classic z-order: the rim arc paints over the pip tips, as before
+		objs = append(objs, c.face, c.titleText, c.center, c.needle2, c.needle, c.displayText, c.displayText2)
+	} else {
+		objs = append(objs, c.titleText, c.displayText, c.displayText2)
+	}
+	return &DualDialRenderer{d: c, objects: objs}
+}
 
 type DualDialRenderer struct {
-	*DualDial
+	d       *DualDial
 	objects []fyne.CanvasObject
 }
 
-func (c *DualDialRenderer) Layout(space fyne.Size) {
+func (r *DualDialRenderer) Layout(space fyne.Size) {
+	c := r.d
 	if c.size == space {
 		return
 	}
 	c.size = space
 
-	c.diameter = fyne.Min(space.Width, space.Height)
+	c.diameter = min(space.Width, space.Height)
 	c.radius = c.diameter * common.OneHalf
 	c.middle = fyne.NewPos(space.Width*common.OneHalf, space.Height*common.OneHalf)
 
 	c.needleOffset = -c.radius * .15
 	c.needleLength = c.radius * 1.14
 
-	stroke := c.diameter * common.OneSixthieth
 	midStroke := c.diameter * common.OneEighthieth
 	smallStroke := c.diameter * common.OneTwohundredth
 
@@ -269,34 +348,89 @@ func (c *DualDialRenderer) Layout(space fyne.Size) {
 	c.titleText.TextSize = c.radius * common.OneFourth
 	c.titleText.Move(c.middle.Add(fyne.NewPos(0, c.diameter*common.OneFourth)))
 
-	center := c.radius * common.OneFourth
-	c.center.Move(c.middle.SubtractXY(center*common.OneHalf, center*common.OneHalf))
-	c.center.Resize(fyne.Size{Width: center, Height: center})
+	// Center element (classic only)
+	if c.center != nil {
+		center := c.radius * common.OneFourth
+		c.center.Move(c.middle.SubtractXY(center*common.OneHalf, center*common.OneHalf))
+		c.center.Resize(fyne.Size{Width: center, Height: center})
+	}
 
 	sixthDiameter := c.diameter * common.OneSixth
 
 	c.displayText.TextSize = c.radius * common.OneThird
-	c.displayText.Move(topleft.AddXY(0, c.diameter*common.OneFifth))
-	c.displayText.Resize(size)
-
 	c.displayText2.TextSize = c.radius * common.OneThird
-	c.displayText2.Move(topleft.AddXY(0, -sixthDiameter))
+
+	if c.cfg.Classic {
+		c.displayText.TextSize = c.radius * common.OneThird
+		c.displayText2.TextSize = c.radius * common.OneThird
+		c.displayText.Move(topleft.AddXY(0, c.diameter*common.OneFifth))
+		c.displayText2.Move(topleft.AddXY(0, -sixthDiameter))
+	} else {
+		c.displayText.TextSize = c.radius * common.OneFourth
+		c.displayText2.TextSize = c.radius * common.OneFourth
+		c.displayText.Move(topleft.AddXY(0, c.diameter*common.OneTenth))
+		c.displayText2.Move(topleft.AddXY(0, -c.diameter*common.OneTwelfth))
+	}
+
+	c.displayText.Resize(size)
 	c.displayText2.Resize(size)
 
-	// Needles & face
-	c.needle.StrokeWidth = stroke
-	c.needle2.StrokeWidth = stroke
-	c.rotateNeedleNoRefresh(c.needle, c.value, c.needleOffset, c.needleLength)
-	c.rotateNeedleNoRefresh(c.needle2, c.value2, c.needleOffset, c.needleLength)
+	// Needles (classic only)
+	if c.needle != nil {
+		needleStroke := c.diameter * common.OneSixthieth
+		c.needle.StrokeWidth = needleStroke
+		c.needle2.StrokeWidth = needleStroke
+		c.rotateNeedleNoRefresh(c.needle, c.value, c.needleOffset, c.needleLength)
+		c.rotateNeedleNoRefresh(c.needle2, c.value2, c.needleOffset, c.needleLength)
+	}
 
-	c.face.Move(c.middle.SubtractXY(c.radius, c.radius))
-	c.face.Resize(fyne.Size{Width: c.diameter, Height: c.diameter})
+	if c.valueArc != nil {
+		// Inner (primary) ring
+		innerR := c.radius * innerScale
+		innerPos := c.middle.SubtractXY(innerR, innerR)
+		innerSize := fyne.Size{Width: innerR * 2, Height: innerR * 2}
+		innerCorner := innerR * (1 - innerCutout) * common.OneHalf
+		c.face.CornerRadius = innerCorner
+		c.face.Move(innerPos)
+		c.face.Resize(innerSize)
+		c.valueArc.CornerRadius = innerCorner
+		c.valueArc.Move(innerPos)
+		c.valueArc.Resize(innerSize)
 
-	// Pips using precomputed trig scaled by current radius
-	fourthRadius := c.radius * common.OneFourth
-	eightRadius := c.radius * common.OneEight
-	radius43 := c.radius * common.OneFourth * 3
-	radius87 := c.radius * common.OneEight * 7
+		// Outer (secondary) ring
+		outerPos := c.middle.SubtractXY(c.radius, c.radius)
+		outerCorner := c.radius * (1 - outerCutout) * common.OneHalf
+		c.face2.CornerRadius = outerCorner
+		c.face2.Move(outerPos)
+		c.face2.Resize(size)
+		c.valueArc2.CornerRadius = outerCorner
+		c.valueArc2.Move(outerPos)
+		c.valueArc2.Resize(size)
+
+		// Layout may run before any SetValue; keep the arcs in step with the values
+		c.syncArcNoRefresh(c.valueArc, c.value, true)
+		c.syncArcNoRefresh(c.valueArc2, c.value2, false)
+	} else {
+		c.face.Move(c.middle.SubtractXY(c.radius, c.radius))
+		c.face.Resize(size)
+	}
+
+	// Pips using precomputed trig scaled by current radius.
+	// Modern ticks live just inside the inner ring (rings span 0.76r..1.0r);
+	// classic ticks run out to the rim like before.
+	var majorOffset, majorLen, minorOffset, minorLen float32
+	if c.cfg.Classic {
+		majorLen = c.radius*common.OneFourth - 1
+		minorLen = c.radius*common.OneEight - 1
+		majorOffset = c.radius * common.OneFourth * 3
+		minorOffset = c.radius * common.OneEight * 7
+	} else {
+		tickOuter := c.radius * 0.74
+		majorLen = c.radius * 0.12
+		minorLen = c.radius * 0.06
+		majorOffset = tickOuter - majorLen
+		minorOffset = tickOuter - minorLen
+	}
 
 	// Label padding and cached box dims (avoid lbl.MinSize per label)
 	labelPad := max(float32(6.0), c.radius*0.14)
@@ -309,13 +443,13 @@ func (c *DualDialRenderer) Layout(space fyne.Size) {
 	for i, p := range c.pips {
 		if i%2 == 0 {
 			p.StrokeWidth = max(2.0, midStroke)
-			c.applySinCos(p, c.pipSin[i], c.pipCos[i], radius43, fourthRadius-1)
+			c.applySinCos(p, c.pipSin[i], c.pipCos[i], majorOffset, majorLen)
 			// Label for long pip (uniform box; no MinSize)
 			lbl := c.pipLabels[i]
 			if lbl != nil {
 				lbl.TextSize = labelTextSize
 				// place inside the gauge slightly inward from long pip inner end
-				labelRadius := radius43 - labelPad
+				labelRadius := majorOffset - labelPad
 				cx := c.middle.X + c.pipSin[i]*labelRadius
 				cy := c.middle.Y - c.pipCos[i]*labelRadius
 				boxW := c.labelBoxW
@@ -325,37 +459,12 @@ func (c *DualDialRenderer) Layout(space fyne.Size) {
 			}
 		} else {
 			p.StrokeWidth = max(2.0, smallStroke)
-			c.applySinCos(p, c.pipSin[i], c.pipCos[i], radius87, eightRadius-1)
+			c.applySinCos(p, c.pipSin[i], c.pipCos[i], minorOffset, minorLen)
 		}
 	}
 }
 
-func (c *DualDialRenderer) MinSize() fyne.Size { return c.minsize }
-func (c *DualDialRenderer) Refresh()           {}
-func (c *DualDialRenderer) Destroy()           {}
-
-func (c *DualDialRenderer) Objects() []fyne.CanvasObject {
-	if c.objects == nil {
-		objs := make([]fyne.CanvasObject, 0, len(c.pips)+len(c.pipLabels)+7)
-		for _, v := range c.pips {
-			objs = append(objs, v)
-		}
-		for _, v := range c.pipLabels {
-			if v != nil {
-				objs = append(objs, v)
-			}
-		}
-		objs = append(objs, c.face, c.titleText, c.center, c.needle2, c.needle, c.displayText, c.displayText2)
-		c.objects = objs
-	}
-	return c.objects
-}
-
-// --- helpers ---
-
-func max(a, b float32) float32 {
-	if a > b {
-		return a
-	}
-	return b
-}
+func (r *DualDialRenderer) MinSize() fyne.Size           { return r.d.minsize }
+func (r *DualDialRenderer) Refresh()                     {}
+func (r *DualDialRenderer) Destroy()                     {}
+func (r *DualDialRenderer) Objects() []fyne.CanvasObject { return r.objects }

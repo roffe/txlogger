@@ -4,12 +4,17 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.bug.st/serial"
 )
 
 const ProductString = "Stag AFR"
+
+// reconnectDelay is how long run() waits between reconnect attempts after the
+// serial port drops (a common occurrence on Windows).
+const reconnectDelay = time.Second
 
 type STAG struct {
 	port string
@@ -21,19 +26,33 @@ type STAG struct {
 	log func(string)
 
 	closeOnce sync.Once
+	closed    atomic.Bool
+	done      chan struct{}
 	mu        sync.Mutex
-	worker    *workerInfo
 }
 
 func NewSTAGClient(port string, logFunc func(string)) (*STAG, error) {
 	return &STAG{
 		port: port,
+		done: make(chan struct{}),
 		log:  logFunc,
 	}, nil
 }
 
 func (a *STAG) Start(ctx context.Context) error {
+	// Fail fast if we can't open the port at all on the initial attempt so the
+	// caller gets immediate feedback. Later drops are handled by run().
+	if err := a.openPort(); err != nil {
+		return err
+	}
 
+	go a.run(ctx)
+
+	return nil
+}
+
+// openPort opens the serial port and stores it on the client.
+func (a *STAG) openPort() error {
 	mode := &serial.Mode{
 		BaudRate: 57600,
 	}
@@ -41,21 +60,58 @@ func (a *STAG) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	sp.SetReadTimeout(5 * time.Millisecond)
+
+	a.mu.Lock()
 	a.sp = sp
-
-	a.sp.SetReadTimeout(5 * time.Millisecond)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	a.worker = &workerInfo{
-		cancel: cancel,
-		done:   make(chan struct{}),
-	}
-	go func() {
-		a.run(ctx)
-		close(a.worker.done)
-	}()
-
+	a.mu.Unlock()
 	return nil
+}
+
+// getPort returns the current serial port, or nil if none is open.
+func (a *STAG) getPort() serial.Port {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.sp
+}
+
+// closePort closes the current serial port if open. It is safe to call
+// multiple times.
+func (a *STAG) closePort() {
+	a.mu.Lock()
+	sp := a.sp
+	a.sp = nil
+	a.mu.Unlock()
+	if sp != nil {
+		if err := sp.Close(); err != nil {
+			a.log(err.Error())
+		}
+	}
+}
+
+// reconnect keeps trying to reopen the serial port until it succeeds or the
+// client is stopped. It returns true when the port was reopened, false when
+// the client is shutting down.
+func (a *STAG) reconnect(ctx context.Context) bool {
+	for {
+		if ctx.Err() != nil || a.closed.Load() {
+			return false
+		}
+		a.log("Stag: reconnecting to " + a.port)
+		if err := a.openPort(); err != nil {
+			a.log("Stag: reconnect failed: " + err.Error())
+			select {
+			case <-ctx.Done():
+				return false
+			case <-a.done:
+				return false
+			case <-time.After(reconnectDelay):
+			}
+			continue
+		}
+		a.log("Stag: reconnected to " + a.port)
+		return true
+	}
 }
 
 func (a *STAG) GetLambda() float64 {
@@ -65,6 +121,42 @@ func (a *STAG) GetLambda() float64 {
 }
 
 func (a *STAG) run(ctx context.Context) {
+	// Make sure any port we (re)opened gets cleaned up when run() exits.
+	defer a.closePort()
+
+	for {
+		if ctx.Err() != nil || a.closed.Load() {
+			return
+		}
+
+		sp := a.getPort()
+		if sp == nil {
+			if !a.reconnect(ctx) {
+				return
+			}
+			continue
+		}
+
+		// session() runs until the port errors or the client is stopped.
+		a.session(ctx, sp)
+
+		if ctx.Err() != nil || a.closed.Load() {
+			return
+		}
+		a.closePort()
+		if !a.reconnect(ctx) {
+			return
+		}
+	}
+}
+
+// session drives one connection: it reads from sp and parses packets until the
+// port errors or the client is stopped.
+func (a *STAG) session(ctx context.Context, sp serial.Port) {
+	// sessionCtx tears down the reader goroutine when this session ends.
+	sessionCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	packetContentBuffer := make([]byte, 0, 64)
 	buf := make([]byte, 8)
 	packetStarted := false
@@ -80,19 +172,26 @@ func (a *STAG) run(ctx context.Context) {
 	go func() {
 		for {
 			// read from serial
-			n, err := a.sp.Read(buf)
-			if ctx.Err() != nil {
+			n, err := sp.Read(buf)
+			if sessionCtx.Err() != nil {
+				return
+			}
+			if err != nil {
+				select {
+				case errChan <- err:
+				case <-sessionCtx.Done():
+				}
 				return
 			}
 			if n == 0 {
 				continue
 			}
-
-			if err != nil {
-				errChan <- err
-			}
 			for _, b := range buf[:n] {
-				byteChan <- b
+				select {
+				case byteChan <- b:
+				case <-sessionCtx.Done():
+					return
+				}
 			}
 		}
 	}()
@@ -101,9 +200,11 @@ func (a *STAG) run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
+		case <-a.done:
+			return
 		case err := <-errChan:
 			a.log(err.Error())
-			// Handle errorfunc
+			// Port dropped; let run() handle reconnection.
 			return
 		case aByte := <-byteChan:
 			if !packetStarted && aByte == 0x32 {
@@ -128,12 +229,12 @@ func (a *STAG) run(ctx context.Context) {
 
 func (a *STAG) Stop() {
 	a.closeOnce.Do(func() {
-		if a.sp != nil {
-			a.log("Stopping Stag serial client")
-			if err := a.sp.Close(); err != nil {
-				a.log(err.Error())
-			}
-		}
+		a.log("Stopping Stag serial client")
+		// Signal run()/session()/reconnect() to stop before closing the port so
+		// a port drop isn't mistaken for a reconnect opportunity.
+		a.closed.Store(true)
+		close(a.done)
+		a.closePort()
 	})
 }
 func (a *STAG) processPacket(packetContentBuffer []byte) {
@@ -158,7 +259,9 @@ func (a *STAG) processPacket(packetContentBuffer []byte) {
 
 func (a *STAG) sendRequest(data []byte) {
 	time.Sleep(100 * time.Millisecond)
-	a.sp.Write(data)
+	if sp := a.getPort(); sp != nil {
+		sp.Write(data)
+	}
 }
 
 func (a *STAG) SetData(data []byte) error {
@@ -183,9 +286,4 @@ func (a *STAG) SetData(data []byte) error {
 
 func (a *STAG) String() string {
 	return fmt.Sprintf("Lambda: %.4f, Oxygen: %.3f", a.lambda, a.oxygen)
-}
-
-type workerInfo struct {
-	cancel context.CancelFunc
-	done   chan struct{}
 }

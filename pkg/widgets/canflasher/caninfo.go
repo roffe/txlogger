@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ecu"
 )
 
@@ -14,23 +14,22 @@ func (t *CanFlasherWidget) ecuInfo() {
 	// 	return
 	// }
 
-	dev, err := t.cfg.CSW.GetAdapter(t.ecuSelect.Selected)
+	dev, err := t.cfg.CSW.GetAdapterWithOverrideFilters(t.ecuSelect.Selected, ecu.Filters(t.ecuSelect.Selected))
 	if err != nil {
 		t.log(err.Error())
 		return
 	}
 
 	go func() {
-
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		fyne.Do(t.Disable)
 		defer fyne.Do(t.Enable)
 
-		c, err := gocan.NewWithOpts(ctx, dev)
+		c, err := gocan.OpenAdapter(ctx, dev)
 		if err != nil {
-			t.logValues.Append(err.Error())
+			t.log(err.Error())
 			return
 		}
 		defer c.Close()
@@ -38,8 +37,8 @@ func (t *CanFlasherWidget) ecuInfo() {
 		tr, err := ecu.New(c, &ecu.Config{
 			Name:       t.ecuSelect.Selected,
 			OnProgress: t.progress,
-			OnMessage:  func(s string) { t.logValues.Append(s) },
-			OnError:    func(err error) { t.logValues.Append(err.Error()) },
+			OnMessage:  t.log,
+			OnError:    func(err error) { t.log(err.Error()) },
 		})
 		if err != nil {
 			t.log(err.Error())

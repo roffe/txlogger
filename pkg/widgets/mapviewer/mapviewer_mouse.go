@@ -1,12 +1,11 @@
 package mapviewer
 
 import (
-	"math"
 	"slices"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/driver/desktop"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -28,7 +27,7 @@ func (mv *MapViewer) MouseOut()                     {}
 
 // MouseMoved is called when the mouse is moved over the map viewer.
 func (mv *MapViewer) MouseMoved(event *desktop.MouseEvent) {
-	//log.Println("MouseMoved", event)
+	// log.Println("MouseMoved", event)
 	if !mv.selecting {
 		return
 	}
@@ -38,13 +37,18 @@ func (mv *MapViewer) MouseMoved(event *desktop.MouseEvent) {
 	}
 
 	mv.mousePos = event.Position
-	nselectedX, nSelectedY := mv.calculateSelectionBounds(event.Position)
-	mv.updateSelection(nselectedX, nSelectedY)
+	nx, ny := mv.calculateSelectionBounds(event.Position)
+	// Only rebuild the selection when the drag crosses into a different cell.
+	if nx == mv.dragCornerX && ny == mv.dragCornerY {
+		return
+	}
+	mv.dragCornerX, mv.dragCornerY = nx, ny
+	mv.selectRegion(nx, ny)
 }
 
 // MouseDown is called when a mouse button is pressed.
 func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
-	//log.Println("MouseDown")
+	// log.Println("MouseDown")
 	mv.lastModifier = event.Modifier
 	if mv.cfg.OnMouseDown != nil {
 		mv.cfg.OnMouseDown()
@@ -54,37 +58,19 @@ func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
 		return
 	}
 
-	if event.Modifier != fyne.KeyModifierControl {
-		for _, rect := range mv.zDataRects {
-			if rect.FillColor != rect.StrokeColor {
-				rect.FillColor = rect.StrokeColor
-				rect.Refresh()
-			}
-		}
-	}
-
 	mv.handleFocusAndInputBuffer()
 
 	switch {
 	case event.Button == desktop.MouseButtonPrimary && event.Modifier == 0:
-		if mv.selectionRect.Hidden {
-			mv.selectionRect.Resize(fyne.NewSize(mv.widthFactor, mv.heightFactor))
-			mv.selectionRect.Show()
-		}
 		mv.handlePrimaryClick(event)
 
 	case event.Button == desktop.MouseButtonPrimary && event.Modifier == fyne.KeyModifierShift:
-		if mv.selectionRect.Hidden {
-			mv.selectionRect.Resize(fyne.NewSize(mv.widthFactor, mv.heightFactor))
-			mv.selectionRect.Show()
-		}
 		mv.handlePrimaryClickWithShift(event)
 
+	case event.Button == desktop.MouseButtonPrimary && event.Modifier == fyne.KeyModifierControl|fyne.KeyModifierShift:
+		mv.handlePrimaryCtrlShiftClick(event)
+
 	case event.Button == desktop.MouseButtonPrimary && event.Modifier == fyne.KeyModifierControl:
-		if mv.selectionRect.Hidden {
-			mv.selectionRect.Resize(fyne.NewSize(mv.widthFactor, mv.heightFactor))
-			mv.selectionRect.Show()
-		}
 		mv.handlePrimaryCtrlClick(event)
 
 	case event.Button == desktop.MouseButtonSecondary && event.Modifier == 0:
@@ -95,57 +81,102 @@ func (mv *MapViewer) MouseDown(event *desktop.MouseEvent) {
 // MouseUp is called when a mouse button is released.
 func (mv *MapViewer) MouseUp(event *desktop.MouseEvent) {
 	// log.Println("MouseUp", event)
-	mv.selectionRect.Hide()
 	if event.Button == desktop.MouseButtonPrimary && mv.selecting {
 		mv.finalizeSelection(event.Position)
 	}
 }
 
-// handlePrimaryClick handles the primary click action.
+// handlePrimaryClick starts a fresh single-cell selection and begins a drag.
 func (mv *MapViewer) handlePrimaryClick(event *desktop.MouseEvent) {
+	mv.clearSelectionVisual()
 	mv.selectedX, mv.SelectedY = mv.calculateSelectionBounds(event.Position)
-
-	cellWidth, cellHeight := mv.calculateCellDimensions()
-	x := (float32(mv.selectedX) * cellWidth)
-	y := (float32(mv.numRows-mv.SelectedY-1) * cellHeight)
-
-	mv.updateCursorPositionAndSize(x, y, cellWidth, cellHeight)
-	mv.selectedCells = []int{mv.SelectedY*mv.numColumns + mv.selectedX}
+	mv.dragCornerX, mv.dragCornerY = mv.selectedX, mv.SelectedY
+	mv.selectedCells = append(mv.selectedCells[:0], mv.SelectedY*mv.numColumns+mv.selectedX)
+	mv.drawSelectionVisual()
 	mv.selecting = true
 }
 
 func (mv *MapViewer) handlePrimaryCtrlClick(event *desktop.MouseEvent) {
 	mv.selectedX, mv.SelectedY = mv.calculateSelectionBounds(event.Position)
-
-	cellWidth, cellHeight := mv.calculateCellDimensions()
-	x := (float32(mv.selectedX) * cellWidth)
-	y := (float32(mv.numRows-mv.SelectedY-1) * cellHeight)
-
-	mv.updateCursorPositionAndSize(x, y, cellWidth, cellHeight)
-
 	newCell := mv.SelectedY*mv.numColumns + mv.selectedX
 
-	// Check if cell is already selected
+	// Toggle the clicked cell while keeping the rest of the selection.
 	if index := slices.Index(mv.selectedCells, newCell); index != -1 {
-		// Remove cell if already selected
 		mv.selectedCells = append(mv.selectedCells[:index], mv.selectedCells[index+1:]...)
-		mv.zDataRects[newCell].FillColor = mv.zDataRects[newCell].StrokeColor
+		mv.selectionRects[newCell].Hide()
 	} else {
-		// Add new cell
 		mv.selectedCells = append(mv.selectedCells, newCell)
-		mv.zDataRects[newCell].FillColor = theme.Color(theme.ColorNameForegroundOnPrimary)
+		mv.selectionRects[newCell].Show()
 	}
-	mv.zDataRects[newCell].Refresh()
+	// Show()/Hide() only flip the Hidden flag, and canvas.Refresh on a rect
+	// that has never been painted (a hidden overlay cell) is a no-op because the
+	// object isn't in the canvas cache. Refresh the always-visible value rect for
+	// this cell instead to dirty the canvas and force an immediate repaint that
+	// draws the toggled highlight.
+	canvas.Refresh(mv.zDataRects[newCell])
 }
 
-// handlePrimaryClickWithShift handles the primary click with shift action.
+// handlePrimaryCtrlShiftClick adds the rectangular block between the anchor cell
+// (selectedX/SelectedY, the last clicked cell) and the clicked corner to the
+// current selection without clearing it.
+func (mv *MapViewer) handlePrimaryCtrlShiftClick(event *desktop.MouseEvent) {
+	nx, ny := mv.calculateSelectionBounds(event.Position)
+	minX, maxX := min(mv.selectedX, nx), max(mv.selectedX, nx)
+	minY, maxY := min(mv.SelectedY, ny), max(mv.SelectedY, ny)
+	for y := minY; y <= maxY; y++ {
+		for x := minX; x <= maxX; x++ {
+			cell := y*mv.numColumns + x
+			if !slices.Contains(mv.selectedCells, cell) {
+				mv.selectedCells = append(mv.selectedCells, cell)
+			}
+		}
+	}
+	mv.dragCornerX, mv.dragCornerY = nx, ny
+	mv.drawSelectionVisual()
+}
+
+// handlePrimaryClickWithShift extends the selection from the current anchor to
+// the clicked cell and begins a drag.
 func (mv *MapViewer) handlePrimaryClickWithShift(event *desktop.MouseEvent) {
-	nselectedX, nSelectedY := mv.calculateSelectionBounds(event.Position)
-	mv.updateSelection(nselectedX, nSelectedY)
+	nx, ny := mv.calculateSelectionBounds(event.Position)
+	mv.dragCornerX, mv.dragCornerY = nx, ny
+	mv.selectRegion(nx, ny)
 	mv.selecting = true
 }
 
+// selectRegion replaces the current selection with the rectangular block
+// between the anchor cell (selectedX/SelectedY) and the given corner, updating
+// the overlay highlight live.
+func (mv *MapViewer) selectRegion(cornerX, cornerY int) {
+	minX, maxX := min(mv.selectedX, cornerX), max(mv.selectedX, cornerX)
+	minY, maxY := min(mv.SelectedY, cornerY), max(mv.SelectedY, cornerY)
+
+	mv.clearSelectionVisual()
+	mv.selectedCells = mv.selectedCells[:0]
+	for y := minY; y <= maxY; y++ {
+		for x := minX; x <= maxX; x++ {
+			mv.selectedCells = append(mv.selectedCells, y*mv.numColumns+x)
+		}
+	}
+	mv.drawSelectionVisual()
+}
+
 func (mv *MapViewer) handleSecondaryClick(event *desktop.MouseEvent) {
+	x, y := mv.calculateSelectionBounds(event.Position)
+	clickedCell := y*mv.numColumns + x
+
+	// The clicked cell becomes the anchor for "Paste here" regardless.
+	mv.selectedX, mv.SelectedY = x, y
+
+	// Right-clicking inside the current selection keeps it (so Copy/Smooth act
+	// on the whole block). Right-clicking outside it, or with no selection,
+	// selects just that cell.
+	if !slices.Contains(mv.selectedCells, clickedCell) {
+		mv.clearSelectionVisual()
+		mv.selectedCells = []int{clickedCell}
+		mv.drawSelectionVisual()
+	}
+
 	mv.showPopupMenu(event.AbsolutePosition)
 }
 
@@ -159,82 +190,42 @@ func (mv *MapViewer) calculateCellDimensions() (float32, float32) {
 // calculateSelectionBounds computes the bounding box of the selection area.
 func (mv *MapViewer) calculateSelectionBounds(eventPos fyne.Position) (int, int) {
 	cellWidth, cellHeight := mv.calculateCellDimensions()
-	//xAxisOffset := mv.yAxisLabelContainer.Size().Width
-	//yAxisOffset := mv.xAxisLabelContainer.Size().Height
+	// xAxisOffset := mv.yAxisLabelContainer.Size().Width
+	// yAxisOffset := mv.xAxisLabelContainer.Size().Height
 
 	// Adjust for inner view position relative to the parent container
 	// This accounts for any extra padding or layout adjustments
 	innerViewPos := mv.innerView.Position()
 
-	nselectedX := max(0, min(int((eventPos.X-innerViewPos.X))/int(cellWidth), mv.numColumns-1))
-	nSelectedY := max(0, min(mv.numRows-int((eventPos.Y-innerViewPos.Y))/int(cellHeight)-1, mv.numRows-1))
+	nselectedX := max(0, min(int((eventPos.X-innerViewPos.X)/cellWidth), mv.numColumns-1))
+	nSelectedY := max(0, min(mv.numRows-int((eventPos.Y-innerViewPos.Y)/cellHeight)-1, mv.numRows-1))
 
 	return nselectedX, nSelectedY
 }
 
-// updateSelection updates the selection based on the new cursor position.
-func (mv *MapViewer) updateSelection(nselectedX, nSelectedY int) {
-	cellWidth, cellHeight := mv.calculateCellDimensions()
-	difX := int(math.Abs(float64(nselectedX - mv.selectedX)))
-	difY := int(math.Abs(float64(nSelectedY - mv.SelectedY)))
-
-	topLeftX := float32(min(mv.selectedX, nselectedX)) * cellWidth
-	topLeftY := float32(mv.numRows-1-max(mv.SelectedY, nSelectedY)) * cellHeight
-
-	mv.updateCursorPositionAndSize(topLeftX, topLeftY, float32(difX+1)*cellWidth, float32(difY+1)*cellHeight)
-}
-
-// updateCursorPositionAndSize updates the cursor's position and size on the screen.
-func (mv *MapViewer) updateCursorPositionAndSize(topLeftX, topLeftY, width, height float32) {
-	mv.selectionRect.Resize(fyne.NewSize(width+2, height+1))
-	mv.selectionRect.Move(fyne.NewPos(topLeftX-1, topLeftY))
-}
-
 // handleFocusAndInputBuffer focuses the MapViewer and clears the input buffer if necessary.
 func (mv *MapViewer) handleFocusAndInputBuffer() {
+	// Take keyboard focus so the key handler (cell editing, increment/decrement,
+	// arrow-key navigation) receives events. The multiwindow manager focuses a
+	// map when its inner window is raised, but a MapViewer placed directly in a
+	// container (e.g. the matrix builder) is never focused otherwise, so clicking
+	// a cell would leave key presses with nowhere to go.
+	if c := fyne.CurrentApp().Driver().CanvasForObject(mv); c != nil {
+		c.Focus(mv)
+	}
 	if mv.inputBuffer.Len() > 0 {
 		mv.inputBuffer.Reset()
 		mv.restoreSelectedValues()
 	}
 }
 
-// finalizeSelection finalizes the selection process.
+// finalizeSelection ends a drag. The selection was already built live during
+// MouseMoved, so this just snaps to the release position and stops selecting.
 func (mv *MapViewer) finalizeSelection(eventPos fyne.Position) {
 	// log.Println("finalizeSelection")
 	mv.selecting = false
-
-	nselectedX, nSelectedY := mv.calculateSelectionBounds(eventPos)
-	mv.updateSelection(nselectedX, nSelectedY)
-
-	// For Ctrl selections, we don't want to clear existing selections
-	if mv.lastModifier != fyne.KeyModifierControl {
-		mv.selectedCells = make([]int, 0)
-	}
-
-	topLeftX := min(mv.selectedX, nselectedX)
-	bottomRightX := max(mv.selectedX, nselectedX)
-	topLeftY := min(mv.SelectedY, nSelectedY)
-	bottomRightY := max(mv.SelectedY, nSelectedY)
-
-	for y := topLeftY; y <= bottomRightY; y++ {
-		for x := topLeftX; x <= bottomRightX; x++ {
-			zIndex := y*mv.numColumns + x
-			if mv.lastModifier == fyne.KeyModifierControl {
-				// For Ctrl, toggle selection
-				if index := slices.Index(mv.selectedCells, zIndex); index != -1 {
-					mv.selectedCells = append(mv.selectedCells[:index], mv.selectedCells[index+1:]...)
-					mv.zDataRects[zIndex].FillColor = mv.zDataRects[zIndex].StrokeColor
-				} else {
-					mv.selectedCells = append(mv.selectedCells, zIndex)
-					mv.zDataRects[zIndex].FillColor = theme.Color(theme.ColorNameForegroundOnPrimary)
-				}
-			} else {
-				mv.selectedCells = append(mv.selectedCells, zIndex)
-				mv.zDataRects[zIndex].FillColor = theme.Color(theme.ColorNameForegroundOnPrimary)
-			}
-			mv.zDataRects[zIndex].Refresh()
-		}
-	}
+	nx, ny := mv.calculateSelectionBounds(eventPos)
+	mv.selectRegion(nx, ny)
 }
 
 func (mv *MapViewer) showPopupMenu(pos fyne.Position) {
@@ -245,15 +236,28 @@ func (mv *MapViewer) showPopupMenu(pos fyne.Position) {
 			}),
 		)
 		if mv.cfg.Editable {
-			menu.Items = append(menu.Items,
-				fyne.NewMenuItem("Paste", func() {
+			pasteMenu := fyne.NewMenuItem("Paste", nil)
+			pasteMenu.ChildMenu = fyne.NewMenu("Paste Options",
+				fyne.NewMenuItem("At original position", func() {
 					mv.paste()
 				}),
+				fyne.NewMenuItem("At currently selected location", func() {
+					mv.pasteHere()
+				}),
+			)
+
+			menu.Items = append(menu.Items,
+				pasteMenu,
 				fyne.NewMenuItem("Smooth", func() {
 					mv.smooth()
 				}),
 			)
 		}
+
+		if mv.mesh != nil {
+			menu.Items = append(menu.Items, fyne.NewMenuItem("Toggle 3D Mesh", mv.toggleMesh))
+		}
+
 		popupMenu := widget.NewPopUpMenu(menu,
 			fyne.CurrentApp().Driver().CanvasForObject(mv),
 		)

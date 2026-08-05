@@ -2,6 +2,7 @@ package multiwindow
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -9,6 +10,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/common"
 )
 
 type WindowRatio struct {
@@ -32,7 +34,8 @@ type MultipleWindows struct {
 
 	windows []*InnerWindow
 
-	content *fyne.Container
+	content  *fyne.Container
+	childBuf []fyne.CanvasObject // reused backing slice for content.Objects
 
 	openOffset fyne.Position
 
@@ -50,7 +53,7 @@ func NewMultipleWindows(wins ...*InnerWindow) *MultipleWindows {
 }
 
 func (m *MultipleWindows) CreateRenderer() fyne.WidgetRenderer {
-	m.content = container.New(&multiWinLayout{})
+	m.content = container.New(&multiWinLayout{mw: m})
 	m.refreshChildren()
 	return widget.NewSimpleRenderer(m.content)
 }
@@ -75,11 +78,11 @@ func (m *MultipleWindows) Add(w *InnerWindow, startPosition ...fyne.Position) bo
 		if m.LockViewport {
 			size := w.MinSize()
 			bounds := m.content.Size()
-			startPosition[0].X = clamp32(startPosition[0].X, 0, bounds.Width-size.Width)
-			startPosition[0].Y = clamp32(startPosition[0].Y, 0, bounds.Height-size.Height)
-			//bounds.Subtract(size).Max(startPosition[0])
+			startPosition[0].X = common.Clamp(startPosition[0].X, 0, bounds.Width-size.Width)
+			startPosition[0].Y = common.Clamp(startPosition[0].Y, 0, bounds.Height-size.Height)
+			// bounds.Subtract(size).Max(startPosition[0])
 		}
-		//w.Move(startPosition[0].SubtractXY(w.MinSize().Width*0.5, 80))
+		// w.Move(startPosition[0].SubtractXY(w.MinSize().Width*0.5, 80))
 		w.Move(startPosition[0])
 	}
 
@@ -156,6 +159,32 @@ func (m *MultipleWindows) Refresh() {
 	m.refreshChildren()
 }
 
+// Cycle raises the bottom-most non-minimized window. m.windows is ordered
+// bottom to top, so repeated calls walk round-robin through the stack.
+func (m *MultipleWindows) Cycle() {
+	for _, w := range m.windows {
+		if !w.minimized {
+			m.Raise(w)
+			return
+		}
+	}
+}
+
+// CycleBack is the inverse of Cycle: it sends the top window to the bottom,
+// rotating the stack the other way, and raises whatever surfaces.
+func (m *MultipleWindows) CycleBack() {
+	for range m.windows {
+		last := len(m.windows) - 1
+		top := m.windows[last]
+		copy(m.windows[1:], m.windows[:last])
+		m.windows[0] = top
+		if !m.windows[last].minimized {
+			m.Raise(m.windows[last])
+			return
+		}
+	}
+}
+
 func (m *MultipleWindows) Raise(w *InnerWindow) {
 	m.raise(w)
 	if obj, ok := w.content.Objects[0].(fyne.Focusable); ok {
@@ -189,15 +218,39 @@ func (m *MultipleWindows) raise(w *InnerWindow) {
 	m.refreshChildren()
 }
 
+// layoutTray docks every minimized window into a row along the bottom edge,
+// mimicking a taskbar/system tray.
+func (m *MultipleWindows) layoutTray() {
+	if m.content == nil {
+		return
+	}
+	const margin float32 = 5
+	x := margin
+	bottom := m.content.Size().Height
+	for _, w := range m.windows {
+		if !w.minimized {
+			continue
+		}
+		size := w.MinSize()
+		w.Resize(size)
+		w.Move(fyne.NewPos(x, bottom-size.Height-margin))
+		x += size.Width + margin
+	}
+}
+
 func (m *MultipleWindows) refreshChildren() {
 	if m.content == nil {
 		return
 	}
-	objs := make([]fyne.CanvasObject, len(m.windows))
-	for i, w := range m.windows {
-		objs[i] = w
+	if cap(m.childBuf) < len(m.windows) {
+		m.childBuf = make([]fyne.CanvasObject, len(m.windows))
+	} else {
+		m.childBuf = m.childBuf[:len(m.windows)]
 	}
-	m.content.Objects = objs
+	for i, w := range m.windows {
+		m.childBuf[i] = w
+	}
+	m.content.Objects = m.childBuf
 	m.content.Refresh()
 }
 
@@ -205,8 +258,13 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 	w.OnDragged = func(ev *fyne.DragEvent) {
 		if w.maximized {
 			w.maximized = false
-			w.Move(ev.AbsolutePosition.SubtractXY(w.preMaximizedSize.Width*0.5, 78))
 			w.Resize(w.preMaximizedSize)
+			// Convert the cursor's canvas-relative position into a position
+			// relative to our container, so this works regardless of where the
+			// container sits on the canvas (e.g. below a toolbar/menu).
+			local := ev.AbsolutePosition.Subtract(fyne.CurrentApp().Driver().AbsolutePositionForObject(m.content))
+			barHeight := w.Theme().Size(theme.SizeNameWindowTitleBarHeight)
+			w.Move(local.SubtractXY(w.preMaximizedSize.Width*0.5, barHeight*0.5))
 			return
 		}
 
@@ -214,98 +272,71 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 		if m.LockViewport {
 			size := w.Size()
 			bounds := m.content.Size()
-			newPos.X = clamp32(newPos.X, 0, bounds.Width-size.Width)
-			newPos.Y = clamp32(newPos.Y, 0, bounds.Height-size.Height)
+			newPos.X = common.Clamp(newPos.X, 0, bounds.Width-size.Width)
+			newPos.Y = common.Clamp(newPos.Y, 0, bounds.Height-size.Height)
 		}
 		w.Move(newPos)
 	}
 
 	w.OnResized = func(direction resizeDirection, ev *fyne.DragEvent) {
-		var newSize fyne.Size
+		// ev.Dragged is the total delta since the drag started; the new rect
+		// is computed fresh from the rect captured at drag start. Clamping
+		// therefore absorbs overshoot: after hitting min size the edge stays
+		// put until the mouse travels back past the point where it clamped,
+		// matching native window behavior.
 		minSize := w.MinSize()
-		currentSize := w.Size()
-		switch direction {
-		case resizeUp:
-			actualDY := ev.Dragged.DY
-			if actualDY > 0 {
-				actualDY = fyne.Min(actualDY, currentSize.Height-minSize.Height)
-			} else if w.Position().Y+actualDY < 0 {
-				actualDY = -w.Position().Y
-			}
-			newSize = fyne.NewSize(currentSize.Width, currentSize.Height-actualDY)
-			w.Move(w.Position().Add(fyne.NewPos(0, actualDY)))
-		case resizeDown:
-			newSize = currentSize.AddWidthHeight(0, ev.Dragged.DY)
-		case resizeLeft:
-			actualDX := ev.Dragged.DX
-			if actualDX > 0 {
-				// When shrinking (dragging right), limit by remaining width
-				actualDX = fyne.Min(actualDX, currentSize.Width-minSize.Width)
-			} else if w.Position().X+actualDX < 0 {
-				// Prevent dragging past left edge
-				actualDX = -w.Position().X
-			}
-			newSize = fyne.NewSize(currentSize.Width-actualDX, currentSize.Height)
-			w.Move(w.Position().Add(fyne.NewPos(actualDX, 0)))
-		case resizeRight:
-			newSize = currentSize.AddWidthHeight(ev.Dragged.DX, 0)
-		case resizeUpLeft:
-			actualDY := ev.Dragged.DY
-			if actualDY > 0 {
-				actualDY = fyne.Min(actualDY, currentSize.Height-minSize.Height)
-			} else if w.Position().Y+actualDY < 0 {
-				actualDY = -w.Position().Y
-			}
-			actualDX := ev.Dragged.DX
-			if actualDX > 0 {
-				// When shrinking (dragging right), limit by remaining width
-				actualDX = fyne.Min(actualDX, currentSize.Width-minSize.Width)
-			} else if w.Position().X+actualDX < 0 {
-				// Prevent dragging past left edge
-				actualDX = -w.Position().X
-			}
-			newSize = fyne.NewSize(currentSize.Width-actualDX, currentSize.Height-actualDY)
-			w.Move(w.Position().Add(fyne.NewPos(actualDX, actualDY)))
-		case resizeUpRight:
-			actualDY := ev.Dragged.DY
-			if actualDY > 0 {
-				actualDY = fyne.Min(actualDY, currentSize.Height-minSize.Height)
-			} else if w.Position().Y+actualDY < 0 {
-				actualDY = -w.Position().Y
-			}
-			newSize = fyne.NewSize(currentSize.Width+ev.Dragged.DX, currentSize.Height-actualDY)
-			w.Move(w.Position().Add(fyne.NewPos(0, actualDY)))
-		case resizeDownLeft:
-			actualDX := ev.Dragged.DX
-			if actualDX > 0 {
-				// When shrinking (dragging right), limit by remaining width
-				actualDX = fyne.Min(actualDX, currentSize.Width-minSize.Width)
-			} else if w.Position().X+actualDX < 0 {
-				// Prevent dragging past left edge
-				actualDX = -w.Position().X
-			}
+		pos := w.dragStartPos
+		size := w.dragStartSize
+		right := pos.X + size.Width
+		bottom := pos.Y + size.Height
 
-			newSize = fyne.NewSize(currentSize.Width-actualDX, currentSize.Height+ev.Dragged.DY)
-			w.Move(w.Position().Add(fyne.NewPos(actualDX, 0)))
-		case resizeDownRight:
-			newSize = currentSize.Add(ev.Dragged)
+		switch direction {
+		case resizeLeft, resizeUpLeft, resizeDownLeft:
+			// Moving edge is the left one: keep the right edge fixed, keep the
+			// window at least minSize wide and never past the viewport's left.
+			pos.X = max(0, min(pos.X+ev.Dragged.DX, right-minSize.Width))
+			size.Width = right - pos.X
+		case resizeRight, resizeUpRight, resizeDownRight:
+			size.Width = max(minSize.Width, size.Width+ev.Dragged.DX)
+		}
+
+		switch direction {
+		case resizeUp, resizeUpLeft, resizeUpRight:
+			pos.Y = max(0, min(pos.Y+ev.Dragged.DY, bottom-minSize.Height))
+			size.Height = bottom - pos.Y
+		case resizeDown, resizeDownLeft, resizeDownRight:
+			size.Height = max(minSize.Height, size.Height+ev.Dragged.DY)
 		}
 
 		if m.LockViewport {
 			contentSize := m.content.Size()
-			pos := w.Position()
-			maxWidth := contentSize.Width - pos.X
-			maxHeight := contentSize.Height - pos.Y
-			newSize.Width = fyne.Min(newSize.Width, maxWidth)
-			newSize.Height = fyne.Min(newSize.Height, maxHeight)
+			size.Width = min(size.Width, contentSize.Width-pos.X)
+			size.Height = min(size.Height, contentSize.Height-pos.Y)
 		}
 
-		w.Resize(newSize.Max(minSize))
+		w.Move(pos)
+		w.Resize(size.Max(minSize))
 		w.maximized = false
 	}
 
 	w.OnTappedBar = func() {
-		//m.Raise(w)
+		if w.minimized {
+			w.OnMinimized() // single click on a tray bar restores it
+		}
+	}
+
+	w.OnMinimized = func() {
+		w.minimized = !w.minimized
+		if w.minimized {
+			w.preMinimizedSize = w.Size()
+			w.preMinimizedPos = w.Position()
+		} else {
+			w.Resize(w.preMinimizedSize)
+			w.Move(w.preMinimizedPos)
+			m.Raise(w)
+		}
+		w.Refresh()
+		m.layoutTray()
 	}
 
 	w.OnMouseDown = func() {
@@ -313,12 +344,16 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 			if c := fyne.CurrentApp().Driver().CanvasForObject(w); c != nil {
 				c.Focus(f)
 			}
-			//c.SetOnTypedKey(f.TypedKey)
+			// c.SetOnTypedKey(f.TypedKey)
 		}
 		m.Raise(w)
 	}
 
 	w.OnMaximized = func() {
+		if w.minimized {
+			w.OnMinimized() // restore from tray instead of maximizing
+			return
+		}
 		if !w.maximized {
 			w.preMaximizedSize = w.Size()
 			w.preMaximizedPos = w.Position()
@@ -354,6 +389,10 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 
 func (m *MultipleWindows) LoadLayout(windows []WindowProperties) error {
 	viewportSize := m.Size()
+	if viewportSize.Width == 0 || viewportSize.Height == 0 {
+		// Viewport not laid out yet; positions/sizes would all collapse to zero.
+		return nil
+	}
 	for _, h := range windows {
 		for _, w := range m.windows {
 			if w.Title() == h.Title {
@@ -388,6 +427,10 @@ func (m *MultipleWindows) LoadLayout(windows []WindowProperties) error {
 func (wm *MultipleWindows) JsonLayout() ([]byte, error) {
 	var history []WindowProperties
 	viewportSize := wm.Size()
+	if viewportSize.Width == 0 || viewportSize.Height == 0 {
+		// Avoid Inf/NaN ratios (which json.Marshal rejects) when not yet sized.
+		return nil, errors.New("multiwindow: cannot save layout before viewport is sized")
+	}
 
 	for _, w := range wm.windows {
 		if w.IgnoreSave {
@@ -395,6 +438,10 @@ func (wm *MultipleWindows) JsonLayout() ([]byte, error) {
 		}
 		pos := w.Position()
 		size := w.Size()
+		if w.minimized { // save real geometry, not the tiny tray bar
+			pos = w.preMinimizedPos
+			size = w.preMinimizedSize
+		}
 		preMaxPos := w.PreMaximizedPos()
 		preMaxSize := w.PreMaximizedSize()
 

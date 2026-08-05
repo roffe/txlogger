@@ -9,8 +9,8 @@ import (
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan"
-	"github.com/roffe/gocan/pkg/gmlan"
+	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/gmlan"
 	"github.com/roffe/txlogger/pkg/ecu/t8sec"
 )
 
@@ -21,7 +21,7 @@ func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) (symb
 	// 	txbridge = true
 	// }
 
-	cl, err := gocan.NewWithOpts(context.TODO(), dev)
+	cl, err := gocan.OpenAdapter(context.TODO(), dev)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) (symb
 
 	start = time.Now()
 
-	frame := gocan.NewFrame(0x7e0, []byte{0x05, gmlan.READ_DATA_BY_IDENTIFIER, 0x14, 0x19, 0x00, 0x00}, gocan.ResponseRequired)
+	frame := gocan.NewFrame(0x7e0, []byte{0x05, gmlan.READ_DATA_BY_IDENTIFIER, 0x14, 0x19, 0x00, 0x00})
 	if _, err := gm.ReadDataByIdentifierFrame(ctx, frame); err != nil {
 		return nil, err
 	}

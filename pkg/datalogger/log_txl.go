@@ -1,12 +1,8 @@
 package datalogger
 
 import (
-	"math"
 	"os"
-	"strconv"
 	"time"
-
-	symbol "github.com/roffe/ecusymbol"
 )
 
 func NewTXLWriter(f *os.File) *TXWriter {
@@ -16,37 +12,30 @@ func NewTXLWriter(f *os.File) *TXWriter {
 }
 
 type TXWriter struct {
-	file       *os.File
-	precission int
+	file *os.File
+	buf  []byte // reusable per-line buffer
 }
 
-func (t *TXWriter) Write(sysvars *ThreadSafeMap, sysvarOrder []string, vars []*symbol.Symbol, ts time.Time) error {
-	_, err := t.file.Write([]byte(ts.Format("02-01-2006 15:04:05.999") + "|"))
-	if err != nil {
-		return err
+func (t *TXWriter) Write(ts time.Time, channels []Channel) error {
+	t.buf = ts.AppendFormat(t.buf[:0], "02-01-2006 15:04:05.999")
+	t.buf = append(t.buf, '|')
+	for i := range channels {
+		t.buf = append(t.buf, channels[i].Name...)
+		t.buf = append(t.buf, '=')
+		// Format the value straight into buf, then swap the first decimal '.'
+		// for ',' in place (the TXL/European separator). No per-sample string.
+		start := len(t.buf)
+		t.buf = channels[i].Append(t.buf)
+		for j := start; j < len(t.buf); j++ {
+			if t.buf[j] == '.' {
+				t.buf[j] = ','
+				break
+			}
+		}
+		t.buf = append(t.buf, '|')
 	}
-	for _, k := range sysvarOrder {
-		val := sysvars.Get(k)
-		if val == math.Trunc(val) {
-			t.precission = 0
-		} else if k == "Lambda.External" {
-			t.precission = 3
-		} else {
-			t.precission = 2
-		}
-		if _, err := t.file.Write([]byte(k + "=" + replaceDot(strconv.FormatFloat(val, 'f', t.precission, 64)) + "|")); err != nil {
-			return err
-		}
-	}
-	for _, va := range vars {
-		if va.Number < 0 {
-			continue
-		}
-		if _, err := t.file.Write([]byte(va.Name + "=" + replaceDot(va.StringValue()) + "|")); err != nil {
-			return err
-		}
-	}
-	_, err = t.file.Write([]byte("IMPORTANTLINE=0|\n"))
+	t.buf = append(t.buf, "IMPORTANTLINE=0|\n"...)
+	_, err := t.file.Write(t.buf)
 	return err
 }
 

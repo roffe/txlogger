@@ -53,6 +53,22 @@ func (l *BaseLogfile) Pos() int {
 	return max(l.pos, 0)
 }
 
+// RecordAt returns the record at the given index without changing the playback
+// position. The index is clamped to the valid range. It is safe to call
+// concurrently with playback as it only reads the immutable records slice.
+func (l *BaseLogfile) RecordAt(i int) Record {
+	if l.length == 0 {
+		return Record{EOF: true}
+	}
+	if i < 0 {
+		i = 0
+	}
+	if i >= l.length {
+		i = l.length - 1
+	}
+	return l.records[i]
+}
+
 func (l *BaseLogfile) Len() int {
 	return l.length
 }

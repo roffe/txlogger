@@ -27,29 +27,51 @@ jobs:
         submodules: recursive
 
     - name: Install NSIS
-      uses: repolevedavaj/install-nsis@v1.2.0
+      uses: repolevedavaj/install-nsis@v1.2.1
       with:
         nsis-version: '3.11'
 
     - name: Set up Go
       uses: actions/setup-go@v6.4.0
       with:
-        go-version: '1.26.3'
+        go-version: '1.26.4'
         cache: false
 
     - name: Install dependencies
       run: |
         go get .
         go install fyne.io/tools/cmd/fyne@latest
-        .\setup_build_env.ps1
+
+    #- name: Install CANUSB SDK
+    #  run: |
+    #    New-Item -ItemType Directory -Path .\canusb -Force | Out-Null
+    #    Invoke-WebRequest -Uri "https://www.canusb.com/files/canusb_dll_driver.zip" -OutFile canusb_dll_driver.zip
+    #    Expand-Archive -Path canusb_dll_driver.zip -DestinationPath .\canusb -Force
+
+    - name: Install CANLIB
+      run: |
+        Invoke-WebRequest -Uri "https://pim.kvaser.com/var/assets/Product_Resources/7330130980150/5.51.461/canlib_5_51_461.exe" -OutFile canlib.exe
+        Start-Process -FilePath .\canlib.exe -ArgumentList "/S" -Wait
+
+    - name: Install llvm-mingw
+      run: |
+        Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20251216/llvm-mingw-20251216-ucrt-x86_64.zip" -OutFile llvm-mingw.zip
+        Expand-Archive -Path llvm-mingw.zip -DestinationPath .\ -Force
+        Rename-Item -Path .\llvm-mingw-20251216-ucrt-x86_64 -NewName llvm-mingw
+
+    - name: Install libusb via vcpkg
+      run: |
+        git clone https://github.com/microsoft/vcpkg.git --depth=1
+        .\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+        .\vcpkg\vcpkg.exe install libusb:x64-windows
 
     - name: Build
       run: |
         $env:PATH += ";D:\a\txlogger\txlogger\llvm-mingw\bin"
-        .\build.ps1 -cangateway -usegitsrc -txlogger -setup
+        .\build.ps1 -j2534proxy -txlogger -setup
 
     - name: Creating Zip
-      run: 7z a txlogger.zip txlogger.exe cangateway.exe .\debug.bat C:\Progra~2\Kvaser\Canlib\Bin\canlib32.dll .\vcpkg\packages\libusb_x64-windows\bin\libusb-1.0.dll .\canusb\dll64\canusbdrv64.dll
+      run: 7z a txlogger.zip txlogger.exe j2534proxy.exe .\debug.bat C:\Progra~2\Kvaser\Canlib\Bin\canlib32.dll .\vcpkg\packages\libusb_x64-windows\bin\libusb-1.0.dll .\dist\canusbdrv64.dll
 
     - name: Creating Setup Zip
       run: 7z a txlogger_setup.zip txlogger_setup.exe

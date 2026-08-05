@@ -3,7 +3,6 @@ package t5
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -86,19 +85,14 @@ func (t *Client) DumpECU(ctx context.Context) ([]byte, error) {
 	t.cfg.OnProgress(float64(length))
 	t.cfg.OnMessage(fmt.Sprintf("Done, took: %s", time.Since(startTime).Round(time.Millisecond).String()))
 
-	checksum, err := t.GetECUChecksum(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	calculated, err := t.CalculateBinChecksum(buffer)
-	if err != nil {
-		return nil, err
-	}
-
-	if !bytes.Equal(checksum, calculated) {
-		t.cfg.OnError(errors.New("Dumped bin and calculated checksum from ECU does not match")) //lint:ignore ST1005 ignore this shit
-		t.cfg.OnError(fmt.Errorf("ECU reported checksum: %X, calculated: %X", checksum, calculated))
+	// Validate the dump but still return it: a broken checksum can also mean
+	// the ECU itself holds a broken bin, which is still worth saving.
+	if checksum, err := t.GetECUChecksum(ctx); err != nil {
+		t.cfg.OnError(fmt.Errorf("dump warning: %w", err))
+	} else if calculated, err := t.CalculateBinChecksum(buffer); err != nil {
+		t.cfg.OnError(fmt.Errorf("dump warning: %w", err))
+	} else if !bytes.Equal(checksum, calculated) {
+		t.cfg.OnError(fmt.Errorf("dump warning: ECU checksum %X does not match dumped data %X, dump may be corrupt", checksum, calculated))
 	}
 
 	return buffer, nil

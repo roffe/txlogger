@@ -7,12 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"sort"
 	"strings"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
@@ -25,58 +24,87 @@ func NewT7(cfg Config, lw LogWriter) (IClient, error) {
 	return &T7Client{BaseLogger: NewBaseLogger(cfg, lw)}, nil
 }
 
-func t7broadcastListener(ctx context.Context, cl *gocan.Client, sysvars *ThreadSafeMap) {
-	broadcast := cl.Subscribe(ctx, 0x1A0, 0x280, 0x3A0)
-	defer broadcast.Close()
-	var speed uint16
-	var rpm uint16
-	var throttle float64
-	var realSpeed float64
-	var limp, cruise, cel uint8
-	var gear uint8
-	var clutchBreak, brakeLight uint8
+// t7BroadcastIDs are the T7 CAN broadcast frames decodeT7Broadcast understands.
+// The txbridge path hands this list to the dongle ('b' command) so it collects and
+// folds them into the log stream; generic adapters subscribe to them live below.
+var t7BroadcastIDs = []uint16{0x1A0, 0x280, 0x3A0 /*, 0x5C0*/}
+
+// t7BroadcastSymbols are the symbol names decodeT7Broadcast can produce. On the
+// txbridge path, requested symbols in this set are sourced from the folded trailer
+// instead of the KWP F0 read.
+var t7BroadcastSymbols = map[string]struct{}{
+	"ActualIn.n_Engine":  {},
+	"Out.X_AccPedal":     {},
+	"Out.X_ActualGear":   {},
+	"Out.ST_BrakeLight":  {},
+	"In.ST_ClutchBrake1": {},
+	"In.v_Vehicle":       {},
+	// "ActualIn.T_Engine": {}, // enable together with 0x5C0 in t7BroadcastIDs
+}
+
+// decodeT7Broadcast decodes one raw T7 broadcast frame into sysvars (plus a few
+// ebus-only status bits). Shared by the live listener (generic adapters) and the
+// txbridge path, which feeds the same bytes from the folded 'r' trailer. Guards on
+// length because the folded frames carry their own dlc.
+func decodeT7Broadcast(id uint16, data []byte, sysvars *ThreadSafeMap) {
+	switch id {
+	case 0x1A0:
+		if len(data) < 6 {
+			return
+		}
+		rpm := binary.BigEndian.Uint16(data[1:3])
+		sysvars.Set("ActualIn.n_Engine", float64(rpm))
+		sysvars.Set("Out.X_AccPedal", float64(data[5]))
+	case 0x280:
+		if len(data) < 5 {
+			return
+		}
+		sysvars.Set("Out.X_ActualGear", float64(data[1]))
+		sysvars.Set("Out.ST_BrakeLight", float64(data[2]&0x02>>1))
+		sysvars.Set("In.ST_ClutchBrake1", float64(data[2]&0x08>>3))
+		ebus.Publish("LIMP", float64(data[3]&0x01))
+		ebus.Publish("CRUISE", float64(data[4]&0x20>>5))
+		ebus.Publish("CEL", float64(data[4]&0x80>>7))
+	case 0x3A0:
+		if len(data) < 5 {
+			return
+		}
+		speed := uint16(data[4]) | uint16(data[3])<<8
+		sysvars.Set("In.v_Vehicle", float64(speed)*0.1)
+	case 0x5C0:
+		// 0x5C0 COTE_ECS: Data[1]=coolant. byte=(u8)(V+40)
+		if len(data) < 2 {
+			return
+		}
+		sysvars.Set("ActualIn.T_Engine", float64(data[1])-40)
+	}
+}
+
+func t7broadcastListener(ctx context.Context, cl *gocan.Bus, sysvars *ThreadSafeMap) {
+	ids := make([]uint32, len(t7BroadcastIDs))
+	for i, id := range t7BroadcastIDs {
+		ids[i] = uint32(id)
+	}
+	broadcast := cl.Subscribe(ctx, ids...)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case msg := <-broadcast.Chan():
-			switch msg.Identifier {
-			case 0x1A0:
-				rpm = binary.BigEndian.Uint16(msg.Data[1:3])
-				throttle = float64(msg.Data[5])
-				sysvars.Set("ActualIn.n_Engine", float64(rpm))
-				sysvars.Set("Out.X_AccPedal", throttle)
-			case 0x280:
-				limp = msg.Data[3] & 0x01
-				cel = msg.Data[4] & 0x80 >> 7
-				cruise = msg.Data[4] & 0x20 >> 5
-
-				gear = msg.Data[1]
-				sysvars.Set("Out.X_ActualGear", float64(gear))
-				brakeLight = msg.Data[2] & 0x02 >> 1
-				sysvars.Set("Out.ST_BrakeLight", float64(brakeLight))
-				clutchBreak = msg.Data[2] & 0x08 >> 3
-				sysvars.Set("In.ST_ClutchBrake1", float64(clutchBreak))
-
-				ebus.Publish("LIMP", float64(limp))
-				ebus.Publish("CRUISE", float64(cruise))
-				ebus.Publish("CEL", float64(cel))
-
-			case 0x3A0:
-				speed = uint16(msg.Data[4]) | uint16(msg.Data[3])<<8
-				realSpeed = float64(speed) * 0.1
-				sysvars.Set("In.v_Vehicle", realSpeed)
+		case msg, ok := <-broadcast:
+			if !ok {
+				return
 			}
+			decodeT7Broadcast(uint16(msg.ID), msg.Bytes(), sysvars)
 		}
 	}
 }
 
-func (c *T7Client) Start() error {
+func (c *T7Client) Start(pctx context.Context) error {
 	defer c.secondTicker.Stop()
 	defer c.lw.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
 	eventHandler := func(e gocan.Event) {
@@ -86,18 +114,22 @@ func (c *T7Client) Start() error {
 		}
 	}
 
-	cl, err := gocan.NewWithOpts(ctx, c.Device, gocan.WithEventHandler(eventHandler))
+	cl, err := gocan.OpenAdapter(ctx, c.Device, gocan.WithEventFunc(eventHandler))
 	if err != nil {
 		return fmt.Errorf("failed to create t7 client: %w", err)
 	}
 	defer cl.Close()
 
+	// Drive everything below off the client's context so a fatal adapter error
+	// (or Close) cancels the polling loop and aborts in-flight requests directly,
+	// instead of relying on cl.Wait returning and the deferred cancel bouncing back.
+	ctx = cl.Context()
+
 	checkBroadcast := true
-	if strings.Contains(c.Device.Name(), "OBDLink") || strings.Contains(c.Device.Name(), "STN") || strings.Contains(c.Device.Name(), "ELM") {
+	if strings.Contains(cl.AdapterName(), "OBDLink") || strings.Contains(cl.AdapterName(), "STN") || strings.Contains(cl.AdapterName(), "ELM") {
 		checkBroadcast = false
 	}
 
-	var sysvarOrder []string
 	if checkBroadcast {
 		bctx, bcancel := context.WithCancel(ctx)
 		defer bcancel()
@@ -105,13 +137,9 @@ func (c *T7Client) Start() error {
 
 		c.OnMessage("Watching for broadcast messages")
 		<-time.After(1550 * time.Millisecond)
-		sysvarOrder = c.sysvars.Keys()
-		sort.StringSlice(sysvarOrder).Sort()
-		if len(sysvarOrder) > 0 {
-			c.OnMessage(fmt.Sprintf("Found %s", sysvarOrder))
-		}
-
-		if len(sysvarOrder) == 0 {
+		if found := c.sysvars.Keys(); len(found) > 0 {
+			c.OnMessage(fmt.Sprintf("Found: %s", strings.Join(found, ", ")))
+		} else {
 			c.OnMessage("No broadcast messages found, stopping broadcast listener")
 			bcancel()
 		}
@@ -122,11 +150,6 @@ func (c *T7Client) Start() error {
 
 	if c.lamb != nil {
 		defer c.lamb.Stop()
-		sysvarOrder = append(sysvarOrder, EXTERNALWBLSYM)
-	}
-
-	if c.WidebandConfig.ADScanner && c.WidebandConfig.Name == "ECU" {
-		sysvarOrder = append(sysvarOrder, LAMBDAADSCANNER)
 	}
 
 	for _, sym := range c.Symbols {
@@ -136,6 +159,10 @@ func (c *T7Client) Start() error {
 			continue
 		}
 	}
+
+	// Broadcast/derived values resolved above become async sysvar channels;
+	// the remaining symbols (Number >= 0) are polled each tick.
+	channels := c.buildChannels()
 
 	kwp := kwp2000.New(cl)
 
@@ -182,6 +209,9 @@ func (c *T7Client) Start() error {
 				}
 			}
 		}
+		// In.v_Vehicle Left front wheel speed
+		// In.v_Vehicle2 Vehicle speed, measured on the rear wheel
+		// In.v_Vehicle3 Right front wheel speed
 
 		specialFN := map[string]func(string, float64){
 			"In.v_Vehicle":  wheelSlipFN,
@@ -219,16 +249,23 @@ func (c *T7Client) Start() error {
 		}
 	}
 
+	/*
+		if c.lamb != nil {
+			lambdbaChan := newFunctionChannel(EXTERNALWBLSYM, func() float64 {
+				lambda := c.lamb.GetLambda()
+				ebus.Publish(EXTERNALWBLSYM, lambda)
+				return lambda
+			})
+			channels = append(channels, lambdbaChan)
+		}
+	*/
+
 	go func() {
 		defer cl.Close()
 		defer func() {
 			_ = kwp.StopSession(ctx)
 			time.Sleep(50 * time.Millisecond)
 		}()
-
-		// In.v_Vehicle Left front wheel speed
-		// In.v_Vehicle2 Vehicle speed, measured on the rear wheel
-		// In.v_Vehicle3 Right front wheel speed
 
 		for {
 			select {
@@ -290,22 +327,7 @@ func (c *T7Client) Start() error {
 				for _, va := range c.Symbols {
 
 					if va.Number < 0 {
-						if va.Number <= -1000 {
-							if ca, ok := cl.Adapter().(gocan.ADCCapable); ok {
-								adcNumber := -va.Number - 1000
-								val, err := ca.GetADCValue(ctx, adcNumber)
-								if err != nil {
-									c.onError()
-									c.OnMessage(err.Error())
-									continue
-								}
-								c.sysvars.Set(va.Name, float64(val))
-								ebus.Publish(va.Name, float64(val))
-								continue
-							}
-						} else {
-							ebus.Publish(va.Name, c.sysvars.Get(va.Name))
-						}
+						ebus.Publish(va.Name, c.sysvars.Get(va.Name))
 						continue
 					}
 
@@ -333,35 +355,11 @@ func (c *T7Client) Start() error {
 					ebus.Publish(EXTERNALWBLSYM, lambda)
 				}
 
-				/*
-					// New shit -----
-					if c.r != nil {
-						var values relayserver.LogValues
-						for _, name := range sysvarOrder {
-							val := c.sysvars.Get(name)
-							values = append(values, relayserver.LogValue{Name: name, Value: val})
-						}
-						for _, va := range c.Symbols {
-							if va.Number < 0 {
-								continue
-							}
-							values = append(values, relayserver.LogValue{Name: va.Name, Value: va.Float64()})
-						}
-						if err := c.r.Send(relayserver.Message{
-							Kind: relayserver.MsgTypeData,
-							Body: values,
-						}); err != nil {
-							c.onError()
-							c.OnMessage("failed to send relay message: " + err.Error())
-						}
-					}
-				*/
-
-				if err := c.lw.Write(c.sysvars, sysvarOrder, c.Symbols, timeStamp); err != nil {
+				if err := c.lw.Write(timeStamp, channels); err != nil {
 					c.onError()
 					c.OnMessage("failed to write log: " + err.Error())
 				}
-				c.onCapture()
+				c.onCapture(timeStamp)
 			}
 		}
 	}()
@@ -370,7 +368,7 @@ func (c *T7Client) Start() error {
 
 func initT7logging(ctx context.Context, kwp *kwp2000.Client, symbols []*symbol.Symbol, onMessage func(string)) error {
 	if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
-		return errors.New("failed to start session")
+		return fmt.Errorf("failed to start session: %w", err)
 	}
 	onMessage("Connected to ECU")
 
@@ -380,17 +378,17 @@ func initT7logging(ctx context.Context, kwp *kwp2000.Client, symbols []*symbol.S
 	}
 
 	if !granted {
-		onMessage("Security access not granted!")
+		return errors.New("security access not granted")
 	} else {
 		onMessage("Security access granted")
 	}
 
 	// For some fucked up reason this clears DTC's and resets adaptation!!!
 	// Did we stumble on a bug in Trionic 7 ECU's firmware?
-	//if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
-	//	return fmt.Errorf("failed to clear dynamic register: %w", err)
-	//}
-	//onMessage("Cleared dynamic register")
+	if err := kwp.ClearDynamicallyDefineLocalId(ctx); err != nil {
+		return fmt.Errorf("failed to clear dynamic register: %w", err)
+	}
+	onMessage("Cleared dynamic register")
 
 	index := 0
 	for _, sym := range symbols {
@@ -398,8 +396,11 @@ func initT7logging(ctx context.Context, kwp *kwp2000.Client, symbols []*symbol.S
 			continue
 		}
 		onMessage("Defining " + sym.Name)
+
+		// log.Println("Define:", sym.String())
+
 		if err := kwp.DynamicallyDefineLocalIdBySymbolNumber(ctx, index, sym.Number); err != nil {
-			return errors.New("failed to define dynamic register")
+			return fmt.Errorf("failed to define dynamic register: %w", err)
 		}
 		index++
 		time.Sleep(12 * time.Millisecond)
