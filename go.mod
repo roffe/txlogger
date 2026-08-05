@@ -4,16 +4,15 @@ go 1.26.0
 
 //replace github.com/roffe/gocan => ../gocan
 //replace github.com/roffe/ecusymbol => ../ecusymbol
-replace fyne.io/fyne/v2 => ../fyne
+//replace fyne.io/fyne/v2 => ../fyne
 
 //replace go.bug.st/serial => ../../../go.bug.st/serial
 
 replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 
 require (
-	fyne.io/fyne/v2 v2.8.1-0.20260801164007-971700c7270d
+	fyne.io/fyne/v2 v2.8.1-0.20260805144035-eac48f301227
 	github.com/avast/retry-go/v4 v4.7.0
-	github.com/lusingander/colorpicker v0.7.5
 	github.com/roffe/ecusymbol v1.2.6-0.20260801112516-31a74272bfb0
 	go.bug.st/serial v1.7.1
 	golang.org/x/image v0.40.0
@@ -27,7 +26,7 @@ require (
 	github.com/ebitengine/oto/v3 v3.4.0
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/hajimehoshi/go-mp3 v0.3.4
-	github.com/roffe/gocan/v2 v2.0.0-20260707232838-0af87a49b848
+	github.com/roffe/gocan/v2 v2.0.0
 	github.com/stretchr/testify v1.11.1
 	github.com/yuin/gopher-lua v1.1.2
 	golang.org/x/sys v0.46.0

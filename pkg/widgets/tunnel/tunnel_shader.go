@@ -230,7 +230,7 @@ func (t *Tunnel) initShader() {
 		[]byte(tunnelPreludeGL+tunnelBody),
 		[]byte(tunnelPreludeES+tunnelBody),
 	)
-	t.shader.SourceHLSL = tunnelHLSL
+	// t.shader.SourceHLSL = tunnelHLSL
 	t.shader.Uniforms = map[string]float32{
 		"time":         0,
 		"speed":        1.1,

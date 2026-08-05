@@ -283,7 +283,7 @@ func (p *Plotter) initShader() bool {
 		[]byte(plotShaderPreludeGL+plotShaderBody),
 		[]byte(plotShaderPreludeES+plotShaderBody),
 	)
-	p.shader.SourceHLSL = plotShaderHLSL
+	// p.shader.SourceHLSL = plotShaderHLSL
 	p.shader.Textures = make(map[string]image.Image, 3)
 	p.shader.Uniforms = make(map[string]float32, 16)
 
