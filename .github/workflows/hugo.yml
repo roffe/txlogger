@@ -28,7 +28,7 @@ jobs:
       - id: pages
         uses: actions/configure-pages@v6
       - name: Build
-        run: hugo --minify"
+        run: hugo --minify
       - uses: actions/upload-pages-artifact@v5
         with:
           path: ./public

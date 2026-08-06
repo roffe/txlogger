@@ -3,6 +3,8 @@ title: Estimated Output
 weight: 50
 ---
 
+![Estimated output](/estimated-output.jpg)
+
 The "Estimated output" tool has two independent halves that share one graph:
 
 1. **Estimate from the binary** — reads the calibration maps out of the currently loaded firmware
