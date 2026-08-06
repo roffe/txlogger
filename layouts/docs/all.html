@@ -1,0 +1,22 @@
+{{ define "main" }}
+<div class="flex flex-col md:flex-row gap-8">
+    <aside class="md:w-64 shrink-0">
+        <nav class="md:sticky md:top-8 bg-gray-800/40 border border-gray-700 p-4">
+            <a href="{{ (site.GetPage "/docs").RelPermalink }}"
+                class="font-exo block text-white uppercase font-bold mb-3">Documentation</a>
+            <ul class="space-y-1">
+                {{ range (site.GetPage "/docs").Pages }}
+                <li>
+                    <a href="{{ .RelPermalink }}"
+                        class="block px-2 py-1 transition-colors {{ if eq .RelPermalink $.RelPermalink }}bg-saab-green text-black font-semibold{{ else }}hover:text-white{{ end }}">{{ .Title }}</a>
+                </li>
+                {{ end }}
+            </ul>
+        </nav>
+    </aside>
+    <article class="prose prose-invert max-w-none flex-1 min-w-0">
+        <h1>{{ .Title }}</h1>
+        {{ .Content }}
+    </article>
+</div>
+{{ end }}

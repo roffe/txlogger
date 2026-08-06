@@ -15,3 +15,6 @@ debug.log
 *.o
 lzhuf/lzhuf.dll
 libusb-1.0.dll
+public/
+resources/_gen/
+.hugo_build.lock

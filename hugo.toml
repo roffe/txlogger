@@ -1,0 +1,12 @@
+baseURL = 'https://txlogger.com/'
+locale = 'en'
+title = 'txlogger'
+
+disableKinds = ['taxonomy', 'term', 'rss']
+
+[params]
+description = "Blazing fast data logging for Trionic 5, 7 & 8 ECU's"
+
+[markup.goldmark.renderer]
+# allow raw HTML in markdown (video embeds etc.)
+unsafe = true
