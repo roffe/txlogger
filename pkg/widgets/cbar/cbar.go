@@ -46,7 +46,7 @@ type CBar struct {
 	displayY float32
 
 	// Bar colors: below center / above center / on center
-	colorLow, colorHigh, colorCenter color.RGBA
+	colorLow, colorHigh, colorCenter color.NRGBA
 
 	// Cache layout calculations
 	middleHeight     float32
@@ -87,14 +87,14 @@ func New(cfg *widgets.GaugeConfig) *CBar {
 		valueRange: cfg.Max - cfg.Min,
 		fmtPrec:    -1,
 		// Modern bars are solid; the classic ones let the ticks show through
-		colorLow:    color.RGBA{0x26, 0xCC, 0x00, 0xFF},
-		colorHigh:   color.RGBA{0xD0, 0x32, 0x2A, 0xFF},
-		colorCenter: color.RGBA{0xFC, 0xBA, 0x03, 0xFF},
+		colorLow:    color.NRGBA{0x26, 0xCC, 0x00, 0xFF},
+		colorHigh:   color.NRGBA{0xD0, 0x32, 0x2A, 0xFF},
+		colorCenter: color.NRGBA{0xFC, 0xBA, 0x03, 0xFF},
 	}
 	if cfg.Classic {
-		s.colorLow = color.RGBA{0x26, 0xCC, 0x00, 0x80}
-		s.colorHigh = color.RGBA{0xA5, 0x00, 0x00, 0x80}
-		s.colorCenter = color.RGBA{0xFC, 0xBA, 0x03, 0x80}
+		s.colorLow = color.NRGBA{0x26, 0xCC, 0x00, 0x80}
+		s.colorHigh = color.NRGBA{0xA5, 0x00, 0x00, 0x80}
+		s.colorCenter = color.NRGBA{0xFC, 0xBA, 0x03, 0x80}
 	}
 	if n := common.ParseFixedPrec(cfg.DisplayString); n >= 0 {
 		s.fmtPrec = n
@@ -126,9 +126,11 @@ func (s *CBar) initializeVisualElements() {
 		FillColor: s.colorCenter,
 	}
 
-	peakColor := color.RGBA{0xFF, 0xFF, 0xFF, 0xE0}
+	// NRGBA, not RGBA: partial alpha with full channels is invalid premultiplied
+	// and renders black on the software rasterizer.
+	peakColor := color.NRGBA{0xFF, 0xFF, 0xFF, 0xE0}
 	if s.cfg.Classic {
-		peakColor = color.RGBA{0xFF, 0xFF, 0xFF, 0xA0}
+		peakColor = color.NRGBA{0xFF, 0xFF, 0xFF, 0xA0}
 	}
 	s.peakLo = &canvas.Rectangle{FillColor: peakColor}
 	s.peakHi = &canvas.Rectangle{FillColor: peakColor}

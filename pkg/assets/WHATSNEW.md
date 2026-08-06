@@ -1,3 +1,7 @@
+# 2.2.0
+- Customizable key shortcuts
+- Added "T7 gear calculator" under the Tools menu: computes GearCal.Ratio / GearCal.Range values for the T7 manual gearbox calibration from gear ratios, final drive and tire diameter. Comes with FM55/FM57 templates, live recalculation as you type and a speed-per-gear graph with hover readout
+
 # 2.1.10
 - Added "Modern" gauge style selectable under graphics settings. It now covers the bar gauges too: VBar, HBar and CBar get a rounded dark track, a solid green→yellow→red fill and labels moved off the bar so they stay readable
 - Added "Compare symbols with other binary" under the Tools menu. Pick a second binary of the same ECU type and get a list of every symbol whose data differs from the currently loaded one, with symbol number, size and address (size mismatches are flagged). Click a symbol to preview it, double-click to keep it open in its own tab. Each symbol shows three tabs: a Diff tab with the per-cell difference (current - other), Current and the other binary. Logging must be stopped while comparing

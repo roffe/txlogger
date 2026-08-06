@@ -31,12 +31,14 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/dtcreader"
 	"github.com/roffe/txlogger/pkg/widgets/editparameters"
 	"github.com/roffe/txlogger/pkg/widgets/estimatedoutput"
+	"github.com/roffe/txlogger/pkg/widgets/gearcalc"
 	"github.com/roffe/txlogger/pkg/widgets/j1979diag"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/matrixbuilder"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
 	"github.com/roffe/txlogger/pkg/widgets/rescaler"
+	"github.com/roffe/txlogger/pkg/widgets/shortcuts"
 	"github.com/roffe/txlogger/pkg/widgets/symbolbrowser"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmmod"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmstatus"
@@ -112,6 +114,16 @@ func (mw *MainWindow) setupMenu() {
 			w.Icon = theme.ColorChromaticIcon()
 			mw.wm.Add(w)
 		}),
+		fyne.NewMenuItemWithIcon("Keyboard shortcuts", theme.SettingsIcon(), func() {
+			if w := mw.wm.HasWindow("Keyboard shortcuts"); w != nil {
+				mw.wm.Raise(w)
+				return
+			}
+			inner := multiwindow.NewInnerWindow("Keyboard shortcuts", shortcuts.New(listLayouts, mw.applyShortcuts))
+			inner.Icon = theme.SettingsIcon()
+			mw.wm.Add(inner)
+			inner.Resize(fyne.NewSize(760, 300))
+		}),
 		fyne.NewMenuItemWithIcon("txbridge", theme.SettingsIcon(), func() {
 			// Open txbridge configurator in a new window
 			if w := mw.wm.HasWindow("txbridge"); w != nil {
@@ -165,6 +177,7 @@ func (mw *MainWindow) setupMenu() {
 			fyne.NewMenuItemWithIcon("Matrix Builder", theme.InfoIcon(), mw.openMatrixBuilder),
 			fyne.NewMenuItemWithIcon("Estimated output", theme.InfoIcon(), mw.openEstimatedOutput),
 			fyne.NewMenuItemWithIcon("T5 CLI", theme.ComputerIcon(), mw.openT5CLI),
+			fyne.NewMenuItemWithIcon("T7 gear calculator", theme.SettingsIcon(), mw.openT7GearCalc),
 			//fyne.NewMenuItemWithIcon("Rescale AccPedalMap", theme.GridIcon(), func() {
 			//	mw.openRescaler(symbol.ECU_T8, "TrqMastCal.X_AccPedalMAP")
 			//}),
@@ -182,10 +195,14 @@ func (mw *MainWindow) setupMenu() {
 	cycleBackItem := fyne.NewMenuItem("Cycle windows back", func() { mw.wm.CycleBack() })
 	cycleBackItem.Shortcut = &desktop.CustomShortcut{KeyName: fyne.KeyTab, Modifier: fyne.KeyModifierControl | fyne.KeyModifierShift}
 
+	closeItem := fyne.NewMenuItem("Close window", func() { mw.wm.CloseActive() })
+	closeItem.Shortcut = &desktop.CustomShortcut{KeyName: fyne.KeyW, Modifier: fyne.KeyModifierControl}
+
 	trailing := []*fyne.Menu{
 		fyne.NewMenu("Arrange",
 			cycleItem,
 			cycleBackItem,
+			closeItem,
 			fyne.NewMenuItemSeparator(),
 			fyne.NewMenuItem("Grid", func() {
 				mw.wm.Arrange(&multiwindow.GridArranger{})
@@ -262,6 +279,17 @@ func (mw *MainWindow) openT5CLI() {
 	inner.OnClose = cli.Close
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(700, 480))
+}
+
+func (mw *MainWindow) openT7GearCalc() {
+	if w := mw.wm.HasWindow("T7 gear calculator"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	inner := multiwindow.NewInnerWindow("T7 gear calculator", gearcalc.New())
+	inner.Icon = theme.SettingsIcon()
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(880, 480))
 }
 
 func (mw *MainWindow) getAdapter() (gocan.Adapter, error) {

@@ -35,6 +35,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/logplayer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
+	"github.com/roffe/txlogger/pkg/widgets/shortcuts"
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
 )
 
@@ -85,6 +86,8 @@ type MainWindow struct {
 
 	j2534LED *ledicon.Widget
 	canLED   *ledicon.Widget
+
+	keyBindings []shortcuts.Binding
 
 	previewFeatures bool
 }
@@ -238,11 +241,6 @@ func (mw *MainWindow) startJ2534Proxy() {
 func (mw *MainWindow) setupShortcuts() {
 	ctrlEnter := &desktop.CustomShortcut{KeyName: fyne.KeyReturn, Modifier: fyne.KeyModifierControl}
 	altEnter := &desktop.CustomShortcut{KeyName: fyne.KeyReturn, Modifier: fyne.KeyModifierAlt}
-	ctrl1 := &desktop.CustomShortcut{KeyName: fyne.Key1, Modifier: fyne.KeyModifierControl}
-	ctrl2 := &desktop.CustomShortcut{KeyName: fyne.Key2, Modifier: fyne.KeyModifierControl}
-	ctrl3 := &desktop.CustomShortcut{KeyName: fyne.Key3, Modifier: fyne.KeyModifierControl}
-	ctrl4 := &desktop.CustomShortcut{KeyName: fyne.Key4, Modifier: fyne.KeyModifierControl}
-
 	mw.Window.Canvas().AddShortcut(ctrlEnter, func(shortcut fyne.Shortcut) {
 		mw.wm.Arrange(&multiwindow.GridArranger{})
 	})
@@ -251,23 +249,60 @@ func (mw *MainWindow) setupShortcuts() {
 		mw.Window.SetFullScreen(!mw.Window.FullScreen())
 	})
 
-	mw.Window.Canvas().AddShortcut(ctrl1, func(shortcut fyne.Shortcut) {
-		log.Println("open settings with Ctrl-1")
+	mw.applyShortcuts(shortcuts.Load())
+}
+
+// applyShortcuts takes the user-configured shortcuts into use, replacing the
+// previous set. The menu is rebuilt because that is where they live.
+func (mw *MainWindow) applyShortcuts(bindings []shortcuts.Binding) {
+	mw.keyBindings = bindings
+	mw.SetMainMenu(mw.GetMenu(mw.selects.ecuSelect.Selected))
+}
+
+// shortcutMenu holds the user-configured shortcuts that apply to the given
+// ECU. They are menu items rather than canvas shortcuts because menu shortcuts
+// are matched before the focused widget gets a shot: a focused map viewer
+// would otherwise swallow them, so hopping between two maps with Ctrl-1/Ctrl-2
+// would only work once. The menu is rebuilt on every ECU switch, which is what
+// makes per-ECU bindings work.
+func (mw *MainWindow) shortcutMenu(ecu string) *fyne.Menu {
+	items := make([]*fyne.MenuItem, 0, len(mw.keyBindings))
+	for _, b := range mw.keyBindings {
+		if b.Key == "" || !b.AppliesTo(ecu) {
+			continue
+		}
+		item := fyne.NewMenuItem(b.Label(), func() { mw.runShortcut(b) })
+		item.Shortcut = &desktop.CustomShortcut{KeyName: b.Key, Modifier: b.Modifier}
+		items = append(items, item)
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	return fyne.NewMenu("Shortcuts", items...)
+}
+
+func (mw *MainWindow) runShortcut(b shortcuts.Binding) {
+	switch b.Action {
+	case shortcuts.ActionSettings:
 		mw.openSettings()
-	})
-
-	mw.Window.Canvas().AddShortcut(ctrl2, func(shortcut fyne.Shortcut) {
-		log.Println("open symbol list with Ctrl-2")
+	case shortcuts.ActionSymbolList:
 		mw.buttons.symbolListBtn.OnTapped()
-	})
-
-	mw.Window.Canvas().AddShortcut(ctrl3, func(shortcut fyne.Shortcut) {
-		log.Println("Ctrl-3")
-	})
-
-	mw.Window.Canvas().AddShortcut(ctrl4, func(shortcut fyne.Shortcut) {
-		log.Println("Ctrl-4")
-	})
+	case shortcuts.ActionMap:
+		// Raise an already open viewer instead of leaning on openMap's own
+		// check, which looks for the bare symbol name while the window it
+		// creates is titled "<symbol> - <description>".
+		for _, w := range mw.wm.Windows() {
+			if t := w.Title(); t == b.Target || strings.HasPrefix(t, b.Target+" - ") {
+				mw.wm.Raise(w)
+				return
+			}
+		}
+		mw.openMap(symbol.ECUTypeFromString(mw.selects.ecuSelect.Selected), "", b.Target, "")
+	case shortcuts.ActionLayout:
+		if err := mw.LoadLayout(b.Target); err != nil {
+			mw.Error(err)
+		}
+	}
 }
 
 func (mw *MainWindow) render() {

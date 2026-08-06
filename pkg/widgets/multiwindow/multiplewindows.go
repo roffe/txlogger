@@ -146,6 +146,13 @@ func (m *MultipleWindows) remove(w *InnerWindow) {
 			m.windows = append(m.windows[:i], m.windows[i+1:]...)
 			m.content.Remove(w)
 			m.refreshChildren()
+			// Focus follows the close: raise whatever surfaced, skipping the tray.
+			for j := len(m.windows) - 1; j >= 0; j-- {
+				if !m.windows[j].minimized {
+					m.Raise(m.windows[j])
+					break
+				}
+			}
 			return
 		}
 	}
@@ -182,6 +189,14 @@ func (m *MultipleWindows) CycleBack() {
 			m.Raise(m.windows[last])
 			return
 		}
+	}
+}
+
+// CloseActive closes the focused window - the top of the stack, since raise
+// puts the active window last. No-op when nothing is open.
+func (m *MultipleWindows) CloseActive() {
+	if n := len(m.windows); n > 0 {
+		m.windows[n-1].Close()
 	}
 }
 

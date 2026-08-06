@@ -1,3 +1,5 @@
+.PHONY: j2534proxy snapshots
+
 export CC=clang
 
 CANINTERFACES=canlib,canusb,combi,ftdi,j2534,pcan,rcan,socketcan
@@ -53,6 +55,12 @@ run: clean pkg/ota/firmware.bin
 clean:
 	rm -f cangateway j2534proxy.exe
 	rm -f txlogger
-.PHONY: j2534proxy
+
+snapshots:
+	go run -tags combi,canusb,ftdi,j2534,pcan,rcan,socketcan ./cmd/screenshots \
+    	-out ../txlogger-webpage/static/screenshots -log cmd/screenshots/t7log.csv \
+    	-bin ".tmp/bosse 25mhz.bin"
+
+
 j2534proxy:
 	GOOS=windows GOARCH=386 go build -tags="j2534" -ldflags '-s -w' -o j2534proxy.exe ./j2534proxy

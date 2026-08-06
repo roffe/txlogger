@@ -40,6 +40,9 @@ func (mw *MainWindow) GetMenu(name string) *fyne.MainMenu {
 		menus = append(menus, fyne.NewMenu(category.Name, mw.buildItems(typ, category.Children)...))
 	}
 	menus = append(menus, mw.trailingMenus...)
+	if sc := mw.shortcutMenu(name); sc != nil {
+		menus = append(menus, sc)
+	}
 
 	return fyne.NewMainMenu(menus...)
 }

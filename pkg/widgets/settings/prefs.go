@@ -81,7 +81,7 @@ var (
 
 	// Graphics
 	prefPlotterRenderer = intPref{"plotterRenderer", 0}
-	prefMeshRenderer    = intPref{"meshRenderer", 2}
+	prefMeshRenderer    = intPref{"meshRenderer", 0}
 	prefGaugeStyle      = stringPref{"gaugeStyle", "Modern"}
 
 	// Logging
