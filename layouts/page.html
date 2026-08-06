@@ -1,0 +1,7 @@
+{{ define "main" }}
+<article class="prose prose-invert max-w-3xl mx-auto">
+    <h1>{{ .Title }}</h1>
+    {{ with .Date }}<p class="text-sm text-gray-500">Last updated: {{ time.Format "2006-01-02" . }}</p>{{ end }}
+    {{ .Content }}
+</article>
+{{ end }}
