@@ -9,14 +9,12 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
-	txtheme "github.com/roffe/txlogger/pkg/theme"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/liveplotter"
 	"github.com/roffe/txlogger/pkg/widgets/msglist"
@@ -24,9 +22,6 @@ import (
 )
 
 func (mw *MainWindow) createButtons() {
-	// mw.buttons.loadSymbolsEcuBtn = mw.loadSymbolsEcuBtnFunc()
-	mw.buttons.addSymbolBtn = mw.addSymbolBtnFunc()
-	mw.buttons.syncSymbolsBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), mw.SyncSymbols)
 	mw.buttons.dashboardBtn = mw.newDashboardBtn()
 	mw.buttons.logBtn = mw.newLogBtn()
 	mw.buttons.layoutRefreshBtn = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
@@ -84,62 +79,11 @@ func (mw *MainWindow) newSymbolListBtn() *widget.Button {
 			return
 		}
 
-		mw.symbolList.UpdateBars(mw.settings.GetRealtimeBars())
-		symbolListWindow := multiwindow.NewSystemWindow("Symbol list", container.NewBorder(
-			nil,
-			container.NewBorder(
-				nil,
-				nil,
-				nil,
-				container.NewGridWithColumns(5,
-					widget.NewButtonWithIcon("", theme.DocumentSaveIcon(), mw.savePreset),
-					widget.NewButtonWithIcon("", theme.ContentAddIcon(), mw.newPreset),
-					widget.NewButtonWithIcon("", txtheme.ExportIcon(), mw.exportPreset),
-					widget.NewButtonWithIcon("", txtheme.ImportIcon(), mw.importPreset),
-					widget.NewButtonWithIcon("", theme.DeleteIcon(), mw.deletePreset),
-				),
-				mw.selects.presetSelect,
-			),
-			// layout.NewSpacer(),
-			// mw.buttons.loadSymbolsEcuBtn,
-			nil,
-			nil,
-			container.NewBorder(
-				container.NewBorder(
-					nil,
-					nil,
-					widget.NewIcon(theme.SearchIcon()),
-					container.NewHBox(
-						mw.buttons.addSymbolBtn,
-						mw.buttons.syncSymbolsBtn,
-					),
-					mw.selects.symbolLookup,
-				),
-				nil,
-				nil,
-				nil,
-				mw.symbolList,
-			),
-		))
+		symbolListWindow := multiwindow.NewSystemWindow("Symbol list", mw.symbolList)
 		symbolListWindow.Icon = theme.ListIcon()
+		symbolListWindow.IgnoreSave = false
 
 		// Fixa så livepreview values kan togglas på/av. med nya ui't så funkar det inte som det ska
-
-		//var cancelFuncs []func()
-		//if mw.settings.GetLivePreview() {
-		//	for _, sym := range mw.symbolList.Symbols() {
-		//		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(sym.Name, func(f float64) {
-		//			mw.symbolList.SetValue(sym.Name, f)
-		//		}))
-		//	}
-		//} else {
-		//	mw.symbolList.Clear()
-		//}
-		//symbolListWindow.OnClose = func() {
-		//	for _, f := range cancelFuncs {
-		//		f()
-		//	}
-		//}
 
 		mw.wm.Add(symbolListWindow)
 		if mw.startup {
@@ -170,64 +114,6 @@ func (mw *MainWindow) newDebugBtn() *widget.Button {
 		}
 		xy := mw.wm.Size().Subtract(dbl.MinSize().AddWidthHeight(20, 60))
 		mw.wm.Add(debugWindow, fyne.NewPos(xy.Width, xy.Height))
-	})
-}
-
-func (mw *MainWindow) addSymbolBtnFunc() *widget.Button {
-	return widget.NewButtonWithIcon("", theme.ContentAddIcon(), func() {
-		if mw.selects.symbolLookup.Text == "" {
-			return
-		}
-		if mw.fw == nil {
-			mw.Error(fmt.Errorf("Cannot add symbol, no binary loaded"))
-			return
-		}
-		/*
-			switch mw.selects.symbolLookup.Text {
-			case "ADC1":
-				mw.symbolList.Add(&symbol.Symbol{
-					Name:             mw.selects.symbolLookup.Text,
-					Correctionfactor: 0.001,
-					Number:           -1000, // -1001 is a special number for ADC symbols
-				})
-				return
-			case "ADC2":
-				mw.symbolList.Add(&symbol.Symbol{
-					Name:             mw.selects.symbolLookup.Text,
-					Correctionfactor: 0.001,
-					Number:           -1001, // -1002 is a special number for ADC symbols
-				})
-				return
-			case "ADC3":
-				mw.symbolList.Add(&symbol.Symbol{
-					Name:             mw.selects.symbolLookup.Text,
-					Correctionfactor: 0.001,
-					Number:           -1002, // -1003 is a special number for ADC symbols
-				})
-				return
-			case "ADC4":
-				mw.symbolList.Add(&symbol.Symbol{
-					Name:             mw.selects.symbolLookup.Text,
-					Correctionfactor: 0.001,
-					Number:           -1003, // -1004 is a special number for ADC symbols
-				})
-				return
-			case "ADC5":
-				mw.symbolList.Add(&symbol.Symbol{
-					Name:             mw.selects.symbolLookup.Text,
-					Correctionfactor: 0.001,
-					Number:           -1004, // -1005 is a special number for ADC symbols
-				})
-				return
-			}
-		*/
-
-		sym := mw.fw.GetByName(mw.selects.symbolLookup.Text)
-		if sym == nil {
-			mw.Error(fmt.Errorf("%q not found in binary", mw.selects.symbolLookup.Text))
-			return
-		}
-		mw.symbolList.Add(sym)
 	})
 }
 
@@ -317,29 +203,37 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 
 		db := dashboard.NewDashboard(dbcfg)
 
+		// The dashboard routes the wideband gauge under the symbol name it was
+		// built with. Feeding that route separately lets it follow the wideband
+		// source as it changes in settings, instead of needing a reopen.
+		wblRoute := dbcfg.WidebandSymbol
+
 		var cancelFuncs []func()
 		for _, m := range db.GetMetricNames() {
-			//if m == "MAF.m_AirInlet" {
-			//	var once sync.Once
-			//	cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(m, func(f float64) {
-			//		if f >= 1800 {
-			//			once.Do(func() {
-			//				if mw.oCtx != nil {
-			//					if err := snd.Pedro(mw.oCtx); err != nil {
-			//						mw.Log("Pedro failed: " + err.Error())
-			//					}
-			//				}
-			//			})
-			//		}
-			//		db.SetValue(m, f)
-			//	}))
-			//	continue
-			//}
-
+			if m == wblRoute {
+				continue
+			}
 			cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(m, func(f float64) {
 				db.SetValue(m, f)
 			}))
 		}
+
+		var wblCancel func()
+		followWBL := func() {
+			if wblCancel != nil {
+				wblCancel()
+			}
+			wblCancel = ebus.SubscribeFunc(mw.settings.GetWidebandSymbolName(), func(f float64) {
+				db.SetValue(wblRoute, f)
+			})
+		}
+		followWBL()
+
+		// the ECU type is part of what the wideband setting resolves to
+		cancelFuncs = append(cancelFuncs,
+			ebus.SubscribeFunc(ebus.TOPIC_WBLSYMBOL, func(float64) { followWBL() }),
+			ebus.SubscribeFunc(ebus.TOPIC_ECU, func(float64) { followWBL() }),
+		)
 
 		dbw := multiwindow.NewInnerWindow("Dashboard", db)
 		dbw.Icon = theme.InfoIcon()
@@ -359,6 +253,7 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 		}
 
 		dbw.OnClose = func() {
+			wblCancel()
 			for _, f := range cancelFuncs {
 				f()
 			}
@@ -435,6 +330,7 @@ func newDataLogger(mw *MainWindow, device gocan.Adapter) (datalogger.IClient, st
 		ECU:            mw.selects.ecuSelect.Selected,
 		Device:         device,
 		Symbols:        mw.symbolList.Symbols(),
+		SeedKey:        mw.seedKey,
 		Rate:           mw.settings.GetFreq(),
 		OnMessage:      mw.Log,
 		CaptureCounter: func(i int) {

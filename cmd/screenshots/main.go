@@ -9,8 +9,10 @@ import (
 	"flag"
 	"image/jpeg"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -50,10 +52,17 @@ func main() {
 	}), nil)
 
 	snap("symbollist.jpg", fyne.NewSize(560, 640), symbolList(), func() {
-		for k, v := range demoValues {
-			ebus.Publish(k, v)
+		// peak each symbol higher than its final value first, otherwise every
+		// row sits at its own max and all bars render full red
+		keys := slices.Sorted(maps.Keys(demoValues))
+		for i, k := range keys {
+			ebus.Publish(k, demoValues[k]*(1.05+0.2*float64(i%4)))
 		}
 		time.Sleep(300 * time.Millisecond) // ebus delivery is async
+		for _, k := range keys {
+			ebus.Publish(k, demoValues[k])
+		}
+		time.Sleep(300 * time.Millisecond)
 	})
 
 	db := dashboard.NewDashboard(&dashboard.Config{
@@ -203,7 +212,16 @@ func symbolList() fyne.CanvasObject {
 		{Name: "Lambda.LambdaInt", Number: 10, Unit: "", Correctionfactor: 1},
 		{Name: "Myrtilos.InjectorDutyCycle", Number: 11, Unit: "%", Correctionfactor: 1},
 	}
-	return symbollist.New(&symbollist.Config{Symbols: syms})
+	v := symbollist.NewViewer(&symbollist.ViewerConfig{
+		App:    fyne.CurrentApp(),
+		Window: fyne.CurrentApp().NewWindow("dialogs"),
+		ECU:    func() string { return "T7" },
+		Log:    func(string) {},
+		Error:  func(err error) { log.Println(err) },
+	})
+	v.LoadSymbols(syms...)
+	v.UpdateBars(true)
+	return v
 }
 
 func snapLogplayer(path string) {

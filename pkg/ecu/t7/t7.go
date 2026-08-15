@@ -1,16 +1,15 @@
 package t7
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/avast/retry-go/v4"
 	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ecu"
+	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
 func init() {
@@ -22,17 +21,26 @@ func init() {
 	})
 }
 
+// Client drives a Trionic 7. All wire traffic goes through pkg/kwp2000; this
+// type owns the T7 specifics: session lifecycle, seed/key selection, bin
+// layout and progress reporting.
 type Client struct {
-	c              *gocan.Bus
-	defaultTimeout time.Duration
-	cfg            *ecu.Config
+	kwp *kwp2000.Client
+	cfg *ecu.Config
+
+	// lastInit is when the diagnostic session was last opened. The ECU ignores
+	// startCommunication while a session is live and only drops the session
+	// after ~6 s of silence, so a recent init is reused instead of re-sent.
+	lastInit time.Time
 }
 
-// request sends a command frame on 0x240 and waits for the reply on 0x258.
-func (t *Client) request(ctx context.Context, payload []byte, timeout time.Duration) (gocan.Frame, error) {
-	rctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-	return t.c.Request(rctx, gocan.NewFrame(0x240, payload), 0x258)
+func New(c *gocan.Bus, cfg *ecu.Config) ecu.Client {
+	kwp := kwp2000.New(c)
+	kwp.SetResponseID(0x258) // T7 always answers here; StartSession confirms it
+	return &Client{
+		kwp: kwp,
+		cfg: ecu.LoadConfig(cfg),
+	}
 }
 
 func (t *Client) MarryECU(context.Context, string) error {
@@ -43,48 +51,14 @@ func (t *Client) RecoverECU(context.Context, []byte) error {
 	return errors.New("not supported")
 }
 
-func New(c *gocan.Bus, cfg *ecu.Config) ecu.Client {
-	t := &Client{
-		c:              c,
-		cfg:            ecu.LoadConfig(cfg),
-		defaultTimeout: 250 * time.Millisecond,
-	}
-	return t
-}
-
-// 266h Send acknowledgement, has 0x3F on 3rd! expectReply hints buffered
-// (ELM/STN) adapters that another 0x258 frame follows this ack.
-func (t *Client) Ack(ctx context.Context, val byte, expectReply bool) error {
-	if expectReply {
-		ctx = gocan.WithExpectedResponses(ctx, 1)
-	}
-	return t.c.Send(ctx, gocan.NewFrame(0x266, []byte{0x40, 0xA1, 0x3F, val & 0xBF, 0x00, 0x00, 0x00, 0x00}))
-}
-
-var lastDataInitialization time.Time
-
+// DataInitialization opens the diagnostic session (startCommunication on 0x220).
 func (t *Client) DataInitialization(ctx context.Context) error {
-	if !lastDataInitialization.IsZero() {
-		if time.Since(lastDataInitialization) < 8*time.Second {
-			return nil
-		}
+	if !t.lastInit.IsZero() && time.Since(t.lastInit) < 8*time.Second {
+		return nil
 	}
-	lastDataInitialization = time.Now()
 
 	err := retry.Do(
-		func() error {
-			rctx, cancel := context.WithTimeout(ctx, t.defaultTimeout)
-			defer cancel()
-			resp, err := t.c.Request(rctx, gocan.NewFrame(0x220, []byte{0x3F, 0x81, 0x00, 0x11, 0x02, 0x40, 0x00, 0x00}), 0x238)
-			if err != nil {
-				return fmt.Errorf("%v", err)
-			}
-			if !bytes.Equal(resp.Data[:], []byte{0x40, 0xBF, 0x21, 0xC1, 0x00, 0x11, 0x02, 0x58}) {
-				return fmt.Errorf("/!\\ Invalid data initialization response")
-			}
-
-			return nil
-		},
+		func() error { return t.kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID) },
 		retry.Context(ctx),
 		retry.Attempts(6),
 		retry.OnRetry(func(n uint, err error) {
@@ -100,163 +74,47 @@ func (t *Client) DataInitialization(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("/!\\ Data initialization failed: %v", err)
 	}
+	t.lastInit = time.Now()
 	return nil
+}
+
+// StopSession ends the diagnostic session. The init cache goes with it, so the
+// next operation opens a fresh session instead of talking into a dead one.
+func (t *Client) StopSession(ctx context.Context) error {
+	t.lastInit = time.Time{}
+	return t.kwp.StopSession(ctx)
 }
 
 // GetHeader reads an ECU identification field (KWP2000 service 0x1A).
 func (t *Client) GetHeader(ctx context.Context, id byte) (string, error) {
-	resp, err := t.request(ctx, []byte{0x40, 0xA1, 0x02, 0x1A, id, 0x00, 0x00, 0x00}, t.defaultTimeout)
+	b, err := t.kwp.ReadECUIdentification(ctx, id)
 	if err != nil {
 		return "", fmt.Errorf("failed getting header: %w", err)
 	}
-	if resp.Data[3] == 0x7F {
-		return "", fmt.Errorf("failed getting header: %w", TranslateErrorCode(resp.Data[5]))
-	}
-
-	remaining := max(0, int(resp.Data[2])-2) // KWP length minus service + field id echo
-	answer := make([]byte, 0, remaining)
-	n := min(remaining, 3) // first frame carries up to 3 data bytes at index 5
-	answer = append(answer, resp.Data[5:5+n]...)
-	remaining -= n
-
-	// low 6 bits of byte 0 count the frames still to come; each 0x266 ack
-	// is itself a request whose reply is the next 0x258 chunk.
-	for resp.Data[0]&0x3F != 0 {
-		rctx, cancel := context.WithTimeout(ctx, t.defaultTimeout)
-		resp, err = t.c.Request(rctx, gocan.NewFrame(0x266, []byte{0x40, 0xA1, 0x3F, resp.Data[0] &^ 0x40, 0x00, 0x00, 0x00, 0x00}), 0x258)
-		cancel()
-		if err != nil {
-			return "", fmt.Errorf("failed getting header: %w", err)
-		}
-		n := min(remaining, 6)
-		answer = append(answer, resp.Data[2:2+n]...)
-		remaining -= n
-	}
-	t.Ack(ctx, resp.Data[0], false) // final frame acked with no reply expected
-
-	return string(answer), nil
+	return string(b), nil
 }
 
 func (t *Client) KnockKnock(ctx context.Context) (bool, error) {
 	if err := t.DataInitialization(ctx); err != nil {
 		return false, err
 	}
-	for i := 0; i <= 4; i++ {
-		ok, err := t.letMeIn(ctx, i)
+	keys := kwp2000.KnownSeedKeys
+	if sk := t.cfg.SeedKey; sk != nil {
+		// user pair first, stock pairs kept as fallback
+		keys = append([]kwp2000.SeedKey{*sk}, keys...)
+		t.cfg.OnMessage(fmt.Sprintf("Using custom seed/key XOR %04X SUB %04X", sk.XOR, sk.Sub))
+	}
+	for _, k := range keys {
+		ok, err := t.kwp.SecurityAccess(ctx, kwp2000.DEVELOPMENT_PRIORITY, k)
 		if err != nil {
 			t.cfg.OnError(fmt.Errorf("/!\\ Failed to obtain security access: %v", err))
 			time.Sleep(3 * time.Second)
 			continue
-
 		}
 		if ok {
-			t.cfg.OnMessage("Security access obtained")
+			t.cfg.OnMessage(fmt.Sprintf("Security access obtained (XOR %04X SUB %04X)", k.XOR, k.Sub))
 			return true, nil
 		}
 	}
-	return false, fmt.Errorf("/!\\ Failed to obtain security access")
-}
-
-func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
-	msg := []byte{0x40, 0xA1, 0x02, 0x27, 0x05, 0x00, 0x00, 0x00}
-	msgReply := []byte{0x40, 0xA1, 0x04, 0x27, 0x06, 0x00, 0x00, 0x00}
-
-	f, err := t.request(ctx, msg, t.defaultTimeout)
-	if err != nil {
-		return false, fmt.Errorf("request seed: %v", err)
-	}
-	t.Ack(ctx, f.Data[0], true)
-
-	s := int(f.Data[5])<<8 | int(f.Data[6])
-	k := calcen(s, method)
-
-	msgReply[5] = byte(int(k) >> 8 & int(0xFF))
-	msgReply[6] = byte(k) & 0xFF
-
-	f2, err := t.request(ctx, msgReply, t.defaultTimeout)
-	if err != nil {
-		return false, fmt.Errorf("send seed: %v", err)
-	}
-	t.Ack(ctx, f2.Data[0], true)
-	if f2.Data[3] == 0x67 && f2.Data[5] == 0x34 {
-		return true, nil
-	} else {
-		log.Println(f2.String())
-		return false, errors.New("invalid response")
-	}
-}
-
-func calcen(seed int, method int) int {
-	key := seed << 2
-	key &= 0xFFFF
-	switch method {
-	case 0:
-		key ^= 0x8142
-		key -= 0x2356
-	case 1:
-		key ^= 0x4081
-		key -= 0x1F6F
-	case 2:
-		key ^= 0x3DC
-		key -= 0x2356
-	case 3:
-		key ^= 0x3D7
-		key -= 0x2356
-	case 4:
-		key ^= 0x409
-		key -= 0x2356
-	}
-	key &= 0xFFFF
-	return key
-}
-
-func (t *Client) LetMeTry(ctx context.Context, key1, key2 int) bool {
-	msg := []byte{0x40, 0xA1, 0x02, 0x27, 0x05, 0x00, 0x00, 0x00}
-	msgReply := []byte{0x40, 0xA1, 0x04, 0x27, 0x06, 0x00, 0x00, 0x00}
-
-	f, err := t.request(ctx, msg, t.defaultTimeout)
-	if err != nil {
-		log.Println(err)
-		return false
-
-	}
-	t.Ack(ctx, f.Data[0], true)
-
-	s := int(f.Data[5])<<8 | int(f.Data[6])
-	k := calcenCustom(s, key1, key2)
-
-	msgReply[5] = byte(int(k) >> 8 & int(0xFF))
-	msgReply[6] = byte(k) & 0xFF
-
-	f2, err := t.request(ctx, msgReply, t.defaultTimeout)
-	if err != nil {
-		log.Println(err)
-		return false
-
-	}
-
-	t.Ack(ctx, f2.Data[0], true)
-
-	if f2.Data[3] == 0x67 && f2.Data[5] == 0x34 {
-		return true
-	} else {
-		return false
-	}
-}
-
-func calcenCustom(seed int, key1, key2 int) int {
-	key := seed << 2
-	key &= 0xFFFF
-	key ^= key1
-	key -= key2
-	key &= 0xFFFF
-	return key
-}
-
-func (t *Client) StopSession(ctx context.Context) error {
-	// bound the exchange: buffered adapters wait out the ctx deadline for the
-	// hinted reply, and the ECU does not always answer 0x82.
-	rctx, cancel := context.WithTimeout(ctx, t.defaultTimeout)
-	defer cancel()
-	return t.c.Send(gocan.WithExpectedResponses(rctx, 1), gocan.NewFrame(0x220, []byte{0x40, 0xA1, 0x02, 0x82, 0x00, 0x00, 0x00, 0x00}))
+	return false, errors.New("/!\\ Failed to obtain security access")
 }

@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan/v2"
+	"github.com/roffe/txlogger/pkg/ebus"
 	"go.bug.st/serial/enumerator"
 )
 
@@ -38,7 +39,6 @@ type Widget struct {
 	autoSave              *widget.Check
 	cursorFollowCrosshair *widget.Check
 	autoLoad              *widget.Check
-	livePreview           *widget.Check
 	meshView              *widget.Check
 	realtimeBars          *widget.Check
 	logFormat             *widget.Select
@@ -50,6 +50,14 @@ type Widget struct {
 	plotRendererSelect *widget.Select
 	meshRendererSelect *widget.Select
 	gaugeStyleSelect   *widget.Select
+
+	// AI chat
+	aiURL      *widget.Entry
+	aiModel    *widget.SelectEntry
+	aiThink    *widget.Check
+	aiRefresh  *widget.Button
+	aiCtxEntry *widget.Entry
+	aiStatus   *widget.Label
 
 	// CAN
 	debugCheckbox   *widget.Check
@@ -107,9 +115,8 @@ func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	sw.autoLoad = checkBox("Load maps from ECU when connected", prefAutoLoad)
 	sw.autoSave = checkBox("Save changes automaticly if connected to ECU (requires open bin)", prefAutoSave)
 	sw.cursorFollowCrosshair = checkBox("Cursor follows crosshair in MapViewer (one hand mapping)", prefCursorFollowCrosshair)
-	sw.livePreview = checkBox("Live preview values in symbollist (uncheck if you have a slow pc)", prefLivePreview)
 	sw.meshView = checkBox("3D Mesh on map viewing", prefMeshView)
-	sw.realtimeBars = checkBox("Bars on live preview values (uncheck if you have a slow pc)", prefRealtimeBars)
+	sw.realtimeBars = checkBoxTopic("Value bars in symbol list (uncheck if you have a slow pc)", prefRealtimeBars, ebus.TOPIC_REALTIMEBARS)
 
 	// Logging
 	sw.logFormat = sw.newLogFormat()
@@ -125,6 +132,9 @@ func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	sw.plotRendererSelect = indexSelect([]string{"Software", "Shader"}, prefPlotterRenderer)
 	sw.meshRendererSelect = indexSelect([]string{"Shader", "Polygons", "Software"}, prefMeshRenderer)
 	sw.gaugeStyleSelect = widget.NewSelect(gaugeStyles, prefGaugeStyle.set)
+
+	// AI chat
+	sw.newAIControls()
 
 	// CAN
 	sw.adapterSelector = sw.newAdapterSelector()
@@ -148,6 +158,9 @@ func (sw *Widget) CreateRenderer() fyne.WidgetRenderer {
 	tabs.Append(sw.loggingTab())
 	tabs.Append(sw.wblTab())
 	tabs.Append(sw.adScannerTab())
+	if prefPreviewFeatures.get() {
+		tabs.Append(sw.aiTab())
+	}
 
 	// tabs.Append(container.NewTabItemWithIcon("txbridge", theme.DownloadIcon(), txconfigurator.NewConfigurator(prefPort.get)))
 

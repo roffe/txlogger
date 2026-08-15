@@ -39,3 +39,5 @@ txlogger
 txlogger.exe
 
 run.log
+
+*.code-workspace

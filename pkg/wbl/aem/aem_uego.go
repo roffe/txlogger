@@ -34,8 +34,10 @@ type AEMuego struct {
 	done      chan struct{}
 	mu        sync.Mutex
 
-	dataBuff []byte
-	dataPos  int
+	dataBuff  []byte
+	dataPos   int
+	frameBad  bool
+	badFrames int
 
 	//debugLog *os.File
 }
@@ -126,6 +128,7 @@ func (a *AEMuego) reconnect(ctx context.Context) bool {
 		}
 		a.log("AEM: reconnected to " + a.port)
 		a.dataPos = 0
+		a.frameBad = false
 		return true
 	}
 }
@@ -179,33 +182,62 @@ func (a *AEMuego) run(ctx context.Context) {
 
 		//log.Printf("AEM: %s", buf[:n])
 
-		for _, b := range buf[:n] {
-			switch b {
-			case '\r':
-				continue
-			case '\n':
+		a.parse(buf[:n])
+	}
+}
+
+// parse consumes serial bytes and updates lambda on every complete, clean line.
+//
+// Cheap USB serial cables (Prolific clones especially) drop bits, so digits
+// arrive corrupted: "10.3" turns up as "\x100.3" or " 0.3". Stripping the bad
+// byte would silently yield 0.03 lambda, so any line containing a byte that is
+// not part of a number is discarded whole.
+func (a *AEMuego) parse(data []byte) {
+	for _, b := range data {
+		switch {
+		case b == '\r':
+			continue
+		case b == '\n':
+			if a.dataPos > 0 && !a.frameBad {
 				value, err := strconv.ParseFloat(string(a.dataBuff[:a.dataPos]), 64)
 				if err != nil {
-					a.log("AEM: " + err.Error())
-					a.dataPos = 0
-					continue
+					a.frameBad = true
+				} else {
+					// log.Printf("AEM: %0.3f", value/10)
+					a.mu.Lock()
+					a.lamba = value / 10
+					a.mu.Unlock()
 				}
-
-				// log.Printf("AEM: %0.3f", value/10)
-				a.mu.Lock()
-				a.lamba = value / 10
-				a.mu.Unlock()
-
-				a.dataPos = 0
-				continue
 			}
-			a.dataBuff[a.dataPos] = b
-			a.dataPos++
-			if a.dataPos == 8 {
-				a.dataPos = 0
+			if a.frameBad {
+				a.countBadFrame()
 			}
+			a.dataPos = 0
+			a.frameBad = false
+			continue
+		case b >= '0' && b <= '9', b == '.', b == '-', b == '+':
+		default:
+			// line noise, poison the whole line
+			a.frameBad = true
+			continue
 		}
+		if a.dataPos == len(a.dataBuff) {
+			// no line ending in sight, this isn't a reading
+			a.frameBad = true
+			a.dataPos = 0
+			continue
+		}
+		a.dataBuff[a.dataPos] = b
+		a.dataPos++
+	}
+}
 
+// countBadFrame logs periodically instead of once per corrupt line, a flaky
+// cable would otherwise drown the log.
+func (a *AEMuego) countBadFrame() {
+	a.badFrames++
+	if a.badFrames%25 == 1 {
+		a.log(fmt.Sprintf("AEM: %d corrupt readings discarded, check serial cable/adapter", a.badFrames))
 	}
 }
 

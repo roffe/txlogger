@@ -42,13 +42,29 @@ func (sw *Widget) generalTab() *container.TabItem {
 		section("Map editor & preview",
 			leftIcon(theme.MoveUpIcon(), sw.cursorFollowCrosshair),
 			leftIcon(theme.ViewFullScreenIcon(), sw.meshView),
-			leftIcon(theme.SearchIcon(), container.NewVBox(sw.livePreview, sw.realtimeBars)),
+			leftIcon(theme.SearchIcon(), sw.realtimeBars),
 		),
 		section("Appearance",
 			leftLabeled("Color blind mode", sw.colorBlindMode),
 		),
 		section("Working directory",
 			sw.workDir,
+		),
+	)
+}
+
+// aiTab configures the local AI chat. Everything runs against an Ollama server
+// the user controls, so there is no API key and nothing to send anywhere.
+func (sw *Widget) aiTab() *container.TabItem {
+	return tab("AI", theme.ComputerIcon(),
+		section("Ollama server",
+			leftLabeled("URL", sw.aiURL),
+			leftLabeled("Model", container.NewBorder(nil, nil, nil, sw.aiRefresh, sw.aiModel)),
+			sw.aiStatus,
+		),
+		section("Generation",
+			leftIcon(theme.InfoIcon(), sw.aiThink),
+			leftLabeled("Context size (tokens)", sw.aiCtxEntry),
 		),
 	)
 }

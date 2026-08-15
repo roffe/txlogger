@@ -13,6 +13,7 @@ func (mw *MainWindow) t7Menu() []MenuItem {
 		}},
 		{Name: "Calibration", Children: []MenuItem{
 			{Name: "ESP Calibration", Func: mw.openESPCalibration},
+			{Name: "Gear calculator", Func: mw.openT7GearCalc},
 			{Name: "AirCompCal.PressMap"},
 			{Name: "AirCtrlCal.map"},
 			{Name: "AreaCal.Area"},
@@ -76,6 +77,7 @@ func (mw *MainWindow) t7Menu() []MenuItem {
 			{Name: "Injection end angles", Data: "InjAnglCal.Map"},
 		}},
 		{Name: "Ignition", Children: []MenuItem{
+			{Name: "MBT ignition analyser", Func: mw.openMBT},
 			{Name: "Ignition map", Data: "IgnNormCal.Map", Region: "LambdaCal.MaxLoadNormTab"},
 			{Name: "Ignition for E85", Data: "IgnE85Cal.fi_AbsMap", Region: "LambdaCal.MaxLoadE85Tab"},
 			{Name: "Ignition for Gas", Data: "IgnNormCal.GasMap"},

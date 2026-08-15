@@ -165,6 +165,7 @@ func (c *T7Client) Start(pctx context.Context) error {
 	channels := c.buildChannels()
 
 	kwp := kwp2000.New(cl)
+	kwp.SetSeedKey(c.SeedKey) // custom pair extracted from the loaded binary, if any
 
 	adConverter := NewWBLInterpolator(c.WidebandConfig)
 

@@ -30,6 +30,9 @@ func (t *CanFlasherWidget) ecuDump(filename string) {
 	filename = addSuffix(filename, ".bin")
 	t.progressBar.SetValue(0)
 
+	// read widget state on the main thread, before the worker starts
+	cfg := t.ecuConfig()
+
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Second)
 		defer cancel()
@@ -48,12 +51,7 @@ func (t *CanFlasherWidget) ecuDump(filename string) {
 		}
 		defer c.Close()
 
-		tr, err := ecu.New(c, &ecu.Config{
-			Name:       t.ecuSelect.Selected,
-			OnProgress: t.progress,
-			OnMessage:  t.log,
-			OnError:    func(err error) { t.log(err.Error()) },
-		})
+		tr, err := ecu.New(c, cfg)
 		if err != nil {
 			t.log(err.Error())
 			return
@@ -72,10 +70,9 @@ func (t *CanFlasherWidget) ecuDump(filename string) {
 			return
 		}
 
-		t.app.SendNotification(fyne.NewNotification("txlogger", "ECU download completed"))
-
 		time.Sleep(200 * time.Millisecond)
-
-		_ = tr.ResetECU(ctx)
+		if t.ecuSelect.Selected != "Trionic 7" {
+			_ = tr.ResetECU(ctx)
+		}
 	}()
 }

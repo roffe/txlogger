@@ -8,6 +8,7 @@ import (
 
 	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/dtc"
+	"github.com/roffe/txlogger/pkg/kwp2000"
 	"github.com/roffe/txlogger/pkg/model"
 )
 
@@ -23,8 +24,16 @@ type Client interface {
 	ResetECU(context.Context) error
 }
 
+// SeedKey is a SecurityAccess (KWP2000 service 0x27) algorithm:
+// key = ((seed<<2) ^ XOR) - Sub. Stock firmware uses one of a handful of known
+// pairs; a locked or re-patched ECU can use any other. Read the pair out of a
+// binary with the T7 Seed/Key patcher (pkg/widgets/seedkey).
+type SeedKey = kwp2000.SeedKey
+
 type Config struct {
-	Name       string
+	Name string
+	// SeedKey, when set, is tried before the known-good pairs.
+	SeedKey    *SeedKey
 	OnProgress func(float64)
 	OnError    func(error)
 	OnMessage  func(string)

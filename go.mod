@@ -4,17 +4,17 @@ go 1.26.0
 
 //replace github.com/roffe/gocan => ../gocan
 //replace github.com/roffe/ecusymbol => ../ecusymbol
-//replace fyne.io/fyne/v2 => ../fyne
+replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20260814175329-6b3252fa4f6c
 
 //replace go.bug.st/serial => ../../../go.bug.st/serial
 
 replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 
 require (
-	fyne.io/fyne/v2 v2.8.1-0.20260805144035-eac48f301227
+	fyne.io/fyne/v2 v2.8.0
 	github.com/avast/retry-go/v4 v4.7.0
-	github.com/roffe/ecusymbol v1.2.6-0.20260801112516-31a74272bfb0
-	go.bug.st/serial v1.7.1
+	github.com/roffe/ecusymbol v1.2.6-0.20260815232325-145b1037334d
+	go.bug.st/serial v1.8.0
 	golang.org/x/image v0.40.0
 	golang.org/x/mod v0.36.0
 	golang.org/x/net v0.54.0 // indirect
@@ -26,7 +26,7 @@ require (
 	github.com/ebitengine/oto/v3 v3.4.0
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/hajimehoshi/go-mp3 v0.3.4
-	github.com/roffe/gocan/v2 v2.0.0
+	github.com/roffe/gocan/v2 v2.1.1-0.20260814153516-cb17a9651f8f
 	github.com/stretchr/testify v1.11.1
 	github.com/yuin/gopher-lua v1.1.2
 	golang.org/x/sys v0.46.0
@@ -34,7 +34,7 @@ require (
 )
 
 require (
-	fyne.io/systray v1.12.2 // indirect
+	fyne.io/systray v1.12.3-0.20260810170012-af4e8e793ec4 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/FyshOS/fancyfs v0.0.1 // indirect
 	github.com/anthonynsimon/bild v0.14.0 // indirect

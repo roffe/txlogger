@@ -72,12 +72,11 @@ func (c *T8Client) Start(pctx context.Context) error {
 
 	channels := c.buildChannels()
 
-	opts := []gmlan.GMLanOption{gmlan.WithCanID(0x7E0), gmlan.WithRecvID(0x7E8)}
-	if cl.AdapterName() == "ELM327" {
-		opts = append(opts, gmlan.WithDefaultTimeout(400*time.Millisecond))
-	}
-
-	gm := gmlan.NewWithOpts(cl, opts...)
+	gm := gmlan.NewWithOpts(cl,
+		gmlan.WithCanID(0x7E0),
+		gmlan.WithRecvID(0x7E8),
+		gmlan.WithDefaultTimeout(200*time.Millisecond),
+	)
 
 	if err := initT8Logging(ctx, gm, c.Symbols, c.OnMessage); err != nil {
 		return fmt.Errorf("failed to init t8 logging: %w", err)
@@ -180,8 +179,11 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Bus, gm *gmlan.Client, cha
 				continue
 			}
 			if len(databuff) != int(expectedPayloadSize) {
+				// One short read is a bad sample, not a reason to end the
+				// session: skip it and keep logging.
+				c.onError()
 				c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
-				return
+				continue
 			}
 			r := bytes.NewReader(databuff)
 

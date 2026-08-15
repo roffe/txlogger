@@ -66,8 +66,19 @@ func (s *Widget) SetColorBlindMode(mode colors.ColorBlindMode) {
 
 func (s *Widget) UpdateBars(enabled bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.updateBars = enabled
+	for _, e := range s.entries {
+		if enabled {
+			e.updateBar(s.cfg.ColorBlindMode)
+			continue
+		}
+		// SetValue stops touching the bars, so shrink the ones already drawn
+		// away instead of leaving them frozen at their last value
+		e.valueBarFactor = 0
+		e.valueBar.Resize(fyne.Size{Width: 0, Height: 26})
+	}
+	s.mu.Unlock()
+	s.Refresh()
 }
 
 func (s *Widget) Names() []string {
@@ -121,16 +132,7 @@ func (s *Widget) SetValue(name string, value float64) {
 			val.max = value
 		}
 		if s.updateBars {
-			if span := val.max - val.min; span > 0 {
-				val.valueBarFactor = float32((value - val.min) / span)
-			} else {
-				val.valueBarFactor = 0
-			}
-			col := colors.GetColorInterpolation(val.min, val.max, value, s.cfg.ColorBlindMode)
-			col.A = barAlpha
-			val.valueBar.FillColor = col
-			totalWidth := val.symbolName.Size().Width
-			val.valueBar.Resize(fyne.Size{Width: val.valueBarFactor * totalWidth, Height: 26})
+			val.updateBar(s.cfg.ColorBlindMode)
 		}
 		val.buf = strconv.AppendFloat(val.buf[:0], value, 'f', val.prec, 64)
 		if string(val.buf) != val.lastText {
@@ -384,6 +386,20 @@ func (sw *SymbolWidgetEntry) SetCorrectionFactor(f float64) {
 	}
 }
 */
+
+// updateBar sizes and colours the value bar from the entry's current value
+// relative to the min and max seen so far.
+func (sw *SymbolWidgetEntry) updateBar(mode colors.ColorBlindMode) {
+	if span := sw.max - sw.min; span > 0 {
+		sw.valueBarFactor = float32((sw.value - sw.min) / span)
+	} else {
+		sw.valueBarFactor = 0
+	}
+	col := colors.GetColorInterpolation(sw.min, sw.max, sw.value, mode)
+	col.A = barAlpha
+	sw.valueBar.FillColor = col
+	sw.valueBar.Resize(fyne.Size{Width: sw.valueBarFactor * sw.symbolName.Size().Width, Height: 26})
+}
 
 func (sw *SymbolWidgetEntry) CreateRenderer() fyne.WidgetRenderer {
 	return &symbolWidgetEntryRenderer{

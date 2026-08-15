@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -23,8 +24,10 @@ import (
 	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu/t8/t8file"
+	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/widgets/aichat"
 	"github.com/roffe/txlogger/pkg/widgets/boosttuner"
 	"github.com/roffe/txlogger/pkg/widgets/canflasher"
 	"github.com/roffe/txlogger/pkg/widgets/customcolors"
@@ -35,9 +38,11 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/j1979diag"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/matrixbuilder"
+	"github.com/roffe/txlogger/pkg/widgets/mbt"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
 	"github.com/roffe/txlogger/pkg/widgets/rescaler"
+	"github.com/roffe/txlogger/pkg/widgets/seedkey"
 	"github.com/roffe/txlogger/pkg/widgets/shortcuts"
 	"github.com/roffe/txlogger/pkg/widgets/symbolbrowser"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmmod"
@@ -45,6 +50,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/t5cli"
 	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7esp"
 	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7piarea"
+	"github.com/roffe/txlogger/pkg/widgets/trionic8/t8nvdm"
 	"github.com/roffe/txlogger/pkg/widgets/txconfigurator"
 )
 
@@ -177,7 +183,7 @@ func (mw *MainWindow) setupMenu() {
 			fyne.NewMenuItemWithIcon("Matrix Builder", theme.InfoIcon(), mw.openMatrixBuilder),
 			fyne.NewMenuItemWithIcon("Estimated output", theme.InfoIcon(), mw.openEstimatedOutput),
 			fyne.NewMenuItemWithIcon("T5 CLI", theme.ComputerIcon(), mw.openT5CLI),
-			fyne.NewMenuItemWithIcon("T7 gear calculator", theme.SettingsIcon(), mw.openT7GearCalc),
+			fyne.NewMenuItemWithIcon("T7 Seed/Key patcher", theme.SearchReplaceIcon(), mw.openSeedKey),
 			//fyne.NewMenuItemWithIcon("Rescale AccPedalMap", theme.GridIcon(), func() {
 			//	mw.openRescaler(symbol.ECU_T8, "TrqMastCal.X_AccPedalMAP")
 			//}),
@@ -222,6 +228,7 @@ func (mw *MainWindow) setupMenu() {
 	if mw.previewFeatures {
 		leading[len(leading)-1].Items = append(
 			leading[len(leading)-1].Items,
+			fyne.NewMenuItemWithIcon("AI chat (local)", theme.ComputerIcon(), mw.openAIChat),
 			fyne.NewMenuItemWithIcon("Canflasher", theme.UploadIcon(), func() {
 				if w := mw.wm.HasWindow("Canflasher"); w != nil {
 					mw.wm.Raise(w)
@@ -266,6 +273,41 @@ func (mw *MainWindow) openEstimatedOutput() {
 	inner.Resize(fyne.NewSize(920, 560))
 }
 
+// openMBT opens (or raises) the "T7 MBT ignition analyser": an offline
+// estimate of MBT timing and cylinder pressure over the loaded ignition map.
+func (mw *MainWindow) openMBT() {
+	if mw.fw == nil {
+		mw.Error(fmt.Errorf("no binary loaded"))
+		return
+	}
+	if ecu := mw.selects.ecuSelect.Selected; ecu != "T7" {
+		mw.Error(fmt.Errorf("the MBT analyser is Trionic 7 only, %s is selected", ecu))
+		return
+	}
+	const title = "T7 MBT ignition analyser"
+	if w := mw.wm.HasWindow(title); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	inner := multiwindow.NewInnerWindow(title, mbt.New(&mbt.Config{
+		GetFW:      func() symbol.SymbolCollection { return mw.fw },
+		Colorblind: mw.settings.GetColorBlindMode(),
+		OpenWindow: func(title string, content fyne.CanvasObject) {
+			if w := mw.wm.HasWindow(title); w != nil {
+				mw.wm.Raise(w)
+				return
+			}
+			help := multiwindow.NewSystemWindow(title, content)
+			help.Icon = theme.HelpIcon()
+			mw.wm.Add(help)
+			help.Resize(fyne.NewSize(820, 620))
+		},
+	}))
+	inner.Icon = theme.InfoIcon()
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(1100, 640))
+}
+
 func (mw *MainWindow) openT5CLI() {
 	if w := mw.wm.HasWindow("T5 CLI"); w != nil {
 		mw.wm.Raise(w)
@@ -290,6 +332,45 @@ func (mw *MainWindow) openT7GearCalc() {
 	inner.Icon = theme.SettingsIcon()
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(880, 480))
+}
+
+// openAIChat opens the local AI chat. The model runs in Ollama on the user's
+// own machine and reads the loaded binary and log through the same accessors
+// the map viewer and log player use — nothing is uploaded anywhere.
+func (mw *MainWindow) openAIChat() {
+	if w := mw.wm.HasWindow("AI chat"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	chat := aichat.New(&aichat.Config{
+		FW:      func() symbol.SymbolCollection { return mw.fw },
+		ECU:     func() string { return mw.selects.ecuSelect.Selected },
+		Log:     func() logfile.Logfile { return mw.logz },
+		BinName: func() string { return filepath.Base(mw.filename) },
+		LogName: func() string { return mw.logFilename },
+		Client:  mw.settings.AIClient,
+		Logger:  mw.Log,
+		ShowMapDiff: func(name string, proposed []float64) error {
+			var err error
+			fyne.DoAndWait(func() { err = mw.showAIMapDiff(name, proposed) })
+			return err
+		},
+	})
+	inner := multiwindow.NewInnerWindow("AI chat", chat)
+	inner.Icon = theme.ComputerIcon()
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(700, 560))
+}
+
+func (mw *MainWindow) openSeedKey() {
+	if w := mw.wm.HasWindow("T7 Seed/Key patcher"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	inner := multiwindow.NewInnerWindow("T7 Seed/Key patcher", seedkey.New())
+	inner.Icon = theme.SearchReplaceIcon()
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(560, 300))
 }
 
 func (mw *MainWindow) getAdapter() (gocan.Adapter, error) {
@@ -389,6 +470,24 @@ func (mw *MainWindow) openPIAreaEditor() {
 	inner.Resize(fyne.Size{Width: 700, Height: 500})
 }
 
+// openNVDMEditor edits the NVDM block of the loaded binary. Reflash the ECU
+// with "Unlock systems partition" enabled to apply it.
+func (mw *MainWindow) openNVDMEditor() {
+	if w := mw.wm.HasWindow("NVDM editor"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	t, ok := mw.fw.(*symbol.T8File)
+	if !ok {
+		mw.Error(errors.New("not a T8 file"))
+		return
+	}
+	inner := multiwindow.NewInnerWindow("NVDM editor", t8nvdm.New(mw.filename, t))
+	inner.Icon = theme.InfoIcon()
+	mw.wm.Add(inner)
+	inner.Resize(fyne.Size{Width: 600, Height: 600})
+}
+
 func (mw *MainWindow) openFirmwareInfoEdit() {
 	if w := mw.wm.HasWindow("Firmware info edit"); w != nil {
 		mw.wm.Raise(w)
@@ -464,6 +563,7 @@ func (mw *MainWindow) openPgmStatus() {
 func (mw *MainWindow) loadBinary() {
 	if mw.dlc != nil {
 		mw.Error(errors.New("stop logging before loading a new binary"))
+		// common.ShowError("Ooups!", errors.New("stop logging before loading a new binary"))
 		return
 	}
 	cb := func(r fyne.URIReadCloser) {
@@ -471,6 +571,7 @@ func (mw *MainWindow) loadBinary() {
 		filename := r.URI().Path()
 		if err := mw.LoadSymbolsFromFile(filename); err != nil {
 			mw.Error(err)
+			// common.ShowError("Darn it!", err)
 			return
 		}
 	}

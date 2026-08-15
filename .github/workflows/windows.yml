@@ -71,10 +71,22 @@ jobs:
         .\build.ps1 -j2534proxy -txlogger -setup
 
     - name: Creating Zip
-      run: 7z a txlogger.zip txlogger.exe j2534proxy.exe .\debug.bat C:\Progra~2\Kvaser\Canlib\Bin\canlib32.dll .\vcpkg\packages\libusb_x64-windows\bin\libusb-1.0.dll .\dist\canusbdrv64.dll
+      run: 7z a txlogger.zip txlogger.exe j2534proxy.exe .\debug.bat C:\Progra~2\Kvaser\Canlib\bin_x64\canlib32.dll .\vcpkg\packages\libusb_x64-windows\bin\libusb-1.0.dll .\dist\canusbdrv64.dll
 
     - name: Creating Setup Zip
       run: 7z a txlogger_setup.zip txlogger_setup.exe
+
+    # DirectX build last: it overwrites txlogger.exe, both zips above are already made
+    - name: Build DirectX
+      run: |
+        $env:PATH += ";D:\a\txlogger\txlogger\llvm-mingw\bin"
+        .\build.ps1 -txlogger -setup -directx
+
+    - name: Creating DirectX Zips
+      run: |
+        7z a txlogger_directx.zip txlogger.exe j2534proxy.exe .\debug.bat C:\Progra~2\Kvaser\Canlib\bin_x64\canlib32.dll .\vcpkg\packages\libusb_x64-windows\bin\libusb-1.0.dll .\dist\canusbdrv64.dll
+        Rename-Item txlogger_setup.exe txlogger_directx_setup.exe
+        7z a txlogger_directx_setup.zip txlogger_directx_setup.exe
 
     - name: Delete previous nightly release
       run: |
@@ -99,3 +111,5 @@ jobs:
         files: |
           txlogger.zip
           txlogger_setup.zip
+          txlogger_directx.zip
+          txlogger_directx_setup.zip

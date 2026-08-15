@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -40,15 +41,23 @@ type CanFlasherWidget struct {
 	infoBTN     *widget.Button
 	dumpBTN     *widget.Button
 	flashBTN    *widget.Button
+	eolBTN      *widget.Button
 	recoveryBTN *widget.Button
 	marryBTN    *widget.Button
+	resetBTN    *widget.Button
 	bootBOX     *widget.Check
 	nvdmBOX     *widget.Check
 	pinEntry    *widget.Entry
 	progressBar *widget.ProgressBar
 	flashLabel  *widget.Label
 	pinLabel    *widget.Label
-	cfg         *Config
+
+	seedKeyLabel *widget.Label
+	seedKeyXOR   *widget.Entry
+	seedKeySub   *widget.Entry
+	seedKeyBox   *fyne.Container
+
+	cfg *Config
 }
 
 type Config struct {
@@ -68,22 +77,30 @@ func (t *CanFlasherWidget) Disable() {
 	t.infoBTN.Disable()
 	t.dumpBTN.Disable()
 	t.flashBTN.Disable()
+	t.eolBTN.Disable()
 	t.marryBTN.Disable()
 	t.recoveryBTN.Disable()
+	t.resetBTN.Disable()
 	t.bootBOX.Disable()
 	t.nvdmBOX.Disable()
 	t.pinEntry.Disable()
+	t.seedKeyXOR.Disable()
+	t.seedKeySub.Disable()
 }
 
 func (t *CanFlasherWidget) Enable() {
 	t.infoBTN.Enable()
 	t.dumpBTN.Enable()
 	t.flashBTN.Enable()
+	t.eolBTN.Enable()
 	t.marryBTN.Enable()
 	t.recoveryBTN.Enable()
+	t.resetBTN.Enable()
 	t.bootBOX.Enable()
 	t.nvdmBOX.Enable()
 	t.pinEntry.Enable()
+	t.seedKeyXOR.Enable()
+	t.seedKeySub.Enable()
 }
 
 func (t *CanFlasherWidget) log(s string) {
@@ -129,14 +146,14 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	}
 
 	// t.wizzardBTN = widget.NewButton("Wizzard", nil) //t.wizzard)
-	t.infoBTN = widget.NewButton("Info", t.ecuInfo) //t.ecuInfo)
-	//t.dtcBTN = widget.NewButton("Read DTC", nil)   //t.readDTC)
+	t.infoBTN = widget.NewButton("Info", t.ecuInfo) // t.ecuInfo)
+	// t.dtcBTN = widget.NewButton("Read DTC", nil)   //t.readDTC)
 	t.dumpBTN = widget.NewButton("Dump", func() {
 		widgets.SaveFile(func(filename string) {
 			t.ecuDump(filename)
 		}, "Bin file", "bin")
 	})
-	//t.sramBTN = widget.NewButton("Dump SRAM", nil) //t.dumpSRAM)
+	// t.sramBTN = widget.NewButton("Dump SRAM", nil) //t.dumpSRAM)
 	t.flashBTN = widget.NewButton("Flash", func() {
 		if t.nvdmBOX.Checked {
 			dialog.ShowConfirm("⚠️ Warning ⚠️", "Are you sure you want to overwrite keys and marriage status in the ECU?", func(confirm bool) {
@@ -153,8 +170,12 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 		widgets.SelectFile(func(r fyne.URIReadCloser) {
 			t.ecuFlash(r.URI().Path())
 		}, "Bin file", "bin")
-
 	})
+	// EOL programming: the full factory sequence (T7 only). Unlike Flash it also
+	// writes VIN/date/tester serial and runs end-of-procedure, which verifies the
+	// ROM checksum and sets the EOL-success flag.
+	t.eolBTN = widget.NewButton("EOL Flash", t.ecuEOL)
+
 	t.marryBTN = widget.NewButton("MarryECM", func() {
 		done := make(chan bool)
 		d := dialog.NewConfirm("Confirmation", "You must do it with ignition ON. "+
@@ -175,7 +196,19 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 		widgets.SelectFile(func(r fyne.URIReadCloser) {
 			t.ecuRecover(r.URI().Path())
 		}, "Bin file", "bin")
+	})
 
+	t.resetBTN = widget.NewButton("Reset ECU", func() {
+		if t.ecuSelect.Selected != "Trionic 7" {
+			t.ecuReset()
+			return
+		}
+		dialog.ShowConfirm("⚠️ Warning ⚠️", "TURN OFF THE IGNITION!!\nIf the ignition is ON, the throttle body will go into limp mode.\n\n"+
+			"Continue?", func(confirm bool) {
+			if confirm {
+				t.ecuReset()
+			}
+		}, fyne.CurrentApp().Driver().AllWindows()[0])
 	})
 
 	t.bootBOX = widget.NewCheck("Unlock boot partition", func(b bool) {
@@ -216,28 +249,55 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 
 	t.nvdmBOX.Checked = (fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsNvdm, false))
 	t.bootBOX.Checked = fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsBoot, false)
-	//t.bootBOX.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsBoot, false))
+	// t.bootBOX.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsBoot, false))
 	// t.ecuList.PlaceHolder = "Select ECU"
 	// t.adapterList.PlaceHolder = "Select Adapter"
 	// t.portList.PlaceHolder = "Select Port"
 	// t.speedList.PlaceHolder = "Select Speed"
+	// Custom SecurityAccess algorithm for T7 ECUs flashed with a patched
+	// seed/key routine, which answers to none of the known-good pairs. Read the
+	// values out of the ECU's binary with Tools > T7 Seed/Key patcher.
+	t.seedKeyLabel = widget.NewLabel("Seed/key XOR & SUB (hex, optional):")
+	t.seedKeyXOR = widget.NewEntry()
+	t.seedKeyXOR.SetPlaceHolder("XOR")
+	t.seedKeySub = widget.NewEntry()
+	t.seedKeySub.SetPlaceHolder("SUB")
+	for _, e := range []*widget.Entry{t.seedKeyXOR, t.seedKeySub} {
+		e.Validator = func(s string) error {
+			if strings.TrimSpace(s) == "" {
+				return nil // empty = use the known-good pairs
+			}
+			_, err := parseHex16(s)
+			return err
+		}
+	}
+	t.seedKeyXOR.SetText(t.app.Preferences().String("canflasher_t7_xor"))
+	t.seedKeySub.SetText(t.app.Preferences().String("canflasher_t7_sub"))
+	t.seedKeyXOR.OnChanged = func(s string) { t.app.Preferences().SetString("canflasher_t7_xor", s) }
+	t.seedKeySub.OnChanged = func(s string) { t.app.Preferences().SetString("canflasher_t7_sub", s) }
+	t.seedKeyBox = container.NewGridWithColumns(2, t.seedKeyXOR, t.seedKeySub)
+
 	t.flashLabel = widget.NewLabel("Flash options:")
 	t.pinLabel = widget.NewLabel("PIN code:")
 	left := t.logScroll
 	right := container.NewVBox(
 		t.ecuSelect,
 		t.infoBTN,
-		//t.dtcBTN,
+		// t.dtcBTN,
 		t.dumpBTN,
-		//t.sramBTN,
+		// t.sramBTN,
 		t.flashBTN,
+		t.eolBTN,
 		t.marryBTN,
 		t.recoveryBTN,
+		t.resetBTN,
 		t.flashLabel,
 		t.bootBOX,
 		t.nvdmBOX,
 		t.pinLabel,
 		t.pinEntry,
+		t.seedKeyLabel,
+		t.seedKeyBox,
 	)
 
 	split := container.NewHSplit(left, right)
@@ -248,28 +308,13 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 
 	t.ecuSelect.OnChanged = func(s string) {
 		t.app.Preferences().SetString("canflasher_ecu", s)
-		if s != "Trionic 8" {
-			t.marryBTN.Hide()
-			t.recoveryBTN.Hide()
-			t.bootBOX.Hide()
-			t.nvdmBOX.Hide()
-			t.pinEntry.Hide()
-			t.pinLabel.Hide()
-			t.flashLabel.Hide()
-		} else {
-			t.marryBTN.Show()
-			t.recoveryBTN.Show()
-			t.bootBOX.Show()
-			t.nvdmBOX.Show()
-			t.pinEntry.Show()
-			t.pinLabel.Show()
-			t.flashLabel.Show()
-		}
+		showIf(s == "Trionic 8", t.marryBTN, t.recoveryBTN, t.bootBOX, t.nvdmBOX, t.pinEntry, t.pinLabel, t.flashLabel)
+		showIf(s == "Trionic 7", t.seedKeyLabel, t.seedKeyBox, t.eolBTN)
 	}
 
 	t.ecuSelect.SetSelected(t.app.Preferences().StringWithFallback("canflasher_ecu", "Trionic 5"))
 
-	//return widget.NewSimpleRenderer(t.container)
+	// return widget.NewSimpleRenderer(t.container)
 	return &CanFlasherWidgetRenderer{
 		t: t,
 	}
@@ -284,12 +329,11 @@ func (tr *CanFlasherWidgetRenderer) Layout(space fyne.Size) {
 }
 
 func (tr *CanFlasherWidgetRenderer) MinSize() fyne.Size {
-	//return tr.t.container.MinSize()
+	// return tr.t.container.MinSize()
 	return fyne.NewSize(600, 450)
 }
 
 func (tr *CanFlasherWidgetRenderer) Refresh() {
-
 }
 
 func (tr *CanFlasherWidgetRenderer) Objects() []fyne.CanvasObject {

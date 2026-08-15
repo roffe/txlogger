@@ -20,6 +20,9 @@ func (t *CanFlasherWidget) ecuInfo() {
 		return
 	}
 
+	// read widget state on the main thread, before the worker starts
+	cfg := t.ecuConfig()
+
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -34,12 +37,7 @@ func (t *CanFlasherWidget) ecuInfo() {
 		}
 		defer c.Close()
 
-		tr, err := ecu.New(c, &ecu.Config{
-			Name:       t.ecuSelect.Selected,
-			OnProgress: t.progress,
-			OnMessage:  t.log,
-			OnError:    func(err error) { t.log(err.Error()) },
-		})
+		tr, err := ecu.New(c, cfg)
 		if err != nil {
 			t.log(err.Error())
 			return

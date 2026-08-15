@@ -441,7 +441,7 @@ func (m *Meshgrid) initShader() {
 		[]byte(meshShaderPreludeGL+meshShaderBody),
 		[]byte(meshShaderPreludeES+meshShaderBody),
 	)
-	// m.shader.SourceHLSL = meshShaderHLSL
+	m.shader.SourceHLSL = meshShaderHLSL
 	m.shader.Textures = make(map[string]image.Image, 2)
 	m.shader.Uniforms = make(map[string]float32, 32)
 	m.updateShaderData()

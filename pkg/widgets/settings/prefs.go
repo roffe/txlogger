@@ -1,6 +1,9 @@
 package settings
 
-import "fyne.io/fyne/v2"
+import (
+	"fyne.io/fyne/v2"
+	"github.com/roffe/txlogger/pkg/ollama"
+)
 
 // prefs returns the application preference store. Every setting in this package
 // is read and written through the typed descriptors below so that storage keys
@@ -74,10 +77,12 @@ var (
 	prefAutoLoad              = boolPref{"autoUpdateLoadEcu", true}
 	prefAutoSave              = boolPref{"autoUpdateSaveEcu", false}
 	prefCursorFollowCrosshair = boolPref{"cursorFollowCrosshair", false}
-	prefLivePreview           = boolPref{"livePreview", true}
 	prefMeshView              = boolPref{"liveMeshView", true}
 	prefRealtimeBars          = boolPref{"realtimeBars", true}
 	prefColorBlindMode        = stringPref{"colorBlindMode", "Normal"}
+
+	// Set from the about window easter egg, gates preview-only settings.
+	prefPreviewFeatures = boolPref{"enable_preview_features1337", false}
 
 	// Graphics
 	prefPlotterRenderer = intPref{"plotterRenderer", 0}
@@ -102,6 +107,12 @@ var (
 	prefWBLLambdaValues     = floatListPref{"wblLambdaValues", []float64{0.5, 1.5}}
 	prefLastADScannerPreset = stringPref{"lastADScannerPreset", ""}
 	prefLastADScannerECU    = stringPref{"lastADScannerECU", "T7"}
+
+	// AI chat (local Ollama)
+	prefAIURL   = stringPref{"aiOllamaURL", ollama.DefaultURL}
+	prefAIModel = stringPref{"aiOllamaModel", "qwen3.6:27b"}
+	prefAIThink = boolPref{"aiOllamaThink", false}
+	prefAICtx   = intPref{"aiOllamaCtx", 16384}
 
 	// CAN
 	prefAdapter = stringPref{"adapter", ""}

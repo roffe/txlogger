@@ -35,6 +35,9 @@ func (t *CanFlasherWidget) ecuFlash(filename string) {
 
 	t.progressBar.SetValue(0)
 
+	// read widget state on the main thread, before the worker starts
+	cfg := t.ecuConfig()
+
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 1800*time.Second)
 		defer cancel()
@@ -53,12 +56,7 @@ func (t *CanFlasherWidget) ecuFlash(filename string) {
 		}
 		defer c.Close()
 
-		tr, err := ecu.New(c, &ecu.Config{
-			Name:       t.ecuSelect.Selected,
-			OnProgress: t.progress,
-			OnMessage:  t.log,
-			OnError:    func(err error) { t.log(err.Error()) },
-		})
+		tr, err := ecu.New(c, cfg)
 		if err != nil {
 			t.log(err.Error())
 			return
@@ -70,22 +68,13 @@ func (t *CanFlasherWidget) ecuFlash(filename string) {
 			return
 		}
 
-		// Show what the ECU reports after flashing as confirmation the
-		// right bin landed (the bootloader is still running at this point).
-		if res, err := tr.Info(ctx); err == nil {
-			for _, r := range res {
-				t.log(r.String())
-			}
-		} else {
-			t.log(err.Error())
-		}
-
-		t.app.SendNotification(fyne.NewNotification("txlogger", "ECU flash completed"))
-
 		time.Sleep(200 * time.Millisecond)
-
-		if err := tr.ResetECU(ctx); err != nil {
-			t.log(err.Error())
+		if t.ecuSelect.Selected == "Trionic 7" {
+			t.log("Flash done, reset ECU or pull fuse to finnish")
+		} else {
+			if err := tr.ResetECU(ctx); err != nil {
+				t.log(err.Error())
+			}
 		}
 	}()
 }

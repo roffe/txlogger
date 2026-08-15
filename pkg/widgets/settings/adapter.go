@@ -75,7 +75,7 @@ func parseBaudrate(speed string) (int, error) {
 // canFilterAndRate returns the CAN acceptance filter and bus rate for the given
 // ECU type and adapter. extraFilters are appended for the Trionic 8 family.
 func canFilterAndRate(ecuType, adapterName string, extraFilters []uint32) ([]uint32, float64) {
-	wblOnCAN := prefWblSource.get() == "CAN"
+	wblOnCAN := prefWBLPort.get() == "CAN"
 
 	switch ecuType {
 	case "T5", "Trionic 5":

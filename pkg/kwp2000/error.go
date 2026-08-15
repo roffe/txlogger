@@ -33,6 +33,16 @@ const (
 	REQUEST_CORRECTLY_RECEIVED_RESPONSE_PENDING        = 0x78
 	INCORRECT_BYTE_COUNT_DURING_BLOCK_TRANSFER         = 0x79
 	SERVICE_NOT_SUPPORTED_IN_ACTIVE_DIAGNOSTIC_SESSION = 0x80
+
+	// Routine/transfer status codes. These are not failures, but they arrive in
+	// the same byte position and callers report them as such.
+	SECURITY_ACCESS_ALLOWED       = 0x34
+	READY_FOR_DOWNLOAD            = 0x44
+	READY_FOR_UPLOAD              = 0x54
+	NORMAL_EXIT_WITH_RESULTS      = 0x61
+	NORMAL_EXIT_WITHOUT_RESULTS   = 0x62
+	ABNORMAL_EXIT_WITH_RESULTS    = 0x63
+	ABNORMAL_EXIT_WITHOUT_RESULTS = 0x64
 )
 
 var (
@@ -64,6 +74,13 @@ var (
 	ErrRequestCorrectlyReceivedResponsePending      = &KWP2000Error{REQUEST_CORRECTLY_RECEIVED_RESPONSE_PENDING, "Response pending"}
 	ErrIncorrectByteCountDuringBlockTransfer        = &KWP2000Error{INCORRECT_BYTE_COUNT_DURING_BLOCK_TRANSFER, "Incorrect byte count during block transfer"}
 	ErrServiceNotSupportedInActiveDiagnosticSession = &KWP2000Error{SERVICE_NOT_SUPPORTED_IN_ACTIVE_DIAGNOSTIC_SESSION, "Service not supported in current diagnostics session"}
+	ErrSecurityAccessAllowed                       = &KWP2000Error{SECURITY_ACCESS_ALLOWED, "Security access allowed"}
+	ErrReadyForDownload                            = &KWP2000Error{READY_FOR_DOWNLOAD, "Ready for download"}
+	ErrReadyForUpload                              = &KWP2000Error{READY_FOR_UPLOAD, "Ready for upload"}
+	ErrNormalExitWithResults                       = &KWP2000Error{NORMAL_EXIT_WITH_RESULTS, "Normal exit with results available"}
+	ErrNormalExitWithoutResults                    = &KWP2000Error{NORMAL_EXIT_WITHOUT_RESULTS, "Normal exit without results available"}
+	ErrAbnormalExitWithResults                     = &KWP2000Error{ABNORMAL_EXIT_WITH_RESULTS, "Abnormal exit with results"}
+	ErrAbnormalExitWithoutResults                  = &KWP2000Error{ABNORMAL_EXIT_WITHOUT_RESULTS, "Abnormal exit without results"}
 )
 
 type KWP2000Error struct {
@@ -135,6 +152,20 @@ func TranslateErrorCode(p byte) error {
 		return ErrIncorrectByteCountDuringBlockTransfer
 	case SERVICE_NOT_SUPPORTED_IN_ACTIVE_DIAGNOSTIC_SESSION:
 		return ErrServiceNotSupportedInActiveDiagnosticSession
+	case SECURITY_ACCESS_ALLOWED:
+		return ErrSecurityAccessAllowed
+	case READY_FOR_DOWNLOAD:
+		return ErrReadyForDownload
+	case READY_FOR_UPLOAD:
+		return ErrReadyForUpload
+	case NORMAL_EXIT_WITH_RESULTS:
+		return ErrNormalExitWithResults
+	case NORMAL_EXIT_WITHOUT_RESULTS:
+		return ErrNormalExitWithoutResults
+	case ABNORMAL_EXIT_WITH_RESULTS:
+		return ErrAbnormalExitWithResults
+	case ABNORMAL_EXIT_WITHOUT_RESULTS:
+		return ErrAbnormalExitWithoutResults
 	default:
 		return fmt.Errorf("unknown error %X", p)
 	}

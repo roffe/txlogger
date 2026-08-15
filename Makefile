@@ -1,4 +1,4 @@
-.PHONY: j2534proxy snapshots
+.PHONY: j2534proxy snapshots clean
 
 export CC=clang
 
@@ -12,6 +12,12 @@ BUILDTAGS:=$(CANINTERFACES),$(EXTRA_TAGS)
 endif
 
 default: txlogger
+
+clean:
+	rm -f cangateway j2534proxy.exe
+	rm -f txlogger
+	rm -f txlogger-dx.exe
+	rm -f txlogger.exe
 
 pkg/ota/firmware.bin: /home/roffe/Documents/PlatformIO/Projects/txbridge/.pio/build/esp32dev/firmware.bin
 	@cp $< $@
@@ -51,10 +57,6 @@ windows-dx:
 run: clean pkg/ota/firmware.bin
 	@echo Using compiler "$(CC)"
 	-GOEXPERIMENT=simd go run -tags=$(BUILDTAGS) . 2>&1 | tee run.log
-
-clean:
-	rm -f cangateway j2534proxy.exe
-	rm -f txlogger
 
 snapshots:
 	go run -tags combi,canusb,ftdi,j2534,pcan,rcan,socketcan ./cmd/screenshots \

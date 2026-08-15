@@ -2,82 +2,32 @@ package t7
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
-
-	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
-func (t *Client) EraseECU(ctx context.Context) error {
-	data := make([]byte, 8)
-	eraseMsg := []byte{0x40, 0xA1, 0x02, kwp2000.START_ROUTINE_BY_IDENTIFIER, kwp2000.RLI_EOL_START, 0x00, 0x00, 0x00}
-	confirmMsg := []byte{0x40, 0xA1, 0x01, 0x3E, 0x00, 0x00, 0x00, 0x00}
+// eraseProgressSteps is the progress bar's denominator. A chip erase takes
+// ~20 s of 250 ms polls, so this is an estimate, not a bound.
+const eraseProgressSteps = 100
 
-	t.cfg.OnProgress(-float64(17))
+func (t *Client) EraseECU(ctx context.Context) error {
+	t.cfg.OnProgress(-float64(eraseProgressSteps))
 	t.cfg.OnMessage("Erasing FLASH")
 
 	progress := 0
-
-	// Start EOL session
-	data[3] = 0
-	i := 0
-	for data[3] != 0x71 && i < 30 {
-		f, err := t.request(ctx, eraseMsg, t.defaultTimeout)
-		if err != nil {
-			return err
-		}
-		data = f.Data[:]
-		t.Ack(ctx, data[0], false)
-		i++
+	start := time.Now()
+	err := t.kwp.EraseFlash(ctx, func() {
 		progress++
-		t.cfg.OnProgress(float64(progress))
-		time.Sleep(250 * time.Millisecond)
-	}
-	if i > 10 {
-		return errors.New("to many tries to erase 1")
-	}
-
-	// Start erase routine
-	data[3] = 0
-	i = 0
-	eraseMsg[4] = kwp2000.RLI_ERASE
-	for data[3] != 0x71 && i < 200 {
-		f, err := t.request(ctx, eraseMsg, t.defaultTimeout)
-		if err != nil {
-			return err
-		}
-		data = f.Data[:]
-		t.Ack(ctx, data[0], false)
-		i++
-		progress++
-		t.cfg.OnProgress(float64(progress))
-		time.Sleep(250 * time.Millisecond)
-	}
-	// Check to see if erase operation lasted longer than 20 sec...
-	if i > 200 {
-		return errors.New("to many tries to erase 2")
+		t.cfg.OnProgress(float64(min(progress, eraseProgressSteps)))
+	})
+	if err != nil {
+		return err
 	}
 
-	data[3] = 0
-	i = 0
-	for data[3] != 0x7E && i < 10 {
-		time.Sleep(250 * time.Millisecond)
-		f, err := t.request(ctx, confirmMsg, t.defaultTimeout)
-		if err != nil {
-			return err
-		}
-		data = f.Data[:]
-		i++
-		progress++
-
-		t.cfg.OnProgress(float64(progress))
-
-	}
-	if i < 10 {
-		t.cfg.OnMessage("Erase done")
-		return nil
-	}
-
-	return fmt.Errorf("unknown erase error")
+	t.cfg.OnProgress(eraseProgressSteps)
+	// The duration is worth showing: a chip erase is ~20 s, so anything much
+	// faster means the ECU was still busy and the writes that follow will all
+	// come back busyRepeatRequest.
+	t.cfg.OnMessage(fmt.Sprintf("Erase done, took: %s", time.Since(start).Round(time.Second)))
+	return nil
 }

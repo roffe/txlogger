@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/roffe/gocan/v2"
 )
 
 func (t *Client) LoadBinFile(filename string) (int64, []byte, error) {
@@ -95,12 +94,13 @@ func computeWriteSegments(bin []byte) []writeSegment {
 	return segs
 }
 
-// Flash the ECU
-func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
+// NormalizeBin validates a 512 KB Trionic 7 image and returns it in Intel byte
+// order, without mutating the caller's slice.
+func NormalizeBin(bin []byte) ([]byte, error) {
 	if len(bin) != 0x80000 {
-		return fmt.Errorf("error: expected a 512KB (0x80000) Trionic 7 binary, got %d bytes", len(bin))
+		return nil, fmt.Errorf("error: expected a 512KB (0x80000) Trionic 7 binary, got %d bytes", len(bin))
 	}
-	// Auto-correct Motorola byte-order dumps (FF FF FC EF) to Intel order on a copy, without mutating the caller's slice.
+	// Auto-correct Motorola byte-order dumps (FF FF FC EF) to Intel order.
 	if bin[0] == 0xFF && bin[1] == 0xFF && bin[2] == 0xFC && bin[3] == 0xEF {
 		log.Println("note: Motorola byte-order detected, swapping to Intel")
 		swapped := make([]byte, len(bin))
@@ -110,8 +110,17 @@ func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
 		bin = swapped
 	}
 	if bin[0] != 0xFF || bin[1] != 0xFF || bin[2] != 0xEF || bin[3] != 0xFC {
-		return fmt.Errorf("error: bin doesn't appear to be for a Trionic 7 ECU! (%02X%02X%02X%02X)",
+		return nil, fmt.Errorf("error: bin doesn't appear to be for a Trionic 7 ECU! (%02X%02X%02X%02X)",
 			bin[0], bin[1], bin[2], bin[3])
+	}
+	return bin, nil
+}
+
+// Flash the ECU
+func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
+	bin, err := NormalizeBin(bin)
+	if err != nil {
+		return err
 	}
 
 	if err := t.DataInitialization(ctx); err != nil {
@@ -127,10 +136,13 @@ func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
 		return err
 	}
 
-	//if err := t.c.Adapter().SetFilter([]uint32{0x258}); err != nil {
-	//	t.cfg.OnError(err)
-	//}
+	return t.writeBin(ctx, bin)
+}
 
+// writeBin runs the download phase: requestDownload/transferData over every data
+// segment, then requestTransferExit. The chip is already erased, so segments may
+// be written in any order and a failed one resumes from its failure point.
+func (t *Client) writeBin(ctx context.Context, bin []byte) error {
 	t.cfg.OnProgress(-float64(0x80000))
 	t.cfg.OnMessage("Flashing ECU")
 
@@ -140,14 +152,13 @@ func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
 		err := retry.Do(func() error {
 			// re-anchor the ECU write pointer at the last good position so a retry
 			// resumes where it failed instead of re-flashing the whole segment
-			if err := t.writeJump(ctx, binPos, seg.end-binPos); err != nil {
+			if err := t.kwp.RequestDownload(ctx, uint32(binPos), uint32(seg.end-binPos)); err != nil {
 				return err
 			}
 			for binPos < seg.end {
-				left := seg.end - binPos
-				writeBytes := min(left, flashChunkSize)
-				if err := t.writeRange(ctx, binPos, binPos+writeBytes, bin); err != nil {
-					return err
+				writeBytes := min(seg.end-binPos, flashChunkSize)
+				if err := t.kwp.TransferDataBlock(ctx, bin[binPos:binPos+writeBytes]); err != nil {
+					return fmt.Errorf("writing 0x%X-0x%X: %w", binPos, binPos+writeBytes, err)
 				}
 				binPos += writeBytes
 				t.cfg.OnProgress(float64(binPos))
@@ -157,7 +168,7 @@ func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
 			retry.Context(ctx),
 			retry.Attempts(30),
 			retry.OnRetry(func(n uint, err error) {
-				t.cfg.OnMessage(fmt.Sprintf("retrying writeRange: %v", err))
+				t.cfg.OnMessage(fmt.Sprintf("retrying block write: %v", err))
 			}),
 			retry.Delay(150*time.Millisecond),
 			retry.LastErrorOnly(true),
@@ -165,121 +176,12 @@ func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
 		if err != nil {
 			return err
 		}
-
 	}
-	end, err := t.request(ctx, []byte{0x40, 0xA1, 0x01, 0x37, 0x00, 0x00, 0x00, 0x00}, t.defaultTimeout)
-	if err != nil {
-		return fmt.Errorf("error waiting for data transfer exit reply: %v", err)
-	}
-	// Send acknowledgement
-	t.Ack(ctx, end.Data[0], false)
 
-	if end.Data[3] != 0x77 {
-		return errors.New("exit download mode failed")
+	if err := t.kwp.RequestTransferExit(ctx); err != nil {
+		return fmt.Errorf("exit download mode failed: %w", err)
 	}
 
 	t.cfg.OnMessage(fmt.Sprintf("Done, took: %s", time.Since(start).Round(time.Second)))
-	// defer t.StopSession(ctx)
-	return nil
-}
-
-// send request "Download - tool to module" to Trionic"
-func (t *Client) writeJump(ctx context.Context, offset, length int) error {
-	jumpMsg := []byte{0x41, 0xA1, 0x08, 0x34, byte(offset >> 16), byte(offset >> 8), byte(offset), 0x00}
-	jumpMsg2 := []byte{0x00, 0xA1, byte(length >> 16), byte(length >> 8), byte(length) /*, 0x00, 0x00, 0x00*/}
-
-	log.Printf("writeJump: offset=%d, length=%d", offset, length)
-	log.Printf("writeJump: jumpMsg=%X", jumpMsg)
-	if err := t.c.Send(ctx, gocan.NewFrame(0x240, jumpMsg)); err != nil {
-		return fmt.Errorf("failed to enable request download #1: %w", err)
-	}
-	log.Printf("writeJump: jumpMsg2=%X", jumpMsg2)
-
-	f, err := t.request(ctx, jumpMsg2, t.defaultTimeout)
-	if err != nil {
-		return fmt.Errorf("failed to enable request download #2: %w", err)
-	}
-
-	t.Ack(ctx, f.Data[0], false)
-
-	if f.Data[3] != 0x74 {
-		log.Println(f.String())
-		return fmt.Errorf("invalid response enabling download mode")
-	}
-
-	return nil
-}
-
-func (t *Client) writeRange(ctx context.Context, start, end int, bin []byte) error {
-	length := end - start
-	binPos := start
-	rows := (length + 3) / 6
-	first := true
-	data := make([]byte, 8)
-	var resp gocan.Frame
-	for i := rows; i >= 0; i-- {
-		data[1] = 0xA1
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-		data[0] = byte(i)
-		if first {
-			data[0] |= 0x40
-			data[2] = byte(length + 1) // length
-			data[3] = 0x36             // Data Transfer
-			for fq := 4; fq < 8; fq++ {
-				data[fq] = bin[binPos]
-				binPos++
-			}
-			first = false
-		} else if i == 0 {
-			left := end - binPos
-			if left > 6 {
-				return fmt.Errorf("sequence is fucked, tell roffe") // this should never happend
-			}
-			for i := 0; i < left; i++ {
-				data[2+i] = bin[binPos]
-				binPos++
-			}
-			if left <= 6 {
-				fill := 8 - left
-				for i := left; i < fill; i++ {
-					data[left+2] = 0x00
-				}
-			}
-		} else {
-			for k := 2; k < 8; k++ {
-				data[k] = bin[binPos]
-				binPos++
-			}
-		}
-		if i > 0 {
-			// Send blocks until the adapter has written this frame, pacing the
-			// burst to the ECU
-			if err := t.c.Send(ctx, gocan.NewFrame(0x240, data)); err != nil {
-				return fmt.Errorf("error writing 0x%X - 0x%X was at pos 0x%X: %w", start, end, binPos, err)
-			}
-			continue
-		}
-		// last frame: Request registers the 0x258 subscription before sending,
-		// so a fast ECU reply can't slip through between the send and the receive
-		r, err := t.request(ctx, data, t.defaultTimeout)
-		if err != nil {
-			return fmt.Errorf("error writing 0x%X - 0x%X was at pos 0x%X: %w", start, end, binPos, err)
-		}
-		resp = r
-	}
-
-	// Send acknowledgement
-	t.Ack(ctx, resp.Data[0], false)
-
-	if resp.Data[3] != 0x76 {
-		if resp.Data[3] == 0x7F {
-			return fmt.Errorf("ECU rejected write 0x%X-0x%X: %w", start, end, TranslateErrorCode(resp.Data[5]))
-		}
-		return fmt.Errorf("ECU did not confirm write 0x%X-0x%X: %s", start, end, resp.String())
-	}
 	return nil
 }

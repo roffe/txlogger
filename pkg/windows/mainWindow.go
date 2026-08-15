@@ -2,7 +2,6 @@ package windows
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -22,29 +21,28 @@ import (
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/ecusymbol/as2"
 	"github.com/roffe/txlogger/j2534proxy/client"
-	"github.com/roffe/txlogger/pkg/colors"
+	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ebus"
+	"github.com/roffe/txlogger/pkg/kwp2000"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/update"
-	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/ledicon"
 	"github.com/roffe/txlogger/pkg/widgets/logplayer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
+	"github.com/roffe/txlogger/pkg/widgets/seedkey"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
 	"github.com/roffe/txlogger/pkg/widgets/shortcuts"
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
 )
 
 const (
-	prefsLastBinFile    = "lastBinFile"
-	prefsSelectedECU    = "lastECU"
-	prefsSymbolList     = "symbolList"
-	prefsSelectedPreset = "selectedPreset"
-	prefsRemoteMode     = "remoteMode"
+	prefsLastBinFile = "lastBinFile"
+	prefsSelectedECU = "lastECU"
+	prefsRemoteMode  = "remoteMode"
 )
 
 // var _ desktop.Mouseable = (*SecretText)(nil)
@@ -70,10 +68,20 @@ type MainWindow struct {
 	counters                    *mainWindowCounters
 	loggingRunning              bool
 	filename                    string
-	symbolList                  *symbollist.Widget
+	symbolList                  *symbollist.Viewer
 
 	as2 *as2.File
 	fw  symbol.SymbolCollection
+
+	// logz is the most recently opened log file, kept so tools that work on
+	// "the log" (currently the AI chat) have something to read. Several log
+	// players can be open at once; this is the last one loaded.
+	logz        logfile.Logfile
+	logFilename string
+
+	// seedKey is the T7 SecurityAccess pair read out of the loaded binary,
+	// tried first when logging so ECUs with a patched/custom algorithm unlock.
+	seedKey *kwp2000.SeedKey
 
 	dlc             datalogger.IClient
 	dlcCancel       context.CancelFunc
@@ -93,20 +101,15 @@ type MainWindow struct {
 }
 
 type mainWindowSelects struct {
-	symbolLookup *widgets.CompletionEntry
 	ecuSelect    *widget.Select
-	presetSelect *widget.Select
 	layoutSelect *widget.Select
 	remoteSelect *widget.Select
 }
 
 type mainWindowButtons struct {
 	debugBtn     *widget.Button
-	addSymbolBtn *widget.Button
 	logBtn       *widget.Button
-	// loadSymbolsEcuBtn *widget.Button
-	syncSymbolsBtn *widget.Button
-	dashboardBtn   *widget.Button
+	dashboardBtn *widget.Button
 
 	layoutRefreshBtn *widget.Button
 	symbolListBtn    *widget.Button
@@ -121,9 +124,6 @@ type mainWindowCounters struct {
 }
 
 func NewMainWindow(app fyne.App) *MainWindow {
-	symbolListConfig := &symbollist.Config{
-		ColorBlindMode: colors.ModeNormal,
-	}
 	mw := &MainWindow{
 		Window:     app.NewWindow("txlogger"),
 		app:        app,
@@ -133,24 +133,24 @@ func NewMainWindow(app fyne.App) *MainWindow {
 		selects:  &mainWindowSelects{},
 		buttons:  &mainWindowButtons{},
 
-		symbolList: symbollist.New(symbolListConfig),
-
 		j2534LED:        ledicon.New("J2534"),
 		canLED:          ledicon.New("CAN"),
 		statusText:      widget.NewLabel("Harder, Better, Faster, Stronger"),
 		previewFeatures: app.Preferences().BoolWithFallback("enable_preview_features1337", false),
 	}
 
-	ebus.SubscribeFunc(ebus.TOPIC_COLORBLINDMODE, func(v float64) {
-		mw.symbolList.SetColorBlindMode(colors.ColorBlindMode(int(v)))
-		mw.symbolList.Refresh()
+	mw.symbolList = symbollist.NewViewer(&symbollist.ViewerConfig{
+		App:    app,
+		Window: mw.Window,
+		ECU:    func() string { return mw.selects.ecuSelect.Selected },
+		Log:    mw.Log,
+		Error:  mw.Error,
 	})
 
 	mw.setupMenu()
 	mw.createButtons()
 	mw.createSelects()
 	mw.createCounters()
-	mw.newSymbolnameTypeahead()
 	mw.setupShortcuts()
 
 	mw.settings = settings.New(&settings.Config{
@@ -162,7 +162,8 @@ func NewMainWindow(app fyne.App) *MainWindow {
 
 	mw.loadPrefs()
 
-	symbolListConfig.ColorBlindMode = mw.settings.GetColorBlindMode()
+	mw.symbolList.SetColorBlindMode(mw.settings.GetColorBlindMode())
+	mw.symbolList.UpdateBars(mw.settings.GetRealtimeBars())
 
 	mw.wm = multiwindow.NewMultipleWindows()
 	mw.wm.LockViewport = true
@@ -341,6 +342,7 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 		mw.Error(fmt.Errorf("failed to open log file: %w", err))
 		return
 	}
+	mw.logz, mw.logFilename = logz, fp
 
 	dbcfg := &dashboard.Config{
 		Logplayer:      true,
@@ -457,6 +459,8 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Positio
 		return
 	}
 
+	mw.logz, mw.logFilename = logz, fp
+
 	mw.Log("loaded log file " + filename)
 	mw.addRecent(filename)
 
@@ -535,22 +539,19 @@ func (mw *MainWindow) Error(err error) {
 	debug.LogDepth(2, err.Error())
 	_ = mw.outputData.Append(err.Error())
 	go fyne.Do(func() {
-		dialog.ShowError(err, mw.Window)
+		// dialog.ShowError(err, mw.Window)
+		common.ShowError("Dang it!", err)
 	})
 	// log.Printf("error: %s", err)
 }
 
 func (mw *MainWindow) Disable() {
 	mw.buttonsDisabled = true
-	mw.buttons.addSymbolBtn.Disable()
-	// mw.buttons.loadSymbolsEcuBtn.Disable()
-	mw.buttons.syncSymbolsBtn.Disable()
 	if !mw.loggingRunning {
 		mw.buttons.logBtn.Disable()
 	}
 
 	mw.selects.ecuSelect.Disable()
-	mw.selects.presetSelect.Disable()
 	mw.selects.remoteSelect.Disable()
 
 	mw.symbolList.Disable()
@@ -558,44 +559,12 @@ func (mw *MainWindow) Disable() {
 
 func (mw *MainWindow) Enable() {
 	mw.buttonsDisabled = false
-	mw.buttons.addSymbolBtn.Enable()
-	// mw.buttons.loadSymbolsEcuBtn.Enable()
-	mw.buttons.syncSymbolsBtn.Enable()
 	mw.buttons.logBtn.Enable()
 
 	mw.selects.ecuSelect.Enable()
-	mw.selects.presetSelect.Enable()
 	mw.selects.remoteSelect.Enable()
 
 	mw.symbolList.Enable()
-}
-
-func (mw *MainWindow) SyncSymbols() {
-	// Print where SyncSymbols was called from
-	_, file, line, _ := runtime.Caller(1)
-	log.Printf("SyncSymbols called from %s:%d", file, line)
-
-	if mw.fw == nil {
-		return
-	}
-	cnt := 0
-	for _, v := range mw.symbolList.Symbols() {
-		sym := mw.fw.GetByName(v.Name)
-		if sym != nil {
-			v.Name = sym.Name
-			v.Number = sym.Number
-			v.Address = sym.Address
-			v.SramOffset = sym.SramOffset
-			v.Length = sym.Length
-			v.Mask = sym.Mask
-			v.Type = sym.Type
-			v.Unit = sym.Unit
-			v.Correctionfactor = sym.Correctionfactor
-			cnt++
-		}
-	}
-	mw.symbolList.Refresh()
-	mw.Log(fmt.Sprintf("Synced %d / %d symbols", cnt, mw.symbolList.Count()))
 }
 
 /*
@@ -653,6 +622,7 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	mw.app.Preferences().SetString(prefsLastBinFile, filename)
 	mw.addRecent(filename)
 
+	mw.captureSeedKey(ecuType, data)
 	mw.LoadSymbols(symbols, ecuType.String())
 	// mw.selects.ecuSelect.SetSelected(ecuType.String())
 	// mw.fw = symbols
@@ -669,39 +639,32 @@ func (mw *MainWindow) LoadSymbolsFromBytes(filename string, data []byte) error {
 	mw.SetTitle(filepath.Base(filename))
 	mw.app.Preferences().SetString(prefsLastBinFile, filename)
 
+	mw.captureSeedKey(ecuType, data)
 	mw.LoadSymbols(symbols, ecuType.String())
 	return nil
+}
+
+// captureSeedKey reads the T7 SecurityAccess algorithm (XOR/SUB) out of the
+// loaded binary so logging can unlock ECUs flashed with a patched/custom
+// algorithm. Cleared for non-T7 or when the routine isn't found (falls back to
+// the stock pairs).
+func (mw *MainWindow) captureSeedKey(ecuType symbol.ECUType, data []byte) {
+	mw.seedKey = nil
+	if ecuType != symbol.ECU_T7 {
+		return
+	}
+	_, xor, sub, err := seedkey.Find(data)
+	if err != nil {
+		return
+	}
+	mw.seedKey = &kwp2000.SeedKey{XOR: xor, Sub: sub}
+	mw.Log(fmt.Sprintf("Seed/key from binary: XOR %04X SUB %04X (%s)", xor, sub, seedkey.MethodName(xor, sub)))
 }
 
 func (mw *MainWindow) LoadSymbols(symbols symbol.SymbolCollection, ecuType string) {
 	mw.selects.ecuSelect.SetSelected(ecuType)
 	mw.fw = symbols
-	mw.SyncSymbols()
-}
-
-func (mw *MainWindow) LoadPreset(r io.Reader) error {
-	b, err := io.ReadAll(r)
-	if err != nil {
-		return fmt.Errorf("failed to read config file: %w", err)
-	}
-	var cfg []*symbol.Symbol
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		return fmt.Errorf("failed to unmarshal config file: %w", err)
-	}
-	mw.symbolList.LoadSymbols(cfg...)
-	mw.app.Preferences().SetString(prefsSymbolList, string(b))
-	return nil
-}
-
-func (mw *MainWindow) ExportPreset(filename string) error {
-	b, err := json.Marshal(mw.symbolList.Symbols())
-	if err != nil {
-		return fmt.Errorf("failed to marshal config file: %w", err)
-	}
-	if err := os.WriteFile(filename, b, 0o644); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
-	}
-	return nil
+	mw.symbolList.SetSymbols(symbols)
 }
 
 // -----

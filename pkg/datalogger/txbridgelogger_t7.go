@@ -41,6 +41,7 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Bus) error {
 	channels := c.buildChannels()
 
 	kwp := kwp2000.New(cl)
+	kwp.SetSeedKey(c.SeedKey) // custom pair extracted from the loaded binary, if any
 	if err := initT7logging(ctx, kwp, c.Symbols, c.OnMessage); err != nil {
 		return fmt.Errorf("failed to init t7 logging: %w", err)
 	}

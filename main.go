@@ -84,6 +84,16 @@ func main() {
 	tx := app.NewWithID("com.roffe.txlogger")
 	tx.Settings().SetTheme(&theme.TxTheme{})
 
+	/*
+		if desk, ok := tx.(desktop.App); ok {
+			m := fyne.NewMenu("MyApp",
+				fyne.NewMenuItem("Show", func() {
+					log.Println("Tapped show")
+				}))
+			desk.SetSystemTrayMenu(m)
+		}
+	*/
+
 	// load presets
 	if err := presets.Load(tx); err != nil {
 		debug.Log("failed to load presets: " + err.Error())

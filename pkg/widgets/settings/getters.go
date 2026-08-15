@@ -6,6 +6,7 @@ import (
 	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/datalogger"
+	"github.com/roffe/txlogger/pkg/ollama"
 	"github.com/roffe/txlogger/pkg/wbl/aem"
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
@@ -20,7 +21,6 @@ import (
 func (sw *Widget) GetFreq() int                   { return prefFreq.get() }
 func (sw *Widget) GetAutoSave() bool              { return prefAutoSave.get() }
 func (sw *Widget) GetAutoLoad() bool              { return prefAutoLoad.get() }
-func (sw *Widget) GetLivePreview() bool           { return prefLivePreview.get() }
 func (sw *Widget) GetRealtimeBars() bool          { return prefRealtimeBars.get() }
 func (sw *Widget) GetMeshView() bool              { return prefMeshView.get() }
 func (sw *Widget) GetCursorFollowCrosshair() bool { return prefCursorFollowCrosshair.get() }
@@ -98,7 +98,6 @@ func (sw *Widget) GetWidebandSymbolName() string {
 			return "None"
 		}
 	case aem.ProductString,
-		"CombiAdapter",
 		ecumaster.ProductString,
 		innovate.ProductString,
 		plx.ProductString,
@@ -108,4 +107,17 @@ func (sw *Widget) GetWidebandSymbolName() string {
 	default:
 		return "None"
 	}
+}
+
+// AIClient returns an Ollama client configured from the AI settings tab, or nil
+// if no model has been chosen yet.
+func (sw *Widget) AIClient() *ollama.Client {
+	model := prefAIModel.get()
+	if model == "" {
+		return nil
+	}
+	c := ollama.New(prefAIURL.get(), model)
+	c.Think = prefAIThink.get()
+	c.ContextSize = prefAICtx.get()
+	return c
 }

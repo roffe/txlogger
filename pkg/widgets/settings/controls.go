@@ -1,7 +1,10 @@
 package settings
 
 import (
+	"context"
+	"fmt"
 	"strconv"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -10,6 +13,7 @@ import (
 	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/ebus"
+	"github.com/roffe/txlogger/pkg/ollama"
 	"github.com/roffe/txlogger/pkg/wbl/aem"
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
@@ -29,6 +33,19 @@ var (
 // checkBox builds a checkbox bound to a boolean preference.
 func checkBox(label string, p boolPref) *widget.Check {
 	return widget.NewCheck(label, p.set)
+}
+
+// checkBoxTopic is checkBox that also announces the new value on the bus, for
+// settings that open widgets react to live.
+func checkBoxTopic(label string, p boolPref, topic string) *widget.Check {
+	return widget.NewCheck(label, func(b bool) {
+		p.set(b)
+		var v float64
+		if b {
+			v = 1
+		}
+		ebus.Publish(topic, v)
+	})
 }
 
 // indexSelect builds a select whose chosen option index is stored in an
@@ -66,7 +83,6 @@ var wblSources = []wblSource{
 	{name: "None"},
 	{name: "ECU", image: "t7", adScanner: true}, // T7 image used as a placeholder
 	{name: aem.ProductString, image: "uego", portSelect: true},
-	{name: "CombiAdapter", image: "combi", adScanner: true},
 	{name: ecumaster.ProductString, image: "lambdatocan"},
 	{name: innovate.ProductString, image: "mtx-l", portSelect: true},
 	{name: plx.ProductString, image: "plx", portSelect: true},
@@ -84,7 +100,7 @@ func (sw *Widget) newWBLSelector() *fyne.Container {
 
 	sw.wblSource = widget.NewSelect(names, func(s string) {
 		prefWblSource.set(s)
-		prefWidebandSymbolName.set(sw.GetWidebandSymbolName())
+		sw.wblSymbolChanged()
 
 		src := byName[s]
 		if src.image != "" {
@@ -123,7 +139,16 @@ func (sw *Widget) newADscannerCheck() *widget.Check {
 	return widget.NewCheck("use AD Scanner (don't forget to add symbol)", func(b bool) {
 		setVisible(b, sw.wblADScannerSymbol)
 		prefUseADScanner.set(b)
+		sw.wblSymbolChanged()
 	})
+}
+
+// wblSymbolChanged stores the symbol the wideband settings now resolve to and
+// announces the move, so an open dashboard re-points at it instead of having to
+// be closed and reopened.
+func (sw *Widget) wblSymbolChanged() {
+	prefWidebandSymbolName.set(sw.GetWidebandSymbolName())
+	ebus.Publish(ebus.TOPIC_WBLSYMBOL, 1)
 }
 
 func (sw *Widget) newColorBlindMode() *widget.Select {
@@ -176,6 +201,51 @@ func (sw *Widget) newPortRefreshButton() *widget.Button {
 	})
 }
 
+// newAIControls builds the local-Ollama controls. The model list is fetched on
+// demand rather than at startup: the server is usually not running, and a
+// blocking probe every time settings open would be a needless stall.
+func (sw *Widget) newAIControls() {
+	sw.aiURL = widget.NewEntry()
+	sw.aiURL.SetPlaceHolder(ollama.DefaultURL)
+	sw.aiURL.OnChanged = prefAIURL.set
+
+	sw.aiModel = widget.NewSelectEntry(nil)
+	sw.aiModel.SetPlaceHolder("qwen3.6:27b")
+	sw.aiModel.OnChanged = prefAIModel.set
+
+	sw.aiThink = checkBox("Let the model reason before answering (slower)", prefAIThink)
+
+	sw.aiCtxEntry = widget.NewEntry()
+	sw.aiCtxEntry.OnChanged = func(s string) {
+		if n, err := strconv.Atoi(strings.TrimSpace(s)); err == nil && n >= 2048 {
+			prefAICtx.set(n)
+		}
+	}
+
+	sw.aiStatus = widget.NewLabel("")
+	sw.aiStatus.Importance = widget.LowImportance
+	sw.aiStatus.Truncation = fyne.TextTruncateEllipsis
+
+	sw.aiRefresh = widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
+		sw.aiStatus.SetText("querying " + prefAIURL.get() + " …")
+		go func() {
+			models, err := ollama.New(prefAIURL.get(), "").Models(context.Background())
+			fyne.Do(func() {
+				if err != nil {
+					sw.aiStatus.SetText(err.Error())
+					return
+				}
+				if len(models) == 0 {
+					sw.aiStatus.SetText("no models installed — run: ollama pull qwen3.6:27b")
+					return
+				}
+				sw.aiModel.SetOptions(models)
+				sw.aiStatus.SetText(fmt.Sprintf("%d models available", len(models)))
+			})
+		}()
+	})
+}
+
 // --- preference hydration --------------------------------------------------
 
 // loadPreferences pushes persisted values into the controls once every widget
@@ -185,7 +255,6 @@ func (sw *Widget) loadPreferences() {
 	sw.autoLoad.SetChecked(prefAutoLoad.get())
 	sw.autoSave.SetChecked(prefAutoSave.get())
 	sw.cursorFollowCrosshair.SetChecked(prefCursorFollowCrosshair.get())
-	sw.livePreview.SetChecked(prefLivePreview.get())
 	sw.meshView.SetChecked(prefMeshView.get())
 	sw.realtimeBars.SetChecked(prefRealtimeBars.get())
 
@@ -202,6 +271,9 @@ func (sw *Widget) loadPreferences() {
 	}
 	sw.logPath.SetText(prefLogPath.getOr(logPath))
 
+	if prefWblSource.get() == "CombiAdapter" { // removed source, would abort logging with "unknown WBL type"
+		prefWblSource.set("None")
+	}
 	sw.wblSource.SetSelected(prefWblSource.get())
 	sw.wblADscanner.SetChecked(prefUseADScanner.get())
 	setVisible(sw.wblADscanner.Checked && sw.wblSource.Selected == "ECU", sw.wblADScannerSymbol)
@@ -222,4 +294,10 @@ func (sw *Widget) loadPreferences() {
 
 	// Logging
 	sw.experimentalT5FastLogger.SetChecked(prefExperimentalT5FastLogger.get())
+
+	// AI chat
+	sw.aiURL.SetText(prefAIURL.get())
+	sw.aiModel.SetText(prefAIModel.get())
+	sw.aiThink.SetChecked(prefAIThink.get())
+	sw.aiCtxEntry.SetText(strconv.Itoa(prefAICtx.get()))
 }

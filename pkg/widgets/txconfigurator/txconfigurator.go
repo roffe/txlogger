@@ -402,7 +402,7 @@ func (tr *ConfiguratorWidgetRenderer) Layout(space fyne.Size) {
 }
 
 func (tr *ConfiguratorWidgetRenderer) MinSize() fyne.Size {
-	return tr.t.container.MinSize()
+	return tr.t.container.MinSize().AddWidthHeight(50, 0)
 }
 
 func (tr *ConfiguratorWidgetRenderer) Refresh() {

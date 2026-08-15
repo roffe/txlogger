@@ -16,6 +16,13 @@ var (
 const (
 	TOPIC_COLORBLINDMODE = "color_blind_mode"
 	TOPIC_ECU            = "selected_ecu"
+	// TOPIC_REALTIMEBARS carries the value bar setting, 1 for on and 0 for off,
+	// so the symbol list picks the change up without being reopened.
+	TOPIC_REALTIMEBARS = "realtime_bars"
+	// TOPIC_WBLSYMBOL signals that the wideband source changed and the symbol
+	// it resolves to may have moved. The value carries nothing; subscribers ask
+	// settings for the current name.
+	TOPIC_WBLSYMBOL = "wbl_symbol"
 	// TOPIC_FRAME fires once per completed log frame, carrying the frame's
 	// timestamp as Unix milliseconds (float64). Subscribers use it as the frame
 	// boundary to sample the latest value of every symbol with a shared, real

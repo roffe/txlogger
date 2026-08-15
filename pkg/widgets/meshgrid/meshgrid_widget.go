@@ -89,6 +89,7 @@ type Meshgrid struct {
 	// Polygon backend (meshgrid_poly.go): one reusable
 	// canvas.ArbitraryPolygon per cell instead of rasterizing into an image.
 	polys       []*canvas.ArbitraryPolygon
+	polyColors  []polyColor
 	polyObjects []fyne.CanvasObject
 	scratchFX   []float32
 	scratchFY   []float32
@@ -140,6 +141,17 @@ type Meshgrid struct {
 	// values run from zmin to zmax.
 	xData, yData        []float64
 	xPrec, yPrec, zPrec int
+
+	// Cached axis tick label strings so per-frame axis updates don't
+	// re-format floats: x/y are built once (their data and precision are set
+	// only at construction), z is rebuilt when zmin/zrange move.
+	xLabels, yLabels, zLabels []string
+	zLabelMin, zLabelRange    float64
+
+	// Previous frame's axis corner picks (-1 before the first frame), kept
+	// for hysteresis: near-ties in the picks otherwise flip the winner with
+	// every pixel of drag and bounce the scales between edges.
+	frontCornerIdx, zCornerIdx int
 
 	refreshPending bool
 
@@ -200,6 +212,9 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 		xPrec: xPrec,
 		yPrec: yPrec,
 		zPrec: zPrec,
+
+		frontCornerIdx: -1,
+		zCornerIdx:     -1,
 
 		colorMode: colorBlindMode,
 

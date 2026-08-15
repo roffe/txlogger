@@ -3,6 +3,7 @@ package kwp2000
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -35,12 +36,19 @@ type Client struct {
 	c                 *gocan.Bus
 	responseID        uint32
 	gotSequrityAccess bool
+	seedKey           *SeedKey // optional custom pair, tried before KnownSeedKeys
 }
 
 var DefaultTimeout = 200 * time.Millisecond
 
 func New(c *gocan.Bus) *Client {
 	return &Client{c: c}
+}
+
+// SetSeedKey sets an optional custom seed/key pair, tried before the stock
+// KnownSeedKeys in RequestSecurityAccess. A nil pair clears it.
+func (t *Client) SetSeedKey(sk *SeedKey) {
+	t.seedKey = sk
 }
 
 func (t *Client) SetResponseID(id uint32) {
@@ -51,7 +59,17 @@ func (t *Client) SetResponseID(id uint32) {
 func (t *Client) request(ctx context.Context, id uint32, payload []byte, timeout time.Duration, replyID uint32) (gocan.Frame, error) {
 	rctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	return t.c.Request(rctx, gocan.NewFrame(id, payload), replyID)
+	return t.c.Request(rctx, newFrame(id, payload), replyID)
+}
+
+// newFrame builds a full 8-byte T7 frame. The ECU reads a fixed-size buffer, and
+// both TrionicCANLib and the flash path always send 8 bytes, so short fixed
+// requests are zero-padded rather than sent with a small DLC. Multi-frame
+// payloads built by splitRequest keep their natural length.
+func newFrame(id uint32, payload []byte) gocan.Frame {
+	var buf [8]byte
+	copy(buf[:], payload)
+	return gocan.NewFrame(id, buf[:])
 }
 
 func (t *Client) StartSession(ctx context.Context, id, responseID uint32) error {
@@ -63,7 +81,7 @@ func (t *Client) StartSession(ctx context.Context, id, responseID uint32) error 
 		return fmt.Errorf("StartSession[2]: %w", TranslateErrorCode(GENERAL_REJECT))
 	}
 	t.responseID = uint32(resp.Data[6])<<8 | uint32(resp.Data[7])
-	//log.Printf("ECU ID: 0x%03X", t.responseID)
+	// log.Printf("ECU ID: 0x%03X", t.responseID)
 	return nil
 }
 
@@ -76,12 +94,19 @@ func (t *Client) StartSession2(ctx context.Context, id, responseID uint32) error
 		return fmt.Errorf("StartSession[2]: %w", TranslateErrorCode(GENERAL_REJECT))
 	}
 	t.responseID = uint32(resp.Data[6])<<8 | uint32(resp.Data[7])
-	//log.Printf("ECU ID: 0x%03X", t.responseID)
+	// log.Printf("ECU ID: 0x%03X", t.responseID)
 	return nil
 }
 
+// StopSession ends the diagnostic session (stopCommunication, service 0x82).
+// The KWP length is 1: the service has no parameters.
 func (t *Client) StopSession(ctx context.Context) error {
-	return t.c.Send(gocan.WithExpectedResponses(ctx, 1), gocan.NewFrame(REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, STOP_COM_REQ}))
+	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x01, STOP_COM_REQ}, DefaultTimeout, t.responseID)
+	if err != nil {
+		return fmt.Errorf("StopSession: %w", err)
+	}
+	t.Ack(ctx, resp.Data[0], false)
+	return checkErr(resp)
 }
 
 func (t *Client) TesterPresent(ctx context.Context) error {
@@ -89,7 +114,13 @@ func (t *Client) TesterPresent(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("TesterPresent: %w", err)
 	}
-	return checkErr(resp)
+	if err := checkErr(resp); err != nil {
+		return err
+	}
+	if resp.Data[3] != TESTER_PRESENT|0x40 {
+		return fmt.Errorf("TesterPresent: unexpected response: %s", resp.String())
+	}
+	return nil
 }
 
 func (t *Client) StartRoutineByIdentifier(ctx context.Context, id byte, extra ...byte) error {
@@ -101,7 +132,68 @@ func (t *Client) StartRoutineByIdentifier(ctx context.Context, id byte, extra ..
 	if err != nil {
 		return fmt.Errorf("StartRoutineByIdentifier: %w", err)
 	}
-	return checkErr(resp)
+	t.Ack(ctx, resp.Data[0], false)
+	return routineResponseErr(resp, id)
+}
+
+// routineResponseErr validates a startRoutineByLocalIdentifier response.
+//
+// The routine-id echo matters more than it looks. Every routine answers the
+// same positive SID 0x71, so without checking the echo a late reply to one
+// routine satisfies the poll for the next one. That is exactly how the EOL
+// erase used to finish in 4 seconds: pollRoutine sends 0x52 until it answers,
+// then immediately starts polling 0x53, and a 0x52 reply that arrived after its
+// own timeout was accepted as "erase complete" — so the download began while
+// the chip was still erasing and every request came back busyRepeatRequest.
+//
+// The check is guarded on the KWP length so an ECU that answers with the bare
+// SID (length 1) is still accepted.
+func routineResponseErr(resp gocan.Frame, id byte) error {
+	if err := checkErr(resp); err != nil {
+		return err
+	}
+	// the EOL erase poll depends on this: the ECU answers busyRepeatRequest, or
+	// something else entirely, until the routine actually starts
+	if resp.Data[3] != START_ROUTINE_BY_IDENTIFIER|0x40 {
+		return fmt.Errorf("StartRoutineByIdentifier: unexpected response: %s", resp.String())
+	}
+	if resp.Data[2] >= 2 && resp.Data[4] != id {
+		return fmt.Errorf("StartRoutineByIdentifier: response is for routine 0x%02X, not 0x%02X: %s", resp.Data[4], id, resp.String())
+	}
+	return nil
+}
+
+// ReadECUIdentification reads one ECU identification field (service 0x1A) — the
+// PI-area entries: VIN 0x90, part number 0x91, engine type 0x97 and friends.
+func (t *Client) ReadECUIdentification(ctx context.Context, id byte) ([]byte, error) {
+	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, READ_ECU_IDENTIFICATION, id}, DefaultTimeout, t.responseID)
+	if err != nil {
+		return nil, fmt.Errorf("ReadECUIdentification[1]: %w", err)
+	}
+	if err := checkErr(resp); err != nil {
+		return nil, err
+	}
+
+	remaining := max(0, int(resp.Data[2])-2) // KWP length minus service + field id echo
+	out := make([]byte, 0, remaining)
+	n := min(remaining, 3) // first frame carries up to 3 data bytes at index 5
+	out = append(out, resp.Data[5:5+n]...)
+	remaining -= n
+
+	// low 6 bits of byte 0 count the frames still to come; each 0x266 ack is
+	// itself a request whose reply is the next 0x258 chunk
+	for resp.Data[0]&0x3F != 0 {
+		resp, err = t.request(ctx, RESP_CHUNK_CONF_ID, []byte{0x40, 0xA1, 0x3F, resp.Data[0] &^ 0x40}, DefaultTimeout, t.responseID)
+		if err != nil {
+			return nil, fmt.Errorf("ReadECUIdentification[2]: %w", err)
+		}
+		n := min(remaining, 6)
+		out = append(out, resp.Data[2:2+n]...)
+		remaining -= n
+	}
+	t.Ack(ctx, resp.Data[0], false) // final frame acked with no reply expected
+
+	return out, nil
 }
 
 func (t *Client) StopRoutineByIdentifier(ctx context.Context, id byte) ([]byte, error) {
@@ -138,36 +230,37 @@ func (t *Client) ReadDataByLocalIdentifierMode(ctx context.Context, id, mode byt
 	}
 
 	dataLenLeft := resp.Data[2] - 2
-	//log.Println(resp.String())
-	//log.Printf("data len left: %d", dataLenLeft)
+	// log.Println(resp.String())
+	// log.Printf("data len left: %d", dataLenLeft)
 
 	thisRead := min(3, dataLenLeft)
 
 	out.Write(resp.Data[5 : 5+thisRead])
 	dataLenLeft -= thisRead
 
-	//log.Printf("data len left: %d", dataLenLeft)
-	//log.Println(resp.String())
+	// log.Printf("data len left: %d", dataLenLeft)
+	// log.Println(resp.String())
 
 	currentChunkNumber := resp.Data[0] & 0x3F
 
 	for currentChunkNumber != 0 {
-		//log.Printf("current chunk %02X", currentChunkNumber)
+		// log.Printf("current chunk %02X", currentChunkNumber)
 		resp, err = t.request(ctx, RESP_CHUNK_CONF_ID, []byte{0x40, 0xA1, 0x3F, resp.Data[0] &^ 0x40, 0x00, 0x00, 0x00, 0x00}, DefaultTimeout, t.responseID)
 		if err != nil {
 			return nil, err
 		}
 		toRead := uint8(math.Min(6, float64(dataLenLeft)))
-		//log.Println("bytes to read", toRead)
+		// log.Println("bytes to read", toRead)
 		out.Write(resp.Data[2 : 2+toRead])
 		dataLenLeft -= toRead
-		//log.Printf("data len left: %d", dataLenLeft)
+		// log.Printf("data len left: %d", dataLenLeft)
 		currentChunkNumber = resp.Data[0] & 0x3F
-		//log.Printf("next chunk %02X", currentChunkNumber)
+		// log.Printf("next chunk %02X", currentChunkNumber)
 	}
 
 	return out.Bytes(), nil
 }
+
 func (cl *Client) ReadDataByIdentifier(ctx context.Context, id byte) ([]byte, error) {
 	resp, err := cl.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, READ_DATA_BY_IDENTIFIER, id}, DefaultTimeout, cl.responseID)
 	if err != nil {
@@ -251,8 +344,8 @@ outer:
 			return nil, fmt.Errorf("TransferData[1]: %w", err)
 		}
 		// C0 BF 04 76 31 50 7600
-		//log.Printf("transfer data: %X, size: %d", b, b[2])
-		//fmt.Printf("%X\n", b)
+		// log.Printf("transfer data: %X, size: %d", b, b[2])
+		// fmt.Printf("%X\n", b)
 
 		toRead := b[2]
 		//		log.Printf("toRead %d, %02X", toRead, b[0])
@@ -318,20 +411,122 @@ func (t *Client) transferData(ctx context.Context) ([]byte, error) {
 	return resp.Bytes(), checkErr(resp)
 }
 
+const (
+	// busyRetryInterval/busyRetries bound a resend loop for NRC 0x21. Programming
+	// one flash block takes single-digit milliseconds, so the poll is short; the
+	// budget still covers a full chip erase in case the ECU is busy with that.
+	busyRetryInterval = 50 * time.Millisecond
+	busyRetries       = 600
+)
+
+// retryOnBusy resends while the ECU answers busyRepeatRequest (NRC 0x21). That
+// code is not a failure — it is the T7 saying "my background flash programmer is
+// still writing the previous block, send it again", and both the spec and
+// XEolprg.c's `eol.u8_command == PROGRAM` branches expect the tester to do
+// exactly that. requestDownload and requestTransferExit are the two that hit it,
+// because both immediately follow a transferData whose block is still being
+// programmed. Both are idempotent, so resending is safe.
+func retryOnBusy(ctx context.Context, do func() error) error {
+	var err error
+	for range busyRetries {
+		if err = do(); !errors.Is(err, ErrBusyRepeatRequest) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(busyRetryInterval):
+		}
+	}
+	return err
+}
+
 func (t *Client) RequestTransferExit(ctx context.Context) error {
-	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x01, REQUEST_TRANSFER_EXIT}, DefaultTimeout, t.responseID)
-	if err != nil {
-		return fmt.Errorf("RequestTransferExit: %w", err)
+	return retryOnBusy(ctx, func() error {
+		resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x01, REQUEST_TRANSFER_EXIT}, DefaultTimeout, t.responseID)
+		if err != nil {
+			return fmt.Errorf("RequestTransferExit: %w", err)
+		}
+		t.Ack(ctx, resp.Data[0], false)
+
+		if err := checkErr(resp); err != nil {
+			return err
+		}
+
+		if resp.Data[3] != REQUEST_TRANSFER_EXIT|0x40 {
+			return fmt.Errorf("RequestTransferExit: expected 0x77, got %02X", resp.Data[3])
+		}
+		return nil
+	})
+}
+
+// transferDataFrames splits a transferData block into the frames a T7 expects:
+// the first carries the KWP header plus 4 payload bytes, the rest 6 each, and
+// byte 0 counts down so the ECU knows how many frames still follow.
+func transferDataFrames(data []byte) [][8]byte {
+	// the first frame always carries 4 payload bytes; pad so a short block does
+	// not read past the caller's slice. The ECU consumes only the length byte's
+	// worth, so the padding never reaches flash.
+	src := make([]byte, max(len(data), 4))
+	copy(src, data)
+
+	rows := (len(data) + 3) / 6
+	frames := make([][8]byte, 0, rows+1)
+	for i, pos := rows, 0; i >= 0; i-- {
+		var buf [8]byte
+		buf[0], buf[1] = byte(i), 0xA1
+		if i == rows { // first frame: KWP header + 4 payload bytes
+			buf[0] |= 0x40
+			buf[2] = byte(len(data) + 1) // KWP length: service id + data
+			buf[3] = TRANSFER_DATA
+			pos += copy(buf[4:], src[pos:min(pos+4, len(src))])
+		} else {
+			pos += copy(buf[2:], src[pos:min(pos+6, len(src))])
+		}
+		frames = append(frames, buf)
+	}
+	return frames
+}
+
+// TransferDataBlock sends one transferData (0x36) block: the whole block is a
+// single KWP message split across frames, and only the last frame is answered
+// (0x76 on the response id). Blocks are limited to 254 bytes by the one-byte
+// KWP length; the flash path uses 128 to match TrionicCANLib.
+func (t *Client) TransferDataBlock(ctx context.Context, data []byte) error {
+	if len(data) == 0 || len(data) > 254 {
+		return fmt.Errorf("TransferDataBlock: block must be 1-254 bytes, got %d", len(data))
 	}
 
-	//	log.Println(resp.String())
+	frames := transferDataFrames(data)
+	var resp gocan.Frame
+	for i, buf := range frames {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		if i < len(frames)-1 {
+			if err := t.c.Send(ctx, gocan.NewFrame(REQ_MSG_ID, buf[:])); err != nil {
+				return fmt.Errorf("TransferDataBlock: frame %d/%d: %w", i+1, len(frames), err)
+			}
+			continue
+		}
+		// last frame: Request registers the response subscription before sending,
+		// so a fast ECU reply can't slip through between the send and the receive
+		r, err := t.request(ctx, REQ_MSG_ID, buf[:], DefaultTimeout, t.responseID)
+		if err != nil {
+			return fmt.Errorf("TransferDataBlock: frame %d/%d: %w", i+1, len(frames), err)
+		}
+		resp = r
+	}
+
+	t.Ack(ctx, resp.Data[0], false)
 
 	if err := checkErr(resp); err != nil {
 		return err
 	}
-
-	if resp.Data[3] != 0x77 {
-		return fmt.Errorf("RequestTransferExit: expected 0x77, got %02X", resp.Data[3])
+	if resp.Data[3] != TRANSFER_DATA|0x40 {
+		return fmt.Errorf("TransferDataBlock: ECU did not confirm write: %s", resp.String())
 	}
 	return nil
 }
@@ -389,95 +584,96 @@ func (t *Client) sendDDL(ctx context.Context, payload []byte) error {
 	return nil
 }
 
+// SeedKey is a securityAccess (service 0x27) algorithm: key = ((seed<<2) ^ XOR) - Sub.
+type SeedKey struct{ XOR, Sub uint16 }
+
+// KnownSeedKeys are the XOR/SUB pairs found in stock T7 firmware, tried in
+// order. An ECU flashed with a patched algorithm answers to none of them —
+// recover its pair from the binary with pkg/widgets/seedkey.
+var KnownSeedKeys = []SeedKey{
+	{XOR: 0x8142, Sub: 0x2356}, // newer SAAB bins
+	{XOR: 0x4081, Sub: 0x1F6F}, // older SAAB bins
+}
+
+// calcKey answers the ECU's seed. uint16 wraps, which is the & 0xFFFF the ECU's
+// 68k word ops do.
+func calcKey(seed uint16, k SeedKey) uint16 {
+	return (seed<<2 ^ k.XOR) - k.Sub
+}
+
+// RequestSecurityAccess tries the stock seed/key pairs at development priority.
 func (t *Client) RequestSecurityAccess(ctx context.Context, force bool) (bool, error) {
 	if t.gotSequrityAccess && !force {
 		return true, nil
 	}
-	for i := 0; i <= 4; i++ {
-		ok, err := t.letMeIn(ctx, i)
+	keys := KnownSeedKeys
+	if t.seedKey != nil {
+		keys = append([]SeedKey{*t.seedKey}, KnownSeedKeys...) // custom pair first
+	}
+	for _, k := range keys {
+		ok, err := t.SecurityAccess(ctx, DEVELOPMENT_PRIORITY, k)
 		if err != nil {
 			debug.Log(fmt.Sprintf("failed to obtain security access: %v", err))
 			time.Sleep(3 * time.Second)
 			continue
 		}
 		if ok {
-			t.gotSequrityAccess = true
 			return true, nil
 		}
 	}
-
 	return false, fmt.Errorf("security access denied")
 }
 
-func (t *Client) letMeIn(ctx context.Context, method int) (bool, error) {
-	msg := []byte{0x40, 0xA1, 0x02, SECURITY_ACCESS, DEVELOPMENT_PRIORITY}
-	ff, err := t.request(ctx, REQ_MSG_ID, msg, DefaultTimeout*2, t.responseID)
+// SecurityAccess runs one seed/key exchange at the given level (0x01/0x03/0x05;
+// 0x05 is what grants flash programming on a shipping T7). A rejected key is
+// returned as an error, not (false, nil).
+func (t *Client) SecurityAccess(ctx context.Context, level byte, k SeedKey) (bool, error) {
+	seed, err := t.RequestSeed(ctx, level)
 	if err != nil {
-		return false, fmt.Errorf("request seed: %v", err)
-	}
-
-	if err := checkErr(ff); err != nil {
 		return false, err
 	}
+	key := calcKey(seed, k)
 
-	seed := int(ff.Data[5])<<8 | int(ff.Data[6])
-	key := CalcKey(seed, method)
-
-	msgReply := []byte{0x40, 0xA1, 0x04, SECURITY_ACCESS, DEVELOPMENT_PRIORITY + 1, byte(int(key) >> 8), byte(key)}
-	f2, err := t.request(ctx, REQ_MSG_ID, msgReply, DefaultTimeout*2, t.responseID)
+	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x04, SECURITY_ACCESS, level + 1, byte(key >> 8), byte(key)}, DefaultTimeout*2, t.responseID)
 	if err != nil {
-		return false, fmt.Errorf("send seed: %v", err)
-
+		return false, fmt.Errorf("send key: %w", err)
 	}
-	if f2.Data[3] == 0x67 && f2.Data[5] == 0x34 {
+	t.Ack(ctx, resp.Data[0], false)
+	if resp.Data[3] == SECURITY_ACCESS|0x40 && resp.Data[5] == 0x34 {
+		t.gotSequrityAccess = true
 		return true, nil
-	} else {
-		err := fmt.Errorf("invalid response security access: %X", f2.Data)
-		debug.Log(err.Error())
+	}
+	if err := checkErr(resp); err != nil {
 		return false, err
 	}
+	return false, fmt.Errorf("invalid response to security access: %s", resp.String())
 }
 
-// 266h Send acknowledgement, has 0x3F on 3rd! expectReply hints buffered
-// (ELM/STN) adapters that another response frame follows this ack.
+// RequestSeed asks for a securityAccess seed at the given level without
+// answering it, leaving the ECU locked.
+func (t *Client) RequestSeed(ctx context.Context, level byte) (uint16, error) {
+	resp, err := t.request(ctx, REQ_MSG_ID, []byte{0x40, 0xA1, 0x02, SECURITY_ACCESS, level}, DefaultTimeout*2, t.responseID)
+	if err != nil {
+		return 0, fmt.Errorf("request seed: %w", err)
+	}
+	t.Ack(ctx, resp.Data[0], false)
+	if err := checkErr(resp); err != nil {
+		return 0, err
+	}
+	if resp.Data[3] != SECURITY_ACCESS|0x40 {
+		return 0, fmt.Errorf("unexpected seed response: %s", resp.String())
+	}
+	return uint16(resp.Data[5])<<8 | uint16(resp.Data[6]), nil
+}
+
+// Ack confirms a received response frame on 0x266 (0x3F on the 3rd byte).
+// expectReply hints buffered (ELM/STN) adapters that another response frame
+// follows; the last frame of a response is acked with expectReply false.
 func (t *Client) Ack(ctx context.Context, val byte, expectReply bool) error {
 	if expectReply {
 		ctx = gocan.WithExpectedResponses(ctx, 1)
 	}
-	return t.c.Send(ctx, gocan.NewFrame(0x266, []byte{0x40, 0xA1, 0x3F, val & 0xBF}))
-}
-
-func CalcKey(seed int, method int) int {
-	key := seed << 2
-	key &= 0xFFFF
-	switch method {
-	case 0:
-		key ^= 0x8142
-		key -= 0x2356
-	case 1:
-		key ^= 0x4081
-		key -= 0x1F6F
-	case 2:
-		key ^= 0x03DC
-		key -= 0x2356
-	case 3:
-		key ^= 0x03D7
-		key -= 0x2356
-	case 4:
-		key ^= 0x0409
-		key -= 0x2356
-	}
-	key &= 0xFFFF
-	return key
-}
-
-func CalcKeyCustom(seed int, xor, minus int) int {
-	key := seed << 2
-	key &= 0xFFFF
-	key ^= xor
-	key -= minus
-	key &= 0xFFFF
-	return key
+	return t.c.Send(ctx, newFrame(RESP_CHUNK_CONF_ID, []byte{0x40, 0xA1, 0x3F, val & 0xBF}))
 }
 
 // kwpFrame is one chunk of a split KWP request; rr marks chunks the ECU
@@ -634,7 +830,7 @@ outer:
 */
 
 func (t *Client) ReadFlash(ctx context.Context, addr, length int) ([]byte, error) {
-	var readPos = addr
+	readPos := addr
 	out := bytes.NewBuffer([]byte{})
 	for readPos < addr+length {
 		select {
@@ -643,7 +839,7 @@ func (t *Client) ReadFlash(ctx context.Context, addr, length int) ([]byte, error
 		default:
 			readLength := min((addr+length)-readPos, 0xF0)
 			err := retry.Do(func() error {
-				//log.Printf("Reading memory by address, pos: 0x%X, length: 0x%X", readPos, readLength)
+				// log.Printf("Reading memory by address, pos: 0x%X, length: 0x%X", readPos, readLength)
 				b, err := t.ReadMemoryByAddressF0(ctx, readPos, readLength)
 				if err != nil {
 					return err
@@ -673,7 +869,7 @@ func (t *Client) ReadMemoryByAddressF0(ctx context.Context, address, length int)
 	if err := t.c.Send(ctx, gocan.NewFrame(REQ_MSG_ID, []byte{0x41, 0xA1, 0x08, DYNAMICALLY_DEFINE_IDENTIFIER, 0xF0, 0x03, 0x00, byte(length)})); err != nil {
 		return nil, fmt.Errorf("failed to set read length: %w", err)
 	}
-	f, err := t.request(ctx, REQ_MSG_ID, []byte{0x00, 0xA1, byte((address >> 16) & 0xFF), byte((address >> 8) & 0xFF), byte(address & 0xFF), 0x00, 0x00, 0x00}, DefaultTimeout*2, t.responseID)
+	f, err := t.request(ctx, REQ_MSG_ID, []byte{0x00, 0xA1, byte((address >> 16) & 0xFF), byte((address >> 8) & 0xFF), byte(address & 0xFF), 0x00, 0x00, 0x00}, DefaultTimeout*3, t.responseID)
 	if err != nil {
 		return nil, err
 	}
@@ -713,7 +909,7 @@ func (t *Client) recvData(ctx context.Context, length int) ([]byte, error) {
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		case <-time.After(DefaultTimeout):
+		case <-time.After(DefaultTimeout * 4):
 			return nil, fmt.Errorf("timeout")
 		case frame, ok := <-ch:
 			if !ok {
@@ -981,6 +1177,42 @@ func (t *Client) WriteDataByAddress(ctx context.Context, address uint32, data []
 
 // ----
 
+// WriteDataByLocalIdentifier writes one PI-area field (service 0x3B). The EOL
+// tail uses it for VIN 0x90, programming date 0x99 and tester serial 0x98; the
+// ECU stores it with writePIArea(id, len(data), data).
+//
+// ⚠️ id 0x98 is checked against a kill-list in the ECU — run the value through
+// TesterSerialBlocked before calling this.
+func (t *Client) WriteDataByLocalIdentifier(ctx context.Context, id byte, data []byte) error {
+	payload := append([]byte{byte(len(data) + 2), WRITE_DATA_BY_LOCAL_IDENTIFIER, id}, data...)
+	return retryOnBusy(ctx, func() error { return t.writeDataByLocalIdentifier(ctx, id, payload) })
+}
+
+func (t *Client) writeDataByLocalIdentifier(ctx context.Context, id byte, payload []byte) error {
+	for _, msg := range t.splitRequest2(payload) {
+		if !msg.rr {
+			if err := t.c.Send(ctx, msg.frame); err != nil {
+				return fmt.Errorf("WriteDataByLocalIdentifier[1]: %w", err)
+			}
+			continue
+		}
+		rctx, cancel := context.WithTimeout(ctx, DefaultTimeout*2)
+		resp, err := t.c.Request(rctx, msg.frame, t.responseID)
+		cancel()
+		if err != nil {
+			return fmt.Errorf("WriteDataByLocalIdentifier[2] id 0x%02X: %w", id, err)
+		}
+		t.Ack(ctx, resp.Data[0], false)
+		if err := checkErr(resp); err != nil {
+			return fmt.Errorf("WriteDataByLocalIdentifier id 0x%02X: %w", id, err)
+		}
+		if resp.Data[3] != WRITE_DATA_BY_LOCAL_IDENTIFIER|0x40 {
+			return fmt.Errorf("WriteDataByLocalIdentifier id 0x%02X: unexpected response: %s", id, resp.String())
+		}
+	}
+	return nil
+}
+
 func (t *Client) RequestUpload(ctx context.Context, address, length uint32) error {
 	message := []byte{0x07, REQUEST_UPLOAD, byte(address >> 16), byte(address >> 8), byte(address), byte(length >> 16), byte(length >> 8), byte(length)}
 	for _, msg := range t.splitRequest(message, false) {
@@ -1094,7 +1326,7 @@ func (t *Client) SaveROM(ctx context.Context, address uint32, data []byte) error
 		time.Sleep(2 * time.Millisecond)
 	}
 	return nil
-	//return t.writeRange(ctx, int(address), int(address)+len(data), data)
+	// return t.writeRange(ctx, int(address), int(address)+len(data), data)
 }
 
 func (t *Client) splitRequest2(payload []byte) []kwpFrame {
@@ -1151,32 +1383,35 @@ func (t *Client) splitRequest2(payload []byte) []kwpFrame {
 	return results
 }
 
+// RequestDownload anchors the ECU's write pointer (service 0x34). The ECU
+// accepts a fresh requestDownload mid-stream, so a failed block can resume from
+// its failure point instead of restarting.
 func (t *Client) RequestDownload(ctx context.Context, address uint32, length uint32) error {
 	message := []byte{0x08, REQUEST_DOWNLOAD, byte(address >> 16), byte(address >> 8), byte(address), 0x00, byte(length >> 16), byte(length >> 8), byte(length)}
-	for _, msg := range t.splitRequest2(message) {
-		log.Println(msg.frame.String())
-		if !msg.rr {
-			if err := t.c.Send(ctx, msg.frame); err != nil {
-				return fmt.Errorf("%s1: %w", getFunctionName(), err)
+	return retryOnBusy(ctx, func() error {
+		for _, msg := range t.splitRequest2(message) {
+			if !msg.rr {
+				if err := t.c.Send(ctx, msg.frame); err != nil {
+					return fmt.Errorf("RequestDownload[1]: %w", err)
+				}
+				continue
 			}
-		} else {
 			rctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
 			resp, err := t.c.Request(rctx, msg.frame, t.responseID)
 			cancel()
 			if err != nil {
-				return fmt.Errorf("%s2: %w", getFunctionName(), err)
+				return fmt.Errorf("RequestDownload[2]: %w", err)
 			}
+			t.Ack(ctx, resp.Data[0], false)
 			if err := checkErr(resp); err != nil {
 				return err
 			}
-			log.Println(resp.String())
-			if resp.Data[3] != 0x74 {
-				return fmt.Errorf("%s5: invalid response enabling download mode", getFunctionName())
+			if resp.Data[3] != REQUEST_DOWNLOAD|0x40 {
+				return fmt.Errorf("RequestDownload[3]: invalid response enabling download mode: %s", resp.String())
 			}
 		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
 func (t *Client) ReadDTCByStatus(ctx context.Context, status byte) ([]dtc.DTC, error) {
@@ -1276,7 +1511,7 @@ func (t *Client) ClearDTCS(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("ClearDTCS[0]: %w", err)
 	}
-	//log.Println(resp.String())
+	// log.Println(resp.String())
 	if err := checkErr(resp); err != nil {
 		return err
 	}
@@ -1368,7 +1603,6 @@ func getFunctionNameN(depth int) string {
 	}
 
 	return textAfterLastDot(fn.Name())
-
 }
 
 func checkErr(f gocan.Frame) error {
