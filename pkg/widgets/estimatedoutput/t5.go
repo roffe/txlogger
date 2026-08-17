@@ -48,7 +48,7 @@ var (
 	}
 )
 
-func (t5) Options(fw symbol.SymbolCollection) []Option {
+func (t5) Options(fw symbol.FirmwareFile) []Option {
 	return []Option{
 		{Key: "turbo", Label: "Turbo", Kind: OptionChoice, Choices: t5Turbos},
 		{Key: "mapsensor", Label: "MAP sensor", Kind: OptionChoice, Choices: t5MapSensors},
@@ -63,7 +63,7 @@ type t5calc struct {
 	insp, fuelX, fuelY    []int
 }
 
-func (t5) Calculate(fw symbol.SymbolCollection, opts map[string]float64) (*Result, error) {
+func (t5) Calculate(fw symbol.FirmwareFile, opts map[string]float64) (*Result, error) {
 	turbo := int(opts["turbo"])
 	if turbo < 0 || turbo >= len(t5TorqueTables) {
 		turbo = 0

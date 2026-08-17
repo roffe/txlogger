@@ -15,19 +15,20 @@ import (
 var _ fyne.Tappable = (*SecretText)(nil)
 
 type SecretText struct {
-	*widget.Label
+	widget.Label
 	tappedTimes int
 	Taps        int
 	Func        func()
 }
 
 func New(text string, taps int, fn func()) *SecretText {
-	label := widget.NewLabel(text)
-	return &SecretText{
-		Label: label,
+	s := &SecretText{
+		Label: *widget.NewLabel(text),
 		Taps:  taps,
 		Func:  fn,
 	}
+	s.ExtendBaseWidget(s)
+	return s
 }
 
 func (s *SecretText) Tapped(*fyne.PointEvent) {

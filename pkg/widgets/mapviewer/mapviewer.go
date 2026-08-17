@@ -503,7 +503,7 @@ func (mv *MapViewer) createRegionOverlay() {
 	}
 	borderCol := mv.cfg.RegionBorderColor
 	if borderCol.A == 0 {
-		borderCol = color.RGBA{0x70, 0x80, 0x90, 0xFF} // ponytail: default slate boundary
+		borderCol = color.RGBA{0xFF, 0x00, 0xFF, 0xFF} // ponytail: magenta — no magenta in the green/yellow/red heatmap
 	}
 	lines := make([]*canvas.Line, len(edges))
 	objs := make([]fyne.CanvasObject, len(edges))
@@ -561,18 +561,20 @@ func (l *regionBorderLayout) Layout(_ []fyne.CanvasObject, size fyne.Size) {
 		return
 	}
 	l.oldSize = size
-	cw := size.Width / float32(l.mv.numColumns)
-	ch := size.Height / float32(l.mv.numRows)
+	// Same snapped edges the value grid uses, or the lines land up to half a
+	// unit off the cell boundaries and the staircase corners don't meet.
+	colEdge := func(c int) float32 { return layout.GridEdge(size.Width, c, l.mv.numColumns) }
+	rowEdge := func(r int) float32 { return size.Height - layout.GridEdge(size.Height, r, l.mv.numRows) }
 	for i, e := range l.edges {
 		ln := l.lines[i]
 		if e.vertical {
-			x := float32(e.c+1) * cw
-			ln.Position1 = fyne.NewPos(x, size.Height-float32(e.r+1)*ch)
-			ln.Position2 = fyne.NewPos(x, size.Height-float32(e.r)*ch)
+			x := colEdge(e.c + 1)
+			ln.Position1 = fyne.NewPos(x, rowEdge(e.r+1))
+			ln.Position2 = fyne.NewPos(x, rowEdge(e.r))
 		} else {
-			y := size.Height - float32(e.r+1)*ch
-			ln.Position1 = fyne.NewPos(float32(e.c)*cw, y)
-			ln.Position2 = fyne.NewPos(float32(e.c+1)*cw, y)
+			y := rowEdge(e.r + 1)
+			ln.Position1 = fyne.NewPos(colEdge(e.c), y)
+			ln.Position2 = fyne.NewPos(colEdge(e.c+1), y)
 		}
 		ln.Refresh()
 	}

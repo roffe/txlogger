@@ -24,7 +24,7 @@ var columnSizes = []float64{0.34, 0.15, 0.15, 0.09, 0.15, 0.12}
 type Widget struct {
 	widget.BaseWidget
 
-	getFW   func() symbol.SymbolCollection
+	getFW   func() symbol.FirmwareFile
 	getECU  func() symbol.ECUType
 	openMap func(symbol.ECUType, string, string)
 	err     func(error)
@@ -37,7 +37,7 @@ type Widget struct {
 	filtered []*symbol.Symbol
 }
 
-func New(getFW func() symbol.SymbolCollection, getECU func() symbol.ECUType, openMap func(symbol.ECUType, string, string), err func(error)) *Widget {
+func New(getFW func() symbol.FirmwareFile, getECU func() symbol.ECUType, openMap func(symbol.ECUType, string, string), err func(error)) *Widget {
 	w := &Widget{
 		getFW:   getFW,
 		getECU:  getECU,

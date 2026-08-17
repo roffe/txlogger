@@ -36,7 +36,7 @@ const renderInterval = 100 * time.Millisecond
 // getters may return a nil/zero value; the tools report that to the model as a
 // plain "not loaded" message.
 type Config struct {
-	FW      func() symbol.SymbolCollection
+	FW      func() symbol.FirmwareFile
 	ECU     func() string
 	Log     func() logfile.Logfile
 	BinName func() string

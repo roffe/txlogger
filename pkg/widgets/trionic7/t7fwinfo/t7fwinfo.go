@@ -12,8 +12,8 @@ import (
 var _ desktop.Mouseable = (*Widget)(nil)
 
 type Widget struct {
-	fw *symbol.T7File
 	widget.BaseWidget
+	fw        *symbol.T7File
 	container *fyne.Container
 }
 
@@ -26,7 +26,6 @@ func New(fw *symbol.T7File) *Widget {
 }
 
 func (t *Widget) CreateRenderer() fyne.WidgetRenderer {
-
 	fwinfo := t.fw.GetInfo()
 
 	engineType := widget.NewEntry()
@@ -130,7 +129,6 @@ func (tr *WidgetRenderer) MinSize() fyne.Size {
 }
 
 func (tr *WidgetRenderer) Refresh() {
-
 }
 
 func (tr *WidgetRenderer) Objects() []fyne.CanvasObject {

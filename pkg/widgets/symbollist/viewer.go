@@ -48,7 +48,7 @@ type Viewer struct {
 	addBtn       *widget.Button
 	syncBtn      *widget.Button
 
-	fw symbol.SymbolCollection
+	fw symbol.FirmwareFile
 
 	content fyne.CanvasObject
 }
@@ -124,7 +124,7 @@ func (v *Viewer) CreateRenderer() fyne.WidgetRenderer {
 
 // SetSymbols sets the symbol collection used for lookup and syncs the
 // listed symbols against it.
-func (v *Viewer) SetSymbols(fw symbol.SymbolCollection) {
+func (v *Viewer) SetSymbols(fw symbol.FirmwareFile) {
 	v.fw = fw
 	v.Sync()
 }

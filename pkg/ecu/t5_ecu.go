@@ -12,7 +12,7 @@ import (
 	"github.com/roffe/gocan/v2"
 )
 
-func GetSymbolsT5(ctx context.Context, dev gocan.Adapter, cb func(string)) (symbol.SymbolCollection, error) {
+func GetSymbolsT5(ctx context.Context, dev gocan.Adapter, cb func(string)) (*symbol.Collection, error) {
 	cl, err := gocan.OpenAdapter(ctx, dev)
 	if err != nil {
 		return nil, err

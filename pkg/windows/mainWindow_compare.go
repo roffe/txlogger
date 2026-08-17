@@ -54,7 +54,7 @@ func (mw *MainWindow) openSymbolCompare() {
 	}, "Binary file", "bin")
 }
 
-func (mw *MainWindow) showSymbolCompare(typ symbol.ECUType, otherName string, other symbol.SymbolCollection) {
+func (mw *MainWindow) showSymbolCompare(typ symbol.ECUType, otherName string, other symbol.FirmwareFile) {
 	var diffs []symbolcompare.Item
 	for _, s := range mw.fw.Symbols() {
 		o := other.GetByName(s.Name)
@@ -142,7 +142,7 @@ func (mw *MainWindow) showSymbolCompare(typ symbol.ECUType, otherName string, ot
 // compareTabContent builds the current and other binary's version of a map
 // plus a per-cell diff as three tabs. ponytail: native AppTabs, no custom
 // wrapper.
-func (mw *MainWindow) compareTabContent(typ symbol.ECUType, otherName string, other symbol.SymbolCollection, mapName string) (fyne.CanvasObject, error) {
+func (mw *MainWindow) compareTabContent(typ symbol.ECUType, otherName string, other symbol.FirmwareFile, mapName string) (fyne.CanvasObject, error) {
 	_, _, _, othZ, _, _, _, err := compareMapData(other, typ, mapName)
 	if err != nil {
 		return nil, err
@@ -227,7 +227,7 @@ func (mw *MainWindow) readonlyMapViewer(name, zLabel string, axis symbol.Axis, x
 
 // compareMapData resolves a map's axes + data from one collection. A trimmed
 // version of newMapViewer's resolution: no as2, no T5 coolant special-case.
-func compareMapData(coll symbol.SymbolCollection, typ symbol.ECUType, mapName string) (axis symbol.Axis, xData, yData, zData []float64, xPrec, yPrec, zPrec int, err error) {
+func compareMapData(coll symbol.FirmwareFile, typ symbol.ECUType, mapName string) (axis symbol.Axis, xData, yData, zData []float64, xPrec, yPrec, zPrec int, err error) {
 	axis = symbol.GetInfo(typ, mapName)
 
 	symX := coll.GetByName(axis.X)

@@ -43,6 +43,8 @@ const (
 	prefsLastBinFile = "lastBinFile"
 	prefsSelectedECU = "lastECU"
 	prefsRemoteMode  = "remoteMode"
+	prefsWindowW     = "windowWidth"
+	prefsWindowH     = "windowHeight"
 )
 
 // var _ desktop.Mouseable = (*SecretText)(nil)
@@ -71,7 +73,7 @@ type MainWindow struct {
 	symbolList                  *symbollist.Viewer
 
 	as2 *as2.File
-	fw  symbol.SymbolCollection
+	fw  symbol.FirmwareFile
 
 	// logz is the most recently opened log file, kept so tools that work on
 	// "the log" (currently the AI chat) have something to read. Several log
@@ -175,7 +177,12 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	mw.SetCloseIntercept(mw.Close)
 	mw.SetPadded(true)
 	mw.SetContent(mw.content)
-	mw.Resize(fyne.NewSize(1000, 700))
+	// ponytail: size only, Fyne has no API to get or set window position
+	p := app.Preferences()
+	mw.Resize(fyne.NewSize(
+		float32(p.FloatWithFallback(prefsWindowW, 1000)),
+		float32(p.FloatWithFallback(prefsWindowH, 700)),
+	))
 	mw.CenterOnScreen()
 	mw.SetMaster()
 
@@ -661,7 +668,7 @@ func (mw *MainWindow) captureSeedKey(ecuType symbol.ECUType, data []byte) {
 	mw.Log(fmt.Sprintf("Seed/key from binary: XOR %04X SUB %04X (%s)", xor, sub, seedkey.MethodName(xor, sub)))
 }
 
-func (mw *MainWindow) LoadSymbols(symbols symbol.SymbolCollection, ecuType string) {
+func (mw *MainWindow) LoadSymbols(symbols symbol.FirmwareFile, ecuType string) {
 	mw.selects.ecuSelect.SetSelected(ecuType)
 	mw.fw = symbols
 	mw.symbolList.SetSymbols(symbols)

@@ -16,7 +16,7 @@ import (
 )
 
 type Config struct {
-	GetFW      func() symbol.SymbolCollection
+	GetFW      func() symbol.FirmwareFile
 	Colorblind colors.ColorBlindMode
 
 	// OpenWindow, if set, shows the help document in the host's window

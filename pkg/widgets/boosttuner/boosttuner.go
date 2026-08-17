@@ -58,7 +58,7 @@ var _ fyne.Widget = (*BoostTuner)(nil)
 // disk). Both are supplied by the main window, which owns mw.fw and the filename.
 type Config struct {
 	// Symbols is the currently loaded binary (mw.fw). Used read-only here.
-	Symbols symbol.SymbolCollection
+	Symbols symbol.FirmwareFile
 	// Save writes data (in engineering units) into the named symbol and persists
 	// the binary to disk, taking a one-time backup on first write. nil disables
 	// the "Apply to binary" buttons.

@@ -24,12 +24,8 @@ func (g *Grid) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	// rounding goes into the cell sizes instead of the gaps.
 	// ponytail: snaps in fyne units; snap to device pixels via canvas scale if
 	// fractional HiDPI scales still shimmer.
-	colEdge := func(c int) float32 {
-		return float32(math.Round(float64(size.Width) * float64(c) / float64(g.Cols)))
-	}
-	rowEdge := func(r int) float32 {
-		return float32(math.Round(float64(size.Height) * float64(r) / float64(g.Rows)))
-	}
+	colEdge := func(c int) float32 { return GridEdge(size.Width, c, g.Cols) }
+	rowEdge := func(r int) float32 { return GridEdge(size.Height, r, g.Rows) }
 
 	for i, obj := range objects[:min(len(objects), g.Rows*g.Cols)] {
 		row := i / g.Cols // row 0 is the bottom row
@@ -54,6 +50,13 @@ func (g *Grid) MinSize(objects []fyne.CanvasObject) fyne.Size {
 	return fyne.Size{Width: w * float32(g.Cols), Height: h * float32(g.Rows)}
 
 	//return fyne.NewSize(float32(g.Cols)*g.Padding+totalPaddingWidth, float32(g.Rows)*g.Padding+totalPaddingHeight)
+}
+
+// GridEdge is the snapped position of boundary i of n equal slices of total.
+// Overlays that must line up with a Grid (cell borders, crosshairs) have to use
+// this instead of i*total/n, or they drift up to half a unit off the cells.
+func GridEdge(total float32, i, n int) float32 {
+	return float32(math.Round(float64(total) * float64(i) / float64(n)))
 }
 
 // NewGrid creates a new Grid layout with the specified number of columns and rows

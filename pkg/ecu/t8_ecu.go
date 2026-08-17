@@ -14,7 +14,7 @@ import (
 	"github.com/roffe/txlogger/pkg/ecu/t8sec"
 )
 
-func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) (symbol.SymbolCollection, error) {
+func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) (*symbol.Collection, error) {
 	// Some day I will make this work with txbridge natively for faster speed
 	// var txbridge bool
 	// if dev.Name() == "txbridge" {
@@ -27,7 +27,7 @@ func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) (symb
 	}
 	defer cl.Close()
 
-	//var symbols []*symbol.Symbol
+	// var symbols []*symbol.Symbol
 
 	gm := gmlan.New(cl, 0x7e0, 0x7e8)
 
@@ -78,7 +78,7 @@ func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) (symb
 	cb("Downloading symbol names (this will take a while)")
 	buff := bytes.NewBuffer(nil)
 	for {
-		//fmt.Print(".")
+		// fmt.Print(".")
 		data, err := gm.ReadDataByIdentifier(ctx, 0x13)
 		if err != nil {
 			if err.Error() == "Unknown - Unknown errror" {
@@ -96,8 +96,8 @@ func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) (symb
 			ll = 0
 		}
 	}
-	//fmt.Println()
-	//cb(fmt.Sprintf("Downloaded: %d bytes in %s", buff.Len(), time.Since(start).String()))
+	// fmt.Println()
+	// cb(fmt.Sprintf("Downloaded: %d bytes in %s", buff.Len(), time.Since(start).String()))
 
 	// os.WriteFile("t8_names.bin", buff.Bytes(), 0644)
 
@@ -131,7 +131,7 @@ func ReadSymbolTable(ctx context.Context, gm *gmlan.Client) ([]*symbol.Symbol, e
 	buff := bytes.NewBuffer(nil)
 	v := 0
 	for {
-		//fmt.Print(".")
+		// fmt.Print(".")
 		data2, err := gm.ReadDataByIdentifier(ctx, 0x13)
 		if err != nil {
 			return nil, err
@@ -148,9 +148,9 @@ func ReadSymbolTable(ctx context.Context, gm *gmlan.Client) ([]*symbol.Symbol, e
 			v = 0
 		}
 	}
-	//fmt.Println()
+	// fmt.Println()
 
-	//os.WriteFile("t8_symbols.bin", buff.Bytes(), 0644)
+	// os.WriteFile("t8_symbols.bin", buff.Bytes(), 0644)
 
 	var symbols []*symbol.Symbol
 
@@ -182,7 +182,7 @@ func ReadSymbolTable(ctx context.Context, gm *gmlan.Client) ([]*symbol.Symbol, e
 			Type:    stype,
 		}
 
-		//log.Println(sym.String())
+		// log.Println(sym.String())
 
 		symbols = append(symbols, sym)
 		symbol_count++
@@ -207,7 +207,7 @@ func ReadSymbolChecksum(ctx context.Context, gm *gmlan.Client) (uint16, uint32, 
 		return 0, 0, "", false, err
 	}
 
-	//log.Printf("Data length: %d", dataLen)
+	// log.Printf("Data length: %d", dataLen)
 
 	var noSymbols uint16
 

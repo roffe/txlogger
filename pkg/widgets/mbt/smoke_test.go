@@ -29,7 +29,7 @@ func TestWidgetSmoke(t *testing.T) {
 	defer app.Quit()
 
 	w := New(&Config{
-		GetFW:      func() symbol.SymbolCollection { return fw },
+		GetFW:      func() symbol.FirmwareFile { return fw },
 		Colorblind: colors.ModeNormal,
 	})
 	win := test.NewWindow(w)

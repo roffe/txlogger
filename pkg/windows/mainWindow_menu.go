@@ -55,7 +55,7 @@ import (
 )
 
 func (mw *MainWindow) setupMenu() {
-	getFW := func() symbol.SymbolCollection {
+	getFW := func() symbol.FirmwareFile {
 		return mw.fw
 	}
 
@@ -264,7 +264,7 @@ func (mw *MainWindow) openEstimatedOutput() {
 	}
 	eo := estimatedoutput.New(&estimatedoutput.Config{
 		ECU:        ecu,
-		GetFW:      func() symbol.SymbolCollection { return mw.fw },
+		GetFW:      func() symbol.FirmwareFile { return mw.fw },
 		Colorblind: mw.settings.GetColorBlindMode(),
 	})
 	inner := multiwindow.NewInnerWindow(title, eo)
@@ -290,7 +290,7 @@ func (mw *MainWindow) openMBT() {
 		return
 	}
 	inner := multiwindow.NewInnerWindow(title, mbt.New(&mbt.Config{
-		GetFW:      func() symbol.SymbolCollection { return mw.fw },
+		GetFW:      func() symbol.FirmwareFile { return mw.fw },
 		Colorblind: mw.settings.GetColorBlindMode(),
 		OpenWindow: func(title string, content fyne.CanvasObject) {
 			if w := mw.wm.HasWindow(title); w != nil {
@@ -343,7 +343,7 @@ func (mw *MainWindow) openAIChat() {
 		return
 	}
 	chat := aichat.New(&aichat.Config{
-		FW:      func() symbol.SymbolCollection { return mw.fw },
+		FW:      func() symbol.FirmwareFile { return mw.fw },
 		ECU:     func() string { return mw.selects.ecuSelect.Selected },
 		Log:     func() logfile.Logfile { return mw.logz },
 		BinName: func() string { return filepath.Base(mw.filename) },
@@ -387,7 +387,7 @@ func (mw *MainWindow) openDTCReader() {
 		mw.wm.Raise(w)
 		return
 	}
-	getFW := func() symbol.SymbolCollection { return mw.fw }
+	getFW := func() symbol.FirmwareFile { return mw.fw }
 	getECU := func() string { return mw.selects.ecuSelect.Selected }
 	inner := multiwindow.NewInnerWindow("DTC Reader", dtcreader.New(getFW, getECU, mw.getAdapter, mw.Log, mw.Error))
 	inner.Icon = theme.InfoIcon()

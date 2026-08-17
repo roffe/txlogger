@@ -34,14 +34,14 @@ type DTCReader struct {
 	readBtn  *widget.Button
 	clearBtn *widget.Button
 
-	getFW      func() symbol.SymbolCollection
+	getFW      func() symbol.FirmwareFile
 	getECU     func() string
 	getAdapter func() (gocan.Adapter, error)
 	log        func(string)
 	err        func(error)
 }
 
-func New(getFW func() symbol.SymbolCollection, getECU func() string, getAdapter func() (gocan.Adapter, error), log func(string), err func(error)) *DTCReader {
+func New(getFW func() symbol.FirmwareFile, getECU func() string, getAdapter func() (gocan.Adapter, error), log func(string), err func(error)) *DTCReader {
 	d := &DTCReader{
 		getFW:      getFW,
 		getECU:     getECU,
@@ -126,7 +126,6 @@ func (d *DTCReader) render() {
 			d.err(err)
 		}
 	})
-
 }
 
 func (d *DTCReader) Enable() {

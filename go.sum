@@ -80,8 +80,8 @@ github.com/nicksnyder/go-i18n/v2 v2.6.1/go.mod h1:Vee0/9RD3Quc/NmwEjzzD7VTZ+Ir7Q
 github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/roffe/ecusymbol v1.2.6-0.20260815232325-145b1037334d h1:BAWOkyQp9BcOB+63NWOWj2aIMgEyj8uHvf6QCMzkozU=
-github.com/roffe/ecusymbol v1.2.6-0.20260815232325-145b1037334d/go.mod h1:Y6vMPbT3P6nVXfUetMZBJKc6N4jPuzpNJfk8bHAfx5Q=
+github.com/roffe/ecusymbol v1.2.6-0.20260817181744-4b5fa740a6f3 h1:0t8Ztn6RV5ejfwibiSO2HOn3SAuC15v5GtOkrCWwhcA=
+github.com/roffe/ecusymbol v1.2.6-0.20260817181744-4b5fa740a6f3/go.mod h1:Y6vMPbT3P6nVXfUetMZBJKc6N4jPuzpNJfk8bHAfx5Q=
 github.com/roffe/fyne/v2 v2.0.0-20260814175329-6b3252fa4f6c h1:ITeixVP/6QPlGec4Kci3mVcL/2owzudF2xynY9PxwIo=
 github.com/roffe/fyne/v2 v2.0.0-20260814175329-6b3252fa4f6c/go.mod h1:kpeuFrClm0fiAgJYr2soTfwKMT5rzNcSKzmgGjxvHOY=
 github.com/roffe/gocan/v2 v2.1.1-0.20260814153516-cb17a9651f8f h1:pfOznlub/KFsxANbXoIVGEgEsXCDjWsCFy/8ueLPNlQ=

@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var EcuList = []string{"T5", "T7", "T8"}
+var EcuList = []string{"T5", "T7", "T8", "AW55"}
 
 const (
 	Pi15            = math.Pi * 1.5

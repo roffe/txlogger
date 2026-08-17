@@ -48,7 +48,7 @@ var tolerancces []int = []int{
 }
 
 // AnalyzeLambda analyzes lambda values based on stable pedal conditions
-func AnalyzeLambda(fw symbol.SymbolCollection, xFrom, yFrom string, logfile logfile.Logfile) ([]int, []int, [][]float64) {
+func AnalyzeLambda(fw symbol.FirmwareFile, xFrom, yFrom string, logfile logfile.Logfile) ([]int, []int, [][]float64) {
 	x := fw.GetByName("IgnNormCal.m_AirXSP")
 	y := fw.GetByName("IgnNormCal.n_EngYSP")
 

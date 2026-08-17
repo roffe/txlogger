@@ -14,7 +14,7 @@ import (
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
-func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (symbol.SymbolCollection, error) {
+func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (*symbol.Collection, error) {
 	cl, err := gocan.OpenAdapter(context.TODO(), dev)
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (symb
 		return nil, err
 	}
 	// log.Println("time to read symbol table", time.Since(start))
-	//cb(fmt.Sprintf("Took %s to load Symbol Table", time.Since(start)))
+	// cb(fmt.Sprintf("Took %s to load Symbol Table", time.Since(start)))
 
 	//	os.WriteFile("symtable.bin", symTable, 0644)
 

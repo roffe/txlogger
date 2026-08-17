@@ -193,7 +193,7 @@ func (w *Widget) readSymbol(name string) string {
 // axesFor returns the decoded X and Y axis values for a map, but only when
 // their dimensions actually multiply out to the map size — a mismatch means the
 // axis table doesn't describe this binary and a grid would be a lie.
-func axesFor(fw symbol.SymbolCollection, ecu symbol.ECUType, name string, zLen int) ([]float64, []float64, bool) {
+func axesFor(fw symbol.FirmwareFile, ecu symbol.ECUType, name string, zLen int) ([]float64, []float64, bool) {
 	ax := symbol.GetInfo(ecu, name)
 	if ax.X == "" {
 		return nil, nil, false
@@ -217,7 +217,7 @@ func axesFor(fw symbol.SymbolCollection, ecu symbol.ECUType, name string, zLen i
 	return x, y, true
 }
 
-func notFound(fw symbol.SymbolCollection, name string) string {
+func notFound(fw symbol.FirmwareFile, name string) string {
 	var near []string
 	lower := strings.ToLower(name)
 	if i := strings.IndexByte(lower, '.'); i > 2 {
@@ -237,7 +237,7 @@ func notFound(fw symbol.SymbolCollection, name string) string {
 	return fmt.Sprintf("Error: no symbol named %q. Did you mean: %s", name, strings.Join(near, ", "))
 }
 
-func precOf(fw symbol.SymbolCollection, name string) int {
+func precOf(fw symbol.FirmwareFile, name string) int {
 	if sym := fw.GetByName(name); sym != nil {
 		return symbol.GetPrecision(sym.Correctionfactor)
 	}
@@ -403,7 +403,8 @@ func (w *Widget) logSamples(channels string, start, count, stride int) string {
 	var b strings.Builder
 	b.WriteString("index,t_s")
 	for _, c := range cols {
-		b.WriteString("," + c)
+		b.WriteByte(',')
+		b.WriteString(c)
 	}
 	b.WriteByte('\n')
 

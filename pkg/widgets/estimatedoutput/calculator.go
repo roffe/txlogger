@@ -60,8 +60,8 @@ type Table struct {
 
 // Calculator estimates output curves for one ECU family from its binary.
 type Calculator interface {
-	Options(fw symbol.SymbolCollection) []Option
-	Calculate(fw symbol.SymbolCollection, opts map[string]float64) (*Result, error)
+	Options(fw symbol.FirmwareFile) []Option
+	Calculate(fw symbol.FirmwareFile, opts map[string]float64) (*Result, error)
 }
 
 // For returns the Calculator for the given ECU name, or nil when the ECU
@@ -78,12 +78,12 @@ func For(ecu string) Calculator {
 	return nil
 }
 
-func has(fw symbol.SymbolCollection, name string) bool {
+func has(fw symbol.FirmwareFile, name string) bool {
 	return fw.GetByName(name) != nil
 }
 
 // nonZero reports whether the symbol exists and holds any non-zero byte.
-func nonZero(fw symbol.SymbolCollection, name string) bool {
+func nonZero(fw symbol.FirmwareFile, name string) bool {
 	s := fw.GetByName(name)
 	if s == nil {
 		return false
@@ -125,7 +125,7 @@ func cint(v float64) int { return int(math.RoundToEven(v)) }
 // symLoader collects missing-symbol errors so the user gets one message
 // naming everything the binary lacks.
 type symLoader struct {
-	fw      symbol.SymbolCollection
+	fw      symbol.FirmwareFile
 	missing []string
 }
 

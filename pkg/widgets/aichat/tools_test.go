@@ -40,7 +40,7 @@ func testWidget(t *testing.T, lf logfile.Logfile) *Widget {
 		newSym(t, "Bosch.Nope", 7),
 	)
 	return &Widget{cfg: &Config{
-		FW:      func() symbol.SymbolCollection { return fw },
+		FW:      func() symbol.FirmwareFile { return fw },
 		ECU:     func() string { return "T7" },
 		Log:     func() logfile.Logfile { return lf },
 		BinName: func() string { return "test.bin" },
@@ -72,7 +72,7 @@ func TestReadSymbolReportsScale(t *testing.T) {
 	fw.Symbols()[0].Correctionfactor = 0.1
 
 	w := &Widget{cfg: &Config{
-		FW:      func() symbol.SymbolCollection { return fw },
+		FW:      func() symbol.FirmwareFile { return fw },
 		ECU:     func() string { return "T7" },
 		Log:     func() logfile.Logfile { return nil },
 		BinName: func() string { return "test.bin" },
@@ -113,7 +113,7 @@ func TestListSymbolsFilter(t *testing.T) {
 
 func TestNoBinaryLoaded(t *testing.T) {
 	w := &Widget{cfg: &Config{
-		FW:  func() symbol.SymbolCollection { return nil },
+		FW:  func() symbol.FirmwareFile { return nil },
 		ECU: func() string { return "T7" },
 		Log: func() logfile.Logfile { return nil },
 	}}

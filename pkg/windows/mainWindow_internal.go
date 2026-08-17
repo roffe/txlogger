@@ -42,6 +42,9 @@ func newOtoContext() *oto.Context {
 */
 
 func (mw *MainWindow) Close() {
+	sz := mw.Canvas().Size()
+	mw.app.Preferences().SetFloat(prefsWindowW, float64(sz.Width))
+	mw.app.Preferences().SetFloat(prefsWindowH, float64(sz.Height))
 	if mw.dlc != nil {
 		mw.Log("Closing datalogger client")
 		mw.dlc.Close()

@@ -20,11 +20,11 @@ const (
 
 var t8Gears = []string{"Undefined", "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Reverse"}
 
-func t8Biopower(fw symbol.SymbolCollection) bool {
+func t8Biopower(fw symbol.FirmwareFile) bool {
 	return has(fw, "FFTrqCal.FFTrq_MaxEngineTab1") || has(fw, "FFTrqCal.FFTrq_MaxEngineTab2")
 }
 
-func (t8) Options(fw symbol.SymbolCollection) []Option {
+func (t8) Options(fw symbol.FirmwareFile) []Option {
 	return []Option{
 		{Key: "automatic", Label: "Automatic gearbox", Kind: OptionBool},
 		{Key: "e85", Label: "E85 fuel", Kind: OptionBool, Disabled: !t8Biopower(fw)},
@@ -57,7 +57,7 @@ type t8calc struct {
 	fuelcutLimit                             int
 }
 
-func (t8) Calculate(fw symbol.SymbolCollection, opts map[string]float64) (*Result, error) {
+func (t8) Calculate(fw symbol.FirmwareFile, opts map[string]float64) (*Result, error) {
 	c := &t8calc{
 		automatic:  opts["automatic"] == 1,
 		overboost:  opts["overboost"] == 1,

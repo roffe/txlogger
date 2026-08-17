@@ -13,7 +13,7 @@ replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 require (
 	fyne.io/fyne/v2 v2.8.0
 	github.com/avast/retry-go/v4 v4.7.0
-	github.com/roffe/ecusymbol v1.2.6-0.20260815232325-145b1037334d
+	github.com/roffe/ecusymbol v1.2.6-0.20260817181744-4b5fa740a6f3
 	go.bug.st/serial v1.8.0
 	golang.org/x/image v0.40.0
 	golang.org/x/mod v0.36.0
