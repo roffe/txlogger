@@ -177,13 +177,15 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	mw.SetCloseIntercept(mw.Close)
 	mw.SetPadded(true)
 	mw.SetContent(mw.content)
-	// ponytail: size only, Fyne has no API to get or set window position
-	p := app.Preferences()
-	mw.Resize(fyne.NewSize(
-		float32(p.FloatWithFallback(prefsWindowW, 1000)),
-		float32(p.FloatWithFallback(prefsWindowH, 700)),
-	))
-	mw.CenterOnScreen()
+	/*
+		// ponytail: size only, Fyne has no API to get or set window position
+		p := app.Preferences()
+		mw.Resize(fyne.NewSize(
+			float32(p.FloatWithFallback(prefsWindowW, 1000)),
+			float32(p.FloatWithFallback(prefsWindowH, 700)),
+		))
+		mw.CenterOnScreen()
+	*/
 	mw.SetMaster()
 
 	mw.whatsNew()

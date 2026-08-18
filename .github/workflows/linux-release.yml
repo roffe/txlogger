@@ -26,14 +26,14 @@ jobs:
         wget -qO- "https://www.kvaser.com/downloads-kvaser/?utm_source=software&utm_ean=7330130980754&utm_status=latest" | tar xz
         make -C linuxcan/canlib
         sudo make -C linuxcan/canlib install
-    - name: Build j2534proxy
-      run: make j2534proxy
     - name: Get Go dependencies
       run: go get .
     - name: Build txlogger
       run: make txlogger
+    - name: Build AppImage
+      run: make appimage
     - name: Archive
-      run: 7z a txloger_ubuntu_x64.7z j2534proxy.exe txlogger
+      run: 7z a txloger_ubuntu_x64.7z txlogger
     - name: Release
       uses: softprops/action-gh-release@v3
       if: github.ref_type == 'tag'
@@ -44,3 +44,4 @@ jobs:
         make_latest: "true"
         files: |
           txloger_ubuntu_x64.7z
+          txlogger-*-x86_64.AppImage

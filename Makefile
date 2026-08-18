@@ -1,4 +1,4 @@
-.PHONY: j2534proxy snapshots clean
+.PHONY: j2534proxy snapshots clean appimage
 
 export CC=clang
 
@@ -16,6 +16,7 @@ default: txlogger
 clean:
 	rm -f cangateway j2534proxy.exe
 	rm -f txlogger
+	rm -f txlogger-*-x86_64.AppImage
 	rm -f txlogger-dx.exe
 	rm -f txlogger.exe
 
@@ -66,3 +67,23 @@ snapshots:
 
 j2534proxy:
 	GOOS=windows GOARCH=386 go build -tags="j2534" -ldflags '-s -w' -o j2534proxy.exe ./j2534proxy
+
+APPIMAGETOOL=.tmp/appimagetool
+VERSION=$(shell sed -n 's/^Version = "\(.*\)"/\1/p' FyneApp.toml)
+
+$(APPIMAGETOOL):
+	@mkdir -p .tmp
+	curl -fsSL -o $@ https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+	chmod +x $@
+
+appimage: txlogger $(APPIMAGETOOL)
+	rm -rf .tmp/AppDir
+	mkdir -p .tmp/AppDir/usr/bin
+	mkdir -p .tmp/AppDir/usr/share/icons/
+	cp txlogger .tmp/AppDir/usr/bin/
+	cp Icon.png .tmp/AppDir/txlogger.png
+	cp Icon.png .tmp/AppDir/usr/share/icons/txlogger.png
+	cp Icon.png .tmp/AppDir/.DirIcon
+	ln -sf usr/bin/txlogger .tmp/AppDir/AppRun
+	printf '[Desktop Entry]\nType=Application\nName=txlogger\nExec=txlogger\nIcon=txlogger\nCategories=Utility;\n' > .tmp/AppDir/txlogger.desktop
+	ARCH=x86_64 $(APPIMAGETOOL) --appimage-extract-and-run .tmp/AppDir txlogger-$(VERSION)-x86_64.AppImage

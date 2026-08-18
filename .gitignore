@@ -38,6 +38,8 @@ cangateway.exe
 txlogger
 txlogger.exe
 
+*.AppImage
+
 run.log
 
 *.code-workspace

@@ -254,6 +254,11 @@ func clearDynamicallyDefinedRegister(ctx context.Context, gm *gmlan.Client) erro
 	return nil
 }
 
+const (
+	APPT_DBSP = 0x80
+	APPT_DBMA = 0x03
+)
+
 func setUpDynamicallyDefinedRegisterBySymbol(ctx context.Context, gm *gmlan.Client, symbol uint16) error {
 	/* payload
 	byte[0] = register id
@@ -264,8 +269,38 @@ func setUpDynamicallyDefinedRegisterBySymbol(ctx context.Context, gm *gmlan.Clie
 	byte[5] symbol id high byte
 	byte[6]	symbol id low byte
 	*/
-	if err := gm.WriteDataByIdentifier(ctx, 0x17, []byte{0xF0, 0x80, 0x00, 0x00, 0x00, byte(symbol >> 8), byte(symbol)}); err != nil {
+	if err := gm.WriteDataByIdentifier(ctx, 0x17, []byte{0xF0, APPT_DBSP, 0x00, 0x00, 0x00, byte(symbol >> 8), byte(symbol)}); err != nil {
 		return fmt.Errorf("SetUpDynamicallyDefinedRegisterBySymbol: %w", err)
+	}
+	return nil
+}
+
+// dbmaPayload builds the $17 payload for one "define by memory address" entry,
+// matching case APPT_DBMA in SetUpDynamicallyDefinedRegister (APP_Apptool.c):
+//
+//	byte[0] register id (only 0xF0 is supported)
+//	byte[1] type, APPT_DBMA
+//	byte[2] unused
+//	byte[3] number of bytes to read at the address
+//	byte[4] address bits 23:16   (the ECU forces bits 31:24 to zero)
+//	byte[5] address bits 15:8
+//	byte[6] address bits 7:0
+func dbmaPayload(address uint32, length uint8) []byte {
+	return []byte{
+		0xF0, APPT_DBMA, 0x00, length,
+		byte(address >> 16), byte(address >> 8), byte(address),
+	}
+}
+
+func setupDynamicallyDefinedRegisterByAddress(ctx context.Context, gm *gmlan.Client, address uint32, length uint8) error {
+	if address > 0xFFFFFF {
+		return fmt.Errorf("SetUpDynamicallyDefinedRegisterByAddress: address %08X exceeds the 24 bit range the ECU accepts", address)
+	}
+	if length == 0 {
+		return fmt.Errorf("SetUpDynamicallyDefinedRegisterByAddress: length must be at least 1 byte")
+	}
+	if err := gm.WriteDataByIdentifier(ctx, 0x17, dbmaPayload(address, length)); err != nil {
+		return fmt.Errorf("SetUpDynamicallyDefinedRegisterByAddress: %w", err)
 	}
 	return nil
 }

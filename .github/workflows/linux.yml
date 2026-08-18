@@ -28,7 +28,21 @@ jobs:
         sudo make -C linuxcan/canlib install
     - name: Get Go dependencies
       run: go get .
-    - name: Build j2534proxy
-      run: make j2534proxy
     - name: Build txlogger
       run: make txlogger
+    - name: Build AppImage
+      run: make appimage
+    - name: Archive
+      run: 7z a txlogger_ubuntu_x64.zip txlogger
+    - name: Update nightly release
+      uses: softprops/action-gh-release@v3
+      env:
+        GITHUB_REPOSITORY: roffe/txlogger
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        tag_name: nightly
+        prerelease: true
+        make_latest: "false"
+        files: |
+          txlogger_ubuntu_x64.zip
+          txlogger-*-x86_64.AppImage

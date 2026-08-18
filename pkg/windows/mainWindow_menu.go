@@ -29,6 +29,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/aichat"
 	"github.com/roffe/txlogger/pkg/widgets/boosttuner"
+	"github.com/roffe/txlogger/pkg/widgets/camtiming"
 	"github.com/roffe/txlogger/pkg/widgets/canflasher"
 	"github.com/roffe/txlogger/pkg/widgets/customcolors"
 	"github.com/roffe/txlogger/pkg/widgets/dtcreader"
@@ -182,6 +183,7 @@ func (mw *MainWindow) setupMenu() {
 			fyne.NewMenuItemWithIcon("Compare symbols with other binary", theme.SearchReplaceIcon(), mw.openSymbolCompare),
 			fyne.NewMenuItemWithIcon("Matrix Builder", theme.InfoIcon(), mw.openMatrixBuilder),
 			fyne.NewMenuItemWithIcon("Estimated output", theme.InfoIcon(), mw.openEstimatedOutput),
+			fyne.NewMenuItemWithIcon("Cam timing", theme.InfoIcon(), mw.openCamTiming),
 			fyne.NewMenuItemWithIcon("T5 CLI", theme.ComputerIcon(), mw.openT5CLI),
 			fyne.NewMenuItemWithIcon("T7 Seed/Key patcher", theme.SearchReplaceIcon(), mw.openSeedKey),
 			//fyne.NewMenuItemWithIcon("Rescale AccPedalMap", theme.GridIcon(), func() {
@@ -321,6 +323,23 @@ func (mw *MainWindow) openT5CLI() {
 	inner.OnClose = cli.Close
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(700, 480))
+}
+
+// openCamTiming opens (or raises) the cam timing tool: the valve timing
+// diagram of the SAAB 16v cams, and the volumetric efficiency measured
+// out of a log next to it.
+func (mw *MainWindow) openCamTiming() {
+	const title = "Cam timing"
+	if w := mw.wm.HasWindow(title); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	inner := multiwindow.NewInnerWindow(title, camtiming.New(&camtiming.Config{
+		ECU: mw.selects.ecuSelect.Selected,
+	}))
+	inner.Icon = theme.SettingsIcon()
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(980, 620))
 }
 
 func (mw *MainWindow) openT7GearCalc() {
