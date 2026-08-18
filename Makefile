@@ -78,12 +78,14 @@ $(APPIMAGETOOL):
 
 appimage: txlogger $(APPIMAGETOOL)
 	rm -rf .tmp/AppDir
-	mkdir -p .tmp/AppDir/usr/bin
+	mkdir -p .tmp/AppDir/usr/bin .tmp/AppDir/usr/lib
 	mkdir -p .tmp/AppDir/usr/share/icons/
 	cp txlogger .tmp/AppDir/usr/bin/
+	cp -L $$(ldd txlogger | awk '/libcanlib/{print $$3}') .tmp/AppDir/usr/lib/libcanlib.so.1
 	cp Icon.png .tmp/AppDir/txlogger.png
 	cp Icon.png .tmp/AppDir/usr/share/icons/txlogger.png
 	cp Icon.png .tmp/AppDir/.DirIcon
-	ln -sf usr/bin/txlogger .tmp/AppDir/AppRun
+	printf '#!/bin/sh\nHERE=$$(dirname "$$(readlink -f "$$0")")\nexport LD_LIBRARY_PATH="$$HERE/usr/lib$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}"\nexec "$$HERE/usr/bin/txlogger" "$$@"\n' > .tmp/AppDir/AppRun
+	chmod +x .tmp/AppDir/AppRun
 	printf '[Desktop Entry]\nType=Application\nName=txlogger\nExec=txlogger\nIcon=txlogger\nCategories=Utility;\n' > .tmp/AppDir/txlogger.desktop
 	ARCH=x86_64 $(APPIMAGETOOL) --appimage-extract-and-run .tmp/AppDir txlogger-x86_64.AppImage
