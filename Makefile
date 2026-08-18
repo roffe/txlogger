@@ -88,4 +88,4 @@ appimage: txlogger $(APPIMAGETOOL)
 	printf '#!/bin/sh\nHERE=$$(dirname "$$(readlink -f "$$0")")\nexport LD_LIBRARY_PATH="$$HERE/usr/lib$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}"\nexec "$$HERE/usr/bin/txlogger" "$$@"\n' > .tmp/AppDir/AppRun
 	chmod +x .tmp/AppDir/AppRun
 	printf '[Desktop Entry]\nType=Application\nName=txlogger\nExec=txlogger\nIcon=txlogger\nCategories=Utility;\n' > .tmp/AppDir/txlogger.desktop
-	ARCH=x86_64 $(APPIMAGETOOL) --appimage-extract-and-run .tmp/AppDir txlogger-x86_64.AppImage
+	ARCH=x86_64 $(APPIMAGETOOL) --appimage-extract-and-run --no-appstream .tmp/AppDir txlogger-x86_64.AppImage

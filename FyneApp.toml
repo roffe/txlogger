@@ -5,7 +5,7 @@ Icon = "Icon.png"
 Name = "txlogger"
 ID = "com.roffe.txlogger"
 Version = "2.2.0"
-Build = 872
+Build = 874
 
 [Migrations]
 fyneDo = true

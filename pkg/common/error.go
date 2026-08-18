@@ -17,7 +17,6 @@ var (
 func init() {
 	zonedOutImage.FillMode = canvas.ImageFillContain
 	zonedOutImage.SetMinSize(fyne.NewSize(121, 207))
-	zonedOutImage.Resize(fyne.NewSize(121, 207))
 }
 
 func ShowError(title string, err error) {
