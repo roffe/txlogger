@@ -86,4 +86,4 @@ appimage: txlogger $(APPIMAGETOOL)
 	cp Icon.png .tmp/AppDir/.DirIcon
 	ln -sf usr/bin/txlogger .tmp/AppDir/AppRun
 	printf '[Desktop Entry]\nType=Application\nName=txlogger\nExec=txlogger\nIcon=txlogger\nCategories=Utility;\n' > .tmp/AppDir/txlogger.desktop
-	ARCH=x86_64 $(APPIMAGETOOL) --appimage-extract-and-run .tmp/AppDir txlogger-$(VERSION)-x86_64.AppImage
+	ARCH=x86_64 $(APPIMAGETOOL) --appimage-extract-and-run .tmp/AppDir txlogger-x86_64.AppImage

@@ -143,7 +143,7 @@ jobs:
         target_commitish: ${{ github.sha }}
         files: |
           txlogger_ubuntu_x64.zip
-          txlogger-*-x86_64.AppImage
+          txlogger-x86_64.AppImage
           txlogger.zip
           txlogger_setup.zip
           txlogger_directx.zip

@@ -42,7 +42,7 @@ jobs:
         make_latest: "true"
         files: |
           txlogger_ubuntu_x64.7z
-          txlogger-*-x86_64.AppImage
+          txlogger-x86_64.AppImage
 
   windows:
     runs-on: windows-latest
