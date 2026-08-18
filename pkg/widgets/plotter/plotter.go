@@ -551,7 +551,7 @@ func (ts *TimeSeries) PlotImage(img *image.RGBA, values map[string][]float64, st
 		fx := float64(x)
 		x0 := int(((fx - 1) * widthFactor))
 		y0 := int(float64(hh) - (data[x-1]-ts.Min)*heightFactor)
-		x1 := (int(fx * widthFactor))
+		x1 := int(fx * widthFactor)
 		if x == dle {
 			x1 = w
 		}

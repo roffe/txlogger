@@ -52,7 +52,7 @@ func NewAEMuegoClient(port string, logFunc func(string)) (*AEMuego, error) {
 		log:      logFunc,
 		done:     make(chan struct{}),
 		dataBuff: make([]byte, 8),
-		//debugLog: f,
+		// debugLog: f,
 	}, nil
 }
 

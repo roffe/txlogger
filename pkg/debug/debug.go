@@ -10,8 +10,10 @@ import (
 	"time"
 )
 
-var initOnce sync.Once
-var fh *os.File
+var (
+	initOnce sync.Once
+	fh       *os.File
+)
 
 func start() {
 	dir, err := os.UserHomeDir()
@@ -20,7 +22,7 @@ func start() {
 	} else {
 		dir = filepath.Join(dir, "txlogger")
 	}
-	fh, err = os.OpenFile(filepath.Join(dir, "txlogger.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	fh, err = os.OpenFile(filepath.Join(dir, "txlogger.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		log.Printf("error opening file: %v", err)
 	}
@@ -58,6 +60,7 @@ func LogRaw(msg string) {
 	fh.WriteString(msg + "\n")
 	fmt.Println(msg)
 }
+
 func Close() {
 	fh.Sync()
 	fh.Close()

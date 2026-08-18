@@ -23,7 +23,7 @@ type TappableText struct {
 	onHover       func(bool)
 	color         color.Color
 	oldSize       fyne.Size
-	//precission    int
+	// precission    int
 }
 
 func NewTappableText(text string, col color.Color, onTapped func(enabled bool), onColorUpdate func(col color.Color), onHover func(bool)) *TappableText {
@@ -161,7 +161,6 @@ func (tr *TappableTextRenderer) MinSize() fyne.Size {
 
 func (tr *TappableTextRenderer) Refresh() {
 	tr.t.value.Refresh()
-
 }
 
 func (tr *TappableTextRenderer) Objects() []fyne.CanvasObject {

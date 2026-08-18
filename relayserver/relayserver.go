@@ -17,7 +17,6 @@ func init() {
 	gob.Register(LogValues{})
 	gob.Register(&DataRequest{})
 	gob.Register([]*symbol.Symbol{})
-
 }
 
 type Server struct {

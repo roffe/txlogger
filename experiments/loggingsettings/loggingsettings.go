@@ -43,7 +43,6 @@ func (tr *LoggingSettingsWidgetRenderer) MinSize() fyne.Size {
 }
 
 func (tr *LoggingSettingsWidgetRenderer) Refresh() {
-
 }
 
 func (tr *LoggingSettingsWidgetRenderer) Objects() []fyne.CanvasObject {

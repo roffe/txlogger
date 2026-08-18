@@ -264,7 +264,7 @@ func scanLinesCustom(data []byte, atEOF bool) (advance int, token []byte, err er
 		}
 		// if LF
 		return i + 1, data[0:i], nil
-	} //else {
+	} // else {
 	// this case is only "i == -1 && j == -1"
 	//	}
 	// If we're at EOF, we have a final, non-terminated line. Return it.

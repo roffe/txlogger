@@ -56,7 +56,7 @@ func (d *DTCReader) clearT8DTCS(ctx context.Context, cl *gocan.Bus) {
 		_ = gm.ReturnToNormalMode(ctx)
 		time.Sleep(75 * time.Millisecond)
 	}()
-	//if err := gm.ClearDiagnosticInformation(ctx, 0x7e0); err != nil {
+	// if err := gm.ClearDiagnosticInformation(ctx, 0x7e0); err != nil {
 	if err := gm.ClearDiagnosticInformation(ctx, 0x7DF); err != nil {
 		d.err(err)
 		return

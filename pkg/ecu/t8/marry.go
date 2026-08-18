@@ -69,7 +69,7 @@ func (t *Client) MarryECU(ctx context.Context, pin string) error {
 		}
 		// ---------- Virginize ECU -----------------
 		nvdmBytes := t8util.GetVirginNVDM()
-		fmask := uint64(0b110) //format nvdm
+		fmask := uint64(0b110) // format nvdm
 
 		if err := t.legion.Bootstrap(ctx, false); err != nil {
 			return err

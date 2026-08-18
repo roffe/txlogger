@@ -639,8 +639,8 @@ func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, f
 		for i := 0; i < (int(length) - 8); i++ {
 			Csum16 += int16(data2Send[i])
 		}
-		data2Send[length-8] = (byte)(Csum16 >> 8 & 0xff)
-		data2Send[length-7] = (byte)(Csum16 & 0xff)
+		data2Send[length-8] = byte(Csum16 >> 8 & 0xff)
+		data2Send[length-7] = byte(Csum16 & 0xff)
 
 		eregion := t8util.Erasedregion(currentAddress, device, formatMask)
 		ffblock := t8util.FFblock(flashData, currentAddress, length-8)

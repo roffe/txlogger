@@ -10,8 +10,8 @@ import (
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/gocan/v2/pkg/serialcommand"
 	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/pkg/serialcommand"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/kwp2000"
 )

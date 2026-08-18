@@ -62,7 +62,6 @@ func (c *Client) sendHandler() {
 			}
 		}
 	}
-
 }
 
 func (c *Client) receiveHandler() {

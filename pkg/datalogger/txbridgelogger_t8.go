@@ -8,9 +8,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/roffe/gocan/v2/pkg/serialcommand"
 	"github.com/roffe/gocan/v2"
 	"github.com/roffe/gocan/v2/gmlan"
+	"github.com/roffe/gocan/v2/pkg/serialcommand"
 	"github.com/roffe/txlogger/pkg/ebus"
 )
 

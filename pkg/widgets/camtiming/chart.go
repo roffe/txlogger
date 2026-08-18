@@ -91,8 +91,10 @@ type chart struct {
 }
 
 func newChart(xTitle, yTitle string, xMin, xMax, xStep float64) *chart {
-	c := &chart{xTitle: xTitle, yTitle: yTitle, xMin: xMin, xMax: xMax, xStep: xStep,
-		xSnap: 1, hoverX: math.NaN()}
+	c := &chart{
+		xTitle: xTitle, yTitle: yTitle, xMin: xMin, xMax: xMax, xStep: xStep,
+		xSnap: 1, hoverX: math.NaN(),
+	}
 	c.ExtendBaseWidget(c)
 	return c
 }

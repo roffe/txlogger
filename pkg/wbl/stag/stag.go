@@ -237,6 +237,7 @@ func (a *STAG) Stop() {
 		a.closePort()
 	})
 }
+
 func (a *STAG) processPacket(packetContentBuffer []byte) {
 	if len(packetContentBuffer) < 5 {
 		return

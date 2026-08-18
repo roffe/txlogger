@@ -165,7 +165,7 @@ func (th *T8Header) DecodeExtraInfo(fullFileData []byte) {
 
 	processBlocks(th.lowaddress, th.lowtypes)
 	processBlocks(th.highaddress, th.hightypes)
-	//update info based on last flash block
+	// update info based on last flash block
 	th.fbc[len(th.fbc)-1].DecodeBlock(th)
 }
 

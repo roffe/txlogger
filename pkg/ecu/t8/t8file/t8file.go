@@ -35,8 +35,7 @@ func (tf *T8File) GetInfo(path string) *T8Header {
 }
 
 func (tf *T8File) saveDataToBinary(address int64, length int, data []byte) error {
-
-	file, err := os.OpenFile(tf.filePath, os.O_RDWR|os.O_CREATE, 0666)
+	file, err := os.OpenFile(tf.filePath, os.O_RDWR|os.O_CREATE, 0o666)
 	if err != nil {
 		return err
 	}

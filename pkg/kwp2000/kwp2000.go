@@ -86,7 +86,7 @@ func (t *Client) StartSession(ctx context.Context, id, responseID uint32) error 
 }
 
 func (t *Client) StartSession2(ctx context.Context, id, responseID uint32) error {
-	resp, err := t.request(ctx, id, []byte{0x3F, START_COM_REQ, 0x00, 0x11, byte((0x740) >> 8), byte((0x740) & 0xFF)}, DefaultTimeout, responseID)
+	resp, err := t.request(ctx, id, []byte{0x3F, START_COM_REQ, 0x00, 0x11, byte(0x740 >> 8), byte(0x740 & 0xFF)}, DefaultTimeout, responseID)
 	if err != nil {
 		return fmt.Errorf("StartSession[1]: %w", err)
 	}
@@ -1357,7 +1357,7 @@ func (t *Client) splitRequest2(payload []byte) []kwpFrame {
 				flag |= 0x80 // we want confirmation for every chunk except the last one
 			}
 		*/
-		msgData[0] = (byte)(flag | (msgCount-i-1)&0x3F) // & 0x3F is not necessary, only to show that this field is 6-bit wide
+		msgData[0] = byte(flag | (msgCount-i-1)&0x3F) // & 0x3F is not necessary, only to show that this field is 6-bit wide
 		msgData[1] = 0xA1
 
 		start := 6 * i

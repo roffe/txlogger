@@ -43,7 +43,6 @@ func (g *Grid) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 }
 
 func (g *Grid) MinSize(objects []fyne.CanvasObject) fyne.Size {
-
 	w := objects[0].MinSize().Width + (2 * g.Padding)
 	h := objects[0].MinSize().Height + (2 * g.Padding)
 

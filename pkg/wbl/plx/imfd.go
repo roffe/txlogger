@@ -380,7 +380,6 @@ func (s *IMFDClient) parsePackets(data []byte) error {
 
 func createMapkey(typ sensorType, instance uint8) string {
 	return fmt.Sprintf("%s #%d", typ.String(), instance)
-
 }
 
 func (s *IMFDClient) parsePacket(packet []byte) error {
@@ -502,7 +501,7 @@ func convertData(sensor sensorType, unit, raw uint16) (float64, string) {
 			retUnit = "km/h"
 		}
 	case ThrottlePosition: // TPS
-		value = float64(raw) //Throttle Position % 0-100
+		value = float64(raw) // Throttle Position % 0-100
 		retUnit = "%"
 	case EngineLoad: // Engine Load %
 		value = float64(raw)
@@ -566,13 +565,13 @@ func convertData(sensor sensorType, unit, raw uint16) (float64, string) {
 			retUnit = "v"
 		}
 	case FuelLevel: // Fuel level
-		value = float64(raw) //Fuel Level %
+		value = float64(raw) // Fuel Level %
 		retUnit = "%"
 	case VoltMeter: // Volts
-		value = float64(raw) / 51.15 //Volt Meter Volts
+		value = float64(raw) / 51.15 // Volt Meter Volts
 		retUnit = "v"
 	case Knock: // Knock
-		value = float64(raw) / 204.6 //Knock volts 0-5
+		value = float64(raw) / 204.6 // Knock volts 0-5
 		retUnit = "v"
 	case DutyCycle: // Duty cycle
 		switch unit {

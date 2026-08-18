@@ -31,9 +31,7 @@ const (
 	Unknown = "Unknown"
 )
 
-var (
-	ErrDataTooShort = errors.New("data is too short to decode, expected at least 8 bytes")
-)
+var ErrDataTooShort = errors.New("data is too short to decode, expected at least 8 bytes")
 
 type LambdaToCAN struct {
 	c       *gocan.Bus
@@ -55,7 +53,7 @@ func (l *LambdaToCAN) Start(ctx context.Context) error {
 			case msg, ok := <-ch:
 				if !ok {
 					log.Println("channel closed")
-					return //channel closed
+					return // channel closed
 				}
 				if err := l.decodeCAN(msg.ID, msg.Bytes()); err != nil {
 					log.Println(err)

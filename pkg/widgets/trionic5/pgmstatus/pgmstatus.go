@@ -322,7 +322,6 @@ func (w *Widget) Set(data float64) {
 	if value&0x8000000000 > 0 {
 		w.leds.fuelSynch.On()
 	}
-
 }
 
 func (w *Widget) CreateRenderer() fyne.WidgetRenderer {

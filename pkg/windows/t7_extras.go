@@ -62,7 +62,6 @@ func (t *T7Extras) CreateRenderer() fyne.WidgetRenderer {
 }
 
 func (t *T7Extras) resetECU() error {
-
 	adapter, err := t.mw.settings.GetAdapter("T7")
 	if err != nil {
 		return err
@@ -119,7 +118,6 @@ func (tr *T7ExtrasRenderer) MinSize() fyne.Size {
 }
 
 func (tr *T7ExtrasRenderer) Refresh() {
-
 }
 
 func (tr *T7ExtrasRenderer) Objects() []fyne.CanvasObject {

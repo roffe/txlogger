@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/roffe/gocan/v2/pkg/serialcommand"
 	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/pkg/serialcommand"
 	"github.com/roffe/txlogger/pkg/ebus"
 )
 

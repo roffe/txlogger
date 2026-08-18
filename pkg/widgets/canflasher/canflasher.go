@@ -247,7 +247,7 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 		fyne.CurrentApp().Preferences().SetBool(settings.PrefsNvdm, b)
 	})
 
-	t.nvdmBOX.Checked = (fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsNvdm, false))
+	t.nvdmBOX.Checked = fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsNvdm, false)
 	t.bootBOX.Checked = fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsBoot, false)
 	// t.bootBOX.SetChecked(fyne.CurrentApp().Preferences().BoolWithFallback(settings.PrefsBoot, false))
 	// t.ecuList.PlaceHolder = "Select ECU"

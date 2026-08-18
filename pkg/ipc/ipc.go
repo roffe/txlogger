@@ -79,8 +79,10 @@ func sendShow() {
 	}
 }
 
-type Router map[string]CommandHandler
-type CommandHandler func(string) *Message
+type (
+	Router         map[string]CommandHandler
+	CommandHandler func(string) *Message
+)
 
 type Message struct {
 	Type string

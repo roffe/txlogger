@@ -43,8 +43,7 @@ func (s *Server) listen() error {
 
 func (s *Server) run() {
 	for {
-		c, err :=
-			s.l.Accept()
+		c, err := s.l.Accept()
 		if err != nil {
 			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
 				continue
@@ -118,7 +117,6 @@ func (s *Server) handleClient(c *Client) {
 			case <-t.C:
 				enc.Encode(&Message{Type: MessageTypeRequest, Data: []byte("ping")})
 			}
-
 		}
 	})
 

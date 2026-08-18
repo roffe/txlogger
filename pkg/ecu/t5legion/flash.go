@@ -64,7 +64,6 @@ func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
 				if i%7 == 6 || i == 0x80-1 {
 					if err := t.sendBootloaderDataCommand(ctx, data, 8); err != nil {
 						return fmt.Errorf("!!! FLASHing Failed !!! after: 0x%X bytes: %v", bytesRead, err)
-
 					}
 				}
 			}

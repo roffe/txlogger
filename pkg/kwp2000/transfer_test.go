@@ -98,9 +98,11 @@ func referenceFrames(bin []byte, length int) [][8]byte {
 func TestRequestDownloadFraming(t *testing.T) {
 	cl := &Client{}
 	var addr, length uint32 = 0x07FE00, 0x000200
-	msgs := cl.splitRequest2([]byte{0x08, REQUEST_DOWNLOAD,
+	msgs := cl.splitRequest2([]byte{
+		0x08, REQUEST_DOWNLOAD,
 		byte(addr >> 16), byte(addr >> 8), byte(addr), 0x00,
-		byte(length >> 16), byte(length >> 8), byte(length)})
+		byte(length >> 16), byte(length >> 8), byte(length),
+	})
 
 	want := [][]byte{
 		{0x41, 0xA1, 0x08, 0x34, 0x07, 0xFE, 0x00, 0x00},

@@ -6,8 +6,8 @@ import (
 	"log"
 	"strconv"
 
-	"github.com/roffe/gocan/v2/pkg/serialcommand"
 	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/pkg/serialcommand"
 	"github.com/roffe/txlogger/pkg/wbl/aem"
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
@@ -142,7 +142,6 @@ func newAEM(ctx context.Context, cl *gocan.Bus, cfg *WBLConfig) (LambdaProvider,
 				//lambda := float64(binary.BigEndian.Uint16(msg.Data()[0:2])) / 100
 				wblClient.SetLambda(f / 10)
 			}
-
 		}()
 	case "CAN":
 		cfg.Log("Starting AEM CAN client")

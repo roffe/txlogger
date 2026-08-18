@@ -11,7 +11,8 @@ import (
 func writePI(bin []byte, fields []struct {
 	id   byte
 	data []byte
-}) {
+},
+) {
 	a := len(bin) - 1
 	for _, f := range fields {
 		bin[a] = byte(len(f.data))

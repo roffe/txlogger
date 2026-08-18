@@ -47,7 +47,6 @@ func NewMyrtilosRegistration(mw *MainWindow) fyne.Widget {
 				Alignment:  fyne.TextAlignLeading,
 				Truncation: fyne.TextTruncateEllipsis,
 			}
-
 		},
 		func(item binding.DataItem, obj fyne.CanvasObject) {
 			i := item.(binding.String)

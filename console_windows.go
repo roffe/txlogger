@@ -43,7 +43,6 @@ func InitConsole() {
 		}
 		log.Printf("attachConsole failed: %v", err)
 	}
-
 }
 
 func attachConsole(dwParentProcess uint32) (ok bool, lasterr error) {

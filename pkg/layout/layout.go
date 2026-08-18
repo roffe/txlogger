@@ -61,8 +61,7 @@ func (l *Horizontal) MinSize(objects []fyne.CanvasObject) fyne.Size {
 	return fyne.NewSize(float32(width+int(offset)), float32(height))
 }
 
-type Vertical struct {
-}
+type Vertical struct{}
 
 func (l *Vertical) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	for i, o := range objects {

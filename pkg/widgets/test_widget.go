@@ -63,7 +63,6 @@ func (tr *TestWidgetRenderer) MinSize() fyne.Size {
 }
 
 func (tr *TestWidgetRenderer) Refresh() {
-
 }
 
 func (tr *TestWidgetRenderer) Objects() []fyne.CanvasObject {

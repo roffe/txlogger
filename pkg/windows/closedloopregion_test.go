@@ -10,10 +10,10 @@ func TestLookup1D(t *testing.T) {
 	cases := []struct {
 		x, want float64
 	}{
-		{700, 650},   // first breakpoint
-		{6200, 330},  // last breakpoint
-		{300, 650},   // below range -> clamp low
-		{9000, 330},  // above range -> clamp high
+		{700, 650},  // first breakpoint
+		{6200, 330}, // last breakpoint
+		{300, 650},  // below range -> clamp low
+		{9000, 330}, // above range -> clamp high
 		{5060, 450}, // exact breakpoint mid-table
 		{4490, 540}, // halfway between 4300(570) and 4680(510)
 	}

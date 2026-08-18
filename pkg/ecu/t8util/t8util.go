@@ -179,7 +179,7 @@ func Erasedregion(address int, device byte, formatMask uint64) bool {
 		} else if address >= 0x4000 {
 			part = 1
 		}
-	case 5: //MCP
+	case 5: // MCP
 		part = int(address>>15) & 0xF
 	}
 

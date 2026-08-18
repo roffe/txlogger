@@ -12,7 +12,7 @@ import (
 const (
 	canID   = 0x05
 	replyID = 0x0C
-	//cmdSetAddr byte = 0xA5
+	// cmdSetAddr byte = 0xA5
 	maxBlock       = 133 // protocol cap per address window
 	chunkSize      = 7   // bytes per data frame (payload[1:] = 7 bytes)
 	respOK    byte = 0x00

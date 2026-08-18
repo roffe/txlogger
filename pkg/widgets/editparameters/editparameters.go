@@ -626,7 +626,6 @@ func (t *T8) SetTopSpeed(ctx context.Context, speed uint16) error {
 
 func (t *T8) GetRPMLimiter(ctx context.Context) (uint16, error) {
 	return t.gm.ReadDataByIdentifierUint16(ctx, pidRPMLimiter)
-
 }
 
 func (t *T8) SetRPMLimit(ctx context.Context, limit uint16) error {

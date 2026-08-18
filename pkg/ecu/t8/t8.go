@@ -108,7 +108,6 @@ func (t *Client) SetTopSpeed(ctx context.Context, speed uint16) error {
 
 func (t *Client) GetRPMLimiter(ctx context.Context) (uint16, error) {
 	return t.gm.ReadDataByIdentifierUint16(ctx, pidRPMLimiter)
-
 }
 
 func (t *Client) SetRPMLimit(ctx context.Context, limit uint16) error {

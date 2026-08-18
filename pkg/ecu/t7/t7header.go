@@ -30,7 +30,6 @@ func smallintBytes(n int) []byte {
 }
 
 func intBytes(n int) []byte {
-
 	b := []byte{byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)}
 	return b
 }
@@ -161,7 +160,7 @@ func (f *FileHeader) SetVin(vin string) {
 }
 
 func NewFileHeader(filename string, autoFixFooter bool) (*FileHeader, error) {
-	file, err := os.OpenFile(filename, os.O_RDWR, 0666)
+	file, err := os.OpenFile(filename, os.O_RDWR, 0o666)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -211,6 +210,7 @@ func NewFileHeader(filename string, autoFixFooter bool) (*FileHeader, error) {
 
 	return fh, nil
 }
+
 func (fh *FileHeader) parseField(fhf *FileHeaderField) {
 	switch fhf.ID {
 	case 0x90:
@@ -444,7 +444,6 @@ func (f *FileHeader) createNewFooter(file io.ReadWriteSeeker, create9B bool, cre
 	for _, h := range headers {
 		f.writeField(file, h)
 	}
-
 }
 
 func (fh *FileHeader) writeField(file io.ReadWriteSeeker, f FileHeaderField) {

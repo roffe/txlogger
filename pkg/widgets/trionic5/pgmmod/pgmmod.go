@@ -19,7 +19,6 @@ type Widget struct {
 }
 
 type boxes struct {
-
 	// byte 0
 	enrichAfterStart  *widget.Check // Enrichment after start (0x01)
 	wotEnrich         *widget.Check // WOT enrichment (0x02)
@@ -73,7 +72,6 @@ type boxes struct {
 	// byte 5
 	tankPressureDiagnostics *widget.Check // Tank pressure diagnostics (0x10)
 	vssEnabled              *widget.Check // VSS enabled (0x80)
-
 }
 
 func New() *Widget {
@@ -142,7 +140,6 @@ func (w *Widget) CreateRenderer() fyne.WidgetRenderer {
 				b, err := w.LoadFunc()
 				if err != nil {
 					dialog.ShowError(err, fyne.CurrentApp().Driver().AllWindows()[0])
-
 				}
 				log.Printf("Load: %X", b)
 				w.Set(b)
@@ -356,7 +353,7 @@ func (w *Widget) Set(data []byte) {
 		w.b.globalAdaptation.SetChecked(true)
 	}
 	if data[3]&0x80 > 0 {
-		w.b.tempCorrClosedLoop.SetChecked(true) //fuelAdjustmentDuringIdle
+		w.b.tempCorrClosedLoop.SetChecked(true) // fuelAdjustmentDuringIdle
 	}
 
 	if len(data) > 4 {

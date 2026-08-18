@@ -4,9 +4,7 @@ import (
 	"errors"
 )
 
-var (
-	ErrCancelled = errors.New("Cancelled")
-)
+var ErrCancelled = errors.New("Cancelled")
 
 // FileFilter describes a file filter for file dialogs.
 type FileFilter struct {

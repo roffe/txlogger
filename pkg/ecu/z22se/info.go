@@ -207,6 +207,7 @@ func (t *Client) Info(ctx context.Context) ([]model.HeaderResult, error) {
 
 	return out, nil
 }
+
 func (t *Client) RequestECUInfoAsString(ctx context.Context, pid byte) (string, error) {
 	resp, err := t.RequestECUInfo(ctx, pid)
 	if err != nil {

@@ -20,7 +20,7 @@ func CalculateAccessKey(seed []byte, level byte) (byte, byte) {
 		key ^= 0x81BF
 	}
 
-	return (byte)((key >> 8) & 0xFF), (byte)(key & 0xFF)
+	return byte((key >> 8) & 0xFF), byte(key & 0xFF)
 }
 
 func CalculateKeyForCIM(a_seed []byte, level byte) (byte, byte) {
@@ -30,5 +30,5 @@ func CalculateKeyForCIM(a_seed []byte, level byte) (byte, byte) {
 	key = ((key >> 8) | (key << 8)) & 0xFFFF
 	key = (0x3FC7 - key) & 0xFFFF
 
-	return (byte)((key >> 8) & 0xFF), (byte)(key & 0xFF)
+	return byte((key >> 8) & 0xFF), byte(key & 0xFF)
 }
