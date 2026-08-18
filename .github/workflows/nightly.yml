@@ -44,7 +44,7 @@ jobs:
         name: linux
         path: |
           txlogger_ubuntu_x64.zip
-          txlogger-*-x86_64.AppImage
+          txlogger-x86_64.AppImage
 
   windows:
     runs-on: windows-latest
