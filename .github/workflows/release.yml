@@ -1,24 +1,52 @@
-name: Build Windows Release
+name: Release
+
 on:
   push:
     tags:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build:
-    runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest]
-        include:
-          - os: windows-latest
-            vcpkgCommitId: '74e6536215718009aae747d86d84b78376bf9e09'
+  linux:
+    runs-on: ubuntu-latest
     steps:
-   
+    - uses: actions/checkout@v6.0.2
+    - name: Set up Go
+      uses: actions/setup-go@v6.4.0
+      with:
+        go-version: '1.26.4'
+        cache: false
+    - name: Get dependencies
+      run: sudo apt-get update && sudo apt-get install 7zip gcc libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev libusb-1.0-0-dev libgtk-3-dev libasound2-dev libftdi1 libftdi1-dev
+    - name: Install Kvaser CANLIB
+      run: |
+        wget -qO- "https://www.kvaser.com/downloads-kvaser/?utm_source=software&utm_ean=7330130980754&utm_status=latest" | tar xz
+        make -C linuxcan/canlib
+        sudo make -C linuxcan/canlib install
+    - name: Get Go dependencies
+      run: go get .
+    - name: Build txlogger
+      run: make txlogger
+    - name: Build AppImage
+      run: make appimage
+    - name: Archive
+      run: 7z a txlogger_ubuntu_x64.7z txlogger
+    - name: Release
+      uses: softprops/action-gh-release@v3
+      if: github.ref_type == 'tag'
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        make_latest: "true"
+        files: |
+          txlogger_ubuntu_x64.7z
+          txlogger-*-x86_64.AppImage
+
+  windows:
+    runs-on: windows-latest
+    steps:
     - uses: actions/checkout@v6.0.2
       with:
         submodules: recursive
@@ -27,23 +55,17 @@ jobs:
       uses: repolevedavaj/install-nsis@v1.2.1
       with:
         nsis-version: '3.11'
-    
+
     - name: Set up Go
       uses: actions/setup-go@v6.4.0
       with:
         go-version: '1.26.4'
         cache: false
-    
+
     - name: Install dependencies
       run: |
         go get .
         go install fyne.io/tools/cmd/fyne@latest
-
-    #- name: Install CANUSB SDK
-    #  run: |
-    #    New-Item -ItemType Directory -Path .\canusb -Force | Out-Null
-    #    Invoke-WebRequest -Uri "https://www.canusb.com/files/canusb_dll_driver.zip" -OutFile canusb_dll_driver.zip
-    #    Expand-Archive -Path canusb_dll_driver.zip -DestinationPath .\canusb -Force
 
     - name: Install CANLIB
       run: |
@@ -61,7 +83,7 @@ jobs:
         git clone https://github.com/microsoft/vcpkg.git --depth=1
         .\vcpkg\bootstrap-vcpkg.bat -disableMetrics
         .\vcpkg\vcpkg.exe install libusb:x64-windows
-    
+
     - name: Build
       run: |
         $env:PATH += ";D:\a\txlogger\txlogger\llvm-mingw\bin"
@@ -76,12 +98,9 @@ jobs:
     - name: Release
       uses: softprops/action-gh-release@v3
       if: github.ref_type == 'tag'
-      env:
-        GITHUB_REPOSITORY: roffe/txlogger
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         make_latest: "true"
         files: |
           txlogger.zip
           txlogger_setup.zip
-
