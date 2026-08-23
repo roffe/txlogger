@@ -2,6 +2,7 @@ package combinedlogplayer
 
 import (
 	"sync"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -51,9 +52,11 @@ func New(cfg *CombinedLogplayerConfig) *Widget {
 
 	cp.db = db
 	cp.lp = logplayer.New(&logplayer.Config{
-		EBus:       buz,
-		Logfile:    cfg.Logfile,
-		TimeSetter: db.SetTime,
+		EBus:    buz,
+		Logfile: cfg.Logfile,
+		TimeSetter: func(t time.Time) {
+			fyne.Do(func() { db.SetTime(t) })
+		},
 	})
 
 	cp.ExtendBaseWidget(cp)
