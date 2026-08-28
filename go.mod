@@ -1,10 +1,10 @@
 module github.com/roffe/txlogger
 
-go 1.26.0
+go 1.27.0
 
 //replace github.com/roffe/gocan => ../gocan
 //replace github.com/roffe/ecusymbol => ../ecusymbol
-replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20260818190503-315a51819d67
+replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20260828134512-0e4ba732a830
 
 //replace go.bug.st/serial => ../../../go.bug.st/serial
 
@@ -12,23 +12,19 @@ replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 
 require (
 	fyne.io/fyne/v2 v2.8.0
-	github.com/avast/retry-go/v4 v4.7.0
-	github.com/roffe/ecusymbol v1.2.6-0.20260817181744-4b5fa740a6f3
-	go.bug.st/serial v1.8.0
-	golang.org/x/image v0.40.0
-	golang.org/x/mod v0.36.0
-	golang.org/x/net v0.54.0 // indirect
-	golang.org/x/sync v0.20.0
-)
-
-require (
 	github.com/Microsoft/go-winio v0.6.2
+	github.com/avast/retry-go/v4 v4.7.0
 	github.com/ebitengine/oto/v3 v3.4.0
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/hajimehoshi/go-mp3 v0.3.4
+	github.com/roffe/ecusymbol v1.2.6-0.20260817181744-4b5fa740a6f3
 	github.com/roffe/gocan/v2 v2.1.1-0.20260814153516-cb17a9651f8f
 	github.com/stretchr/testify v1.11.1
 	github.com/yuin/gopher-lua v1.1.2
+	go.bug.st/serial v1.8.0
+	golang.org/x/image v0.40.0
+	golang.org/x/mod v0.36.0
+	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.46.0
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.78
 )
@@ -48,7 +44,7 @@ require (
 	github.com/fyne-io/image v0.1.1 // indirect
 	github.com/fyne-io/oksvg v0.2.0 // indirect
 	github.com/go-gl/gl v0.0.0-20260331235117-4566fea9a276 // indirect
-	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1.0.20260707082822-2a407d02d01a // indirect
+	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.2 // indirect
 	github.com/go-text/render v0.2.1 // indirect
 	github.com/go-text/typesetting v0.3.4 // indirect
 	github.com/golang/mock v1.6.0 // indirect
@@ -73,6 +69,7 @@ require (
 	github.com/yuin/goldmark v1.8.2 // indirect
 	go.einride.tech/can v0.16.1 // indirect
 	golang.org/x/crypto v0.51.0 // indirect
+	golang.org/x/net v0.54.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/tools v0.45.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
