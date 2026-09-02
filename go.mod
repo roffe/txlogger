@@ -5,7 +5,7 @@ go 1.27.0
 replace github.com/roffe/gocan/v2 => ../gocan
 
 //replace github.com/roffe/ecusymbol => ../ecusymbol
-replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20260828134512-0e4ba732a830
+replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 a29bcb9f9f3d530e825402e5a0832844975174c5
 
 //replace go.bug.st/serial => ../../../go.bug.st/serial
 
