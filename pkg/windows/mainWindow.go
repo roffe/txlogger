@@ -20,12 +20,12 @@ import (
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/ecusymbol/as2"
+	"github.com/roffe/gocan/v2/t7kwp"
 	"github.com/roffe/txlogger/j2534proxy/client"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ebus"
-	"github.com/roffe/txlogger/pkg/kwp2000"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
@@ -83,7 +83,7 @@ type MainWindow struct {
 
 	// seedKey is the T7 SecurityAccess pair read out of the loaded binary,
 	// tried first when logging so ECUs with a patched/custom algorithm unlock.
-	seedKey *kwp2000.SeedKey
+	seedKey *t7kwp.SeedKey
 
 	dlc             datalogger.IClient
 	dlcCancel       context.CancelFunc
@@ -666,7 +666,7 @@ func (mw *MainWindow) captureSeedKey(ecuType symbol.ECUType, data []byte) {
 	if err != nil {
 		return
 	}
-	mw.seedKey = &kwp2000.SeedKey{XOR: xor, Sub: sub}
+	mw.seedKey = &t7kwp.SeedKey{XOR: xor, Sub: sub}
 	mw.Log(fmt.Sprintf("Seed/key from binary: XOR %04X SUB %04X (%s)", xor, sub, seedkey.MethodName(xor, sub)))
 }
 

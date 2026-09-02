@@ -12,8 +12,8 @@ import (
 
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/t7kwp"
 	"github.com/roffe/txlogger/pkg/ebus"
-	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
 type T7Client struct {
@@ -164,7 +164,7 @@ func (c *T7Client) Start(pctx context.Context) error {
 	// the remaining symbols (Number >= 0) are polled each tick.
 	channels := c.buildChannels()
 
-	kwp := kwp2000.New(cl)
+	kwp := t7kwp.New(cl)
 	kwp.SetSeedKey(c.SeedKey) // custom pair extracted from the loaded binary, if any
 
 	adConverter := NewWBLInterpolator(c.WidebandConfig)
@@ -367,8 +367,8 @@ func (c *T7Client) Start(pctx context.Context) error {
 	return cl.Wait(ctx)
 }
 
-func initT7logging(ctx context.Context, kwp *kwp2000.Client, symbols []*symbol.Symbol, onMessage func(string)) error {
-	if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
+func initT7logging(ctx context.Context, kwp *t7kwp.Client, symbols []*symbol.Symbol, onMessage func(string)) error {
+	if err := kwp.StartSession(ctx, t7kwp.INIT_MSG_ID, t7kwp.INIT_RESP_ID); err != nil {
 		return fmt.Errorf("failed to start session: %w", err)
 	}
 	onMessage("Connected to ECU")

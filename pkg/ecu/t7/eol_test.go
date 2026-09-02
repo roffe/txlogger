@@ -3,7 +3,7 @@ package t7
 import (
 	"testing"
 
-	"github.com/roffe/txlogger/pkg/kwp2000"
+	"github.com/roffe/gocan/v2/t7kwp"
 )
 
 // writePI lays out PI-area entries the way the ECU does: growing downward from
@@ -53,8 +53,8 @@ func TestROMChecksum(t *testing.T) {
 }
 
 func TestDefaultTesterSerial(t *testing.T) {
-	padded := kwp2000.PadTesterSerial(DefaultTesterSerial)
-	if kwp2000.TesterSerialBlocked(padded) {
+	padded := t7kwp.PadTesterSerial(DefaultTesterSerial)
+	if t7kwp.TesterSerialBlocked(padded) {
 		t.Fatalf("%q is on the ECU's kill-list — writing it would brick a T7", DefaultTesterSerial)
 	}
 	// The safety margin is structural, not luck: offsets 9..11 must all be

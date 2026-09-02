@@ -2,7 +2,8 @@ module github.com/roffe/txlogger
 
 go 1.27.0
 
-//replace github.com/roffe/gocan => ../gocan
+replace github.com/roffe/gocan/v2 => ../gocan
+
 //replace github.com/roffe/ecusymbol => ../ecusymbol
 replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20260828134512-0e4ba732a830
 
@@ -18,7 +19,7 @@ require (
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/roffe/ecusymbol v1.2.6-0.20260817181744-4b5fa740a6f3
-	github.com/roffe/gocan/v2 v2.1.1-0.20260814153516-cb17a9651f8f
+	github.com/roffe/gocan/v2 v2.1.1-0.20260902194357-7616f564e2a0
 	github.com/stretchr/testify v1.11.1
 	github.com/yuin/gopher-lua v1.1.2
 	go.bug.st/serial v1.8.0

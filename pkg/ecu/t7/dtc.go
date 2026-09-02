@@ -15,5 +15,13 @@ func (t *Client) ReadDTC(ctx context.Context) ([]dtc.DTC, error) {
 		return nil, err
 	}
 	defer t.StopSession(ctx)
-	return t.kwp.ReadDTCByStatus(ctx, readDTCStatus)
+	raw, err := t.kwp.ReadDTCByStatus(ctx, readDTCStatus)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]dtc.DTC, 0, len(raw))
+	for _, d := range raw {
+		out = append(out, dtc.DTC{ECU: dtc.ECU_T7, Code: d.Code, Status: d.Status})
+	}
+	return out, nil
 }

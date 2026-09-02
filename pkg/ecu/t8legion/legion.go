@@ -584,10 +584,9 @@ func (t *Client) DeterminePartitionmask(ctx context.Context, file []byte, device
 		}
 		if !bytes.Equal(lmd5, md5) {
 			formatmask |= uint64(1 << (i - 1))
+			t.cfg.OnMessage(fmt.Sprintf("Partition %d: tagged for erase and write", i))
 		}
 	}
-
-	t.cfg.OnMessage(fmt.Sprintf("Partition's MD5 missmath mask: %b", formatmask))
 
 	if !z22se {
 		if !boot {
@@ -698,7 +697,7 @@ func (t *Client) EraseFlash(ctx context.Context, device byte, formatMask uint64)
 	if formatMask == 0 {
 		return nil
 	}
-	t.cfg.OnMessage("Erasing flash, " + fmt.Sprintf("format mask: %b", formatMask))
+	t.cfg.OnMessage(fmt.Sprintf("Erasing partitions %s of device %d", partitionList(formatMask), device))
 	tmp := ((formatMask&0xff)<<8 | (formatMask>>8)&0xFF)
 	cmd := (tmp<<40 | ((^tmp)&0xFFFF)<<24 | 0x13400) + uint64(device)
 	payload := make([]byte, 8)
@@ -711,6 +710,8 @@ func (t *Client) EraseFlash(ctx context.Context, device byte, formatMask uint64)
 	var eraseDone bool = false
 	var firstPass bool = true
 	var retryCount uint16 = 0
+	start := time.Now()
+	lastReport := start
 
 	for !eraseDone {
 		formatbuf, _, err := t.ReadDataByLocalIdentifier(ctx, true, 0xF0, 0, 4)
@@ -728,19 +729,34 @@ func (t *Client) EraseFlash(ctx context.Context, device byte, formatMask uint64)
 					return err
 				}
 			} else {
-				t.cfg.OnMessage("Erasing device: " + fmt.Sprintf("%d", formatbuf[3]))
+				t.cfg.OnMessage(fmt.Sprintf("Erasing device %d...", formatbuf[3]))
 				firstPass = false
 			}
 		} else {
 			if formatbuf[3] == 1 {
-				t.cfg.OnMessage("Erasing done")
+				t.cfg.OnMessage(fmt.Sprintf("Erase completed after %s", time.Since(start).Round(time.Second)))
 				eraseDone = true
+			} else if time.Since(lastReport) >= 5*time.Second {
+				// ponytail: the loader only says "busy" (byte > 1), it doesn't report which partition it's on
+				t.cfg.OnMessage(fmt.Sprintf("Still erasing... %s", time.Since(start).Round(time.Second)))
+				lastReport = time.Now()
 			}
 		}
 
 		time.Sleep(500 * time.Millisecond)
 	}
 	return nil
+}
+
+// partitionList renders a format mask as "1, 3, 9" for the log.
+func partitionList(mask uint64) string {
+	var parts []string
+	for i := 1; i <= 9; i++ {
+		if mask&(1<<(i-1)) != 0 {
+			parts = append(parts, strconv.Itoa(i))
+		}
+	}
+	return strings.Join(parts, ", ")
 }
 
 func (t *Client) StartSecondaryBootloader(ctx context.Context) error {
