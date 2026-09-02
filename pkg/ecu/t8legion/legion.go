@@ -584,7 +584,6 @@ func (t *Client) DeterminePartitionmask(ctx context.Context, file []byte, device
 		}
 		if !bytes.Equal(lmd5, md5) {
 			formatmask |= uint64(1 << (i - 1))
-			t.cfg.OnMessage(fmt.Sprintf("Partition %d: tagged for erase and write", i))
 		}
 	}
 
@@ -603,6 +602,11 @@ func (t *Client) DeterminePartitionmask(ctx context.Context, file []byte, device
 		if !z22se {
 			formatmask &= uint64(0x1BF)
 		}
+	}
+	if formatmask == 0 {
+		t.cfg.OnMessage("No partitions differ, nothing to erase")
+	} else {
+		t.cfg.OnMessage("Partitions tagged for erase and write: " + partitionList(formatmask))
 	}
 	return formatmask, nil
 }
