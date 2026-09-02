@@ -8,8 +8,8 @@ import (
 
 	"github.com/avast/retry-go/v4"
 	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/t7kwp"
 	"github.com/roffe/txlogger/pkg/ecu"
-	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
 func init() {
@@ -25,7 +25,7 @@ func init() {
 // type owns the T7 specifics: session lifecycle, seed/key selection, bin
 // layout and progress reporting.
 type Client struct {
-	kwp *kwp2000.Client
+	kwp *t7kwp.Client
 	cfg *ecu.Config
 
 	// lastInit is when the diagnostic session was last opened. The ECU ignores
@@ -35,7 +35,7 @@ type Client struct {
 }
 
 func New(c *gocan.Bus, cfg *ecu.Config) ecu.Client {
-	kwp := kwp2000.New(c)
+	kwp := t7kwp.New(c)
 	kwp.SetResponseID(0x258) // T7 always answers here; StartSession confirms it
 	return &Client{
 		kwp: kwp,
@@ -58,7 +58,7 @@ func (t *Client) DataInitialization(ctx context.Context) error {
 	}
 
 	err := retry.Do(
-		func() error { return t.kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID) },
+		func() error { return t.kwp.StartSession(ctx, t7kwp.INIT_MSG_ID, t7kwp.INIT_RESP_ID) },
 		retry.Context(ctx),
 		retry.Attempts(6),
 		retry.OnRetry(func(n uint, err error) {
@@ -98,14 +98,14 @@ func (t *Client) KnockKnock(ctx context.Context) (bool, error) {
 	if err := t.DataInitialization(ctx); err != nil {
 		return false, err
 	}
-	keys := kwp2000.KnownSeedKeys
+	keys := t7kwp.KnownSeedKeys
 	if sk := t.cfg.SeedKey; sk != nil {
 		// user pair first, stock pairs kept as fallback
-		keys = append([]kwp2000.SeedKey{*sk}, keys...)
+		keys = append([]t7kwp.SeedKey{*sk}, keys...)
 		t.cfg.OnMessage(fmt.Sprintf("Using custom seed/key XOR %04X SUB %04X", sk.XOR, sk.Sub))
 	}
 	for _, k := range keys {
-		ok, err := t.kwp.SecurityAccess(ctx, kwp2000.DEVELOPMENT_PRIORITY, k)
+		ok, err := t.kwp.SecurityAccess(ctx, t7kwp.DEVELOPMENT_PRIORITY, k)
 		if err != nil {
 			t.cfg.OnError(fmt.Errorf("/!\\ Failed to obtain security access: %v", err))
 			time.Sleep(3 * time.Second)

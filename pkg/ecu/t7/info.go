@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/roffe/txlogger/pkg/kwp2000"
+	"github.com/roffe/gocan/v2/t7kwp"
 	"github.com/roffe/txlogger/pkg/model"
 )
 
@@ -75,7 +75,7 @@ func (t *Client) l3SeedXOR(ctx context.Context) []model.HeaderResult {
 // service 0x27, sub-function 0x03) and returns the two seed bytes, without
 // completing the handshake — no key is sent, so the ECU stays locked.
 func (t *Client) requestL3Seed(ctx context.Context) (hi, lo byte, err error) {
-	seed, err := t.kwp.RequestSeed(ctx, kwp2000.HIGH_PRIORITY)
+	seed, err := t.kwp.RequestSeed(ctx, t7kwp.HIGH_PRIORITY)
 	if err != nil {
 		return 0, 0, fmt.Errorf("request L3 seed: %w", err)
 	}

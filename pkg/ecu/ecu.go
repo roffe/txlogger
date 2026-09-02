@@ -7,8 +7,8 @@ import (
 	"sort"
 
 	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/t7kwp"
 	"github.com/roffe/txlogger/pkg/dtc"
-	"github.com/roffe/txlogger/pkg/kwp2000"
 	"github.com/roffe/txlogger/pkg/model"
 )
 
@@ -28,7 +28,7 @@ type Client interface {
 // key = ((seed<<2) ^ XOR) - Sub. Stock firmware uses one of a handful of known
 // pairs; a locked or re-patched ECU can use any other. Read the pair out of a
 // binary with the T7 Seed/Key patcher (pkg/widgets/seedkey).
-type SeedKey = kwp2000.SeedKey
+type SeedKey = t7kwp.SeedKey
 
 type Config struct {
 	Name string

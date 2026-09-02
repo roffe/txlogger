@@ -36,6 +36,7 @@ import (
 	"github.com/roffe/txlogger/pkg/widgets/editparameters"
 	"github.com/roffe/txlogger/pkg/widgets/estimatedoutput"
 	"github.com/roffe/txlogger/pkg/widgets/gearcalc"
+	"github.com/roffe/txlogger/pkg/widgets/hexeditor"
 	"github.com/roffe/txlogger/pkg/widgets/j1979diag"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/matrixbuilder"
@@ -181,6 +182,7 @@ func (mw *MainWindow) setupMenu() {
 				inner.Resize(fyne.Size{Width: 760, Height: 520})
 			}),
 			fyne.NewMenuItemWithIcon("Compare symbols with other binary", theme.SearchReplaceIcon(), mw.openSymbolCompare),
+			fyne.NewMenuItemWithIcon("Hex editor", theme.DocumentIcon(), mw.openHexEditor),
 			fyne.NewMenuItemWithIcon("Matrix Builder", theme.InfoIcon(), mw.openMatrixBuilder),
 			fyne.NewMenuItemWithIcon("Estimated output", theme.InfoIcon(), mw.openEstimatedOutput),
 			fyne.NewMenuItemWithIcon("Cam timing", theme.InfoIcon(), mw.openCamTiming),
@@ -505,6 +507,88 @@ func (mw *MainWindow) openNVDMEditor() {
 	inner.Icon = theme.InfoIcon()
 	mw.wm.Add(inner)
 	inner.Resize(fyne.Size{Width: 600, Height: 600})
+}
+
+// openHexEditor opens a raw hex editor over the loaded binary. Byte() hands
+// back the file's live backing slice (after syncing cached symbol data into
+// it), so edits land directly in the data Save() writes out. Save() also
+// copies every symbol's cached bytes back over that slice, which would clobber
+// hex edits made inside a symbol's region — so each edit is mirrored into any
+// overlapping symbol, using the same address translation Save() itself uses.
+func (mw *MainWindow) openHexEditor() {
+	if w := mw.wm.HasWindow("Hex editor"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	if mw.fw == nil {
+		mw.Error(errors.New("no binary loaded"))
+		return
+	}
+	raw, ok := mw.fw.(interface{ Byte() ([]byte, error) })
+	if !ok {
+		mw.Error(errors.New("loaded binary does not expose raw data"))
+		return
+	}
+	data, err := raw.Byte()
+	if err != nil {
+		mw.Error(err)
+		return
+	}
+
+	type region struct {
+		start, end int
+		sym        *symbol.Symbol
+	}
+	var regions []region
+	for _, s := range mw.fw.Symbols() {
+		off := int64(s.Address)
+		if s.Address > 0x7FFFFF { // T7 SRAM-mapped symbol, same rule as T7File.Save
+			off -= int64(s.SramOffset)
+		}
+		n := len(s.Bytes())
+		if off <= 0 || n == 0 || off+int64(n) > int64(len(data)) {
+			continue
+		}
+		regions = append(regions, region{int(off), int(off) + n, s})
+	}
+	// ponytail: linear scans over ~10k regions per keypress/edit; index if it ever shows up in a profile
+	symAt := func(off int) string {
+		for _, r := range regions {
+			if off >= r.start && off < r.end {
+				return fmt.Sprintf("%s+%d", r.sym.Name, off-r.start)
+			}
+		}
+		return ""
+	}
+	onEdit := func(off int, b byte) {
+		for _, r := range regions {
+			if off >= r.start && off < r.end {
+				r.sym.Bytes()[off-r.start] = b
+			}
+		}
+	}
+	onSave := func() error {
+		if mw.filename == "" {
+			return errors.New("no filename to save to")
+		}
+		if bak := mw.filename + ".bak"; !fileExists(bak) {
+			if orig, err := os.ReadFile(mw.filename); err == nil {
+				_ = os.WriteFile(bak, orig, 0o644)
+			}
+		}
+		return mw.fw.Save(mw.filename)
+	}
+
+	he := hexeditor.New(hexeditor.Config{
+		Data:     data,
+		OnEdit:   onEdit,
+		OnSave:   onSave,
+		SymbolAt: symAt,
+	})
+	inner := multiwindow.NewInnerWindow("Hex editor", he)
+	inner.Icon = theme.DocumentIcon()
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(760, 620))
 }
 
 func (mw *MainWindow) openFirmwareInfoEdit() {

@@ -7,13 +7,13 @@ import (
 
 	"fyne.io/fyne/v2"
 	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/t7kwp"
 	"github.com/roffe/txlogger/pkg/dtc"
-	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
 func (d *DTCReader) readT7DTCS(ctx context.Context, cl *gocan.Bus) {
-	kwp := kwp2000.New(cl)
-	if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
+	kwp := t7kwp.New(cl)
+	if err := kwp.StartSession(ctx, t7kwp.INIT_MSG_ID, t7kwp.INIT_RESP_ID); err != nil {
 		d.err(err)
 		return
 	}
@@ -31,14 +31,21 @@ func (d *DTCReader) readT7DTCS(ctx context.Context, cl *gocan.Bus) {
 		return
 	}
 
-	d.dtcs = dtcs
+	d.dtcs = make([]dtc.DTC, 0, len(dtcs))
+	for _, t := range dtcs {
+		d.dtcs = append(d.dtcs, dtc.DTC{
+			ECU:    dtc.ECU_T7,
+			Code:   t.Code,
+			Status: t.Status,
+		})
+	}
 	fyne.Do(d.Refresh)
 }
 
 func (d *DTCReader) clearT7DTCS(ctx context.Context, cl *gocan.Bus) {
-	kwp := kwp2000.New(cl)
+	kwp := t7kwp.New(cl)
 
-	if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
+	if err := kwp.StartSession(ctx, t7kwp.INIT_MSG_ID, t7kwp.INIT_RESP_ID); err != nil {
 		d.err(err)
 		return
 	}

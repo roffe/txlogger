@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/roffe/txlogger/pkg/kwp2000"
+	"github.com/roffe/gocan/v2/t7kwp"
 )
 
 // DefaultTesterSerial is what txlogger stamps into PI field 0x98 — the field
@@ -28,7 +28,7 @@ const DefaultTesterSerial = "txlogger EOL"
 type EOLParams struct {
 	VIN          string // 0x90, 17 chars
 	ProgDate     string // 0x99, "YYMMDD"
-	TesterSerial string // 0x98, padded to 13 — see kwp2000.TesterSerialBlocked
+	TesterSerial string // 0x98, padded to 13 — see t7kwp.TesterSerialBlocked
 }
 
 // Validate checks the params the ECU would otherwise reject, plus the one it
@@ -40,7 +40,7 @@ func (p EOLParams) Validate() error {
 	if p.ProgDate == "" {
 		return errors.New("programming date (0x99) is required")
 	}
-	if kwp2000.TesterSerialBlocked(kwp2000.PadTesterSerial(p.TesterSerial)) {
+	if t7kwp.TesterSerialBlocked(t7kwp.PadTesterSerial(p.TesterSerial)) {
 		return fmt.Errorf("tester serial %q is on the ECU's kill-list: writing it runs FlashErase(0) and halts the ECU (BDM recovery only)", p.TesterSerial)
 	}
 	return nil
@@ -137,7 +137,7 @@ func (t *Client) EOLFlash(ctx context.Context, bin []byte, p EOLParams) error {
 	}{
 		{0x90, "VIN", []byte(p.VIN)},
 		{0x99, "programming date", []byte(p.ProgDate)},
-		{0x98, "tester serial", kwp2000.PadTesterSerial(p.TesterSerial)},
+		{0x98, "tester serial", t7kwp.PadTesterSerial(p.TesterSerial)},
 	}
 	for _, f := range fields {
 		t.cfg.OnMessage(fmt.Sprintf("Writing %s (0x%02X): %q", f.name, f.id, string(f.data)))

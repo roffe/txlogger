@@ -11,7 +11,7 @@ import (
 
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan/v2"
-	"github.com/roffe/txlogger/pkg/kwp2000"
+	"github.com/roffe/gocan/v2/t7kwp"
 )
 
 func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (*symbol.Collection, error) {
@@ -21,8 +21,8 @@ func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (*sym
 	}
 	defer cl.Close()
 
-	k := kwp2000.New(cl)
-	if err := k.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
+	k := t7kwp.New(cl)
+	if err := k.StartSession(ctx, t7kwp.INIT_MSG_ID, t7kwp.INIT_RESP_ID); err != nil {
 		return nil, err
 	}
 	defer k.StopSession(ctx)
