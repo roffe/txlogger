@@ -187,7 +187,6 @@ func (mw *MainWindow) setupMenu() {
 			fyne.NewMenuItemWithIcon("Estimated output", theme.InfoIcon(), mw.openEstimatedOutput),
 			fyne.NewMenuItemWithIcon("Cam timing", theme.InfoIcon(), mw.openCamTiming),
 			fyne.NewMenuItemWithIcon("T5 CLI", theme.ComputerIcon(), mw.openT5CLI),
-			fyne.NewMenuItemWithIcon("T7 Seed/Key patcher", theme.SearchReplaceIcon(), mw.openSeedKey),
 			//fyne.NewMenuItemWithIcon("Rescale AccPedalMap", theme.GridIcon(), func() {
 			//	mw.openRescaler(symbol.ECU_T8, "TrqMastCal.X_AccPedalMAP")
 			//}),
@@ -245,7 +244,6 @@ func (mw *MainWindow) setupMenu() {
 				mw.wm.Add(inner)
 				inner.Resize(fyne.NewSize(450, 250))
 			}),
-			fyne.NewMenuItemWithIcon("T7 Boost Auto-Tuner", theme.MediaFastForwardIcon(), mw.openBoostTuner),
 		)
 	}
 

@@ -60,7 +60,7 @@ func ExportRecords(dir, prefix, ext string, records []logfile.Record) (string, e
 			values[j] = rec.Values[name]
 		}
 		if err := w.Write(rec.Time, channels); err != nil {
-			w.Close()
+			_ = w.Close()
 			return "", fmt.Errorf("failed to write record: %w", err)
 		}
 	}

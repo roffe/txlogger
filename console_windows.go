@@ -1,12 +1,9 @@
 package main
 
 import (
-	"errors"
 	"log"
 	"os"
 	"syscall"
-
-	"github.com/roffe/gocan/v2/pkg/w32"
 )
 
 const (
@@ -14,39 +11,35 @@ const (
 )
 
 var (
-	procAttachConsole              = w32.Modkernel32.MustFindProc("AttachConsole")
+	modkernel32                    *syscall.DLL
+	procAttachConsole              *syscall.Proc
 	oldStdin, oldStdout, oldStderr = os.Stdin, os.Stdout, os.Stderr //lint:ignore U1000 Prevent GC of the original std handles
 )
 
-func InitConsole() {
-	ok, err := attachConsole(ATTACH_PARENT_PROCESS)
-	if ok {
-		log.Println("attaching console")
-		hout, err1 := syscall.GetStdHandle(syscall.STD_OUTPUT_HANDLE)
-		if err1 != nil {
-			log.Printf("stdout connection error : %v", err1)
-		}
-		herr, err2 := syscall.GetStdHandle(syscall.STD_ERROR_HANDLE)
-		if err2 != nil {
-			log.Printf("stderr connection error : %v", err2)
-		}
-		os.Stdout = os.NewFile(uintptr(hout), "/dev/stdout")
-		os.Stderr = os.NewFile(uintptr(herr), "/dev/stderr")
-		log.SetOutput(os.Stderr)
-		log.Println("attached console")
-		return
-	}
+func init() {
+	var err error
+	modkernel32, err = syscall.LoadDLL("kernel32.dll")
 	if err != nil {
-		if errors.Is(err, syscall.Errno(5)) {
-			// Access denied means already attached to a console
-			return
-		}
-		log.Printf("attachConsole failed: %v", err)
+		panic(err)
+	}
+	procAttachConsole, err = modkernel32.FindProc("AttachConsole")
+	if err != nil {
+		panic(err)
 	}
 }
 
-func attachConsole(dwParentProcess uint32) (ok bool, lasterr error) {
-	r1, _, lasterr := syscall.SyscallN(procAttachConsole.Addr(), uintptr(dwParentProcess), 0, 0)
-	ok = bool(r1 != 0)
-	return
+func InitConsole() {
+	r1, _, errno := syscall.SyscallN(procAttachConsole.Addr(), uintptr(ATTACH_PARENT_PROCESS))
+	if r1 == 0 {
+		// 5 = already have a console, 6 = parent has none (launched from Explorer)
+		if errno != 5 && errno != 6 {
+			log.Printf("AttachConsole: %v", errno)
+		}
+		return
+	}
+	stdout, _ := syscall.GetStdHandle(syscall.STD_OUTPUT_HANDLE)
+	stderr, _ := syscall.GetStdHandle(syscall.STD_ERROR_HANDLE)
+	os.Stdout = os.NewFile(uintptr(stdout), "/dev/stdout")
+	os.Stderr = os.NewFile(uintptr(stderr), "/dev/stderr")
+	log.SetOutput(os.Stderr)
 }

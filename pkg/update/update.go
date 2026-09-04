@@ -185,5 +185,5 @@ func IsLatest(version string) (bool, string) {
 	}
 	//	log.Println("latest.TagName:", latest.TagName)
 	//	log.Println("current.Version:", version)
-	return !(semver.Compare(latest.TagName, version) > 0), latest.TagName
+	return semver.Compare(latest.TagName, version) <= 0, latest.TagName
 }

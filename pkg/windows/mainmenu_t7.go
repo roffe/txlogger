@@ -1,7 +1,16 @@
 package windows
 
 func (mw *MainWindow) t7Menu() []MenuItem {
+	actions := []MenuItem{
+		{Name: "Firmware information", Func: mw.openFirmwareInfo},
+		{Name: "Import address table from another binary", Func: mw.importAddressTable},
+		{Name: "T7 Seed/Key patcher", Func: mw.openSeedKey},
+	}
+	if mw.previewFeatures {
+		actions = append(actions, MenuItem{Name: "T7 Boost Auto-Tuner", Func: mw.openBoostTuner})
+	}
 	return []MenuItem{
+		{Name: "Actions", Children: actions},
 		{Name: "Diagnostics", Children: []MenuItem{
 			{Name: "DTC Reader", Func: mw.openDTCReader},
 			{Name: "J1979", Func: mw.openJ1979},

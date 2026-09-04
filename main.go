@@ -8,20 +8,22 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"strings"
 	"syscall"
 
+	db "runtime/debug"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	_ "github.com/roffe/gocan/v2/adapters/all"
+	_ "github.com/roffe/gocan/v2/adapters/combi"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ipc"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/theme"
 	"github.com/roffe/txlogger/pkg/windows"
-
-	_ "github.com/roffe/gocan/v2/adapters/all"
-	_ "github.com/roffe/gocan/v2/adapters/combi"
 )
 
 var (
@@ -55,6 +57,15 @@ func main() {
 	if os.Getenv("FP") == "1" {
 		runFileChild()
 		return
+	}
+
+	// absolute path so -d (chdir) doesn't break the deferred remove
+	if crashLog, err := filepath.Abs("crash.log"); err == nil {
+		if f, err := os.Create(crashLog); err == nil {
+			defer os.Remove(crashLog)
+			defer f.Close()
+			db.SetCrashOutput(f, db.CrashOptions{})
+		}
 	}
 
 	InitConsole()
