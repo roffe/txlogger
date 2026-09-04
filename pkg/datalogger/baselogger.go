@@ -71,7 +71,7 @@ func NewBaseLogger(cfg Config, lw LogWriter) *BaseLogger {
 func (bl *BaseLogger) Close() {
 	bl.closeOnce.Do(func() {
 		if bl.r != nil {
-			bl.r.Close()
+			_ = bl.r.Close()
 		}
 		close(bl.quitChan)
 		time.Sleep(150 * time.Millisecond)
@@ -168,8 +168,8 @@ func (bl *BaseLogger) buildChannels() []Channel {
 
 func (bl *BaseLogger) setupWBL(ctx context.Context, cl *gocan.Bus) error {
 	cfg := &wbl.WBLConfig{
-		WBLType:  bl.Config.WidebandConfig.Name,
-		Port:     bl.Config.WidebandConfig.Port,
+		WBLType:  bl.WidebandConfig.Name,
+		Port:     bl.WidebandConfig.Port,
 		Log:      bl.OnMessage,
 		Txbridge: strings.HasPrefix(cl.AdapterName(), "txbridge"),
 	}

@@ -31,7 +31,7 @@ release:
 
 debug: clean
 	@echo Using compiler "$(CC)"
-	-go run -tags=$(BUILDTAGS),debug . 2>&1 | tee run.log
+	-go run -tags=$(BUILDTAGS),debug . 2>&1 | tee -i run.log
 
 windows:
 	CGO_CFLAGS="-Ivcpkg/packages/libusb_x64-windows/include/libusb-1.0" \
@@ -57,7 +57,7 @@ windows-dx:
 
 run: clean pkg/ota/firmware.bin
 	@echo Using compiler "$(CC)"
-	-GOEXPERIMENT=simd go run -tags=$(BUILDTAGS) . 2>&1 | tee run.log
+	-GOEXPERIMENT=simd go run -tags=$(BUILDTAGS) . 2>&1 | tee -i run.log
 
 snapshots:
 	go run -tags combi,canusb,ftdi,j2534,pcan,rcan,socketcan ./cmd/screenshots \

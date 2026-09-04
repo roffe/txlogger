@@ -495,6 +495,7 @@ func (c *TxBridge) configureT5Symbols() (int, error) {
 	return int(expectedPayloadSize), nil
 }
 
+/*
 func (c *TxBridge) calculateExpectedPayloadSize() int {
 	var expectedPayloadSize uint16
 	for _, sym := range c.Symbols {
@@ -502,3 +503,4 @@ func (c *TxBridge) calculateExpectedPayloadSize() int {
 	}
 	return int(expectedPayloadSize)
 }
+*/

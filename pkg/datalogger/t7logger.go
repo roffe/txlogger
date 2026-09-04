@@ -125,10 +125,8 @@ func (c *T7Client) Start(pctx context.Context) error {
 	// instead of relying on cl.Wait returning and the deferred cancel bouncing back.
 	ctx = cl.Context()
 
-	checkBroadcast := true
-	if strings.Contains(cl.AdapterName(), "OBDLink") || strings.Contains(cl.AdapterName(), "STN") || strings.Contains(cl.AdapterName(), "ELM") {
-		checkBroadcast = false
-	}
+	name := cl.AdapterName()
+	checkBroadcast := !strings.Contains(name, "OBDLink") && !strings.Contains(name, "STN") && !strings.Contains(name, "ELM")
 
 	if checkBroadcast {
 		bctx, bcancel := context.WithCancel(ctx)

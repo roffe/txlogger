@@ -50,9 +50,8 @@ func (mw *MainWindow) Close() {
 		mw.dlc.Close()
 		time.Sleep(250 * time.Millisecond)
 	}
+	// closing the master window ends ShowAndRun; main's defers (crash.log removal etc) run on return
 	mw.Window.Close()
-	time.Sleep(200 * time.Millisecond)
-	os.Exit(0)
 }
 
 func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {

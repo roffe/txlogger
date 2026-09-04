@@ -71,12 +71,12 @@ func (c *TxBridge) Start(ctx context.Context) error {
 		return err
 	}
 
-	switch c.Config.ECU {
+	switch c.ECU {
 	case "T5":
 		if err := c.setECU("5"); err != nil {
 			return err
 		}
-		if c.Config.ExperimentalT5FastLogging {
+		if c.ExperimentalT5FastLogging {
 			debug.Log("Using experimental T5 fast logger")
 			return c.t5new(ctx, cl)
 		}
@@ -92,7 +92,7 @@ func (c *TxBridge) Start(ctx context.Context) error {
 		}
 		return c.t8(ctx, cl)
 	default:
-		return errors.New("unknown ECU type: " + c.Config.ECU)
+		return errors.New("unknown ECU type: " + c.ECU)
 	}
 }
 
@@ -104,8 +104,8 @@ func (c *TxBridge) setECU(ecuType string) error {
 	// Setting the ECU above applies a per-ECU default delay. Override it with the
 	// configured rate now: delayTime is the firmware's ms between reads = 1000/Hz.
 	// Framed command: 'D' <len=1> <delay> <checksum=delay>.
-	if c.Config.Rate > 0 {
-		delay := 1000 / c.Config.Rate
+	if c.Rate > 0 {
+		delay := 1000 / c.Rate
 		if delay < 1 {
 			delay = 1
 		} else if delay > 255 {
