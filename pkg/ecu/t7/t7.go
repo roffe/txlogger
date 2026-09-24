@@ -58,7 +58,16 @@ func (t *Client) DataInitialization(ctx context.Context) error {
 	}
 
 	err := retry.Do(
-		func() error { return t.kwp.StartSession(ctx, t7kwp.INIT_MSG_ID, t7kwp.INIT_RESP_ID) },
+		func() error {
+			err := t.kwp.StartSession(ctx, t7kwp.INIT_MSG_ID, t7kwp.INIT_RESP_ID)
+			if err != nil {
+				// startCommunication is ignored while a session is live, e.g. one
+				// left by a failed flash (ECU still in EOL mode). stopCommunication
+				// ends it and resets the ECU's EOL buffers, so the retry gets through.
+				_ = t.kwp.StopSession(ctx)
+			}
+			return err
+		},
 		retry.Context(ctx),
 		retry.Attempts(6),
 		retry.OnRetry(func(n uint, err error) {

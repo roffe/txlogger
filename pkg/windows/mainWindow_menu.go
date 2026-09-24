@@ -786,8 +786,22 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 
 	var mv *mapviewer.MapViewer
 
+	var ecuAddr uint32
+	switch mw.selects.ecuSelect.Selected {
+	case "T5":
+		ecuAddr = symZ.SramOffset
+	case "T7":
+		ecuAddr = symZ.Address
+	case "T8":
+		ecuAddr = symZ.Address + symZ.SramOffset
+	}
+	// T7 closed binaries keep calibration in flash (< 0x80000): the stock ECU
+	// refuses 0x23 reads there (NRC 0x12), MapTun-patched ones reset, and flash
+	// can't be written live anyway. Only RAM-backed maps get ECU load/save.
+	ecuLive := mw.selects.ecuSelect.Selected != "T7" || ecuAddr >= 0x80000
+
 	updateFunc := func(idx int, value []float64) {
-		if mw.dlc != nil && mw.settings.GetAutoSave() {
+		if mw.dlc != nil && ecuLive && mw.settings.GetAutoSave() {
 			buff := bytes.NewBuffer([]byte{})
 			var dataLen int
 			for i, val := range value {
@@ -797,41 +811,20 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 				}
 			}
 
-			var addr uint32
-			switch mw.selects.ecuSelect.Selected {
-			case "T5":
-				addr = symZ.SramOffset
-			case "T7":
-				addr = symZ.Address
-			case "T8":
-				addr = symZ.Address + symZ.SramOffset
-			}
-
 			start := time.Now()
-			if err := mw.dlc.SetRAM(addr+uint32(idx*dataLen), buff.Bytes()); err != nil {
+			if err := mw.dlc.SetRAM(ecuAddr+uint32(idx*dataLen), buff.Bytes()); err != nil {
 				mw.Error(err)
 				return
 			}
 			// mw.Log(fmt.Sprintf("set $%d %s %s", addr, axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
-			mw.Log(fmt.Sprintf("set %s $%X %dms", axis.Z, addr+uint32(idx*dataLen), time.Since(start).Truncate(10*time.Millisecond).Milliseconds()))
+			mw.Log(fmt.Sprintf("set %s $%X %dms", axis.Z, ecuAddr+uint32(idx*dataLen), time.Since(start).Truncate(10*time.Millisecond).Milliseconds()))
 		}
 	}
 
 	loadRamFunc := func() {
-		if mw.dlc != nil {
+		if mw.dlc != nil && ecuLive {
 			start := time.Now()
-			var addr uint32
-
-			switch mw.selects.ecuSelect.Selected {
-			case "T5":
-				addr = symZ.SramOffset
-			case "T7":
-				addr = symZ.Address
-			case "T8":
-				addr = symZ.Address + symZ.SramOffset
-			}
-
-			data, err := mw.dlc.GetRAM(addr, uint32(symZ.Length))
+			data, err := mw.dlc.GetRAM(ecuAddr, uint32(symZ.Length))
 			if err != nil {
 				mw.Error(err)
 				return
@@ -846,22 +839,12 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 	}
 
 	saveRamFunc := func(data []float64) {
-		if mw.dlc == nil {
+		if mw.dlc == nil || !ecuLive {
 			return
 		}
 		start := time.Now()
 		buff := bytes.NewBuffer(symZ.EncodeFloat64s(data))
-		var startPos uint32
-		switch mw.selects.ecuSelect.Selected {
-		case "T5":
-			startPos = symZ.SramOffset
-		case "T7":
-			startPos = symZ.Address
-		case "T8":
-			startPos = symZ.Address + symZ.SramOffset
-		}
-
-		if err := mw.dlc.SetRAM(startPos, buff.Bytes()); err != nil {
+		if err := mw.dlc.SetRAM(ecuAddr, buff.Bytes()); err != nil {
 			mw.Error(err)
 			return
 		}
@@ -1019,6 +1002,9 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 				}()
 			},
 		},
+	}
+	if !ecuLive {
+		cfg.Buttons = cfg.Buttons[:2] // drop Load/Save ECU
 	}
 
 	var err error

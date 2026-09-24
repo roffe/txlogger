@@ -22,9 +22,7 @@ type Arranger interface {
 type baseArrangement struct{}
 
 func (b *baseArrangement) setWindowState(w *InnerWindow, pos fyne.Position, size fyne.Size, maximized bool) {
-	w.preMaximizedPos = w.Position()
-	w.preMaximizedSize = w.Size()
-	w.maximized = maximized
+	w.SetMaximized(maximized, w.Position(), w.Size())
 	w.Move(pos)
 	w.Resize(size)
 }

@@ -5,7 +5,7 @@ go 1.27.0
 //replace github.com/roffe/gocan/v2 => ../gocan
 
 //replace github.com/roffe/ecusymbol => ../ecusymbol
-replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20260902195541-a29bcb9f9f3d
+replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20260924181033-34b9175ed867
 
 //replace go.bug.st/serial => ../../../go.bug.st/serial
 
@@ -15,11 +15,12 @@ require (
 	fyne.io/fyne/v2 v2.8.0
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/avast/retry-go/v4 v4.7.0
+	github.com/dweymouth/fyne-tooltip v0.4.0
 	github.com/ebitengine/oto/v3 v3.4.0
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/hajimehoshi/go-mp3 v0.3.4
-	github.com/roffe/ecusymbol v1.2.6-0.20260904215927-430a00d81970
-	github.com/roffe/gocan/v2 v2.1.1-0.20260902194357-7616f564e2a0
+	github.com/roffe/ecusymbol v1.2.6-0.20260924192406-eb1f987c0234
+	github.com/roffe/gocan/v2 v2.1.1-0.20260924192453-8923d277381b
 	github.com/stretchr/testify v1.11.1
 	github.com/yuin/gopher-lua v1.1.2
 	go.bug.st/serial v1.8.0
@@ -35,7 +36,6 @@ require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/FyshOS/fancyfs v0.0.1 // indirect
 	github.com/anthonynsimon/bild v0.14.0 // indirect
-	github.com/bendikro/dl v0.0.0-20190410215913-e41fdb9069d4 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/ebitengine/purego v0.9.1 // indirect
@@ -43,11 +43,11 @@ require (
 	github.com/fyne-io/gl-js v0.2.1-0.20260315212741-029c47fd27e8 // indirect
 	github.com/fyne-io/glfw-js v0.4.0 // indirect
 	github.com/fyne-io/image v0.1.1 // indirect
-	github.com/fyne-io/oksvg v0.2.0 // indirect
+	github.com/fyne-io/oksvg v0.2.1-0.20260918172519-a9af55fa95d9 // indirect
 	github.com/go-gl/gl v0.0.0-20260331235117-4566fea9a276 // indirect
 	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.2 // indirect
 	github.com/go-text/render v0.2.1 // indirect
-	github.com/go-text/typesetting v0.3.4 // indirect
+	github.com/go-text/typesetting v0.3.5 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/gotmc/libusb/v2 v2.6.0 // indirect

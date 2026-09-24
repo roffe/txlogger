@@ -6,10 +6,19 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	ttwidget "github.com/dweymouth/fyne-tooltip/widget"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
 
 func (mw *MainWindow) newToolbar() *fyne.Container {
+	arrangeBt := ttwidget.NewButtonWithIcon("", theme.GridIcon(), func() {
+		mw.wm.Arrange(&multiwindow.GridArranger{})
+	})
+	arrangeBt.SetToolTip("Arrange windows in a grid")
+
+	closeAllBt := ttwidget.NewButtonWithIcon("", theme.ContentClearIcon(), mw.wm.CloseAll)
+	closeAllBt.SetToolTip("Close all windows")
+
 	toolbar := container.NewHBox(
 		mw.buttons.symbolListBtn,
 		container.NewBorder(
@@ -24,10 +33,8 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 		mw.buttons.livePlotBtn,
 		mw.buttons.dashboardBtn,
 		mw.buttons.addGaugeBtn,
-		widget.NewButtonWithIcon("", theme.GridIcon(), func() {
-			mw.wm.Arrange(&multiwindow.GridArranger{})
-		}),
-		widget.NewButtonWithIcon("", theme.ContentClearIcon(), mw.wm.CloseAll),
+		arrangeBt,
+		closeAllBt,
 		layout.NewSpacer(),
 		container.NewBorder(
 			nil,

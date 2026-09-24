@@ -18,6 +18,8 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	fynetooltip "github.com/dweymouth/fyne-tooltip"
+	ttwidget "github.com/dweymouth/fyne-tooltip/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/ecusymbol/as2"
 	"github.com/roffe/gocan/v2/t7kwp"
@@ -109,14 +111,14 @@ type mainWindowSelects struct {
 }
 
 type mainWindowButtons struct {
-	debugBtn     *widget.Button
-	logBtn       *widget.Button
-	dashboardBtn *widget.Button
+	debugBtn     *ttwidget.Button
+	logBtn       *ttwidget.Button
+	dashboardBtn *ttwidget.Button
 
 	layoutRefreshBtn *widget.Button
-	symbolListBtn    *widget.Button
-	addGaugeBtn      *widget.Button
-	livePlotBtn      *widget.Button
+	symbolListBtn    *ttwidget.Button
+	addGaugeBtn      *ttwidget.Button
+	livePlotBtn      *ttwidget.Button
 }
 
 type mainWindowCounters struct {
@@ -176,7 +178,7 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	mw.Window.SetOnDropped(mw.onDropped)
 	mw.SetCloseIntercept(mw.Close)
 	mw.SetPadded(true)
-	mw.SetContent(mw.content)
+	mw.SetContent(fynetooltip.AddWindowToolTipLayer(mw.content, mw.Canvas()))
 	/*
 		// ponytail: size only, Fyne has no API to get or set window position
 		p := app.Preferences()

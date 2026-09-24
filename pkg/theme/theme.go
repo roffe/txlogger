@@ -78,6 +78,8 @@ func (m TxTheme) Size(name fyne.ThemeSizeName) float32 {
 		return 1
 	case theme.SizeNameInputRadius:
 		return 5
+	case theme.SizeNameButtonRadius: // fyne 2.8 split this from InputRadius; 0 made every button square
+		return 5
 	case theme.SizeNameSelectionRadius:
 		return 3
 	case theme.SizeNameWindowTitleBarHeight:
@@ -88,6 +90,10 @@ func (m TxTheme) Size(name fyne.ThemeSizeName) float32 {
 		return 20
 	case theme.SizeNameWindowButtonRadius:
 		return 0
+	case theme.SizeNameWindowShadowRadius: // inner window shadow, fyne defaults
+		return 10
+	case theme.SizeNameWindowShadowActiveRadius:
+		return 20
 	default:
 		return 0
 	}

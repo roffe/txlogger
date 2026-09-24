@@ -41,5 +41,7 @@ txlogger.exe
 *.AppImage
 
 run.log
+crash.log
 
 *.code-workspace
+scripts/t7immo.lua

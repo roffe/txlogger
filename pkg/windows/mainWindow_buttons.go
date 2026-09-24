@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	ttwidget "github.com/dweymouth/fyne-tooltip/widget"
 	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
@@ -33,8 +34,8 @@ func (mw *MainWindow) createButtons() {
 	mw.buttons.livePlotBtn = mw.newLivePlotBtn()
 }
 
-func (mw *MainWindow) newLivePlotBtn() *widget.Button {
-	return widget.NewButtonWithIcon("Live plot", theme.MediaSkipNextIcon(), func() {
+func (mw *MainWindow) newLivePlotBtn() *ttwidget.Button {
+	bt := ttwidget.NewButtonWithIcon("Live plot", theme.MediaSkipNextIcon(), func() {
 		if w := mw.wm.HasWindow("Live plot"); w != nil {
 			mw.wm.Raise(w)
 			return
@@ -57,10 +58,12 @@ func (mw *MainWindow) newLivePlotBtn() *widget.Button {
 		mw.wm.Add(lpw)
 		lpw.Resize(fyne.NewSize(900, 500))
 	})
+	bt.SetToolTip("Open live plot window")
+	return bt
 }
 
-func (mw *MainWindow) newaddGaugeBtn() *widget.Button {
-	return widget.NewButtonWithIcon("", theme.ContentAddIcon(), func() {
+func (mw *MainWindow) newaddGaugeBtn() *ttwidget.Button {
+	bt := ttwidget.NewButtonWithIcon("", theme.ContentAddIcon(), func() {
 		if w := mw.wm.HasWindow("Create gauge"); w != nil {
 			mw.wm.Raise(w)
 			return
@@ -70,10 +73,12 @@ func (mw *MainWindow) newaddGaugeBtn() *widget.Button {
 		iw.Icon = theme.ContentAddIcon()
 		mw.wm.Add(iw)
 	})
+	bt.SetToolTip("Create a new gauge")
+	return bt
 }
 
-func (mw *MainWindow) newSymbolListBtn() *widget.Button {
-	return widget.NewButtonWithIcon("Symbol list", theme.ListIcon(), func() {
+func (mw *MainWindow) newSymbolListBtn() *ttwidget.Button {
+	bt := ttwidget.NewButtonWithIcon("Symbol list", theme.ListIcon(), func() {
 		if w := mw.wm.HasWindow("Symbol list"); w != nil {
 			mw.wm.Raise(w)
 			return
@@ -91,10 +96,12 @@ func (mw *MainWindow) newSymbolListBtn() *widget.Button {
 			symbolListWindow.Resize(fyne.NewSize(300, 550))
 		}
 	})
+	bt.SetToolTip("Open symbol list window")
+	return bt
 }
 
-func (mw *MainWindow) newDebugBtn() *widget.Button {
-	return widget.NewButtonWithIcon("Debug log", theme.InfoIcon(), func() {
+func (mw *MainWindow) newDebugBtn() *ttwidget.Button {
+	bt := ttwidget.NewButtonWithIcon("Debug log", theme.InfoIcon(), func() {
 		if w := mw.wm.HasWindow("Debug log"); w != nil {
 			mw.wm.Raise(w)
 			return
@@ -115,6 +122,8 @@ func (mw *MainWindow) newDebugBtn() *widget.Button {
 		xy := mw.wm.Size().Subtract(dbl.MinSize().AddWidthHeight(20, 60))
 		mw.wm.Add(debugWindow, fyne.NewPos(xy.Width, xy.Height))
 	})
+	bt.SetToolTip("Open debug log window")
+	return bt
 }
 
 /*
@@ -153,8 +162,8 @@ func (mw *MainWindow) newLogplayerBtn() *widget.Button {
 }
 */
 
-func (mw *MainWindow) newLogBtn() *widget.Button {
-	return widget.NewButtonWithIcon("Start", theme.MediaPlayIcon(), func() {
+func (mw *MainWindow) newLogBtn() *ttwidget.Button {
+	bt := ttwidget.NewButtonWithIcon("Start", theme.MediaPlayIcon(), func() {
 		if mw.loggingRunning {
 			if mw.dlc != nil {
 				mw.dlc.Close()
@@ -176,10 +185,12 @@ func (mw *MainWindow) newLogBtn() *widget.Button {
 		}
 		mw.startLogging()
 	})
+	bt.SetToolTip("Start or stop logging")
+	return bt
 }
 
-func (mw *MainWindow) newDashboardBtn() *widget.Button {
-	return widget.NewButtonWithIcon("Dashboard", theme.InfoIcon(), func() {
+func (mw *MainWindow) newDashboardBtn() *ttwidget.Button {
+	bt := ttwidget.NewButtonWithIcon("Dashboard", theme.InfoIcon(), func() {
 		if w := mw.wm.HasWindow("Dashboard"); w != nil {
 			mw.wm.Raise(w)
 			return
@@ -230,7 +241,8 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 		followWBL()
 
 		// the ECU type is part of what the wideband setting resolves to
-		cancelFuncs = append(cancelFuncs,
+		cancelFuncs = append(
+			cancelFuncs,
 			ebus.SubscribeFunc(ebus.TOPIC_WBLSYMBOL, func(float64) { followWBL() }),
 			ebus.SubscribeFunc(ebus.TOPIC_ECU, func(float64) { followWBL() }),
 		)
@@ -264,6 +276,8 @@ func (mw *MainWindow) newDashboardBtn() *widget.Button {
 			dbw.Move(fyne.NewPos(500, 0))
 		}
 	})
+	bt.SetToolTip("Open Dashboard")
+	return bt
 }
 
 func (mw *MainWindow) startLogging() {

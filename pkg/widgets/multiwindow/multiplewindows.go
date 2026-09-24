@@ -271,8 +271,10 @@ func (m *MultipleWindows) refreshChildren() {
 
 func (m *MultipleWindows) setupChild(w *InnerWindow) {
 	w.OnDragged = func(ev *fyne.DragEvent) {
+		// ev.Dragged is the total delta since the drag started, so the clamp
+		// below absorbs overshoot instead of drifting the window off the cursor.
 		if w.maximized {
-			w.maximized = false
+			w.setMaximized(false)
 			w.Resize(w.preMaximizedSize)
 			// Convert the cursor's canvas-relative position into a position
 			// relative to our container, so this works regardless of where the
@@ -280,10 +282,12 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 			local := ev.AbsolutePosition.Subtract(fyne.CurrentApp().Driver().AbsolutePositionForObject(m.content))
 			barHeight := w.Theme().Size(theme.SizeNameWindowTitleBarHeight)
 			w.Move(local.SubtractXY(w.preMaximizedSize.Width*0.5, barHeight*0.5))
+			// Re-anchor so the rest of the drag continues from the restored rect.
+			w.dragStartPos = w.Position().SubtractXY(ev.Dragged.DX, ev.Dragged.DY)
 			return
 		}
 
-		newPos := w.Position().Add(ev.Dragged)
+		newPos := w.dragStartPos.AddXY(ev.Dragged.DX, ev.Dragged.DY)
 		if m.LockViewport {
 			size := w.Size()
 			bounds := m.content.Size()
@@ -330,8 +334,8 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 		}
 
 		w.Move(pos)
-		w.Resize(size.Max(minSize))
-		w.maximized = false
+		w.Resize(fyne.NewSize(max(size.Width, minSize.Width), max(size.Height, minSize.Height)))
+		w.setMaximized(false)
 	}
 
 	w.OnTappedBar = func() {
@@ -393,7 +397,7 @@ func (m *MultipleWindows) setupChild(w *InnerWindow) {
 			})
 			rm.Start()
 		}
-		w.maximized = !w.maximized
+		w.setMaximized(!w.maximized)
 		m.Raise(w)
 	}
 

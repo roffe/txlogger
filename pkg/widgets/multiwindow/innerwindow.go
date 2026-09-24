@@ -56,7 +56,10 @@ type InnerWindow struct {
 	//	- On Darwin this will be `widget.ButtonAlignLeading`
 	//	- On all other OS this will be `widget.ButtonAlignTrailing`
 	Alignment widget.ButtonAlign
-	OnClose   func()                `json:"-"`
+	OnClose   func() `json:"-"`
+	// OnDragged is called while the title bar is dragged. Like OnResized, the
+	// event's Dragged field holds the TOTAL delta since the drag started; add
+	// it to dragStartPos.
 	OnDragged func(*fyne.DragEvent) `json:"-"`
 	// OnResized is called while a border resize drag is in progress. The
 	// event's Dragged field holds the TOTAL delta since the drag started, not
@@ -87,8 +90,8 @@ type InnerWindow struct {
 	preMinimizedSize fyne.Size
 	preMinimizedPos  fyne.Position
 
-	// window rect at the start of the current border-resize drag; OnResized
-	// computes the new rect from these plus the total drag delta.
+	// window rect at the start of the current move or border-resize drag;
+	// OnDragged/OnResized compute the new rect from these plus the total drag delta.
 	dragStartPos  fyne.Position
 	dragStartSize fyne.Size
 
@@ -166,9 +169,18 @@ func (w *InnerWindow) Maximized() bool {
 }
 
 func (w *InnerWindow) SetMaximized(maximized bool, prePos fyne.Position, preSize fyne.Size) {
-	w.maximized = maximized
 	w.preMaximizedPos = prePos
 	w.preMaximizedSize = preSize
+	w.setMaximized(maximized)
+}
+
+// setMaximized refreshes on change so the maximize/restore button icon follows the state.
+func (w *InnerWindow) setMaximized(maximized bool) {
+	if w.maximized == maximized {
+		return
+	}
+	w.maximized = maximized
+	w.Refresh()
 }
 
 func (w *InnerWindow) PreMaximizedSize() fyne.Size {
@@ -245,6 +257,7 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 	v := fyne.CurrentApp().Settings().ThemeVariant()
 	w.bg = canvas.NewRectangle(th.Color(theme.ColorNameOverlayBackground, v))
 	w.bg.CornerRadius = 4
+	configureShadow(w.bg, w.active, th, v)
 	contentBG := canvas.NewRectangle(th.Color(theme.ColorNameBackground, v))
 
 	var topBorder, bottomBorder, leftBorder, rightBorder *draggableBorder
@@ -263,18 +276,18 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 	}
 
 	r := &innerWindowRenderer{
-		ShadowingRenderer: NewShadowingRenderer(objects, SubmergedContentLevel),
-		win:               w,
-		bar:               bar,
-		title:             title,
-		buttons:           []*borderButton{min, max, close},
-		bg:                w.bg,
-		topBorder:         topBorder,
-		bottomBorder:      bottomBorder,
-		leftBorder:        leftBorder,
-		rightBorder:       rightBorder,
-		borders:           borders,
-		contentBG:         contentBG,
+		objects:      objects,
+		win:          w,
+		bar:          bar,
+		title:        title,
+		buttons:      []*borderButton{min, max, close},
+		bg:           w.bg,
+		topBorder:    topBorder,
+		bottomBorder: bottomBorder,
+		leftBorder:   leftBorder,
+		rightBorder:  rightBorder,
+		borders:      borders,
+		contentBG:    contentBG,
 	}
 	r.Layout(w.Size())
 	return r
@@ -307,6 +320,7 @@ func (w *InnerWindow) SetTitle(title string) {
 var _ fyne.WidgetRenderer = (*innerWindowRenderer)(nil)
 
 type innerWindowRenderer struct {
+	objects []fyne.CanvasObject
 	win     *InnerWindow
 	bar     *fyne.Container
 	title   *draggableLabel
@@ -320,23 +334,19 @@ type innerWindowRenderer struct {
 	rightBorder  fyne.CanvasObject
 
 	borders []fyne.CanvasObject // all border handles, for show/hide
-
-	*ShadowingRenderer
 }
 
+func (i *innerWindowRenderer) Objects() []fyne.CanvasObject { return i.objects }
+func (i *innerWindowRenderer) Destroy()                     {}
+
 // Layout arranges the window chrome. The visible window (bg) fills the widget
-// rect exactly: the resize strips straddle its edges, the shadow hugs it, and
-// the title bar and content sit inside with symmetric padding insets.
+// rect exactly and paints its own shadow; the resize strips straddle its
+// edges, and the title bar and content sit inside with symmetric padding insets.
 func (i *innerWindowRenderer) Layout(size fyne.Size) {
 	th := i.win.Theme()
 	padding := th.Size(theme.SizeNamePadding)
 	barHeight := th.Size(theme.SizeNameWindowTitleBarHeight)
 
-	// Shadow and background wrap the full widget rect. The shadow is inset by
-	// the bg corner radius so its gradients show through the rounded-off
-	// corner notches instead of the bare canvas behind the window.
-	inset := i.bg.CornerRadius
-	i.LayoutShadow(size.SubtractWidthHeight(2*inset, 2*inset), fyne.NewPos(inset, inset))
 	i.bg.Resize(size)
 
 	// Title bar: full width minus a padding inset on each side.
@@ -431,6 +441,7 @@ func (i *innerWindowRenderer) Refresh() {
 	th := i.win.Theme()
 	v := fyne.CurrentApp().Settings().ThemeVariant()
 	i.bg.FillColor = th.Color(i.win.bgFillColor, v)
+	configureShadow(i.bg, i.win.active, th, v)
 	i.bg.Refresh()
 	i.contentBG.FillColor = th.Color(theme.ColorNameBackground, v)
 	i.contentBG.Refresh()
@@ -438,11 +449,28 @@ func (i *innerWindowRenderer) Refresh() {
 	for _, b := range i.buttons {
 		b.setTheme(th, i.win.active)
 	}
+	if i.win.maximized {
+		i.buttons[1].b.SetIcon(theme.ViewRestoreIcon())
+	} else {
+		i.buttons[1].b.SetIcon(theme.WindowMaximizeIcon())
+	}
 	i.bar.Refresh()
 	if i.title.Text != i.win.title {
 		i.title.SetText(i.win.title)
 	}
-	i.ShadowingRenderer.RefreshShadow()
+}
+
+// configureShadow sizes the window's painter-drawn drop shadow from the theme,
+// larger for the active window.
+func configureShadow(bg *canvas.Rectangle, active bool, th fyne.Theme, v fyne.ThemeVariant) {
+	radius := th.Size(theme.SizeNameWindowShadowRadius)
+	if active {
+		radius = th.Size(theme.SizeNameWindowShadowActiveRadius)
+	}
+	bg.Shadow.Color = th.Color(theme.ColorNameShadow, v)
+	bg.Shadow.Offset = fyne.NewPos(radius/8, radius/4)
+	bg.Shadow.Spread = radius / 2
+	bg.Shadow.BlurRadius = radius
 }
 
 var (
@@ -453,7 +481,9 @@ var (
 
 type draggableLabel struct {
 	widget.Label
-	win *InnerWindow
+	win      *InnerWindow
+	dragging bool
+	pressAbs fyne.Position // mouse position at drag start, anchor for total-delta moves
 }
 
 func newDraggableLabel(title string, win *InnerWindow) *draggableLabel {
@@ -484,13 +514,26 @@ func (d *draggableLabel) TypedKey(ev *fyne.KeyEvent) {
 func (d *draggableLabel) TypedRune(r rune) {
 }
 
+// Dragged reports the total travel since the press, like draggableBorder, so a
+// window clamped at the viewport edge stays under the cursor when it comes back.
 func (d *draggableLabel) Dragged(ev *fyne.DragEvent) {
+	if !d.dragging {
+		d.dragging = true
+		d.pressAbs = fyne.NewPos(ev.AbsolutePosition.X-ev.Dragged.DX, ev.AbsolutePosition.Y-ev.Dragged.DY)
+		d.win.dragStartPos = d.win.Position()
+	}
 	if f := d.win.OnDragged; f != nil {
-		f(ev)
+		total := *ev
+		total.Dragged = fyne.Delta{
+			DX: ev.AbsolutePosition.X - d.pressAbs.X,
+			DY: ev.AbsolutePosition.Y - d.pressAbs.Y,
+		}
+		f(&total)
 	}
 }
 
 func (d *draggableLabel) DragEnd() {
+	d.dragging = false
 }
 
 func (d *draggableLabel) Tapped(ev *fyne.PointEvent) {
@@ -588,11 +631,7 @@ func (b *buttonTheme) Color(n fyne.ThemeColorName, v fyne.ThemeVariant) color.Co
 
 func (b *buttonTheme) Size(n fyne.ThemeSizeName) float32 {
 	switch n {
-	case theme.SizeNameInputRadius:
-		//if b.mode == modeIcon {
-		//	return 4
-		//}
-		//n = theme.SizeNameWindowButtonRadius
+	case theme.SizeNameButtonRadius:
 		return 4
 	case theme.SizeNameInlineIcon:
 		// n = theme.SizeNameWindowButtonIcon
