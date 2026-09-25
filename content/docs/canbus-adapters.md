@@ -20,10 +20,13 @@ following adapters. Pick the one matching your hardware in **Settings → CAN Ad
 | Just4Trionic | STM32F103C8T6 based DIY adapter |
 | YACA | Yet Another CANbus Adapter |
 
-## J2534 pass-thru (Windows)
+## J2534 pass-thru
 
 Any device with a J2534 driver installed, for example Drewtech Mongoose, Tactrix Openport
 and GM MDI. txlogger enumerates installed J2534 drivers automatically.
+
+On Linux, the Drewtech MongoosePro GM II and Tactrix OpenPort 2.0 work with open source
+drivers. See [J2534 on Linux](/docs/linux-j2534/).
 
 ## WiFi
 
@@ -38,4 +41,3 @@ and GM MDI. txlogger enumerates installed J2534 drivers automatically.
 |---|---|
 | rCAN | CAN device by [roffe.nu](https://roffe.nu) |
 | SocketCAN | Linux only, when building txlogger from source |
-| Drewtech Mongoose | Native Linux driver, when building txlogger from source |
