@@ -67,6 +67,7 @@ func (c *Controller[K, V]) SubscribeFunc(topic K, fn func(V)) (unsubscribe func(
 	}
 }
 
+/*
 // Subscribe registers a buffered channel that receives every value published
 // to topic. The returned unsubscribe function removes the subscription and
 // closes the channel.
@@ -92,7 +93,7 @@ func (c *Controller[K, V]) Subscribe(topic K, buffer int) (ch <-chan V, unsubscr
 		})
 	}
 }
-
+*/
 // Publish delivers v to every current subscriber of topic. Callbacks run
 // synchronously in the caller's goroutine in an unspecified order. This is the
 // hot path: it takes no locks and allocates nothing.
