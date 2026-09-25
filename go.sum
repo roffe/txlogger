@@ -84,8 +84,6 @@ github.com/roffe/ecusymbol v1.2.6-0.20260924192406-eb1f987c0234 h1:KhSLtnXXj3EBz
 github.com/roffe/ecusymbol v1.2.6-0.20260924192406-eb1f987c0234/go.mod h1:Y6vMPbT3P6nVXfUetMZBJKc6N4jPuzpNJfk8bHAfx5Q=
 github.com/roffe/fyne/v2 v2.0.0-20260924181033-34b9175ed867 h1:i6CsoXVWw4a3pJu0+riBYkdmgOIuPRyo4j9TzV2qBXU=
 github.com/roffe/fyne/v2 v2.0.0-20260924181033-34b9175ed867/go.mod h1:eXHJ/D9Y58UcDw7SkguadCRI64M4flXyjoMn827Q5SI=
-github.com/roffe/gocan/v2 v2.1.1-0.20260924192453-8923d277381b h1:+lNGB9QlsWUs80taBwLdDskXa+Ffur/QkHzPQBSLOc8=
-github.com/roffe/gocan/v2 v2.1.1-0.20260924192453-8923d277381b/go.mod h1:w0j6hk8tdHclfTVuWBoTY1whyfgRumMACXGizbKErYM=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=

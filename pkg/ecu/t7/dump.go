@@ -19,17 +19,26 @@ func (t *Client) DumpECU(ctx context.Context) ([]byte, error) {
 		return nil, fmt.Errorf("failed to authenticate: %v", err)
 	}
 	defer t.StopSession(ctx)
-	return t.readECU(ctx, 0, 0x80000)
+	return t.readECU(ctx, 0, 0x80000, t.probeFast(ctx) > 0)
 }
 
-func (t *Client) readECU(ctx context.Context, addr, length int) ([]byte, error) {
+func (t *Client) readECU(ctx context.Context, addr, length int, fast bool) ([]byte, error) {
 	t.cfg.OnProgress(-float64(length))
 	t.cfg.OnMessage("Dumping ECU")
 
 	start := time.Now()
 	out := bytes.NewBuffer(make([]byte, 0, length))
 
-	for readPos := addr; readPos < addr+length; {
+	if fast {
+		if err := t.fastRead(ctx, out, addr, length); err != nil {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			t.cfg.OnMessage(fmt.Sprintf("Fast read failed at 0x%X, continuing with standard read: %v", addr+out.Len(), err))
+		}
+	}
+
+	for readPos := addr + out.Len(); readPos < addr+length; {
 		t.cfg.OnProgress(float64(out.Len()))
 		select {
 		case <-ctx.Done():

@@ -132,22 +132,36 @@ func (t *Client) FlashECU(ctx context.Context, bin []byte) error {
 		return fmt.Errorf("failed to authenticate: %v", err)
 	}
 
+	fast := t.probeFast(ctx) // before the erase: the EOL code in RAM is the current firmware's
+
 	if err := t.EraseECU(ctx); err != nil {
 		return err
 	}
 
-	return t.writeBin(ctx, bin)
+	return t.writeBin(ctx, bin, fast)
 }
 
 // writeBin runs the download phase: requestDownload/transferData over every data
 // segment, then requestTransferExit. The chip is already erased, so segments may
 // be written in any order and a failed one resumes from its failure point.
-func (t *Client) writeBin(ctx context.Context, bin []byte) error {
+// fastBlock > 0 (from probeFast) writes with the fast routines first; whatever
+// they can't finish goes the KWP way.
+func (t *Client) writeBin(ctx context.Context, bin []byte, fastBlock int) error {
 	t.cfg.OnProgress(-float64(0x80000))
 	t.cfg.OnMessage("Flashing ECU")
 
 	start := time.Now()
-	for _, seg := range computeWriteSegments(bin) {
+	segs := computeWriteSegments(bin)
+	if fastBlock > 0 {
+		var err error
+		if segs, err = t.fastWrite(ctx, bin, segs, fastBlock); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			t.cfg.OnMessage(fmt.Sprintf("Fast flash failed, continuing with standard transfer: %v", err))
+		}
+	}
+	for _, seg := range segs {
 		binPos := seg.start // persists across attempts; only advances on successful writes
 		err := retry.Do(func() error {
 			// re-anchor the ECU write pointer at the last good position so a retry

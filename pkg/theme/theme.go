@@ -1,7 +1,10 @@
 package theme
 
 import (
+	"errors"
 	"image/color"
+	"os"
+	"path/filepath"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
@@ -16,6 +19,29 @@ var (
 
 func ExportIcon() fyne.Resource { return exportIcon }
 func ImportIcon() fyne.Resource { return importIcon }
+
+// Load returns TxTheme overridden by theme.json next to the executable, if present.
+// Any color or size the file leaves out keeps the TxTheme value; theme.default.json
+// in this package is a dump of those values.
+func Load() (fyne.Theme, error) {
+	dir := os.Getenv("APPIMAGE") // os.Executable is inside the read-only AppImage mount
+	if dir == "" {
+		exe, err := os.Executable()
+		if err != nil {
+			return &TxTheme{}, err
+		}
+		dir = exe
+	}
+	f, err := os.Open(filepath.Join(filepath.Dir(dir), "theme.json"))
+	if errors.Is(err, os.ErrNotExist) {
+		return &TxTheme{}, nil
+	}
+	if err != nil {
+		return &TxTheme{}, err
+	}
+	defer f.Close()
+	return theme.FromJSONReaderWithFallback(f, &TxTheme{})
+}
 
 type TxTheme struct{}
 

@@ -121,10 +121,11 @@ func (t *Client) EOLFlash(ctx context.Context, bin []byte, p EOLParams) error {
 	if err != nil || !ok {
 		return fmt.Errorf("failed to authenticate: %v", err)
 	}
+	fast := t.probeFast(ctx) // before the erase: the EOL code in RAM is the current firmware's
 	if err := t.EraseECU(ctx); err != nil {
 		return err
 	}
-	if err := t.writeBin(ctx, bin); err != nil {
+	if err := t.writeBin(ctx, bin, fast); err != nil {
 		return err
 	}
 

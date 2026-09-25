@@ -93,7 +93,11 @@ func main() {
 
 	// create app
 	tx := app.NewWithID("com.roffe.txlogger")
-	tx.Settings().SetTheme(&theme.TxTheme{})
+	th, err := theme.Load()
+	if err != nil {
+		debug.Log("theme.json: " + err.Error())
+	}
+	tx.Settings().SetTheme(th)
 
 	/*
 		if desk, ok := tx.(desktop.App); ok {
