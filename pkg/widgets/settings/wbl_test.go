@@ -20,9 +20,7 @@ func TestWidebandSourceChangeIsAnnounced(t *testing.T) {
 	test.NewWindow(sw) // the controls are built in CreateRenderer
 
 	var pulses int
-	// subscribe on the controller directly: ebus.SubscribeFunc defers to the
-	// Fyne event loop, which is not running here
-	defer ebus.CONTROLLER.SubscribeFunc(ebus.TOPIC_WBLSYMBOL, func(float64) { pulses++ })()
+	defer ebus.SubscribeFunc(ebus.TOPIC_WBLSYMBOL, func(float64) { pulses++ })()
 
 	sw.wblSource.SetSelected(aem.ProductString)
 	if pulses != 1 {

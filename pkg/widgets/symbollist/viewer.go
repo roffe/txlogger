@@ -81,9 +81,10 @@ func NewViewer(cfg *ViewerConfig) *Viewer {
 	v.presetSelect.Alignment = fyne.TextAlignLeading
 	v.presetSelect.PlaceHolder = noPreset
 
+	// these run on the publisher's goroutine; SetColorBlindMode and UpdateBars
+	// post their own canvas work
 	ebus.SubscribeFunc(ebus.TOPIC_COLORBLINDMODE, func(f float64) {
 		v.list.SetColorBlindMode(colors.ColorBlindMode(int(f)))
-		v.list.Refresh()
 	})
 
 	ebus.SubscribeFunc(ebus.TOPIC_REALTIMEBARS, func(f float64) {
@@ -353,7 +354,8 @@ func (v *Viewer) Enable() {
 	v.list.Enable()
 }
 
-// The rest is the list API, delegated.
+// The rest is the list API, delegated. SetValue, Clear, UpdateBars and
+// SetColorBlindMode may be called from any goroutine, like the list's.
 
 func (v *Viewer) Names() []string                       { return v.list.Names() }
 func (v *Viewer) Symbols() []*symbol.Symbol             { return v.list.Symbols() }
@@ -364,5 +366,4 @@ func (v *Viewer) UpdateBars(enabled bool)               { v.list.UpdateBars(enab
 func (v *Viewer) LoadSymbols(symbols ...*symbol.Symbol) { v.list.LoadSymbols(symbols...) }
 func (v *Viewer) SetColorBlindMode(mode colors.ColorBlindMode) {
 	v.list.SetColorBlindMode(mode)
-	v.list.Refresh()
 }

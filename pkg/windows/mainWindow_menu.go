@@ -1021,7 +1021,7 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.YFrom, mv.SetY))
 	}
 	cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(ebus.TOPIC_COLORBLINDMODE, func(value float64) {
-		mv.SetColorBlindMode(colors.ColorBlindMode(int(value)))
+		fyne.Do(func() { mv.SetColorBlindMode(colors.ColorBlindMode(int(value))) })
 	}))
 
 	return mv, cfg, axis, cancelFuncs, nil

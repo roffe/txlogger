@@ -4,7 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"fyne.io/fyne/v2"
 	"github.com/roffe/txlogger/pkg/bus"
 )
 
@@ -51,13 +50,13 @@ func PublishFrame(t time.Time) {
 	CONTROLLER.Publish(TOPIC_FRAME, float64(t.UnixMilli()))
 }
 
+// SubscribeFunc calls f with every value published to topic and returns the
+// unsubscribe func. f runs synchronously on the publishing goroutine (a
+// datalogger or log player for symbol topics, usually the UI goroutine for
+// settings topics), so it must be quick and reach Fyne objects only through
+// fyne.Do. The widget setters fed from here post just their canvas work.
 func SubscribeFunc(topic string, f func(float64)) func() {
-	wrapFN := func(v float64) {
-		fyne.Do(func() {
-			f(v)
-		})
-	}
-	return CONTROLLER.SubscribeFunc(topic, wrapFN)
+	return CONTROLLER.SubscribeFunc(topic, f)
 }
 
 func SetOnMessage(f func(string, float64)) {

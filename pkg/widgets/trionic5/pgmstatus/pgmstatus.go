@@ -1,6 +1,8 @@
 package pgmstatus
 
 import (
+	"sync"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
@@ -13,6 +15,9 @@ type Widget struct {
 	leds leds
 
 	content *fyne.Container
+
+	mu    sync.Mutex // guards value; Set runs on publisher goroutines
+	value uint64     // last bitfield posted; 0 matches the all-off LEDs New starts with
 }
 
 type leds struct {
@@ -197,8 +202,21 @@ func (w *Widget) clearAll() {
 	w.leds.tempCmp.Off()
 }
 
+// Set may be called from any goroutine. Pgm_status rarely changes, so repeats
+// are dropped here and only a changed bitfield is posted to the LEDs.
 func (w *Widget) Set(data float64) {
 	value := uint64(data)
+	w.mu.Lock()
+	defer w.mu.Unlock() // held across fyne.Do so updates reach the UI in order
+	if value == w.value {
+		return
+	}
+	w.value = value
+	fyne.Do(func() { w.setLEDs(value) })
+}
+
+// setLEDs lights the LED of every set bit. UI goroutine only.
+func (w *Widget) setLEDs(value uint64) {
 	w.clearAll()
 	if value&0x01 > 0 {
 		w.leds.ignition.On()

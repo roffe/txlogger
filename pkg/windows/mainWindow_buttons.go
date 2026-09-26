@@ -240,11 +240,13 @@ func (mw *MainWindow) newDashboardBtn() *ttwidget.Button {
 		}
 		followWBL()
 
-		// the ECU type is part of what the wideband setting resolves to
+		// the ECU type is part of what the wideband setting resolves to.
+		// followWBL reads the settings widgets and swaps wblCancel, so it
+		// always runs on the UI goroutine.
 		cancelFuncs = append(
 			cancelFuncs,
-			ebus.SubscribeFunc(ebus.TOPIC_WBLSYMBOL, func(float64) { followWBL() }),
-			ebus.SubscribeFunc(ebus.TOPIC_ECU, func(float64) { followWBL() }),
+			ebus.SubscribeFunc(ebus.TOPIC_WBLSYMBOL, func(float64) { fyne.Do(followWBL) }),
+			ebus.SubscribeFunc(ebus.TOPIC_ECU, func(float64) { fyne.Do(followWBL) }),
 		)
 
 		dbw := multiwindow.NewInnerWindow("Dashboard", db)

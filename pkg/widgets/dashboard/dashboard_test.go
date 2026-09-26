@@ -1,15 +1,18 @@
 package dashboard
 
 import (
+	"sync"
 	"testing"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
+	"github.com/roffe/txlogger/pkg/widgets/internal/uitest"
 )
 
-// Gauges build their canvas objects in CreateRenderer, so the metric router
-// must never reach a gauge the layout doesn't render — feeding one panics on
-// nil canvas objects (CBar.applyBar was the reported crash).
+// Gauges build their canvas objects in CreateRenderer. Feeding the dashboard
+// before its first layout, or with items removed, must not panic on nil canvas
+// objects (CBar.applyBar was the reported crash). The router's gate also keeps
+// values away from gauges the layout doesn't render.
 func TestFeedingUnrenderedGaugesIsSafe(t *testing.T) {
 	test.NewApp()
 	const wbl = "Lambda.External"
@@ -120,5 +123,56 @@ func TestEditModeSwapsOverlayObjects(t *testing.T) {
 	}
 	if after := len(renderer.Objects()); after != before {
 		t.Errorf("object count %d after leaving edit mode, want %d", after, before)
+	}
+}
+
+// Publishers feed the dashboard from their own goroutines while the UI
+// goroutine re-lays it out. Run with -race.
+func TestSetValueWhileRelayingOut(t *testing.T) {
+	onUI := uitest.Start(t)
+
+	var db *Dashboard
+	var win fyne.Window
+	onUI(func() {
+		db = NewDashboard(&Config{WidebandSymbol: "Lambda.External"})
+		win = test.NewWindow(db)
+		win.SetPadded(false)
+		win.Resize(fyne.NewSize(800, 600))
+	})
+
+	names := db.GetMetricNames()
+	var wg sync.WaitGroup
+	for p := range 4 {
+		wg.Go(func() {
+			for i := range 300 {
+				v := float64((i+p)%50 - 10)
+				for _, name := range names {
+					switch name {
+					case "KnkDet.KnockCyl", "Knock_offset1234":
+						db.SetValue(name, 0) // a knock arms a 5 s hide timer
+					default:
+						db.SetValue(name, v)
+					}
+				}
+			}
+		})
+	}
+
+	for i, style := range []string{StyleBar, StyleGauge, StyleBar, StyleGauge} {
+		onUI(func() {
+			win.Resize(fyne.NewSize(800+float32(i)*40, 600-float32(i)*30))
+			db.setWBLStyle(style)
+			db.removeItem("rpm")
+			db.addItem(*itemDefByID("rpm"))
+		})
+	}
+	wg.Wait()
+
+	db.SetValue("Out.fi_Ignition", 12.3)
+	onUI(func() {}) // flush the posts queued so far
+	var got string
+	onUI(func() { got = db.text.ign.Text })
+	if got != "Ign: 12.3" {
+		t.Errorf("ign text %q, want %q", got, "Ign: 12.3")
 	}
 }

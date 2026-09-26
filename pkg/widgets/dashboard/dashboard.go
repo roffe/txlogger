@@ -3,6 +3,7 @@ package dashboard
 import (
 	_ "embed"
 	"image/color"
+	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -43,11 +44,20 @@ type Dashboard struct {
 	// snap-grid layout; see layout.go
 	layout *Layout
 
-	// placed/ready gate the metric router: gauges build their canvas objects
-	// in CreateRenderer, so feeding one that the layout doesn't render (or
-	// that hasn't been laid out yet) panics on nil objects.
-	placed map[string]bool
-	ready  bool
+	// mu guards everything SetValue and SetTime touch: the router closures'
+	// state, cfg.AirDemToString, placed/wbStyle and timeBuffer. They
+	// run on the publishing goroutine and post canvas work with fyne.Do
+	// under mu, so it reaches the UI in publish order. fyne.Do can run
+	// inline (test driver), so nothing it runs may take mu. Gauge setters
+	// take their own lock under mu, never the other way around.
+	mu sync.Mutex
+
+	// placed gates the metric router so only gauges the layout places are
+	// fed; nil until the first layout. wbStyle is the wblambda item's Style.
+	// applyLayout rebuilds both after its canvas work and swaps them in
+	// under mu.
+	placed  map[string]bool
+	wbStyle string
 
 	// edit mode state; see edit.go
 	editMode  bool
@@ -127,7 +137,6 @@ func NewDashboard(cfg *Config) *Dashboard {
 		cfg:       cfg,
 		logplayer: cfg.Logplayer,
 		layout:    loadActiveLayout(),
-		placed:    make(map[string]bool, len(itemDefs)),
 		gauges: Gauges{
 			airmass: dualdial.New(&widgets.GaugeConfig{
 				Title:   "mg/c",
@@ -338,27 +347,36 @@ func (db *Dashboard) GetMetricNames() []string {
 func (db *Dashboard) Close() {
 }
 
+// SetTime is safe to call from any goroutine, the UI one included.
 func (db *Dashboard) SetTime(t time.Time) {
 	if db.text.time != nil {
+		db.mu.Lock()
+		defer db.mu.Unlock()
 		db.timeBuffer = db.timeBuffer[:0]
 		db.timeBuffer = t.AppendFormat(db.timeBuffer, "15:04:05.00")
-		db.text.time.Text = string(db.timeBuffer)
-		db.text.time.Refresh()
+		s := string(db.timeBuffer)
+		fyne.Do(func() {
+			db.text.time.Text = s
+			db.text.time.Refresh()
+		})
 	}
 }
 
+// SetValue is safe to call from any goroutine, the UI one included.
 func (db *Dashboard) SetValue(key string, value float64) {
 	if setFunc, ok := db.metricRouter[key]; ok {
+		db.mu.Lock()
+		defer db.mu.Unlock()
 		setFunc(value)
 	}
 }
 
 // setWBLambda feeds whichever wideband display the layout renders.
 func (db *Dashboard) setWBLambda(value float64) {
-	if !db.ready || !db.placed["wblambda"] {
+	if !db.placed["wblambda"] {
 		return
 	}
-	if it := db.layout.item("wblambda"); it != nil && it.Style == StyleGauge {
+	if db.wbStyle == StyleGauge {
 		db.gauges.wbgauge.SetValue(value)
 		return
 	}
@@ -366,10 +384,10 @@ func (db *Dashboard) setWBLambda(value float64) {
 }
 
 // gate wraps a gauge setter so values only reach a widget the layout
-// currently renders.
+// currently renders. Like every route it runs under db.mu.
 func (db *Dashboard) gate(id string, set func(float64)) func(float64) {
 	return func(value float64) {
-		if db.ready && db.placed[id] {
+		if db.placed[id] {
 			set(value)
 		}
 	}
@@ -440,20 +458,21 @@ func (db *Dashboard) cellSize() (float32, float32) {
 }
 
 // applyLayout positions every layout item (and the fixed corner buttons)
-// from its grid rect. Safe to call after any layout mutation.
+// from its grid rect. Safe to call after any layout mutation. UI goroutine
+// only; it takes db.mu just to swap in the router gate, after the canvas work.
 func (db *Dashboard) applyLayout() {
 	if db.size.Width <= 0 || db.size.Height <= 0 {
 		return
 	}
 	cw, ch := db.cellSize()
-	clear(db.placed)
+	placed := make(map[string]bool, len(db.layout.Items))
 	for i := range db.layout.Items {
 		it := &db.layout.Items[i]
 		obj := db.itemObject(it)
 		if obj == nil {
 			continue
 		}
-		db.placed[it.ID] = true
+		placed[it.ID] = true
 		// MinSize() creates the widget renderer if it doesn't exist yet, so
 		// the gauge's canvas objects are ready before any value arrives.
 		obj.MinSize()
@@ -485,7 +504,14 @@ func (db *Dashboard) applyLayout() {
 	if db.editMode {
 		db.layoutEditOverlay()
 	}
-	db.ready = true
+
+	var wbStyle string
+	if it := db.layout.item("wblambda"); it != nil {
+		wbStyle = it.Style
+	}
+	db.mu.Lock()
+	db.placed, db.wbStyle = placed, wbStyle
+	db.mu.Unlock()
 }
 
 type DashboardRenderer struct {

@@ -4,20 +4,22 @@ import (
 	"strconv"
 	"testing"
 
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/widget"
 )
 
 // BenchmarkPublishToLabel is the real logging hot path: a symbol value published
-// on the ebus, delivered through the fyne.Do wrapper to a widget that renders
-// it. One iteration is one symbol update on screen.
+// on the ebus, formatted on the publishing goroutine and handed to a widget that
+// renders it via fyne.Do. One iteration is one symbol update on screen.
 func BenchmarkPublishToLabel(b *testing.B) {
 	test.NewTempApp(b)
 	l := widget.NewLabel("0.00")
 	test.NewTempWindow(b, l)
 
 	unsub := SubscribeFunc("bench.symbol", func(v float64) {
-		l.SetText(strconv.FormatFloat(v, 'f', 2, 64))
+		s := strconv.FormatFloat(v, 'f', 2, 64)
+		fyne.Do(func() { l.SetText(s) })
 	})
 	defer unsub()
 

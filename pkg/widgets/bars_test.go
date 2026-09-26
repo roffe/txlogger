@@ -135,3 +135,45 @@ func TestCBarFillAnchoredToCenter(t *testing.T) {
 		}
 	}
 }
+
+// Standalone gauge windows subscribe before the gauge first renders: a value
+// published then must not panic, and must be on the face once it renders.
+func TestBarsDrawValueSetBeforeRender(t *testing.T) {
+	test.NewApp()
+	size := fyne.NewSize(200, 200)
+	for _, w := range []gauge{
+		vbar.New(&widgets.GaugeConfig{Min: 0, Max: 100, MinSize: size}),
+		hbar.New(&widgets.GaugeConfig{Min: 0, Max: 100, MinSize: size}),
+		cbar.New(&widgets.GaugeConfig{Min: -50, Center: 0, Max: 50, MinSize: size}),
+	} {
+		w.SetValue(25) // a quarter of the range away from where the bar starts
+		track, bar := trackAndBar(t, w, size)
+		area := func(r *canvas.Rectangle) float32 { return r.Size().Width * r.Size().Height }
+		if got := area(bar) / area(track); got < 0.2 {
+			t.Errorf("%T: bar fills %.2f of the track, want 0.25", w, got)
+		}
+		objs := test.WidgetRenderer(w).Objects()
+		if got := objs[len(objs)-1].(*canvas.Text).Text; got != "25" {
+			t.Errorf("%T: readout %q, want %q", w, got, "25")
+		}
+	}
+}
+
+// A CBar reads 0 until its first sample (no data yet, though the bar sits at
+// center), and that first sample draws even when it equals center.
+func TestCBarFirstSampleAtCenterDraws(t *testing.T) {
+	test.NewApp()
+	c := cbar.New(&widgets.GaugeConfig{Min: 0.5, Center: 1, Max: 1.5, DisplayString: "λ %.2f"})
+	trackAndBar(t, c, fyne.NewSize(200, 60))
+	readout := func() string {
+		objs := test.WidgetRenderer(c).Objects()
+		return objs[len(objs)-1].(*canvas.Text).Text
+	}
+	if got := readout(); got != "λ 0.00" {
+		t.Errorf("readout before data %q, want %q", got, "λ 0.00")
+	}
+	c.SetValue(1)
+	if got := readout(); got != "λ 1.00" {
+		t.Errorf("readout after first sample %q, want %q", got, "λ 1.00")
+	}
+}

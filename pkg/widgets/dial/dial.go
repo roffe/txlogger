@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"math"
 	"strconv"
+	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -18,7 +19,15 @@ type Dial struct {
 
 	cfg *widgets.GaugeConfig
 
-	value float64
+	// mu guards the SetValue side below. SetValue runs on publishing
+	// goroutines; apply, Layout and CreateRenderer run on the UI goroutine
+	// and never take mu.
+	mu     sync.Mutex
+	target float64 // last value SetValue accepted
+	text   string  // readout for target
+	buf    []byte  // format scratch
+
+	value float64 // value on screen; UI goroutine only
 
 	needle *canvas.Line
 
@@ -49,7 +58,6 @@ type Dial struct {
 	// Fast float formatting
 	fmtPrec   int // precision extracted from displayString like "%.0f", "%.1f", defaults to -1
 	gaugePrec int // precision extracted from GaugeTextString like "%.0f", "%.1f", defaults to -1
-	buf       []byte
 
 	// Label sizing cache (avoids MinSize calls every layout)
 	maxLabelChars int     // longest label length at construction
@@ -63,6 +71,7 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 		displayString: "%.0f",
 		minsize:       fyne.NewSize(100, 100),
 		fmtPrec:       -1,
+		text:          "0",
 	}
 	c.ExtendBaseWidget(c)
 
@@ -109,7 +118,7 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 	if cfg.Classic {
 		displayColor = color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF}
 	}
-	c.displayText = &canvas.Text{Text: "0", Color: displayColor, TextSize: 52}
+	c.displayText = &canvas.Text{Text: c.text, Color: displayColor, TextSize: 52}
 	c.displayText.Alignment = fyne.TextAlignCenter
 
 	// Build pips + labels once; also track the longest label length.
@@ -205,15 +214,38 @@ func (c *Dial) syncValueArcNoRefresh() bool {
 	return true
 }
 
+// SetValue may be called from any goroutine. Repeats are dropped and the
+// readout is formatted here; only the canvas update goes through fyne.Do.
 func (c *Dial) SetValue(value float64) {
-	if value == c.value {
+	c.mu.Lock()
+	defer c.mu.Unlock() // held across fyne.Do so updates reach the UI in order
+	if value == c.target {
 		return
 	}
+	c.target = value
+
+	// Format with minimal allocs; skip the text update if the output is unchanged
+	c.buf = c.buf[:0]
+	if c.fmtPrec >= 0 {
+		c.buf = strconv.AppendFloat(c.buf, value, 'f', c.fmtPrec, 64)
+	} else {
+		c.buf = common.AppendFormatFloat(c.buf, c.displayString, value)
+	}
+	text := "" // empty: readout unchanged
+	if !common.SameTextBytes(c.text, c.buf) {
+		c.text = string(c.buf)
+		text = c.text
+	}
+	fyne.Do(func() { c.apply(value, text) })
+}
+
+// apply draws what SetValue worked out. UI goroutine only.
+func (c *Dial) apply(value float64, text string) {
 	c.value = value
 
-	// Update needle position (no immediate refresh)
 	if c.needle != nil {
 		c.rotateNeedleNoRefresh(c.needle, value, c.needleOffset, c.needleLength)
+		canvas.Refresh(c.needle)
 	}
 
 	// Value arc is the indicator in the modern style; color shifts through the zones
@@ -221,22 +253,8 @@ func (c *Dial) SetValue(value float64) {
 		canvas.Refresh(c.valueArc)
 	}
 
-	// Update text with minimal allocs; skip refresh if formatted output is unchanged
-	c.buf = c.buf[:0]
-	if c.fmtPrec >= 0 {
-		c.buf = strconv.AppendFloat(c.buf, value, 'f', c.fmtPrec, 64)
-	} else {
-		c.buf = common.AppendFormatFloat(c.buf, c.displayString, value)
-	}
-	textChanged := !common.SameTextBytes(c.displayText.Text, c.buf)
-	if textChanged {
-		c.displayText.Text = string(c.buf)
-	}
-
-	if c.needle != nil {
-		canvas.Refresh(c.needle)
-	}
-	if textChanged {
+	if text != "" {
+		c.displayText.Text = text
 		canvas.Refresh(c.displayText)
 	}
 }

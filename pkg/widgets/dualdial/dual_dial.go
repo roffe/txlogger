@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"math"
 	"strconv"
+	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -28,8 +29,15 @@ type DualDial struct {
 	titleText     *canvas.Text
 	displayString string
 
-	value  float64
-	value2 float64
+	// mu guards the SetValue side below. SetValue and SetValue2 run on
+	// publishing goroutines; apply, apply2, Layout and CreateRenderer run on
+	// the UI goroutine and never take mu.
+	mu              sync.Mutex
+	target, target2 float64 // last values SetValue/SetValue2 accepted
+	text, text2     string  // readouts for target/target2
+	buf1, buf2      []byte  // format scratch
+
+	value, value2 float64 // values on screen; UI goroutine only
 
 	needle  *canvas.Line
 	needle2 *canvas.Line
@@ -64,11 +72,9 @@ type DualDial struct {
 	pipSin []float32
 	pipCos []float32
 
-	// fast float formatting buffers
+	// fast float formatting
 	fmtPrec   int
 	gaugePrec int
-	buf1      []byte
-	buf2      []byte
 
 	// Label sizing cache (avoid per-label MinSize on each layout)
 	maxLabelChars int
@@ -83,6 +89,8 @@ func New(cfg *widgets.GaugeConfig) *DualDial {
 		displayString: "%.0f",
 		minsize:       fyne.NewSize(100, 100),
 		fmtPrec:       -1,
+		text:          "0",
+		text2:         "0",
 	}
 	s.ExtendBaseWidget(s)
 
@@ -130,10 +138,10 @@ func New(cfg *widgets.GaugeConfig) *DualDial {
 	if cfg.Classic {
 		displayColor = color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF}
 	}
-	s.displayText = &canvas.Text{Text: "0", Color: displayColor, TextSize: 52}
+	s.displayText = &canvas.Text{Text: s.text, Color: displayColor, TextSize: 52}
 	s.displayText.Alignment = fyne.TextAlignCenter
 
-	s.displayText2 = &canvas.Text{Text: "0", Color: color.RGBA{R: 0xff, G: 0x0, B: 0, A: 0xFF}, TextSize: 35}
+	s.displayText2 = &canvas.Text{Text: s.text2, Color: color.RGBA{R: 0xff, G: 0x0, B: 0, A: 0xFF}, TextSize: 35}
 	s.displayText2.Alignment = fyne.TextAlignCenter
 
 	// Modern ticks are neutral — the value arc carries the green→yellow→red zone
@@ -229,20 +237,16 @@ func (c *DualDial) syncArcNoRefresh(arc *canvas.Arc, value float64, zone bool) b
 	return true
 }
 
+// SetValue sets the primary value; it may be called from any goroutine.
+// Repeats are dropped and the readout is formatted here; only the canvas
+// update goes through fyne.Do.
 func (c *DualDial) SetValue(value float64) {
-	if value == c.value {
+	c.mu.Lock()
+	defer c.mu.Unlock() // held across fyne.Do so updates reach the UI in order
+	if value == c.target {
 		return
 	}
-	c.value = value
-
-	if c.needle != nil {
-		c.rotateNeedleNoRefresh(c.needle, value, c.needleOffset, c.needleLength)
-	}
-
-	// Value arc is the primary indicator in the modern style
-	if c.valueArc != nil && c.syncArcNoRefresh(c.valueArc, value, true) {
-		canvas.Refresh(c.valueArc)
-	}
+	c.target = value
 
 	c.buf1 = c.buf1[:0]
 	if c.fmtPrec >= 0 {
@@ -250,33 +254,22 @@ func (c *DualDial) SetValue(value float64) {
 	} else {
 		c.buf1 = common.AppendFormatFloat(c.buf1, c.displayString, value)
 	}
-	textChanged := !common.SameTextBytes(c.displayText.Text, c.buf1)
-	if textChanged {
-		c.displayText.Text = string(c.buf1)
+	text := "" // empty: readout unchanged
+	if !common.SameTextBytes(c.text, c.buf1) {
+		c.text = string(c.buf1)
+		text = c.text
 	}
-
-	if c.needle != nil {
-		canvas.Refresh(c.needle)
-	}
-	if textChanged {
-		canvas.Refresh(c.displayText)
-	}
+	fyne.Do(func() { c.apply(value, text) })
 }
 
+// SetValue2 is SetValue for the secondary value.
 func (c *DualDial) SetValue2(value float64) {
-	if value == c.value2 {
+	c.mu.Lock()
+	defer c.mu.Unlock() // held across fyne.Do so updates reach the UI in order
+	if value == c.target2 {
 		return
 	}
-	c.value2 = value
-
-	if c.needle2 != nil {
-		c.rotateNeedleNoRefresh(c.needle2, value, c.needleOffset, c.needleLength)
-	}
-
-	// Outer arc is the secondary indicator in the modern style
-	if c.valueArc2 != nil && c.syncArcNoRefresh(c.valueArc2, value, false) {
-		canvas.Refresh(c.valueArc2)
-	}
+	c.target2 = value
 
 	c.buf2 = c.buf2[:0]
 	if c.fmtPrec >= 0 {
@@ -284,15 +277,50 @@ func (c *DualDial) SetValue2(value float64) {
 	} else {
 		c.buf2 = common.AppendFormatFloat(c.buf2, c.displayString, value)
 	}
-	textChanged := !common.SameTextBytes(c.displayText2.Text, c.buf2)
-	if textChanged {
-		c.displayText2.Text = string(c.buf2)
+	text := "" // empty: readout unchanged
+	if !common.SameTextBytes(c.text2, c.buf2) {
+		c.text2 = string(c.buf2)
+		text = c.text2
+	}
+	fyne.Do(func() { c.apply2(value, text) })
+}
+
+// apply draws what SetValue worked out. UI goroutine only.
+func (c *DualDial) apply(value float64, text string) {
+	c.value = value
+
+	if c.needle != nil {
+		c.rotateNeedleNoRefresh(c.needle, value, c.needleOffset, c.needleLength)
+		canvas.Refresh(c.needle)
 	}
 
+	// Value arc is the primary indicator in the modern style
+	if c.valueArc != nil && c.syncArcNoRefresh(c.valueArc, value, true) {
+		canvas.Refresh(c.valueArc)
+	}
+
+	if text != "" {
+		c.displayText.Text = text
+		canvas.Refresh(c.displayText)
+	}
+}
+
+// apply2 draws what SetValue2 worked out. UI goroutine only.
+func (c *DualDial) apply2(value float64, text string) {
+	c.value2 = value
+
 	if c.needle2 != nil {
+		c.rotateNeedleNoRefresh(c.needle2, value, c.needleOffset, c.needleLength)
 		canvas.Refresh(c.needle2)
 	}
-	if textChanged {
+
+	// Outer arc is the secondary indicator in the modern style
+	if c.valueArc2 != nil && c.syncArcNoRefresh(c.valueArc2, value, false) {
+		canvas.Refresh(c.valueArc2)
+	}
+
+	if text != "" {
+		c.displayText2.Text = text
 		canvas.Refresh(c.displayText2)
 	}
 }

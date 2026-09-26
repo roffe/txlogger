@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"math"
 	"strconv"
+	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -20,8 +21,18 @@ type VBar struct {
 	displayText *canvas.Text
 	lines       []*canvas.Line
 
-	cfg   *widgets.GaugeConfig
-	value float64
+	cfg *widgets.GaugeConfig
+
+	// mu guards the SetValue side below. SetValue runs on publishing
+	// goroutines; apply, Layout and CreateRenderer run on the UI goroutine
+	// and never take mu.
+	mu             sync.Mutex
+	target         float64 // last value SetValue accepted
+	lastColorIdx   int     // hot-path skips: color and readout last handed to apply
+	lastDisplayInt int
+	hasLastDisplay bool
+
+	value float64 // value on screen; UI goroutine only
 	size  fyne.Size
 
 	// Vertical band the bar occupies; modern reserves text rows above and below
@@ -38,11 +49,6 @@ type VBar struct {
 	cacheMinInt  int // first value represented in caches
 	cacheSpan    float64
 	cacheSpanInv float64
-
-	// Hot-path skips
-	lastColorIdx   int
-	lastDisplayInt int
-	hasLastDisplay bool
 }
 
 func New(cfg *widgets.GaugeConfig) *VBar {
@@ -115,17 +121,43 @@ func (s *VBar) cacheIndexForValue(v float64) int {
 	return idx
 }
 
+// SetValue may be called from any goroutine. Repeats are dropped and the
+// color and readout are picked here; only the canvas update goes through
+// fyne.Do.
 func (s *VBar) SetValue(value float64) {
-	if value == s.value {
+	s.mu.Lock()
+	defer s.mu.Unlock() // held across fyne.Do so updates reach the UI in order
+	if value == s.target {
 		return
 	}
-	s.value = value
+	s.target = value
 
-	idx := s.cacheIndexForValue(value)
-	if idx != s.lastColorIdx {
-		s.bar.FillColor = s.fillCache[idx]
-		s.bar.StrokeColor = s.strokeCache[idx]
-		s.lastColorIdx = idx
+	colorIdx := s.cacheIndexForValue(value)
+	if colorIdx == s.lastColorIdx {
+		colorIdx = -1 // color unchanged
+	} else {
+		s.lastColorIdx = colorIdx
+	}
+
+	text := "" // empty: readout unchanged
+	if iv := int(value); !s.hasLastDisplay || iv != s.lastDisplayInt {
+		s.lastDisplayInt = iv
+		s.hasLastDisplay = true
+		text = strconv.Itoa(iv)
+	}
+	fyne.Do(func() { s.apply(value, colorIdx, text) })
+}
+
+// apply draws what SetValue worked out. UI goroutine only.
+func (s *VBar) apply(value float64, colorIdx int, text string) {
+	s.value = value
+	if s.bar == nil {
+		return // not rendered yet; CreateRenderer and Layout draw from s.value
+	}
+
+	if colorIdx >= 0 {
+		s.bar.FillColor = s.fillCache[colorIdx]
+		s.bar.StrokeColor = s.strokeCache[colorIdx]
 	}
 
 	norm := s.clampNorm(value)
@@ -133,17 +165,17 @@ func (s *VBar) SetValue(value float64) {
 	s.bar.Resize(fyne.Size{Width: s.size.Width, Height: barHeight})
 	s.bar.Move(fyne.Position{X: 0, Y: s.barY + s.barH - barHeight})
 
-	iv := int(value)
-	if !s.hasLastDisplay || iv != s.lastDisplayInt {
-		s.lastDisplayInt = iv
-		s.hasLastDisplay = true
-		s.displayText.Text = strconv.Itoa(iv)
+	if text != "" {
+		s.displayText.Text = text
 		s.displayText.Refresh()
 	}
 }
 
+// Value returns the last value SetValue accepted. Safe from any goroutine.
 func (s *VBar) Value() float64 {
-	return s.value
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.target
 }
 
 func (s *VBar) CreateRenderer() fyne.WidgetRenderer {
@@ -161,10 +193,12 @@ func (s *VBar) CreateRenderer() fyne.WidgetRenderer {
 		s.face = &canvas.Rectangle{FillColor: widgets.TrackColor}
 	}
 
-	// default bar rect (will be resized in Layout/SetValue)
+	// Bar and readout start from s.value: SetValue may have run before the
+	// first render. The bar is sized in Layout.
+	idx := s.cacheIndexForValue(s.value)
 	s.bar = &canvas.Rectangle{
-		FillColor:   s.fillCache[0],
-		StrokeColor: s.strokeCache[0],
+		FillColor:   s.fillCache[idx],
+		StrokeColor: s.strokeCache[idx],
 	}
 
 	s.titleText = &canvas.Text{
@@ -176,7 +210,7 @@ func (s *VBar) CreateRenderer() fyne.WidgetRenderer {
 	s.titleText.Alignment = fyne.TextAlignCenter
 
 	s.displayText = &canvas.Text{
-		Text:     "0",
+		Text:     strconv.Itoa(int(s.value)),
 		Color:    textColor,
 		TextSize: 25,
 	}
@@ -270,7 +304,7 @@ func (r *VBarRenderer) MinSize() fyne.Size {
 }
 
 func (r *VBarRenderer) Refresh() {
-	// no-op, state is pushed directly on SetValue/Layout
+	// no-op, state is pushed directly by apply/Layout
 }
 
 func (r *VBarRenderer) Destroy() {

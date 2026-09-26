@@ -23,8 +23,11 @@ func (db *Dashboard) activeAirSetter(obj *canvas.Text) func(float64) {
 		buf = append(buf, " ("...)
 		buf = strconv.AppendFloat(buf, value, 'f', 0, 64)
 		buf = append(buf, ")"...)
-		obj.Text = string(buf)
-		obj.Refresh()
+		s := string(buf)
+		fyne.Do(func() {
+			obj.Text = s
+			obj.Refresh()
+		})
 		lastVal = value
 	}
 }
@@ -65,8 +68,11 @@ func knkDetSetter(icon *icon.Icon) func(float64) {
 		} else {
 			knkStr2[3] = '-'
 		}
-		icon.SetText(string(knkStr2))
-		icon.Show()
+		s := string(knkStr2)
+		fyne.Do(func() {
+			icon.SetText(s)
+			icon.Show()
+		})
 
 		if hideTimer == nil {
 			hideTimer = time.AfterFunc(5*time.Second, func() {
@@ -86,9 +92,9 @@ func showHider(obj fyne.CanvasObject) func(float64) {
 		}
 		oldValue = value
 		if value == 1 {
-			obj.Show()
+			fyne.Do(obj.Show)
 		} else {
-			obj.Hide()
+			fyne.Do(obj.Hide)
 		}
 	}
 }
@@ -105,18 +111,27 @@ func ioffSetter(obj *canvas.Text, icon *canvas.Image) func(float64) {
 		buf = append(buf, "Ioff: "...)
 		buf = strconv.AppendFloat(buf, value, 'f', 1, 64)
 		buf = append(buf, "°"...)
-		obj.Text = string(buf)
+		s := string(buf)
+		var c color.Color // stays nil for NaN, which keeps the current color
+		var taz func()
 		switch {
 		case value >= 0:
-			obj.Color = color.RGBA{R: 0, G: 0xFF, B: 0, A: 0xFF}
-			icon.Hide()
+			c, taz = color.RGBA{R: 0, G: 0xFF, B: 0, A: 0xFF}, icon.Hide
 		case value < 0 && value >= -3:
-			obj.Color = color.RGBA{R: 0xFF, G: 0xA5, B: 0, A: 0xFF}
+			c = color.RGBA{R: 0xFF, G: 0xA5, B: 0, A: 0xFF}
 		case value < -3:
-			obj.Color = color.RGBA{R: 0xFF, G: 0, B: 0, A: 0xFF}
-			icon.Show()
+			c, taz = color.RGBA{R: 0xFF, G: 0, B: 0, A: 0xFF}, icon.Show
 		}
-		obj.Refresh()
+		fyne.Do(func() {
+			obj.Text = s
+			if c != nil {
+				obj.Color = c
+			}
+			if taz != nil {
+				taz()
+			}
+			obj.Refresh()
+		})
 	}
 }
 
@@ -132,8 +147,11 @@ func textSetter(obj *canvas.Text, text, unit string, precision int) func(float64
 		buf = append(buf, ": "...)
 		buf = strconv.AppendFloat(buf, value, 'f', precision, 64)
 		buf = append(buf, unit...)
-		obj.Text = string(buf)
-		obj.Refresh()
+		s := string(buf)
+		fyne.Do(func() {
+			obj.Text = s
+			obj.Refresh()
+		})
 		lastVal = value
 	}
 }
@@ -156,15 +174,20 @@ func idcSetter(obj *canvas.Text, text string) func(float64) {
 		}
 		buf = strconv.AppendInt(buf, iv, 10)
 		buf = append(buf, '%')
-		obj.Text = string(buf)
+		s := string(buf)
+		var c color.Color
 		switch {
 		case value > 60 && value < 85:
-			obj.Color = color.RGBA{R: 0xFF, G: 0xA5, B: 0, A: 0xFF}
+			c = color.RGBA{R: 0xFF, G: 0xA5, B: 0, A: 0xFF}
 		case value >= 85:
-			obj.Color = color.RGBA{R: 0xFF, G: 0, B: 0, A: 0xFF}
+			c = color.RGBA{R: 0xFF, G: 0, B: 0, A: 0xFF}
 		default:
-			obj.Color = color.RGBA{R: 0, G: 0xFF, B: 0, A: 0xFF}
+			c = color.RGBA{R: 0, G: 0xFF, B: 0, A: 0xFF}
 		}
-		obj.Refresh()
+		fyne.Do(func() {
+			obj.Text = s
+			obj.Color = c
+			obj.Refresh()
+		})
 	}
 }

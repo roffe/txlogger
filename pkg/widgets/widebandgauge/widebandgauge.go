@@ -8,6 +8,7 @@ import (
 	"image/color"
 	"math"
 	"strconv"
+	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -55,9 +56,18 @@ var (
 type WidebandGauge struct {
 	widget.BaseWidget
 
-	cfg   *widgets.GaugeConfig
-	value float64
-	lit   int // index of the currently lit segment
+	cfg *widgets.GaugeConfig
+
+	// mu guards the SetValue side below. SetValue runs on publishing
+	// goroutines; apply, Layout and CreateRenderer run on the UI goroutine
+	// and never take mu.
+	mu     sync.Mutex
+	target float64 // last value SetValue accepted
+	seg    int     // segment for target
+	text   string  // readout for target
+	buf    []byte  // format scratch
+
+	lit int // index of the segment lit on screen; UI goroutine only
 
 	arc         *canvas.Arc // background track behind the segments, dial-style
 	segments    []*canvas.Line
@@ -74,7 +84,6 @@ type WidebandGauge struct {
 	invSpan float64 // 1/(Max-Min)
 
 	fmtPrec int
-	buf     []byte
 }
 
 func New(cfg *widgets.GaugeConfig) *WidebandGauge {
@@ -98,7 +107,8 @@ func New(cfg *widgets.GaugeConfig) *WidebandGauge {
 
 	g := &WidebandGauge{
 		cfg:     cfg,
-		value:   cfg.Center,
+		target:  cfg.Center,
+		text:    "0",
 		invSpan: 1 / (cfg.Max - cfg.Min),
 		fmtPrec: -1,
 	}
@@ -125,7 +135,7 @@ func New(cfg *widgets.GaugeConfig) *WidebandGauge {
 	}
 
 	g.displayText = &canvas.Text{
-		Text:      "0",
+		Text:      g.text,
 		Color:     widgets.TextPrimary,
 		TextStyle: fyne.TextStyle{Monospace: true},
 		Alignment: fyne.TextAlignCenter,
@@ -156,7 +166,8 @@ func New(cfg *widgets.GaugeConfig) *WidebandGauge {
 		g.segCos = append(g.segCos, float32(c))
 	}
 
-	g.lit = g.segmentFor(g.value)
+	g.seg = g.segmentFor(g.target)
+	g.lit = g.seg
 	g.segments[g.lit].StrokeColor = zoneColor(g.lit)
 
 	g.ExtendBaseWidget(g)
@@ -188,19 +199,16 @@ func dim(c color.RGBA) color.RGBA {
 	return color.RGBA{c.R / 5, c.G / 5, c.B / 5, 0xFF}
 }
 
+// SetValue may be called from any goroutine. Repeats are dropped and the
+// segment and readout are worked out here; only a visible change goes through
+// fyne.Do.
 func (g *WidebandGauge) SetValue(value float64) {
-	if value == g.value {
+	g.mu.Lock()
+	defer g.mu.Unlock() // held across fyne.Do so updates reach the UI in order
+	if value == g.target {
 		return
 	}
-	g.value = value
-
-	if idx := g.segmentFor(value); idx != g.lit {
-		g.segments[g.lit].StrokeColor = dim(zoneColor(g.lit))
-		canvas.Refresh(g.segments[g.lit])
-		g.lit = idx
-		g.segments[g.lit].StrokeColor = zoneColor(g.lit)
-		canvas.Refresh(g.segments[g.lit])
-	}
+	g.target = value
 
 	g.buf = g.buf[:0]
 	if g.fmtPrec >= 0 {
@@ -208,8 +216,32 @@ func (g *WidebandGauge) SetValue(value float64) {
 	} else {
 		g.buf = common.AppendFormatFloat(g.buf, g.cfg.DisplayString, value)
 	}
-	if !common.SameTextBytes(g.displayText.Text, g.buf) {
-		g.displayText.Text = string(g.buf)
+	text := "" // empty: readout unchanged
+	if !common.SameTextBytes(g.text, g.buf) {
+		g.text = string(g.buf)
+		text = g.text
+	}
+
+	seg := g.segmentFor(value)
+	if seg == g.seg && text == "" {
+		return // same LED, same readout
+	}
+	g.seg = seg
+	fyne.Do(func() { g.apply(seg, text) })
+}
+
+// apply lights seg and shows text. UI goroutine only.
+func (g *WidebandGauge) apply(seg int, text string) {
+	if seg != g.lit {
+		g.segments[g.lit].StrokeColor = dim(zoneColor(g.lit))
+		canvas.Refresh(g.segments[g.lit])
+		g.lit = seg
+		g.segments[g.lit].StrokeColor = zoneColor(g.lit)
+		canvas.Refresh(g.segments[g.lit])
+	}
+
+	if text != "" {
+		g.displayText.Text = text
 		canvas.Refresh(g.displayText)
 	}
 }

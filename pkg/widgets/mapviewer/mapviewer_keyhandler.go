@@ -203,22 +203,15 @@ func (mv *MapViewer) smooth() {
 
 // updateCursor collapses the selection to the single cell at selectedX/SelectedY
 // and redraws the overlay highlight. Used by keyboard navigation and the
-// crosshair-follow cursor. Pass goroutine=true when called off the main thread.
-func (mv *MapViewer) updateCursor(goroutine bool) {
+// crosshair-follow cursor. UI goroutine only.
+func (mv *MapViewer) updateCursor() {
 	cell := mv.SelectedY*mv.numColumns + mv.selectedX
 	if len(mv.selectedCells) == 1 && mv.selectedCells[0] == cell {
 		return
 	}
-	apply := func() {
-		mv.clearSelectionVisual()
-		mv.selectedCells = append(mv.selectedCells[:0], cell)
-		mv.drawSelectionVisual()
-	}
-	if goroutine {
-		fyne.Do(apply)
-	} else {
-		apply()
-	}
+	mv.clearSelectionVisual()
+	mv.selectedCells = append(mv.selectedCells[:0], cell)
+	mv.drawSelectionVisual()
 }
 
 type updateBlock struct {

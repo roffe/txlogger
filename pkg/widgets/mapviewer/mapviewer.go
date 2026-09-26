@@ -7,6 +7,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync"
 
 	_ "embed"
 
@@ -48,8 +49,12 @@ type MapViewer struct {
 	cfg        *Config
 	zMin, zMax float64
 
+	// SetX/SetY side: they run on publisher goroutines
+	xyMu           sync.Mutex
 	xValue, yValue float64
-	xIndex, yIndex float64
+	cellX, cellY   float64 // last crosshair cell posted, NaN until the first
+
+	xIndex, yIndex float64 // crosshair cell on screen, UI goroutine only
 
 	numColumns, numRows, numData int
 
@@ -107,6 +112,8 @@ func New(config *Config) (*MapViewer, error) {
 		numRows:    len(config.YData),
 		numData:    len(config.ZData),
 		colorMode:  config.ColorblindMode,
+		cellX:      math.NaN(),
+		cellY:      math.NaN(),
 	}
 	mv.ExtendBaseWidget(mv)
 
@@ -332,24 +339,30 @@ func (mv *MapViewer) render() fyne.CanvasObject {
 	)
 }
 
+// SetX may be called from any goroutine. It only stores the value; SetY moves
+// the crosshair.
 func (mv *MapViewer) SetX(xValue float64) {
+	mv.xyMu.Lock()
 	mv.xValue = xValue
+	mv.xyMu.Unlock()
 }
 
+// SetY may be called from any goroutine. The crosshair cell is worked out
+// here; only moving the crosshair and cursors goes through fyne.Do.
 func (mv *MapViewer) SetY(yValue float64) {
+	mv.xyMu.Lock()
+	defer mv.xyMu.Unlock() // held across fyne.Do so updates reach the UI in order
 	mv.yValue = yValue
-	if mv.crosshair.Hidden {
-		size := fyne.Size{Width: mv.widthFactor, Height: mv.heightFactor}
-
-		mv.crosshair.Show()
-		if mv.crosshair.Size() != size {
-			mv.crosshair.Resize(size)
-		}
-
-	}
-	if err := mv.setXY(); err != nil {
+	xIdx, yIdx, err := mv.crosshairCell()
+	if err != nil {
 		log.Println("MapViewer SetXY error:", err)
+		return
 	}
+	if xIdx == mv.cellX && yIdx == mv.cellY {
+		return
+	}
+	mv.cellX, mv.cellY = xIdx, yIdx
+	fyne.Do(func() { mv.setXY(xIdx, yIdx) })
 }
 
 func (mv *MapViewer) setCellText(idx int, value float64) {
@@ -604,10 +617,13 @@ func (mv *MapViewer) drawSelectionVisual() {
 	canvas.Refresh(mv.selectionOverlay)
 }
 
-func (mv *MapViewer) setXY() error {
-	xIdx, yIdx, err := interpolate.Interpolate64S(mv.cfg.XData, mv.cfg.YData, mv.cfg.ZData, mv.xValue, mv.yValue)
+// crosshairCell works out the cell for the last X and Y values, clamped to the
+// map. Call with xyMu held. It only reads what New fixed: the axes and the map
+// size.
+func (mv *MapViewer) crosshairCell() (float64, float64, error) {
+	xIdx, yIdx, err := interpolate.Interpolate64S(mv.cfg.XData, mv.cfg.YData, mv.xValue, mv.yValue)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	if yIdx < 0 {
 		yIdx = 0
@@ -618,6 +634,21 @@ func (mv *MapViewer) setXY() error {
 		xIdx = 0
 	} else if xIdx > float64(mv.numColumns-1) {
 		xIdx = float64(mv.numColumns - 1)
+	}
+	return xIdx, yIdx, nil
+}
+
+// setXY moves the crosshair, the graph and mesh cursors and, with
+// CursorFollowCrosshair, the selection to the cell. UI goroutine only.
+func (mv *MapViewer) setXY(xIdx, yIdx float64) {
+	if mv.crosshair.Hidden {
+		size := fyne.Size{Width: mv.widthFactor, Height: mv.heightFactor}
+
+		mv.crosshair.Show()
+		if mv.crosshair.Size() != size {
+			mv.crosshair.Resize(size)
+		}
+
 	}
 	mv.xIndex = xIdx
 	mv.yIndex = yIdx
@@ -641,9 +672,8 @@ func (mv *MapViewer) setXY() error {
 	if mv.cfg.CursorFollowCrosshair {
 		mv.selectedX = int(math.Round(xIdx))
 		mv.SelectedY = int(math.Round(yIdx))
-		mv.updateCursor(true)
+		mv.updateCursor()
 	}
-	return nil
 }
 
 // stepSelected adjusts every selected cell by one ZPrecision step. sign is +1

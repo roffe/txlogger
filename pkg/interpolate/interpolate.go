@@ -76,9 +76,10 @@ func Interpolate64(xAxis, yAxis, data []float64, xValue, yValue float64) (float6
 	return float64(xIdx-1) + xFrac, float64(yIdx-1) + yFrac, interpolatedValue, nil
 }
 
-func Interpolate64S(xAxis, yAxis, data []float64, xValue, yValue float64) (float64, float64, error) {
-	if len(xAxis) == 0 || len(yAxis) == 0 || len(data) == 0 {
-		return 0, 0, fmt.Errorf("xAxis, yAxis or data is empty")
+// Interpolate64S returns the fractional axis positions of xValue and yValue.
+func Interpolate64S(xAxis, yAxis []float64, xValue, yValue float64) (float64, float64, error) {
+	if len(xAxis) == 0 || len(yAxis) == 0 {
+		return 0, 0, fmt.Errorf("xAxis or yAxis is empty")
 	}
 
 	xIdx, xFrac := findIndexAndFrac64(xAxis, xValue)

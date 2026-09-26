@@ -10,9 +10,11 @@ import (
 )
 
 func (db *Dashboard) createRouter() map[string]func(float64) {
-	// Gauges build their canvas objects in CreateRenderer, so every gauge
-	// setter goes through db.gate: a gauge the layout doesn't place is never
-	// fed. Text and image elements need no gating.
+	// Every route runs under db.mu (see SetValue), which guards the state the
+	// closures below capture, cfg.AirDemToString included. Gauge setters are
+	// goroutine-safe and go through db.gate: a gauge the layout doesn't place
+	// is never fed. Text and image elements need no gating; their setters
+	// post only the canvas mutation with fyne.Do.
 	setRPM := db.gate("rpm", db.gauges.rpm.SetValue)
 	setIAT := db.gate("iat", db.gauges.iat.SetValue)
 	setEngineTemp := db.gate("engineTemp", db.gauges.engineTemp.SetValue)

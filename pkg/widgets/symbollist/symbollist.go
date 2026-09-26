@@ -32,7 +32,10 @@ type Widget struct {
 	scroll     *container.Scroll
 	updateBars bool
 	subs       map[string]func()
-	mu         sync.Mutex
+	// mu guards cfg, entryMap, entries, subs, updateBars and the entries'
+	// value state. SetValue takes it on publisher goroutines; never take it
+	// in anything fyne.Do runs or in the renderers.
+	mu sync.Mutex
 }
 
 type Config struct {
@@ -58,27 +61,39 @@ func (s *Widget) render() {
 	s.scroll = container.NewVScroll(s.container)
 }
 
+// SetColorBlindMode recolours the value bars. It may be called from any
+// goroutine; the bars are redrawn through fyne.Do.
 func (s *Widget) SetColorBlindMode(mode colors.ColorBlindMode) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	defer s.mu.Unlock() // held across fyne.Do so updates reach the UI in order
 	s.cfg.ColorBlindMode = mode
+	if !s.updateBars {
+		return // UpdateBars colours them when they come back on
+	}
+	for _, e := range s.entries {
+		factor, col := e.bar(mode)
+		fyne.Do(func() { e.setBar(factor, col) })
+	}
 }
 
+// UpdateBars turns the value bars on or off. It may be called from any
+// goroutine; the bars are redrawn through fyne.Do, in order with SetValue's
+// updates so an older one still queued can't redraw a bar after this.
 func (s *Widget) UpdateBars(enabled bool) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.updateBars = enabled
 	for _, e := range s.entries {
+		// SetValue stops touching the bars when they're off, so shrink the
+		// ones already drawn away instead of leaving them frozen at their
+		// last value
+		var factor float32
+		var col color.RGBA
 		if enabled {
-			e.updateBar(s.cfg.ColorBlindMode)
-			continue
+			factor, col = e.bar(s.cfg.ColorBlindMode)
 		}
-		// SetValue stops touching the bars, so shrink the ones already drawn
-		// away instead of leaving them frozen at their last value
-		e.valueBarFactor = 0
-		e.valueBar.Resize(fyne.Size{Width: 0, Height: 26})
+		fyne.Do(func() { e.setBar(factor, col) })
 	}
-	s.mu.Unlock()
-	s.Refresh()
 }
 
 func (s *Widget) Names() []string {
@@ -117,31 +132,47 @@ func compareFold(a, b string) int {
 	return len(a) - len(b)
 }
 
+// SetValue may be called from any goroutine. The min/max, the bar and the text
+// are worked out here; only the canvas update goes through fyne.Do.
 func (s *Widget) SetValue(name string, value float64) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	defer s.mu.Unlock() // held across fyne.Do so updates reach the UI in order
 	val, found := s.entryMap[name]
-	if found {
-		if value == val.value {
-			return
-		}
-		val.value = value
-		if value < val.min {
-			val.min = value
-		} else if value > val.max {
-			val.max = value
-		}
-		if s.updateBars {
-			val.updateBar(s.cfg.ColorBlindMode)
-		}
-		val.buf = strconv.AppendFloat(val.buf[:0], value, 'f', val.prec, 64)
-		if string(val.buf) != val.lastText {
-			val.lastText = string(val.buf)
-			val.symbolValue.SetText(val.lastText)
-		}
+	if !found || value == val.value {
+		return
 	}
+	val.value = value
+	if value < val.min {
+		val.min = value
+	} else if value > val.max {
+		val.max = value
+	}
+	bars := s.updateBars
+	var factor float32
+	var col color.RGBA
+	if bars {
+		factor, col = val.bar(s.cfg.ColorBlindMode)
+	}
+	var text string // stays empty when the formatted value didn't change
+	val.buf = strconv.AppendFloat(val.buf[:0], value, 'f', val.prec, 64)
+	if string(val.buf) != val.lastText {
+		val.lastText = string(val.buf)
+		text = val.lastText
+	}
+	if !bars && text == "" {
+		return
+	}
+	fyne.Do(func() {
+		if bars {
+			val.setBar(factor, col)
+		}
+		if text != "" {
+			val.symbolValue.SetText(text)
+		}
+	})
 }
 
+// Disable must be called on the UI goroutine.
 func (s *Widget) Disable() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -151,6 +182,7 @@ func (s *Widget) Disable() {
 	}
 }
 
+// Enable must be called on the UI goroutine.
 func (s *Widget) Enable() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -160,6 +192,8 @@ func (s *Widget) Enable() {
 	}
 }
 
+// Add lists and subscribes the symbols not listed yet. It must be called on
+// the UI goroutine.
 func (s *Widget) Add(symbols ...*symbol.Symbol) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -205,18 +239,21 @@ func (s *Widget) Add(symbols ...*symbol.Symbol) {
 	}
 }
 
+// Clear resets every value to "---". It may be called from any goroutine.
 func (s *Widget) Clear() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	defer s.mu.Unlock() // held across fyne.Do so updates reach the UI in order
 	for _, e := range s.entries {
 		// NaN sentinel so the next sample always renders, even if it equals
 		// the last value seen before the clear
 		e.value = math.NaN()
 		e.min = 0
 		e.max = 0
-		e.valueBarFactor = 0
 		e.lastText = "---"
-		e.symbolValue.SetText("---")
+		fyne.Do(func() {
+			e.setBar(0, color.RGBA{})
+			e.symbolValue.SetText("---")
+		})
 	}
 }
 
@@ -233,6 +270,8 @@ func (s *Widget) clear() {
 	clear(s.subs)
 }
 
+// LoadSymbols replaces the listed symbols. It must be called on the UI
+// goroutine.
 func (s *Widget) LoadSymbols(symbols ...*symbol.Symbol) {
 	s.clear()
 	s.Add(symbols...)
@@ -289,7 +328,6 @@ func (s *Widget) CreateRenderer() fyne.WidgetRenderer {
 
 func (s *Widget) newSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*SymbolWidgetEntry)) *SymbolWidgetEntry {
 	sw := &SymbolWidgetEntry{
-		w:          s,
 		symbol:     sym,
 		prec:       symbol.GetPrecision(sym.Correctionfactor),
 		deleteFunc: deleteFunc,
@@ -344,8 +382,6 @@ func (s *Widget) newSymbolWidgetEntry(sym *symbol.Symbol, deleteFunc func(*Symbo
 type SymbolWidgetEntry struct {
 	widget.BaseWidget
 
-	w *Widget
-
 	symbol      *symbol.Symbol
 	symbolName  *widget.Label
 	symbolValue *widget.Label
@@ -353,10 +389,11 @@ type SymbolWidgetEntry struct {
 	// symbolCorrectionfactor *widget.Entry
 	deleteBTN      *widget.Button
 	valueBar       *canvas.Rectangle
-	valueBarFactor float32
+	valueBarFactor float32 // bar width relative to the name column, UI goroutine only
 
 	deleteFunc func(*SymbolWidgetEntry)
 
+	// SetValue side, guarded by Widget.mu
 	value    float64
 	min, max float64
 	prec     int
@@ -387,18 +424,29 @@ func (sw *SymbolWidgetEntry) SetCorrectionFactor(f float64) {
 }
 */
 
-// updateBar sizes and colours the value bar from the entry's current value
-// relative to the min and max seen so far.
-func (sw *SymbolWidgetEntry) updateBar(mode colors.ColorBlindMode) {
+// bar works out the value bar's size factor and colour from the entry's
+// current value relative to the min and max seen so far. Call with
+// Widget.mu held.
+func (sw *SymbolWidgetEntry) bar(mode colors.ColorBlindMode) (float32, color.RGBA) {
+	var factor float32
 	if span := sw.max - sw.min; span > 0 {
-		sw.valueBarFactor = float32((sw.value - sw.min) / span)
-	} else {
-		sw.valueBarFactor = 0
+		factor = float32((sw.value - sw.min) / span)
 	}
 	col := colors.GetColorInterpolation(sw.min, sw.max, sw.value, mode)
 	col.A = barAlpha
+	return factor, col
+}
+
+// setBar draws the value bar. UI goroutine only.
+func (sw *SymbolWidgetEntry) setBar(factor float32, col color.RGBA) {
+	sw.valueBarFactor = factor
+	recolor := sw.valueBar.FillColor != col
 	sw.valueBar.FillColor = col
-	sw.valueBar.Resize(fyne.Size{Width: sw.valueBarFactor * sw.symbolName.Size().Width, Height: 26})
+	if size := (fyne.Size{Width: factor * sw.symbolName.Size().Width, Height: 26}); size != sw.valueBar.Size() {
+		sw.valueBar.Resize(size) // refreshes
+	} else if recolor {
+		sw.valueBar.Refresh()
+	}
 }
 
 func (sw *SymbolWidgetEntry) CreateRenderer() fyne.WidgetRenderer {
@@ -430,11 +478,9 @@ func (s *symbolWidgetEntryRenderer) MinSize() fyne.Size {
 	return fyne.NewSize(200, 36)
 }
 
+// Refresh leaves the bar's colour to setBar: the value state it comes from
+// belongs to SetValue's side.
 func (s *symbolWidgetEntryRenderer) Refresh() {
-	col := colors.GetColorInterpolation(s.e.min, s.e.max, s.e.value, s.e.w.cfg.ColorBlindMode)
-	col.A = barAlpha
-	s.e.valueBar.FillColor = col
-	s.e.valueBar.StrokeColor = col
 	s.e.container.Refresh()
 }
 

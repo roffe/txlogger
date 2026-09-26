@@ -2,7 +2,9 @@ package cbar
 
 import (
 	"image/color"
+	"math"
 	"strconv"
+	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -27,13 +29,23 @@ type CBar struct {
 
 	// Peak-hold markers: latch the furthest excursion either side of center so a
 	// value jittering at 10 Hz still shows how far it actually went.
-	peakLo, peakHi       *canvas.Rectangle
-	peakLoVal, peakHiVal float64
+	peakLo, peakHi *canvas.Rectangle
 
 	cfg *widgets.GaugeConfig
 
-	// Cached values
-	value float64
+	// mu guards the SetValue side below. SetValue runs on publishing
+	// goroutines; apply, Layout and CreateRenderer run on the UI goroutine
+	// and never take mu.
+	mu                 sync.Mutex
+	target             float64 // last value SetValue accepted, clamped; NaN until the first
+	targetLo, targetHi float64 // peak markers after the last sample
+	text               string  // readout for target
+	buf                []byte  // format scratch
+
+	// On screen; UI goroutine only
+	value                float64
+	peakLoVal, peakHiVal float64
+	readout              string
 
 	lastSize    fyne.Size
 	valueRange  float64
@@ -56,7 +68,6 @@ type CBar struct {
 
 	// Fast float formatting
 	fmtPrec int
-	buf     []byte
 
 	// Cached monospace glyph width for the current display TextSize
 	charWidth float32
@@ -81,6 +92,9 @@ func New(cfg *widgets.GaugeConfig) *CBar {
 
 	s := &CBar{
 		cfg:        cfg,
+		target:     math.NaN(), // the first sample always draws
+		targetLo:   cfg.Center,
+		targetHi:   cfg.Center,
 		value:      cfg.Center,
 		peakLoVal:  cfg.Center,
 		peakHiVal:  cfg.Center,
@@ -99,6 +113,9 @@ func New(cfg *widgets.GaugeConfig) *CBar {
 	if n := common.ParseFixedPrec(cfg.DisplayString); n >= 0 {
 		s.fmtPrec = n
 	}
+	// Until the first sample the bar sits at center but reads 0: no data yet
+	s.text = string(s.format(nil, 0))
+	s.readout = s.text
 	s.ExtendBaseWidget(s)
 	return s
 }
@@ -143,14 +160,9 @@ func (s *CBar) initializeVisualElements() {
 		Alignment: fyne.TextAlignCenter,
 	}
 
-	s.buf = s.buf[:0]
-	if s.fmtPrec >= 0 {
-		s.buf = strconv.AppendFloat(s.buf, 0, 'f', s.fmtPrec, 64)
-	} else {
-		s.buf = common.AppendFormatFloat(s.buf, s.cfg.DisplayString, 0)
-	}
+	// Readout starts from s.readout: SetValue may have run before the first render
 	s.displayText = &canvas.Text{
-		Text:      string(s.buf),
+		Text:      s.readout,
 		Color:     textColor,
 		TextSize:  float32(s.cfg.DisplayTextSize),
 		TextStyle: fyne.TextStyle{Monospace: true},
@@ -173,7 +185,15 @@ func (s *CBar) initializeVisualElements() {
 	}
 }
 
-// applyBar positions, sizes and colors the deviation bar from the current value.
+// format appends the readout for v to dst.
+func (s *CBar) format(dst []byte, v float64) []byte {
+	if s.fmtPrec >= 0 {
+		return strconv.AppendFloat(dst, v, 'f', s.fmtPrec, 64)
+	}
+	return common.AppendFormatFloat(dst, s.cfg.DisplayString, v)
+}
+
+// applyBar positions, sizes and colors the deviation bar from the value on screen.
 func (s *CBar) applyBar() {
 	barPosition := s.center
 	var pxWidth float32
@@ -199,24 +219,24 @@ func (s *CBar) applyBar() {
 	s.applyPeaks()
 }
 
-// syncPeaks latches the current value into whichever marker it exceeds and
-// decays both back toward center. Reports whether either moved.
+// syncPeaks latches target into whichever marker it exceeds and decays both
+// back toward center. Reports whether either moved. Caller holds mu.
 func (s *CBar) syncPeaks() bool {
-	lo, hi := s.peakLoVal, s.peakHiVal
-	if s.value < lo {
-		lo = s.value
+	lo, hi := s.targetLo, s.targetHi
+	if s.target < lo {
+		lo = s.target
 	} else {
 		lo += (s.cfg.Center - lo) * peakDecay
 	}
-	if s.value > hi {
-		hi = s.value
+	if s.target > hi {
+		hi = s.target
 	} else {
 		hi += (s.cfg.Center - hi) * peakDecay
 	}
-	if lo == s.peakLoVal && hi == s.peakHiVal {
+	if lo == s.targetLo && hi == s.targetHi {
 		return false
 	}
-	s.peakLoVal, s.peakHiVal = lo, hi
+	s.targetLo, s.targetHi = lo, hi
 	return true
 }
 
@@ -233,29 +253,46 @@ func (s *CBar) applyPeaks() {
 	}
 }
 
+// SetValue may be called from any goroutine. The value is clamped, the peaks
+// decayed and the readout formatted here; only the canvas update goes through
+// fyne.Do.
 func (s *CBar) SetValue(value float64) {
 	value = max(s.cfg.Min, min(s.cfg.Max, value))
-	changed := value != s.value
-	s.value = value
+	s.mu.Lock()
+	defer s.mu.Unlock() // held across fyne.Do so updates reach the UI in order
+	changed := value != s.target
+	s.target = value
 
 	// Peaks keep decaying even when the value is unchanged, so a latched
 	// excursion never freezes on the face.
 	if !s.syncPeaks() && !changed {
 		return
 	}
-	s.applyBar()
-	if !changed {
-		return
-	}
 
-	s.buf = s.buf[:0]
-	if s.fmtPrec >= 0 {
-		s.buf = strconv.AppendFloat(s.buf, s.value, 'f', s.fmtPrec, 64)
-	} else {
-		s.buf = common.AppendFormatFloat(s.buf, s.cfg.DisplayString, s.value)
+	text := "" // empty: readout unchanged
+	if changed {
+		s.buf = s.format(s.buf[:0], value)
+		if !common.SameTextBytes(s.text, s.buf) {
+			s.text = string(s.buf)
+			text = s.text
+		}
 	}
-	if !common.SameTextBytes(s.displayText.Text, s.buf) {
-		s.displayText.Text = string(s.buf)
+	lo, hi := s.targetLo, s.targetHi
+	fyne.Do(func() { s.apply(value, lo, hi, text) })
+}
+
+// apply draws what SetValue worked out. UI goroutine only.
+func (s *CBar) apply(value, lo, hi float64, text string) {
+	s.value, s.peakLoVal, s.peakHiVal = value, lo, hi
+	if text != "" {
+		s.readout = text
+	}
+	if s.bar == nil {
+		return // not rendered yet; CreateRenderer and Layout draw from the fields above
+	}
+	s.applyBar()
+	if text != "" {
+		s.displayText.Text = text
 		s.displayText.Refresh()
 		s.updateDisplayTextPosition()
 	}

@@ -58,11 +58,9 @@ func main() {
 		for i, k := range keys {
 			ebus.Publish(k, demoValues[k]*(1.05+0.2*float64(i%4)))
 		}
-		time.Sleep(300 * time.Millisecond) // ebus delivery is async
 		for _, k := range keys {
 			ebus.Publish(k, demoValues[k])
 		}
-		time.Sleep(300 * time.Millisecond)
 	})
 
 	db := dashboard.NewDashboard(&dashboard.Config{
