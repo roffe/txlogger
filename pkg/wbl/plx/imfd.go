@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"go.bug.st/serial"
 )
@@ -290,7 +291,7 @@ func (s *IMFDClient) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	p.SetReadTimeout(2)
+	p.SetReadTimeout(5 * time.Millisecond)
 
 	buf := make([]byte, 1)
 	go func() {

@@ -72,6 +72,8 @@ func (s *SecretText) Tapped(*fyne.PointEvent) {
 		d := dialog.NewCustom("You found the secret", "Leif", t, fyne.CurrentApp().Driver().AllWindows()[0])
 		d.SetOnClosed(func() {
 			player.Pause()
+			sound.Suspend()
+			t.Stop() // the shader animation otherwise repaints until the renderer expires
 		})
 		d.Show()
 	}

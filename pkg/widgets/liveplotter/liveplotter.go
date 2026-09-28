@@ -16,6 +16,7 @@ import (
 	"image"
 	"image/color"
 	"sort"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -89,6 +90,7 @@ type Widget struct {
 	root        *fyne.Container
 
 	plotResolution fyne.Size
+	fmtBuf         []byte // legend value scratch, UI goroutine only
 	size           fyne.Size
 
 	imgBuffers [2]*image.RGBA
@@ -390,12 +392,13 @@ func (p *Widget) computeLegendVals() {
 
 func (p *Widget) updateLegendValues() {
 	for i := range p.order {
-		newValue := fmt.Sprintf("%.4g", p.legendVals[i])
+		// %.4g into a reused buffer: an unchanged value allocates nothing
+		p.fmtBuf = strconv.AppendFloat(p.fmtBuf[:0], p.legendVals[i], 'g', 4, 64)
 		obj := p.legendTexts[i]
-		if obj.Value() == newValue {
+		if obj.Value() == string(p.fmtBuf) {
 			continue
 		}
-		obj.SetValue(newValue)
+		obj.SetValue(string(p.fmtBuf))
 	}
 }
 

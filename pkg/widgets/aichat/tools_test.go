@@ -125,30 +125,15 @@ func TestNoBinaryLoaded(t *testing.T) {
 	}
 }
 
-// fakeLog is a minimal logfile.Logfile; only the read-only accessors the tools
-// use are meaningful.
-type fakeLog struct{ recs []logfile.Record }
-
-func (f *fakeLog) Get() logfile.Record           { return f.recs[0] }
-func (f *fakeLog) Next() logfile.Record          { return f.recs[0] }
-func (f *fakeLog) Prev() logfile.Record          { return f.recs[0] }
-func (f *fakeLog) Seek(int)                      {}
-func (f *fakeLog) Pos() int                      { return 0 }
-func (f *fakeLog) Len() int                      { return len(f.recs) }
-func (f *fakeLog) RecordAt(i int) logfile.Record { return f.recs[i] }
-func (f *fakeLog) Start() time.Time              { return f.recs[0].Time }
-func (f *fakeLog) End() time.Time                { return f.recs[len(f.recs)-1].Time }
-func (f *fakeLog) Close()                        {}
-
-func newFakeLog(rpm ...float64) *fakeLog {
+func newFakeLog(rpm ...float64) logfile.Logfile {
 	t0 := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
-	f := &fakeLog{}
+	times := make([]time.Time, len(rpm))
+	rows := make([]map[string]float64, len(rpm))
 	for i, v := range rpm {
-		rec := logfile.NewRecord(t0.Add(time.Duration(i) * 100 * time.Millisecond))
-		rec.SetValue("ActualIn.n_Engine", v)
-		f.recs = append(f.recs, rec)
+		times[i] = t0.Add(time.Duration(i) * 100 * time.Millisecond)
+		rows[i] = map[string]float64{"ActualIn.n_Engine": v}
 	}
-	return f
+	return logfile.FromRows(times, rows)
 }
 
 func TestLogInfoStats(t *testing.T) {

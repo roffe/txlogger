@@ -57,7 +57,7 @@ func ExportRecords(dir, prefix, ext string, records []logfile.Record) (string, e
 	for i := range records {
 		rec := records[i]
 		for j, name := range cols {
-			values[j] = rec.Values[name]
+			values[j], _ = rec.Value(name)
 		}
 		if err := w.Write(rec.Time, channels); err != nil {
 			_ = w.Close()
@@ -74,8 +74,8 @@ func ExportRecords(dir, prefix, ext string, records []logfile.Record) (string, e
 // recordColumns returns the value column names of a record in a stable
 // (alphabetical) order so the exported log has a deterministic layout.
 func recordColumns(rec logfile.Record) []string {
-	cols := make([]string, 0, len(rec.Values))
-	for k := range rec.Values {
+	var cols []string
+	for k := range rec.All() {
 		cols = append(cols, k)
 	}
 	sort.Strings(cols)

@@ -336,26 +336,14 @@ func TestPullDetectionTallGear(t *testing.T) {
 	}
 }
 
-type fakeLog struct{ recs []logfile.Record }
-
-func (f *fakeLog) Get() logfile.Record           { return logfile.Record{} }
-func (f *fakeLog) Next() logfile.Record          { return logfile.Record{} }
-func (f *fakeLog) Prev() logfile.Record          { return logfile.Record{} }
-func (f *fakeLog) Seek(int)                      {}
-func (f *fakeLog) Pos() int                      { return 0 }
-func (f *fakeLog) Len() int                      { return len(f.recs) }
-func (f *fakeLog) RecordAt(i int) logfile.Record { return f.recs[i] }
-func (f *fakeLog) Start() time.Time              { return time.Time{} }
-func (f *fakeLog) End() time.Time                { return time.Time{} }
-func (f *fakeLog) Close()                        {}
-
 // TestSpeedAltValidation: In.v_Vehicle2 must only be preferred when alive.
 // A dead rear ABS ring reads a constant 0 — using it yields v=0 everywhere
 // and a confidently wrong ~0 hp curve.
 func TestSpeedAltValidation(t *testing.T) {
 	sig := logSignalsByECU["T7"]
-	makeLog := func(alt func(kmh float64) float64) *fakeLog {
-		f := &fakeLog{}
+	makeLog := func(alt func(kmh float64) float64) logfile.Logfile {
+		var times []time.Time
+		var rows []map[string]float64
 		for i := 0; i < 300; i++ { // 15 s @ 20 Hz WOT ramp, 2000-6800 rpm
 			ts := float64(i) * 0.05
 			kmh := 50 + 3*ts
@@ -367,12 +355,10 @@ func TestSpeedAltValidation(t *testing.T) {
 			if alt != nil {
 				vals[sig.speedAlt] = alt(kmh)
 			}
-			f.recs = append(f.recs, logfile.Record{
-				Time:   time.Unix(0, int64(ts*float64(time.Second))),
-				Values: vals,
-			})
+			times = append(times, time.Unix(0, int64(ts*float64(time.Second))))
+			rows = append(rows, vals)
 		}
-		return f
+		return logfile.FromRows(times, rows)
 	}
 	// dead channel: constant 0 -> primary must be used, pull still found
 	pulls, err := extractPulls(makeLog(func(float64) float64 { return 0 }), sig)

@@ -346,7 +346,7 @@ func (w *Widget) logInfo() string {
 	stats := make(map[string]*stat)
 	n := lf.Len()
 	for i := 0; i < n; i++ {
-		for k, v := range lf.RecordAt(i).Values {
+		for k, v := range lf.RecordAt(i).All() {
 			s := stats[k]
 			if s == nil {
 				s = &stat{min: math.Inf(1), max: math.Inf(-1)}
@@ -397,7 +397,10 @@ func (w *Widget) logSamples(channels string, start, count, stride int) string {
 
 	cols := splitList(channels)
 	if len(cols) == 0 {
-		cols = sortedKeys(lf.RecordAt(start).Values)
+		for k := range lf.RecordAt(start).All() {
+			cols = append(cols, k)
+		}
+		sort.Strings(cols)
 	}
 
 	var b strings.Builder
@@ -414,7 +417,7 @@ func (w *Widget) logSamples(channels string, start, count, stride int) string {
 		rec := lf.RecordAt(i)
 		fmt.Fprintf(&b, "%d,%.2f", i, rec.Time.Sub(t0).Seconds())
 		for _, c := range cols {
-			if v, ok := rec.Values[c]; ok {
+			if v, ok := rec.Value(c); ok {
 				fmt.Fprintf(&b, ",%s", fmtVal(v, 2))
 			} else {
 				b.WriteString(",")

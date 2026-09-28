@@ -48,5 +48,14 @@ func NewPlayer(r io.Reader) *oto.Player {
 			panic("sound.NewPlayer: " + err.Error())
 		}
 	}
+	_ = octx.Resume()
 	return octx.NewPlayer(r)
+}
+
+// Suspend stops the audio device. An idle context otherwise keeps feeding it
+// silence, waking the process ~40 times a second.
+func Suspend() {
+	if octx != nil {
+		_ = octx.Suspend()
+	}
 }

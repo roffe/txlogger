@@ -139,15 +139,16 @@ func (v *veTab) load() {
 func readSamples(lf logfile.Logfile, sig veSignals) []veSample {
 	var out []veSample
 	for i := 0; i < lf.Len(); i++ {
-		vals := lf.RecordAt(i).Values
-		rpm, ok1 := vals[sig.rpm]
-		air, ok2 := vals[sig.air]
-		p, ok3 := vals[sig.map_]
-		t, ok4 := vals[sig.iat]
+		rec := lf.RecordAt(i)
+		rpm, ok1 := rec.Value(sig.rpm)
+		air, ok2 := rec.Value(sig.air)
+		p, ok3 := rec.Value(sig.map_)
+		t, ok4 := rec.Value(sig.iat)
 		if !ok1 || !ok2 || !ok3 || !ok4 || rpm <= 0 || air <= 0 {
 			continue
 		}
-		out = append(out, veSample{rpm: rpm, air: air, bar: p, iat: t, pedal: vals[sig.pedal]})
+		pedal, _ := rec.Value(sig.pedal)
+		out = append(out, veSample{rpm: rpm, air: air, bar: p, iat: t, pedal: pedal})
 	}
 	// txlogger records manifold pressure in bar, but a csv exported from
 	// another tool may hold kPa. Scale by what the numbers themselves say:

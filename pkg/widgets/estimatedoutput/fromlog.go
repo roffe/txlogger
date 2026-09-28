@@ -74,14 +74,14 @@ func extractPulls(lf logfile.Logfile, sig logSignals) ([]*logPull, error) {
 		var cntA, cntBoth int
 		for i := 0; i < n; i++ {
 			rec := lf.RecordAt(i)
-			a, okA := rec.Values[sig.speedAlt]
+			a, okA := rec.Value(sig.speedAlt)
 			if !okA {
 				continue
 			}
 			cntA++
 			minA = math.Min(minA, a)
 			maxA = math.Max(maxA, a)
-			if s, okS := rec.Values[sig.speed]; okS {
+			if s, okS := rec.Value(sig.speed); okS {
 				cntBoth++
 				sumA += a
 				sumS += s
@@ -95,8 +95,8 @@ func extractPulls(lf logfile.Logfile, sig logSignals) ([]*logPull, error) {
 	var t0 float64
 	for i := 0; i < n; i++ {
 		rec := lf.RecordAt(i)
-		r, ok := rec.Values[sig.rpm]
-		s, ok2 := rec.Values[speedKey]
+		r, ok := rec.Value(sig.rpm)
+		s, ok2 := rec.Value(speedKey)
 		if !ok || !ok2 {
 			continue
 		}
@@ -108,12 +108,12 @@ func extractPulls(lf logfile.Logfile, sig logSignals) ([]*logPull, error) {
 		t = append(t, ts-t0)
 		rpm = append(rpm, r)
 		v = append(v, s/3.6)
-		a, okA := rec.Values[sig.airmass]
+		a, okA := rec.Value(sig.airmass)
 		if !okA {
 			a = math.NaN()
 		}
 		air = append(air, a)
-		x, okT := rec.Values[sig.throttle]
+		x, okT := rec.Value(sig.throttle)
 		if !okT {
 			x = math.NaN()
 		}

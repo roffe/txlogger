@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -364,22 +365,13 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 		WidebandSymbol: mw.settings.GetWidebandSymbolName(),
 	}
 
-	rec := logz.Next()
-	if !rec.EOF {
-		for k := range rec.Values {
-			if k == "AirMassMast.m_Request" {
-				dbcfg.AirDemToString = datalogger.AirDemToStringT8
-				break
-			} else if k == "Lufttemp" {
-				// T5
-				break
-			} else {
-				dbcfg.AirDemToString = datalogger.AirDemToStringT7
-				break
-			}
-		}
+	switch cols := logz.Columns(); {
+	case slices.Contains(cols, "AirMassMast.m_Request"):
+		dbcfg.AirDemToString = datalogger.AirDemToStringT8
+	case slices.Contains(cols, "Lufttemp"): // T5
+	case len(cols) > 0:
+		dbcfg.AirDemToString = datalogger.AirDemToStringT7
 	}
-	logz.Seek(0)
 
 	switch mw.selects.ecuSelect.Selected {
 	case "T7":

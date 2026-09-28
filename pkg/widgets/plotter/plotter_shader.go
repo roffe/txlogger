@@ -70,7 +70,7 @@ precision mediump float;
 
 const plotShaderBody = `
 #define MAX_SERIES 64
-#define MAX_SEG 4
+#define MAX_SEG 16 // covers the hovered 4 px line at ppd 1.5 up to 200% scaling
 #define MAX_RAW 16
 #define MAX_GROUPS 24
 
@@ -79,7 +79,7 @@ uniform vec4 bounds;
 
 uniform sampler2D data_tex; // one texel per sample, 16-bit value in RG
 uniform sampler2D mm_tex;   // min/max per 16 samples: RG=min, BA=max
-uniform sampler2D meta_tex; // per series: x0 color, x1 enabled, x2 length, x3 lane
+uniform sampler2D meta_tex; // per series: x0 color, x1 RGB length (0 = disabled) A lane
 
 uniform float series_count;
 uniform float lane_count;   // horizontal bands, 0 = overlay on full height
@@ -102,7 +102,7 @@ float decode16(float hi, float lo) {
 }
 
 vec4 meta_at(float x, float si) {
-    return texture2D(meta_tex, vec2((x + 0.5) / 4.0, (si + 0.5) / meta_h));
+    return texture2D(meta_tex, vec2((x + 0.5) / 2.0, (si + 0.5) / meta_h));
 }
 
 // normalized sample value; idx is clamped to the series
@@ -130,6 +130,22 @@ vec2 sample_mm(float si, float gidx, float glen) {
 float val_y(float v, float y0, float h) {
     float frac = v * 3.0 - 1.0;
     return y0 + (1.0 - frac) * (h - 1.0);
+}
+
+// false when device y is out of reach of samples [ia, ib] (at most 17, so
+// two 16:1 min/max groups cover them): those groups bound every segment and
+// column run drawn from the samples, so one or two fetches reject a pixel
+// that would otherwise read every sample
+bool near_band(float si, float ia, float ib, float len, float y, float y0, float h, float pad) {
+    float glen = ceil(len / 16.0);
+    float ga = floor(clamp(ia, 0.0, len - 1.0) / 16.0);
+    float gb = floor(clamp(ib, 0.0, len - 1.0) / 16.0);
+    vec2 mm = sample_mm(si, ga, glen);
+    if (gb > ga) {
+        vec2 mm2 = sample_mm(si, gb, glen);
+        mm = vec2(min(mm.x, mm2.x), max(mm.y, mm2.y));
+    }
+    return y >= val_y(mm.y, y0, h) - pad && y <= val_y(mm.x, y0, h) + pad;
 }
 
 float seg_dist(vec2 p, vec2 a, vec2 b) {
@@ -162,20 +178,17 @@ void main() {
             break;
         }
         float si = float(i);
-        if (meta_at(1.0, si).r < 0.5) {
-            continue; // disabled via the legend
-        }
-        vec4 m2 = meta_at(2.0, si);
-        float len = m2.r * 16711680.0 + m2.g * 65280.0 + m2.b * 255.0;
+        vec4 m1 = meta_at(1.0, si);
+        float len = m1.r * 16711680.0 + m1.g * 65280.0 + m1.b * 255.0;
         if (len < 2.0) {
-            continue;
+            continue; // too short, or disabled via the legend
         }
         // stacked lanes: each enabled series owns one horizontal band and is
         // clipped to it, mirroring the image backend's sub-image draw
         float lane_y0 = 0.0;
         float lane_h = h_dev;
         if (lane_count >= 1.0) {
-            float li = floor(meta_at(3.0, si).r * 255.0 + 0.5);
+            float li = floor(m1.a * 255.0 + 0.5);
             lane_y0 = floor(li * h_dev / lane_count);
             lane_h = floor((li + 1.0) * h_dev / lane_count) - lane_y0;
             if (p_dev.y < lane_y0 || p_dev.y > lane_y0 + lane_h) {
@@ -185,19 +198,31 @@ void main() {
         // hovered series renders at 4 logical px like PlotImage thickness 4
         float half_w = (abs(si - highlight) < 0.5 ? 2.0 : 0.5) * pix_scale;
 
+        float pad = half_w + aa + 1.0; // mask is 0 from half_w + aa out
         float mask = 0.0;
         if (ppd <= 1.5) {
-            // zoomed in: true polyline, distance to the segments around
-            // this pixel's column
-            float i0 = floor(spos);
+            // zoomed in: true polyline, distance to the segments that can
+            // reach this pixel - a segment is never closer than its
+            // horizontal gap, so only those within half_w + aa in x count
+            float reach = (half_w + aa) * ppd;
+            float j = floor(spos - reach);
+            float j_end = min(floor(spos + reach), j + float(MAX_SEG) - 1.0);
+            if (!near_band(si, j, j_end + 1.0, len, p_dev.y, lane_y0, lane_h, pad)) {
+                continue;
+            }
+            float x0 = (j - plot_start) / points_shown * w_dev;
+            float y0 = val_y(sample_val(si, j, len), lane_y0, lane_h);
             float dmin = BIG;
-            for (int k = -MAX_SEG; k < MAX_SEG; k++) {
-                float j = i0 + float(k);
-                float x0 = (j - plot_start) / points_shown * w_dev;
+            for (int k = 0; k < MAX_SEG; k++) {
+                if (j > j_end) {
+                    break;
+                }
                 float x1 = (j + 1.0 - plot_start) / points_shown * w_dev;
-                float y0 = val_y(sample_val(si, j, len), lane_y0, lane_h);
                 float y1 = val_y(sample_val(si, j + 1.0, len), lane_y0, lane_h);
                 dmin = min(dmin, seg_dist(p_dev, vec2(x0, y0), vec2(x1, y1)));
+                x0 = x1;
+                y0 = y1;
+                j += 1.0;
             }
             mask = 1.0 - smoothstep(half_w - aa, half_w + aa, dmin);
         } else {
@@ -209,6 +234,9 @@ void main() {
             float lo = BIG;
             float hi = -BIG;
             if (ppd <= 14.0) {
+                if (!near_band(si, floor(s_a), ceil(s_b), len, p_dev.y, lane_y0, lane_h, pad)) {
+                    continue;
+                }
                 for (int k = 0; k < MAX_RAW; k++) {
                     float idx = s_a + float(k);
                     if (idx > s_b) {
@@ -233,6 +261,9 @@ void main() {
             }
             float d = max(val_y(hi, lane_y0, lane_h) - p_dev.y, p_dev.y - val_y(lo, lane_y0, lane_h));
             mask = 1.0 - smoothstep(half_w - aa, half_w + aa, d);
+        }
+        if (mask <= 0.0) {
+            continue; // off the line, as most pixels are: skip the color fetch
         }
 
         // max blend, same as bresenhamCore, so overlap is order independent
@@ -344,26 +375,24 @@ func encodeSeries(data, mm *image.RGBA, texW, rawRow, mmRow int, ts *TimeSeries,
 	}
 }
 
-// updateShaderMeta rebuilds the per-series metadata texture (color, enabled,
-// length, lane). Called when the legend toggles or recolors a series; a fresh
-// image is allocated because the painter re-uploads only when the map entry
-// points at a new image.
+// updateShaderMeta rebuilds the per-series metadata texture: color in column
+// 0, then length (0 for a disabled series) and lane packed into column 1 so the
+// shader reads all three with one fetch. Called when the legend toggles or
+// recolors a series; a fresh image is allocated because the painter re-uploads
+// only when the map entry points at a new image.
 func (p *Plotter) updateShaderMeta() {
 	if p.shader == nil {
 		return
 	}
 	p.shader.Uniforms["lane_count"] = float32(p.updateLanes())
-	meta := image.NewRGBA(image.Rect(0, 0, 4, len(p.ts)))
+	meta := image.NewRGBA(image.Rect(0, 0, 2, len(p.ts)))
 	for i, ts := range p.ts {
 		meta.SetRGBA(0, i, ts.Color)
-		var enabled uint8
+		n := 0
 		if ts.Enabled {
-			enabled = 0xff
+			n = len(p.values[ts.Name])
 		}
-		meta.SetRGBA(1, i, color.RGBA{R: enabled, A: 0xff})
-		n := len(p.values[ts.Name])
-		meta.SetRGBA(2, i, color.RGBA{R: uint8(n >> 16), G: uint8(n >> 8), B: uint8(n), A: 0xff})
-		meta.SetRGBA(3, i, color.RGBA{R: uint8(p.laneOf[i]), A: 0xff})
+		meta.SetRGBA(1, i, color.RGBA{R: uint8(n >> 16), G: uint8(n >> 8), B: uint8(n), A: uint8(p.laneOf[i])})
 	}
 	p.shader.Textures["meta_tex"] = meta
 }

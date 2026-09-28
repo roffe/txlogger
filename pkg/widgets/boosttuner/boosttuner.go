@@ -323,29 +323,13 @@ func parseLog(name string, r io.Reader) (map[string][]float64, int, error) {
 	}
 	defer lf.Close()
 
+	// The log's columns are already row-aligned with NaN gaps. Callers only
+	// append them onto their own series, never write into them.
 	local := make(map[string][]float64)
-	n := 0
-	for {
-		rec := lf.Next()
-		if rec.EOF {
-			break
-		}
-		for k, v := range rec.Values {
-			if k == "Pgm_status" {
-				continue
-			}
-			arr := local[k]
-			for len(arr) < n { // back-fill records before this key first appeared
-				arr = append(arr, math.NaN())
-			}
-			local[k] = append(arr, v)
-		}
-		n++
-		for k, arr := range local { // forward-fill keys missing from this record
-			for len(arr) < n {
-				arr = append(arr, math.NaN())
-			}
-			local[k] = arr
+	n := lf.Len()
+	for _, k := range lf.Columns() {
+		if k != "Pgm_status" {
+			local[k] = lf.Column(k)
 		}
 	}
 	if n == 0 {

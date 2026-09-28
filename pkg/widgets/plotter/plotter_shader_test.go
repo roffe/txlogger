@@ -125,34 +125,37 @@ func TestPlotShaderEncodeHeadroom(t *testing.T) {
 	}
 }
 
-// The metadata texture carries color, enabled flag and series length, and a
-// legend toggle must produce a fresh image holding the new state.
+// The metadata texture carries color, series length (0 when disabled) and
+// lane, and a legend toggle must produce a fresh image holding the new state.
 func TestPlotShaderMeta(t *testing.T) {
 	p := shaderPlotter(t, 2, 100)
 
+	metaLen := func(meta *image.RGBA, i int) int {
+		c := meta.RGBAAt(1, i)
+		return int(c.R)<<16 | int(c.G)<<8 | int(c.B)
+	}
 	meta := p.shader.Textures["meta_tex"].(*image.RGBA)
 	for i, ts := range p.ts {
 		if c := meta.RGBAAt(0, i); c != ts.Color {
 			t.Fatalf("series %d color %v, want %v", i, c, ts.Color)
 		}
-		if c := meta.RGBAAt(1, i); c.R != 0xff {
-			t.Fatalf("series %d not flagged enabled", i)
-		}
-		n := len(p.values[ts.Name])
-		c := meta.RGBAAt(2, i)
-		if got := int(c.R)<<16 | int(c.G)<<8 | int(c.B); got != n {
+		if got, n := metaLen(meta, i), len(p.values[ts.Name]); got != n {
 			t.Fatalf("series %d length %d, want %d", i, got, n)
 		}
 	}
 
-	p.ts[1].Enabled = false
+	p.ts[0].Enabled = false
+	p.laneMode = true
 	p.updateShaderMeta()
 	meta2 := p.shader.Textures["meta_tex"].(*image.RGBA)
 	if meta2 == meta {
 		t.Fatal("meta texture not replaced; painter would not re-upload")
 	}
-	if c := meta2.RGBAAt(1, 1); c.R != 0 {
-		t.Fatal("disabled series still flagged enabled")
+	if metaLen(meta2, 0) != 0 {
+		t.Fatal("disabled series still has a length")
+	}
+	if lane := meta2.RGBAAt(1, 1).A; lane != 0 {
+		t.Fatalf("second series in lane %d, want 0 with the first disabled", lane)
 	}
 }
 

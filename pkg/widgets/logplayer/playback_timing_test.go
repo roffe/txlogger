@@ -1,6 +1,8 @@
 package logplayer
 
 import (
+	"math"
+	"slices"
 	"testing"
 	"time"
 )
@@ -58,4 +60,18 @@ func absErr(a, b time.Duration) time.Duration {
 		return b - a
 	}
 	return a - b
+}
+
+func TestGapFilled(t *testing.T) {
+	nan := math.NaN()
+	full := []float64{1, 2, 3}
+	if got := gapFilled(full); &got[0] != &full[0] {
+		t.Error("a column without gaps should be passed through, not copied")
+	}
+	if got := gapFilled([]float64{nan, 2, nan, 4, nan}); !slices.Equal(got, []float64{2, 2, 2, 4, 4}) {
+		t.Errorf("gapFilled = %v", got)
+	}
+	if gapFilled([]float64{nan, nan}) != nil {
+		t.Error("an all-missing column should be dropped")
+	}
 }

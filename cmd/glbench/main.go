@@ -3,8 +3,16 @@
 // ECU attached. The default view is a typical session: the symbol list, the
 // dashboard and three map viewers as inner windows on a 1920x1080 desktop.
 //
-//	FYNE_GL_DEBUG=1 go run ./cmd/glbench -cpuprofile cpu.out -shot frame.png
+//	FYNE_GL_DEBUG=1 go run -tags migrated_fynedo ./cmd/glbench -cpuprofile cpu.out -shot frame.png
 //	go tool pprof -top -cum cpu.out
+//
+// Build with -tags migrated_fynedo: fyne package adds it to release builds
+// (FyneApp.toml declares the fyneDo migration), and without it fyne's caches
+// are sync.Maps and its locks real, which profiles differently from what ships.
+//
+// Each run ends with a heap line: allocations per second, bytes per second and
+// GC cycles over the measured window, so escape fixes can be measured too.
+// -hz 0 measures the idle app.
 //
 // FYNE_GL_DEBUG makes the GL painter log draw calls, paint time and texture
 // churn every 120 frames. It measures whichever fyne the build resolves; add
@@ -19,6 +27,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"runtime"
 	"runtime/pprof"
 	"time"
 
@@ -39,8 +48,9 @@ var (
 	view       = flag.String("view", "real", "real (symbol list, dashboard and -maps map viewers as inner windows), dashboard, symbols, map or all")
 	maps       = flag.Int("maps", 3, "map viewers in the real view")
 	dur        = flag.Duration("d", 20*time.Second, "how long to run after a 3s warmup")
-	hz         = flag.Int("hz", 50, "value updates per second, like a logger's sample rate")
+	hz         = flag.Int("hz", 50, "value updates per second, like a logger's sample rate; 0 measures the idle app")
 	cpuprofile = flag.String("cpuprofile", "", "write a CPU profile of the run here")
+	memprofile = flag.String("memprofile", "", "write an allocation profile of the run here, and one of the warmup to diff it against: go tool pprof -sample_index=alloc_objects -base mem.out.base mem.out")
 	shot       = flag.String("shot", "", "write a PNG capture of the window here at the end of the run")
 )
 
@@ -70,6 +80,9 @@ var updates []func(phase float64)
 
 func main() {
 	flag.Parse()
+	if *memprofile != "" {
+		runtime.MemProfileRate = 4096
+	}
 	// txlogger declares the fyneDo migration in FyneApp.toml, which switches
 	// off fyne's per-call thread checks. Without it those checks cost about a
 	// third of the CPU and swamp everything this is meant to measure, so it is
@@ -146,18 +159,36 @@ func main() {
 			}
 			defer pprof.StopCPUProfile()
 		}
-		t := time.NewTicker(time.Second / time.Duration(*hz))
-		defer t.Stop()
-		end := time.Now().Add(*dur)
-		for now := range t.C {
-			if now.After(end) {
-				break
-			}
-			ph := float64(now.UnixNano()) / 1e9 * 2
-			for _, u := range updates {
-				u(ph)
-			}
+		if *memprofile != "" {
+			writeAllocs(*memprofile + ".base")
 		}
+		var m0, m1 runtime.MemStats
+		runtime.ReadMemStats(&m0)
+		t0 := time.Now()
+		if *hz > 0 {
+			t := time.NewTicker(time.Second / time.Duration(*hz))
+			defer t.Stop()
+			end := time.Now().Add(*dur)
+			for now := range t.C {
+				if now.After(end) {
+					break
+				}
+				ph := float64(now.UnixNano()) / 1e9 * 2
+				for _, u := range updates {
+					u(ph)
+				}
+			}
+		} else {
+			time.Sleep(*dur) // idle: nothing changes, only the driver's own loop runs
+		}
+		runtime.ReadMemStats(&m1)
+		if *memprofile != "" {
+			writeAllocs(*memprofile)
+		}
+		secs := time.Since(t0).Seconds()
+		log.Printf("heap: %.0f allocs/s, %.1f KiB/s, %d GCs, %.1f MiB in use",
+			float64(m1.Mallocs-m0.Mallocs)/secs, float64(m1.TotalAlloc-m0.TotalAlloc)/secs/1024,
+			m1.NumGC-m0.NumGC, float64(m1.HeapAlloc)/(1<<20))
 		if *shot != "" {
 			// One fixed final state, left to settle, so captures from two builds
 			// can be compared pixel for pixel. Capture reads the front buffer,
@@ -262,6 +293,20 @@ func fuelMap(name string, cols, rows int) *mapviewer.Config {
 	return &mapviewer.Config{
 		Name: name, XData: x, YData: y, ZData: z,
 		ZPrecision: 2, XLabel: "Rpm", YLabel: "mg/c", ZLabel: "Fuel enrichment",
+	}
+}
+
+// writeAllocs writes the allocation profile. The profile only covers up to the
+// last completed GC, so one is forced first.
+func writeAllocs(path string) {
+	runtime.GC()
+	f, err := os.Create(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	if err := pprof.Lookup("allocs").WriteTo(f, 0); err != nil {
+		log.Fatal(err)
 	}
 }
 
