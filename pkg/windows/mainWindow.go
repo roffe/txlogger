@@ -665,9 +665,9 @@ func (mw *MainWindow) captureSeedKey(ecuType symbol.ECUType, data []byte) {
 }
 
 func (mw *MainWindow) LoadSymbols(symbols symbol.FirmwareFile, ecuType string) {
-	mw.selects.ecuSelect.SetSelected(ecuType)
 	mw.fw = symbols
 	mw.symbolList.SetSymbols(symbols)
+	mw.selects.ecuSelect.SetSelected(ecuType) // selects the ECU's preset, which syncs
 }
 
 // -----

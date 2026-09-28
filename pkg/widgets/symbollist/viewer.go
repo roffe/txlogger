@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -123,11 +124,10 @@ func (v *Viewer) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(v.content)
 }
 
-// SetSymbols sets the symbol collection used for lookup and syncs the
-// listed symbols against it.
+// SetSymbols sets the symbol collection used for lookup. It does not sync;
+// selecting a preset (or SelectPresetForECU) does.
 func (v *Viewer) SetSymbols(fw symbol.FirmwareFile) {
 	v.fw = fw
-	v.Sync()
 }
 
 // Sync refreshes the listed symbols with fresh data from the loaded binary.
@@ -213,9 +213,15 @@ func (v *Viewer) SelectPreset(name string) {
 	v.presetSelect.SetSelected(name)
 }
 
-// SelectPresetForECU selects the last used preset for the given ECU.
+// SelectPresetForECU selects the last used preset for the given ECU, or just
+// syncs the current list if that preset no longer exists.
 func (v *Viewer) SelectPresetForECU(ecu string) {
-	v.presetSelect.SetSelected(v.cfg.App.Preferences().StringWithFallback(ecu+prefsSelectedPreset, ecu+" Dash"))
+	name := v.cfg.App.Preferences().StringWithFallback(ecu+prefsSelectedPreset, ecu+" Dash")
+	if slices.Contains(v.presetSelect.Options, name) {
+		v.presetSelect.SetSelected(name) // loads + syncs
+		return
+	}
+	v.Sync()
 }
 
 func (v *Viewer) reloadPresets() {
