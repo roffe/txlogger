@@ -5,7 +5,7 @@ go 1.27.0
 replace github.com/roffe/gocan/v2 => ../gocan
 
 //replace github.com/roffe/ecusymbol => ../ecusymbol
-replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20260926204425-671e9824075c
+replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20260928185240-2f8915398d21
 
 //replace go.bug.st/serial => ../../../go.bug.st/serial
 
@@ -17,6 +17,8 @@ require (
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/dweymouth/fyne-tooltip v0.4.0
 	github.com/ebitengine/oto/v3 v3.4.0
+	github.com/go-gl/gl v0.0.0-20260331235117-4566fea9a276
+	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.2
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/roffe/ecusymbol v1.2.6-0.20260924192406-eb1f987c0234
@@ -44,8 +46,6 @@ require (
 	github.com/fyne-io/glfw-js v0.4.0 // indirect
 	github.com/fyne-io/image v0.1.1 // indirect
 	github.com/fyne-io/oksvg v0.2.1-0.20260918172519-a9af55fa95d9 // indirect
-	github.com/go-gl/gl v0.0.0-20260331235117-4566fea9a276 // indirect
-	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.2 // indirect
 	github.com/go-text/render v0.2.1 // indirect
 	github.com/go-text/typesetting v0.3.5 // indirect
 	github.com/golang/mock v1.6.0 // indirect
