@@ -165,8 +165,6 @@ func (c *T7Client) Start(pctx context.Context) error {
 	kwp := t7kwp.New(cl)
 	kwp.SetSeedKey(c.SeedKey) // custom pair extracted from the loaded binary, if any
 
-	adConverter := NewWBLInterpolator(c.WidebandConfig)
-
 	if err := initT7logging(ctx, kwp, c.Symbols, c.OnMessage); err != nil {
 		return fmt.Errorf("failed to init t7 logging: %w", err)
 	}
@@ -219,34 +217,7 @@ func (c *T7Client) Start(pctx context.Context) error {
 		}
 	*/
 
-	router := map[string]func(s *symbol.Symbol) bool{
-		"IgnKnk.fi_Offset": func(s *symbol.Symbol) bool {
-			data := s.Bytes()
-			if len(data) != 8 {
-				return false
-			}
-
-			ioffCyl1 := int16(binary.BigEndian.Uint16(data[0:2]))
-			ioffCyl2 := int16(binary.BigEndian.Uint16(data[2:4]))
-			ioffCyl3 := int16(binary.BigEndian.Uint16(data[4:6]))
-			ioffCyl4 := int16(binary.BigEndian.Uint16(data[6:8]))
-
-			ebus.Publish("IgnKnk.fi_Offset.Cyl1", float64(ioffCyl1)/10)
-			ebus.Publish("IgnKnk.fi_Offset.Cyl2", float64(ioffCyl2)/10)
-			ebus.Publish("IgnKnk.fi_Offset.Cyl3", float64(ioffCyl3)/10)
-			ebus.Publish("IgnKnk.fi_Offset.Cyl4", float64(ioffCyl4)/10)
-			return true
-		},
-	}
-
-	if c.WidebandConfig.ADScanner {
-		router[c.WidebandConfig.ADScannerSymbol] = func(s *symbol.Symbol) bool {
-			lambda := adConverter(s.Int())
-			c.sysvars.Set(LAMBDAADSCANNER, lambda)
-			ebus.Publish(LAMBDAADSCANNER, lambda)
-			return true
-		}
-	}
+	publishSpecial := c.t7SpecialPublisher()
 
 	/*
 		if c.lamb != nil {
@@ -299,11 +270,7 @@ func (c *T7Client) Start(pctx context.Context) error {
 				write.Address += uint32(toWrite)
 				write.Length -= toWrite
 				if write.Length > 0 {
-					select {
-					case c.writeChan <- write:
-					default:
-						log.Println("kisskorv updateChan full")
-					}
+					requeue(c.writeChan, write)
 					continue
 				}
 				write.Complete(nil)
@@ -337,22 +304,16 @@ func (c *T7Client) Start(pctx context.Context) error {
 						break
 					}
 
-					if fn, ok := router[va.Name]; ok && fn(va) {
-						continue
+					if !publishSpecial(va) {
+						ebus.Publish(va.Name, va.Float64())
 					}
-
-					ebus.Publish(va.Name, va.Float64())
 				}
 
 				if r.Len() > 0 {
 					c.OnMessage(fmt.Sprintf("%d leftover bytes!", r.Len()))
 				}
 
-				if c.lamb != nil {
-					lambda := c.lamb.GetLambda()
-					c.sysvars.Set(EXTERNALWBLSYM, lambda)
-					ebus.Publish(EXTERNALWBLSYM, lambda)
-				}
+				c.publishExternalWBL()
 
 				if err := c.lw.Write(timeStamp, channels); err != nil {
 					c.onError()
@@ -526,3 +487,25 @@ func newDisplProtADConverterT7(wbl WidebandConfig) func(float64) float64 {
 	}
 }
 */
+
+var ignOffsetCylNames = [4]string{"IgnKnk.fi_Offset.Cyl1", "IgnKnk.fi_Offset.Cyl2", "IgnKnk.fi_Offset.Cyl3", "IgnKnk.fi_Offset.Cyl4"}
+
+// t7SpecialPublisher returns fn(sym) that publishes T7 symbols needing custom
+// decoding (per-cylinder ignition offsets, the AD scanner input) and reports
+// whether it handled sym; otherwise the caller publishes sym.Float64().
+func (bl *BaseLogger) t7SpecialPublisher() func(s *symbol.Symbol) bool {
+	adScanner := bl.adScannerFunc()
+	return func(s *symbol.Symbol) bool {
+		if s.Name == "IgnKnk.fi_Offset" {
+			data := s.Bytes()
+			if len(data) != 8 {
+				return false
+			}
+			for cyl, name := range ignOffsetCylNames {
+				ebus.Publish(name, float64(int16(binary.BigEndian.Uint16(data[cyl*2:])))/10)
+			}
+			return true
+		}
+		return adScanner(s.Name, s.Int())
+	}
+}

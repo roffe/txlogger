@@ -1,41 +1,35 @@
 package datalogger
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/avast/retry-go/v4"
 	"github.com/roffe/gocan/v2"
-	"github.com/roffe/gocan/v2/pkg/serialcommand"
-	"github.com/roffe/txlogger/pkg/ebus"
 )
 
-func (c *TxBridge) t5(pctx context.Context, cl *gocan.Bus) error {
+// t5 logs via the dongle's autonomous T5 read loop. gather first uploads the
+// gather stub/table (enableT5Gather) so the dongle reads one packed buffer.
+func (c *TxBridge) t5(pctx context.Context, cl *gocan.Bus, gather bool) error {
 	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
-
-	// T5 decodes every value into sysvars (see newT5Converter), so all columns
-	// are sysvar channels.
-	channels := make([]Channel, 0, len(c.Symbols)+2)
-	for _, s := range c.Symbols {
-		s.Correctionfactor = 0.1
-		channels = append(channels, newSysvarChannel(c.sysvars, s.Name))
-	}
 
 	if c.lamb != nil {
 		defer c.lamb.Stop()
 	}
-	for _, name := range c.appendExtraSysvars(nil) {
-		channels = append(channels, newSysvarChannel(c.sysvars, name))
-	}
+	channels := c.t5Channels()
 
 	expectedPayloadSize, err := c.configureT5Symbols()
 	if err != nil {
 		return fmt.Errorf("error configuring symbols: %w", err)
+	}
+
+	if gather {
+		if err := c.enableT5Gather(ctx, cl); err != nil {
+			return fmt.Errorf("error enabling gather: %w", err)
+		}
 	}
 
 	tx := c.tb.Subscribe(ctx, 'r')
@@ -44,8 +38,7 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Bus) error {
 		return fmt.Errorf("error starting logging: %w", err)
 	}
 
-	converto := newT5Converter()
-	adscannerConverter := NewWBLInterpolator(c.WidebandConfig)
+	publish := c.t5Publisher()
 
 	go func() {
 		defer cl.Close()
@@ -62,85 +55,14 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Bus) error {
 				c.OnMessage("Stopped logging..")
 				return
 			case <-c.secondTicker.C:
-				c.FpsCounter(c.capturePerSecond)
-				if c.errPerSecond > 5 {
-					c.OnMessage("too many errors, aborting logging")
+				if msg := c.perSecond(lastData); msg != "" {
+					c.OnMessage(msg)
 					return
 				}
-				if time.Since(lastData) > dataTimeout {
-					c.OnMessage("no data for 5s, aborting logging")
-					return
-				}
-				c.resetPerSecond()
 			case read := <-c.readChan:
-				toRead := min(234, read.Length)
-				read.Length -= toRead
-				cmd := serialcommand.SerialCommand{
-					Command: 'R',
-					Data: []byte{
-						byte(read.Address),
-						byte(read.Address >> 8),
-						byte(read.Address >> 16),
-						byte(read.Address >> 24),
-						byte(toRead),
-					},
-				}
-				read.Address += uint32(toRead)
-				rctx, rcancel := context.WithTimeout(ctx, 3*time.Second)
-				resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'R')
-				rcancel()
-				if err != nil {
-					read.Complete(err)
-					continue
-				}
-				read.Data = append(read.Data, resp.Data...)
-				if read.Length > 0 {
-					c.readChan <- read
-				} else {
-					read.Complete(nil)
-				}
-				continue
+				c.handleReadTxbridge(ctx, read, 234, 3*time.Second)
 			case write := <-c.writeChan:
-				toWrite := min(128, write.Length)
-				cmd := serialcommand.SerialCommand{
-					Command: 'W',
-					Data: []byte{
-						byte(write.Address),
-						byte(write.Address >> 8),
-						byte(write.Address >> 16),
-						byte(write.Address >> 24),
-						byte(toWrite),
-					},
-				}
-				cmd.Data = append(cmd.Data, write.Data[:toWrite]...)
-
-				write.Data = write.Data[toWrite:] // remove the data we just sent
-				write.Address += uint32(toWrite)
-				write.Length -= toWrite
-
-				rctx, rcancel := context.WithTimeout(ctx, 5*time.Second)
-				resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'W', 'e')
-				rcancel()
-				if err != nil {
-					write.Complete(err)
-					continue
-				}
-
-				if resp.Command == 'e' {
-					write.Complete(fmt.Errorf("error response: % 02X", resp.Data))
-					continue
-				}
-
-				if write.Length > 0 {
-					select {
-					case c.writeChan <- write:
-					default:
-						log.Println("writeChan full")
-					}
-					continue
-				}
-				write.Complete(nil)
-				continue
+				c.handleWriteTxbridge(ctx, write, 128, 5*time.Second)
 			case msg, ok := <-tx:
 				if !ok {
 					c.OnMessage("txbridge sub closed")
@@ -154,40 +76,21 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Bus) error {
 					continue
 				}
 
-				r := bytes.NewReader(msg.Data)
-				if err := binary.Read(r, binary.LittleEndian, &c.currtimestamp); err != nil {
+				r, timeStamp, err := c.readFrameHeader(msg.Data)
+				if err != nil {
 					c.onError()
-					c.OnMessage("failed to read timestamp: " + err.Error())
+					c.OnMessage(err.Error())
 					continue
 				}
-
-				if c.firstTime.IsZero() {
-					c.firstTime = time.Now()
-					c.firstTimestamp = c.currtimestamp
-				}
-
-				timeStamp := c.calculateCompensatedTimestamp()
 
 				for _, sym := range c.Symbols {
 					if err := sym.Read(r); err != nil {
 						c.OnMessage("failed to read symbol " + sym.Name + ": " + err.Error())
 						return
 					}
-					val := converto(sym.Name, sym.Bytes())
-					if c.WidebandConfig.ADScanner && sym.Name == c.WidebandConfig.ADScannerSymbol {
-						lambda := adscannerConverter(int(val))
-						c.sysvars.Set(LAMBDAADSCANNER, lambda)
-						ebus.Publish(LAMBDAADSCANNER, lambda)
-					}
-					c.sysvars.Set(sym.Name, val)
-					ebus.Publish(sym.Name, val)
+					publish(sym)
 				}
-
-				if c.lamb != nil {
-					lambda := c.lamb.GetLambda()
-					c.sysvars.Set(EXTERNALWBLSYM, lambda)
-					ebus.Publish(EXTERNALWBLSYM, lambda)
-				}
+				c.publishExternalWBL()
 
 				if err := c.lw.Write(timeStamp, channels); err != nil {
 					c.OnMessage("failed to write log: " + err.Error())
@@ -287,198 +190,6 @@ func (c *TxBridge) uploadT5SRAM(ctx context.Context, cl *gocan.Bus, address uint
 	return nil
 }
 
-// t5new is a test variant of t5 that enables the gather fast-logger. Identical to
-// t5 except for the enableT5Gather call before startLogging. Flip the dispatch in
-// txbridgelogger.go (c.t5 -> c.t5new) to try it; merge into t5 once validated.
-func (c *TxBridge) t5new(pctx context.Context, cl *gocan.Bus) error {
-	ctx, cancel := context.WithCancel(pctx)
-	defer cancel()
-
-	channels := make([]Channel, 0, len(c.Symbols)+2)
-	for _, s := range c.Symbols {
-		s.Correctionfactor = 0.1
-		channels = append(channels, newSysvarChannel(c.sysvars, s.Name))
-	}
-
-	if c.lamb != nil {
-		defer c.lamb.Stop()
-	}
-	for _, name := range c.appendExtraSysvars(nil) {
-		channels = append(channels, newSysvarChannel(c.sysvars, name))
-	}
-
-	expectedPayloadSize, err := c.configureT5Symbols() // configure the symbol list in the dongle and get the expected payload size
-	if err != nil {
-		return fmt.Errorf("error configuring symbols: %w", err)
-	}
-
-	// --- the only difference from t5(): build+upload the gather stub/table and enable.
-	if err := c.enableT5Gather(ctx, cl); err != nil {
-		return fmt.Errorf("error enabling gather: %w", err)
-	}
-
-	tx := c.tb.Subscribe(ctx, 'r')
-
-	if err := c.startLogging(); err != nil {
-		return fmt.Errorf("error starting logging: %w", err)
-	}
-
-	converto := newT5Converter()
-	adscannerConverter := NewWBLInterpolator(c.WidebandConfig)
-
-	go func() {
-		defer cl.Close()
-		defer func() {
-			_ = c.stopLogging()
-			time.Sleep(50 * time.Millisecond)
-		}()
-		lastData := time.Now()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-c.quitChan:
-				c.OnMessage("Stopped logging..")
-				return
-			case <-c.secondTicker.C:
-				c.FpsCounter(c.capturePerSecond)
-				if c.errPerSecond > 5 {
-					c.OnMessage("too many errors, aborting logging")
-					return
-				}
-				if time.Since(lastData) > dataTimeout {
-					c.OnMessage("no data for 5s, aborting logging")
-					return
-				}
-				c.resetPerSecond()
-			case read := <-c.readChan:
-				toRead := min(234, read.Length)
-				read.Length -= toRead
-				cmd := serialcommand.SerialCommand{
-					Command: 'R',
-					Data: []byte{
-						byte(read.Address),
-						byte(read.Address >> 8),
-						byte(read.Address >> 16),
-						byte(read.Address >> 24),
-						byte(toRead),
-					},
-				}
-				read.Address += uint32(toRead)
-				rctx, rcancel := context.WithTimeout(ctx, 3*time.Second)
-				resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'R')
-				rcancel()
-				if err != nil {
-					read.Complete(err)
-					continue
-				}
-				read.Data = append(read.Data, resp.Data...)
-				if read.Length > 0 {
-					c.readChan <- read
-				} else {
-					read.Complete(nil)
-				}
-				continue
-			case write := <-c.writeChan:
-				toWrite := min(128, write.Length)
-				cmd := serialcommand.SerialCommand{
-					Command: 'W',
-					Data: []byte{
-						byte(write.Address),
-						byte(write.Address >> 8),
-						byte(write.Address >> 16),
-						byte(write.Address >> 24),
-						byte(toWrite),
-					},
-				}
-				cmd.Data = append(cmd.Data, write.Data[:toWrite]...)
-
-				write.Data = write.Data[toWrite:]
-				write.Address += uint32(toWrite)
-				write.Length -= toWrite
-
-				rctx, rcancel := context.WithTimeout(ctx, 5*time.Second)
-				resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'W', 'e')
-				rcancel()
-				if err != nil {
-					write.Complete(err)
-					continue
-				}
-
-				if resp.Command == 'e' {
-					write.Complete(fmt.Errorf("error response: % 02X", resp.Data))
-					continue
-				}
-
-				if write.Length > 0 {
-					select {
-					case c.writeChan <- write:
-					default:
-						log.Println("writeChan full")
-					}
-					continue
-				}
-				write.Complete(nil)
-				continue
-			case msg, ok := <-tx:
-				if !ok {
-					c.OnMessage("txbridge sub closed")
-					return
-				}
-				lastData = time.Now()
-
-				if len(msg.Data) != (expectedPayloadSize + 4) {
-					c.onError()
-					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, len(msg.Data)))
-					continue
-				}
-
-				r := bytes.NewReader(msg.Data)
-				if err := binary.Read(r, binary.LittleEndian, &c.currtimestamp); err != nil {
-					c.onError()
-					c.OnMessage("failed to read timestamp: " + err.Error())
-					continue
-				}
-
-				if c.firstTime.IsZero() {
-					c.firstTime = time.Now()
-					c.firstTimestamp = c.currtimestamp
-				}
-
-				timeStamp := c.calculateCompensatedTimestamp()
-
-				for _, sym := range c.Symbols {
-					if err := sym.Read(r); err != nil {
-						c.OnMessage("failed to read symbol " + sym.Name + ": " + err.Error())
-						return
-					}
-					val := converto(sym.Name, sym.Bytes())
-					if c.WidebandConfig.ADScanner && sym.Name == c.WidebandConfig.ADScannerSymbol {
-						lambda := adscannerConverter(int(val))
-						c.sysvars.Set(LAMBDAADSCANNER, lambda)
-						ebus.Publish(LAMBDAADSCANNER, lambda)
-					}
-					c.sysvars.Set(sym.Name, val)
-					ebus.Publish(sym.Name, val)
-				}
-
-				if c.lamb != nil {
-					lambda := c.lamb.GetLambda()
-					c.sysvars.Set(EXTERNALWBLSYM, lambda)
-					ebus.Publish(EXTERNALWBLSYM, lambda)
-				}
-
-				if err := c.lw.Write(timeStamp, channels); err != nil {
-					c.OnMessage("failed to write log: " + err.Error())
-					return
-				}
-				c.onCapture(timeStamp)
-			}
-		}
-	}()
-	return cl.Wait(ctx)
-}
-
 func (c *TxBridge) configureT5Symbols() (int, error) {
 	var expectedPayloadSize uint16
 	var symbollist []byte
@@ -494,13 +205,3 @@ func (c *TxBridge) configureT5Symbols() (int, error) {
 	c.OnMessage("Symbol list configured")
 	return int(expectedPayloadSize), nil
 }
-
-/*
-func (c *TxBridge) calculateExpectedPayloadSize() int {
-	var expectedPayloadSize uint16
-	for _, sym := range c.Symbols {
-		expectedPayloadSize += sym.Length
-	}
-	return int(expectedPayloadSize)
-}
-*/

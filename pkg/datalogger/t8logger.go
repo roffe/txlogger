@@ -115,7 +115,7 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Bus, gm *gmlan.Client, cha
 		time.Sleep(50 * time.Millisecond)
 	}()
 
-	adConverter := NewWBLInterpolator(c.WidebandConfig)
+	adScanner := c.adScannerFunc()
 
 	t := time.NewTicker(time.Second / time.Duration(c.Rate))
 	defer t.Stop()
@@ -136,19 +136,18 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Bus, gm *gmlan.Client, cha
 			}
 			c.resetPerSecond()
 		case read := <-c.readChan:
-			for read.Left > 0 {
+			var err error
+			for read.Left > 0 && err == nil {
 				chunkSize = uint32(math.Min(float64(read.Left), T8ReadChunkSize))
 				log.Printf("Reading RAM 0x%X %d", read.Address, chunkSize)
-				data, err := gm.ReadMemoryByAddress(ctx, read.Address, chunkSize)
-				if err != nil {
-					read.Complete(err)
-					continue
+				var data []byte
+				if data, err = gm.ReadMemoryByAddress(ctx, read.Address, chunkSize); err == nil {
+					read.Data = append(read.Data, data...)
+					read.Left -= chunkSize
+					read.Address += chunkSize
 				}
-				read.Data = append(read.Data, data...)
-				read.Left -= chunkSize
-				read.Address += chunkSize
 			}
-			read.Complete(nil)
+			read.Complete(err)
 		case upd := <-c.writeChan:
 			chunkSize = uint32(math.Min(float64(upd.Length), T8WriteChunkSize))
 			log.Printf("Updating RAM 0x%X %d", upd.Address, chunkSize)
@@ -160,7 +159,7 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Bus, gm *gmlan.Client, cha
 			upd.Length -= chunkSize
 			upd.Data = upd.Data[chunkSize:]
 			if upd.Length > 0 {
-				c.writeChan <- upd
+				requeue(c.writeChan, upd)
 				t.Reset(time.Second / time.Duration(c.Rate))
 				continue
 			}
@@ -195,22 +194,14 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Bus, gm *gmlan.Client, cha
 				}
 
 				ebus.Publish(va.Name, va.Float64())
-
-				if c.WidebandConfig.ADScanner && va.Name == c.WidebandConfig.ADScannerSymbol {
-					lambda := adConverter(va.Int())
-					c.sysvars.Set(LAMBDAADSCANNER, lambda)
-					ebus.Publish(LAMBDAADSCANNER, lambda)
-				}
+				adScanner(va.Name, va.Int())
 			}
 
 			if r.Len() > 0 {
 				c.OnMessage(fmt.Sprintf("%d leftover bytes!", r.Len()))
 			}
 
-			if c.lamb != nil {
-				ebus.Publish(EXTERNALWBLSYM, c.lamb.GetLambda())
-				c.sysvars.Set(EXTERNALWBLSYM, c.lamb.GetLambda())
-			}
+			c.publishExternalWBL()
 
 			if err := c.lw.Write(timeStamp, channels); err != nil {
 				c.onError()

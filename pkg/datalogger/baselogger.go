@@ -95,7 +95,35 @@ func (bl *BaseLogger) GetRAM(address uint32, length uint32) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("busy")
 	}
-	return req.Data, req.Wait()
+	err := req.Wait() // Data is filled in by the logger loop; read it only after Wait
+	return req.Data, err
+}
+
+// publishSysvar stores a sysvar and publishes it on the bus.
+func (bl *BaseLogger) publishSysvar(name string, v float64) {
+	bl.sysvars.Set(name, v)
+	ebus.Publish(name, v)
+}
+
+// publishExternalWBL samples the external wideband, if one is configured.
+func (bl *BaseLogger) publishExternalWBL() {
+	if bl.lamb != nil {
+		bl.publishSysvar(EXTERNALWBLSYM, bl.lamb.GetLambda())
+	}
+}
+
+// adScannerFunc returns fn(symbolName, adValue) that publishes the AD scanner
+// lambda when symbolName is the configured AD scanner input, and reports
+// whether it was.
+func (bl *BaseLogger) adScannerFunc() func(name string, ad int) bool {
+	conv := NewWBLInterpolator(bl.WidebandConfig)
+	return func(name string, ad int) bool {
+		if !bl.WidebandConfig.ADScanner || name != bl.WidebandConfig.ADScannerSymbol {
+			return false
+		}
+		bl.publishSysvar(LAMBDAADSCANNER, conv(ad))
+		return true
+	}
 }
 
 // update capture counters and emit the per-frame tick so live consumers can

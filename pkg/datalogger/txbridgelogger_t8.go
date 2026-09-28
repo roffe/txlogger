@@ -1,16 +1,13 @@
 package datalogger
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
 	"fmt"
 	"log"
 	"time"
 
 	"github.com/roffe/gocan/v2"
 	"github.com/roffe/gocan/v2/gmlan"
-	"github.com/roffe/gocan/v2/pkg/serialcommand"
 	"github.com/roffe/txlogger/pkg/ebus"
 )
 
@@ -58,7 +55,7 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Bus) error {
 	go func() {
 		defer cl.Close()
 
-		adConverter := NewWBLInterpolator(c.WidebandConfig)
+		adScanner := c.adScannerFunc()
 
 		defer func() {
 			_ = c.stopLogging() // stop the dongle's read loop before ending the session
@@ -75,25 +72,15 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Bus) error {
 				c.OnMessage("Finished logging")
 				return
 			case <-c.secondTicker.C:
-				c.FpsCounter(c.capturePerSecond)
-				if c.errPerSecond > 5 {
-					c.OnMessage("too many errors, aborting logging")
+				if msg := c.perSecond(lastData); msg != "" {
+					c.OnMessage(msg)
 					return
 				}
-				if time.Since(lastData) > dataTimeout {
-					c.OnMessage("no data for 5s, aborting logging")
-					return
-				}
-				c.resetPerSecond()
 			case read := <-c.readChan:
-				if err := c.handleReadTxbridge(ctx, read); err != nil {
-					read.Complete(err)
-				}
+				c.handleReadTxbridge(ctx, read, 235, 4*time.Second)
 			case upd := <-c.writeChan:
 				log.Printf("Updating RAM 0x%X", upd.Address)
-				if err := c.handleWriteTxbridge(ctx, upd); err != nil {
-					upd.Complete(err)
-				}
+				c.handleWriteTxbridge(ctx, upd, 235, 1*time.Second)
 			case msg, ok := <-tx:
 				if !ok {
 					c.OnMessage("txbridge recv channel closed")
@@ -105,19 +92,12 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Bus) error {
 					return
 				}
 
-				r := bytes.NewReader(msg.Data)
-				if err := binary.Read(r, binary.LittleEndian, &c.currtimestamp); err != nil {
+				r, timeStamp, err := c.readFrameHeader(msg.Data)
+				if err != nil {
 					c.onError()
-					c.OnMessage("failed to read timestamp: " + err.Error())
+					c.OnMessage(err.Error())
 					continue
 				}
-
-				if c.firstTime.IsZero() {
-					c.firstTime = time.Now()
-					c.firstTimestamp = c.currtimestamp
-				}
-
-				timeStamp := c.calculateCompensatedTimestamp()
 
 				for _, va := range c.Symbols {
 					if err := va.Read(r); err != nil {
@@ -126,23 +106,14 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Bus) error {
 						break
 					}
 					ebus.Publish(va.Name, va.Float64())
-
-					if c.WidebandConfig.ADScanner && va.Name == c.WidebandConfig.ADScannerSymbol {
-						lambda := adConverter(va.Int())
-						c.sysvars.Set(LAMBDAADSCANNER, lambda)
-						ebus.Publish(LAMBDAADSCANNER, lambda)
-					}
+					adScanner(va.Name, va.Int())
 				}
 
 				if r.Len() > 0 {
 					c.OnMessage(fmt.Sprintf("%d leftover bytes!", r.Len()))
 				}
 
-				if c.lamb != nil {
-					lambda := c.lamb.GetLambda()
-					c.sysvars.Set(EXTERNALWBLSYM, lambda)
-					ebus.Publish(EXTERNALWBLSYM, lambda)
-				}
+				c.publishExternalWBL()
 
 				if err := c.lw.Write(timeStamp, channels); err != nil {
 					c.onError()
@@ -154,71 +125,4 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Bus) error {
 		}
 	}()
 	return cl.Wait(ctx)
-}
-
-func (c *TxBridge) handleReadTxbridge(ctx context.Context, read *DataRequest) error {
-	toRead := min(235, read.Length)
-	// log.Printf("Reading RAM $%X:%d", read.Address, toRead)
-	cmd := serialcommand.SerialCommand{
-		Command: 'R',
-		Data: []byte{
-			byte(read.Address),
-			byte(read.Address >> 8),
-			byte(read.Address >> 16),
-			byte(read.Address >> 24),
-			byte(toRead),
-		},
-	}
-	rctx, cancel := context.WithTimeout(ctx, 4*time.Second)
-	defer cancel()
-	resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'R')
-	if err != nil {
-		return err
-	}
-	read.Address += uint32(toRead)
-	read.Length -= toRead
-	read.Data = append(read.Data, resp.Data...)
-	if read.Length > 0 {
-		c.readChan <- read
-	} else {
-		read.Complete(nil)
-	}
-	return nil
-}
-
-func (c *TxBridge) handleWriteTxbridge(ctx context.Context, write *DataRequest) error {
-	toWrite := min(write.Length, 235)
-	// log.Printf("Writing RAM $%X:%d", write.Address, toWrite)
-	cmd := serialcommand.SerialCommand{
-		Command: 'W',
-		Data: []byte{
-			byte(write.Address),
-			byte(write.Address >> 8),
-			byte(write.Address >> 16),
-			byte(write.Address >> 24),
-			byte(toWrite),
-		},
-	}
-
-	cmd.Data = append(cmd.Data, write.Data[:toWrite]...)
-
-	rctx, cancel := context.WithTimeout(ctx, 1*time.Second)
-	defer cancel()
-	resp, err := c.tb.Request(rctx, cmd.Command, cmd.Data, 'W', 'e')
-	if err != nil {
-		return err
-	}
-	if resp.Command == 'e' {
-		return fmt.Errorf("error: %X", resp.Data)
-	}
-	write.Address += uint32(toWrite)
-	write.Length -= toWrite
-	write.Data = write.Data[toWrite:]
-
-	if write.Length > 0 {
-		c.writeChan <- write
-	} else {
-		write.Complete(nil)
-	}
-	return nil
 }
