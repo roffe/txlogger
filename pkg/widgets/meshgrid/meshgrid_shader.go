@@ -164,13 +164,19 @@ vec3 project_grid(mat3 rot, vec3 g, float pix_scale) {
     return vec3((v.xy + 0.5 * vec2(size_w, size_h)) * pix_scale, v.z);
 }
 
-// value color with the depth shading of getColorWithDepth; h in grid units
+// value color with depth shading; h in grid units. The wireframe keeps the
+// strong ramp and haze of getColorWithDepth, its only depth cue. On the lit
+// surface the ramp is slight, so a colour still reads as the value it shows
+// in the map.
 vec3 height_color(float h, float view_z) {
     float val = clamp(h / height_units, 0.0, 1.0);
     vec4 base = texture2D(colormap_tex, vec2(val * 0.99609375 + 0.001953125, 0.5));
     float df = clamp((view_z - view_zmin) / view_zrange, 0.0, 1.0);
-    vec3 rgb = base.rgb * (0.6 + 0.4 * df);
-    rgb.b = min(1.0, rgb.b + (1.0 - df) * 0.05882353);
+    float dmin = render_mode > 1.5 ? 0.6 : 0.88;
+    vec3 rgb = base.rgb * (dmin + (1.0 - dmin) * df);
+    if (render_mode > 1.5) {
+        rgb.b = min(1.0, rgb.b + (1.0 - df) * 0.05882353);
+    }
     // Yellow emphasis from getColorWithDepth, but ramped smoothly: the CPU
     // path applies the 10% boost per vertex and lets Gouraud blur its edge,
     // while this shader runs per pixel, so a hard threshold would draw a
@@ -199,7 +205,7 @@ float line_mask(float d, float half_w) {
 }
 
 // front-to-back "under" compositing of one wireframe segment
-void wire_seg(vec2 p_dev, mat3 rot, float pix_scale, float half_w, vec3 a, vec3 b, float fade, inout vec3 acc, inout float acc_a) {
+void wire_seg(vec2 p_dev, mat3 rot, float pix_scale, float half_w, vec3 a, vec3 b, inout vec3 acc, inout float acc_a) {
     vec3 pa = project_grid(rot, a, pix_scale);
     vec3 pb = project_grid(rot, b, pix_scale);
     float h = seg_param(p_dev, pa.xy, pb.xy);
@@ -208,7 +214,7 @@ void wire_seg(vec2 p_dev, mat3 rot, float pix_scale, float half_w, vec3 a, vec3 
     if (mask <= 0.0) {
         return;
     }
-    vec3 rgb = height_color(mix(a.z, b.z, h), mix(pa.z, pb.z, h)) * fade;
+    vec3 rgb = height_color(mix(a.z, b.z, h), mix(pa.z, pb.z, h));
     acc += (1.0 - acc_a) * mask * rgb;
     acc_a += (1.0 - acc_a) * mask;
 }
@@ -240,17 +246,25 @@ float cell_ao(float cx, float cy) {
     return 1.0 - 0.4 * c;
 }
 
-// Blinn-Phong shading with an ambient floor and fake AO. n is the raw cell
-// normal from cross(C-A, D-B), which points along -Z for a flat cell, so it is
-// flipped to face up. light and view_dir are unit vectors in grid space; the
-// specular term is gated to the lit side and the ambient term keeps shadowed
-// faces readable instead of black.
+// Blinn-Phong shading with an ambient floor and fake AO. n is the raw triangle
+// normal, which points along -Z for a flat cell, so it is flipped to face up.
+// light and view_dir are unit vectors in grid space; the specular term is
+// gated to the lit side and the ambient term keeps shadowed faces readable
+// instead of black. The steep diffuse term is deliberate: the brightness step
+// between differently tilted triangles is what shows each cell's fold, and
+// with it the shape of the surface. A wrap-around (half-Lambert) term was
+// tried and flattened that step to under half. The underside is left unlit at
+// the ambient level whatever the light does: that darkness is how you tell
+// which side you are looking at while orbiting.
 vec3 shade_surface(vec3 base, vec3 n, vec3 light, vec3 view_dir, float ao) {
     float nl = length(n);
     if (nl <= 0.0) {
         return base * ao;
     }
     vec3 N = -n / nl;
+    if (dot(N, view_dir) < 0.0) {
+        return base * (0.32 * ao);
+    }
     float diff = max(dot(N, light), 0.0);
     vec3 H = normalize(light + view_dir);
     float spec = (diff > 0.0) ? pow(max(dot(N, H), 0.0), 32.0) : 0.0;
@@ -326,18 +340,18 @@ void main() {
         float h_tr = corner_height(cx + 1.0, cy + 1.0);
 
         // cell corners; the solid fill chooses its diagonal per cell (below)
-        // while the wireframe diagonal runs B-D like the CPU line mesh
+        // while the wireframe draws only the cell borders, the same grid the
+        // solid+wireframe mode lays over the surface
         vec3 A = vec3(cx, cy + 1.0, h_tl);
         vec3 B = vec3(cx + 1.0, cy + 1.0, h_tr);
         vec3 C = vec3(cx + 1.0, cy, h_br);
         vec3 D = vec3(cx, cy, h_bl);
 
         if (mode == 2) {
-            wire_seg(p_dev, rot, pix_scale, half_w, A, B, 1.0, acc, acc_a);
-            wire_seg(p_dev, rot, pix_scale, half_w, B, C, 1.0, acc, acc_a);
-            wire_seg(p_dev, rot, pix_scale, half_w, C, D, 1.0, acc, acc_a);
-            wire_seg(p_dev, rot, pix_scale, half_w, D, A, 1.0, acc, acc_a);
-            wire_seg(p_dev, rot, pix_scale, half_w, B, D, 0.7, acc, acc_a);
+            wire_seg(p_dev, rot, pix_scale, half_w, A, B, acc, acc_a);
+            wire_seg(p_dev, rot, pix_scale, half_w, B, C, acc, acc_a);
+            wire_seg(p_dev, rot, pix_scale, half_w, C, D, acc, acc_a);
+            wire_seg(p_dev, rot, pix_scale, half_w, D, A, acc, acc_a);
             if (acc_a > 0.995) {
                 break;
             }

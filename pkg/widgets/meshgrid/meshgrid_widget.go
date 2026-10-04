@@ -195,9 +195,11 @@ func NewMeshgrid(xlabel, ylabel, zlabel string, values []float64, cols, rows int
 		// Set up the cell size based on the space available and desired spacing
 		cellWidth:  32,
 		cellHeight: 32,
-		depth:      400,
-		size:       fyne.NewSize(200, 200),
-		scale:      1,
+		// Height follows the footprint so a small map isn't drawn as a tower:
+		// 0.75 of the longer side, about what the old fixed 400 gave a 16x16.
+		depth: 0.75 * float64(max(cols, rows)) * 32,
+		size:  fyne.NewSize(200, 200),
+		scale: 1,
 
 		rotationMatrix: NewMatrix3x3(),
 		cameraRotation: NewMatrix3x3(),
@@ -366,35 +368,38 @@ func (m *Meshgrid) scaleMeshgrid(factor float64) {
 	m.updateVertexPositions()
 }
 
-// fitMargin leaves a border around the mesh so it isn't drawn flush to the
-// widget edges (and so the axis indicator, which extends past the mesh, has
-// some room).
-const fitMargin = 0.85
+// fitBand is the border, in logical pixels, kept free around the fitted mesh
+// for the axis scales: their tick labels and names sit outside the box edges.
+//
+// ponytail: one fixed band. It covers value labels up to six characters; a
+// longer Z label on a width-limited pane overshoots by a few px. Size the band
+// from the label widths if that shows up.
+const fitBand = 64
 
-// projectedBounds returns the min/max of the mesh's current projected
-// (orthographic) screen positions. Both reflect the current scale, rotation
-// and pan.
+// projectedBounds returns the min/max of what is drawn, in the current
+// projected (orthographic) view positions: the surface plus the box edges the
+// axis scales ride on, which reach the floor and the full height whatever the
+// values near them. Both reflect the current scale, rotation and pan.
 func (m *Meshgrid) projectedBounds() (minX, maxX, minY, maxY float64) {
 	minX, maxX = math.Inf(1), math.Inf(-1)
 	minY, maxY = math.Inf(1), math.Inf(-1)
+	grow := func(x, y float64) {
+		minX, maxX = min(minX, x), max(maxX, x)
+		minY, maxY = min(minY, y), max(maxY, y)
+	}
 	for i := range m.vertices {
 		row := m.vertices[i]
 		for j := range row {
-			v := &row[j]
-			if v.X < minX {
-				minX = v.X
-			}
-			if v.X > maxX {
-				maxX = v.X
-			}
-			if v.Y < minY {
-				minY = v.Y
-			}
-			if v.Y > maxY {
-				maxY = v.Y
-			}
+			grow(row[j].X, row[j].Y)
 		}
 	}
+	floor, _, zIdx := m.axisCorners()
+	for _, c := range floor {
+		x, y, _ := m.viewPos(c.ox, c.oy, 0)
+		grow(x, y)
+	}
+	x, y, _ := m.viewPos(floor[zIdx].ox, floor[zIdx].oy, m.depth)
+	grow(x, y)
 	return
 }
 
@@ -427,9 +432,9 @@ func (m *Meshgrid) centerInView() {
 }
 
 // fitScaleForSize returns the m.scale value that makes the mesh's projected
-// bounding box fill the given widget size (minus fitMargin) at the current
-// rotation. The bounding box is linear in m.scale, so it is normalized to a
-// unit scale first.
+// bounding box fill the given widget size (minus fitBand on every side) at the
+// current rotation. The bounding box is linear in m.scale, so it is normalized
+// to a unit scale first.
 func (m *Meshgrid) fitScaleForSize(size fyne.Size) float64 {
 	w, h := m.projectedExtent()
 	if w <= 0 || h <= 0 || m.scale == 0 {
@@ -437,8 +442,9 @@ func (m *Meshgrid) fitScaleForSize(size fyne.Size) float64 {
 	}
 	wPer := w / m.scale
 	hPer := h / m.scale
-	sx := float64(size.Width) * fitMargin / wPer
-	sy := float64(size.Height) * fitMargin / hPer
+	// A pane too small for the bands still gives the mesh half of itself.
+	sx := max(float64(size.Width)-2*fitBand, float64(size.Width)/2) / wPer
+	sy := max(float64(size.Height)-2*fitBand, float64(size.Height)/2) / hPer
 	return math.Min(sx, sy)
 }
 
@@ -539,14 +545,21 @@ func (m *Meshgrid) updateVertexPositions() {
 // a larger z is nearer the viewer. This lets the axis overlay project arbitrary
 // box-edge points, not just stored vertices.
 func (m *Meshgrid) projectOriginal(ox, oy, oz float64) (sx, sy, vz float32) {
+	x, y, z := m.viewPos(ox, oy, oz)
+	return float32(float64(m.size.Width)*0.5 + x), float32(float64(m.size.Height)*0.5 + y), float32(z)
+}
+
+// viewPos applies the camera transform of updateVertexPositions to a point in
+// the mesh's original coordinate space.
+func (m *Meshgrid) viewPos(ox, oy, oz float64) (x, y, z float64) {
 	vx := (ox - m.centerX) * m.scale
 	vy := (oy - m.centerY) * m.scale
-	vz3 := (oz - m.centerZ) * m.scale
+	vz := (oz - m.centerZ) * m.scale
 	r := m.cameraRotation
-	x := r[0][0]*vx + r[0][1]*vy + r[0][2]*vz3 - m.cameraPosition[0]
-	y := r[1][0]*vx + r[1][1]*vy + r[1][2]*vz3 - m.cameraPosition[1]
-	z := r[2][0]*vx + r[2][1]*vy + r[2][2]*vz3 - m.cameraPosition[2]
-	return float32(float64(m.size.Width)*0.5 + x), float32(float64(m.size.Height)*0.5 + y), float32(z)
+	x = r[0][0]*vx + r[0][1]*vy + r[0][2]*vz - m.cameraPosition[0]
+	y = r[1][0]*vx + r[1][1]*vy + r[1][2]*vz - m.cameraPosition[1]
+	z = r[2][0]*vx + r[2][1]*vy + r[2][2]*vz - m.cameraPosition[2]
+	return
 }
 
 // SetFloat64 updates a single cell value. The whole mesh is rebuilt since a
