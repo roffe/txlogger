@@ -1,3 +1,5 @@
+//go:build !linux
+
 package widgets
 
 import "github.com/roffe/txlogger/pkg/native"
