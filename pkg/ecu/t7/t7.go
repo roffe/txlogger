@@ -14,10 +14,11 @@ import (
 
 func init() {
 	ecu.Register(&ecu.EcuInfo{
-		Name:    "Trionic 7",
-		NewFunc: New,
-		CANRate: 500,
-		Filter:  []uint32{0x238, 0x258, 0x266, 0x270, t7kwp.FAST_UP_ID},
+		Name:        "Trionic 7",
+		NewFunc:     New,
+		CANRate:     500,
+		Filter:      []uint32{0x238, 0x258, 0x266, 0x270, t7kwp.FAST_UP_ID},
+		ManualReset: true,
 	})
 }
 

@@ -116,11 +116,11 @@ type Config struct {
 	FullscreenFunc func(bool)
 }
 
+func unknownAirDem(float64) string { return "Unknown" }
+
 func NewDashboard(cfg *Config) *Dashboard {
 	if cfg.AirDemToString == nil {
-		cfg.AirDemToString = func(f float64) string {
-			return "Unknown"
-		}
+		cfg.AirDemToString = unknownAirDem
 	}
 
 	speedometerText := "km/h"
@@ -371,6 +371,17 @@ func (db *Dashboard) SetValue(key string, value float64) {
 	}
 }
 
+// SetAirDemToString swaps the active air demand formatter, e.g. when the
+// selected ECU changes. Safe to call from any goroutine.
+func (db *Dashboard) SetAirDemToString(f func(float64) string) {
+	if f == nil {
+		f = unknownAirDem
+	}
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	db.cfg.AirDemToString = f
+}
+
 // setWBLambda feeds whichever wideband display the layout renders.
 func (db *Dashboard) setWBLambda(value float64) {
 	if !db.placed["wblambda"] {
@@ -391,10 +402,6 @@ func (db *Dashboard) gate(id string, set func(float64)) func(float64) {
 			set(value)
 		}
 	}
-}
-
-func interpol(x0, y0, x1, y1, x float64) float64 {
-	return y0 + (x-x0)*(y1-y0)/(x1-x0)
 }
 
 // itemObject maps a layout item to its canvas object. Returns nil for items

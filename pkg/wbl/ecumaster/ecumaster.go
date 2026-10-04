@@ -33,6 +33,9 @@ const (
 
 var ErrDataTooShort = errors.New("data is too short to decode, expected at least 8 bytes")
 
+// CANIDs are the frames the LAMBDA to CAN module broadcasts.
+var CANIDs = []uint32{0x664, 0x665}
+
 type LambdaToCAN struct {
 	c       *gocan.Bus
 	st      LambdaToCANStatus
@@ -46,7 +49,7 @@ func NewLambdaToCAN(c *gocan.Bus) *LambdaToCAN {
 
 func (l *LambdaToCAN) Start(ctx context.Context) error {
 	l.running = true
-	ch := l.c.Subscribe(ctx, 0x664, 0x665)
+	ch := l.c.Subscribe(ctx, CANIDs...)
 	go func() {
 		for l.running {
 			select {

@@ -2,6 +2,7 @@ package canflasher
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -15,7 +16,7 @@ func (t *CanFlasherWidget) ecuMarry(pin string) {
 		return
 	}
 
-	dev, err := t.cfg.CSW.GetAdapterWithExtraFilters(t.ecuSelect.Selected, []uint32{0x645}, false)
+	dev, err := t.adapter(slices.Concat(ecu.Info(t.ecuSelect.Selected).Filter, []uint32{0x645})...)
 	if err != nil {
 		t.log(err.Error())
 		return

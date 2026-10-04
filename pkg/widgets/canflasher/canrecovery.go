@@ -11,7 +11,7 @@ import (
 )
 
 func (t *CanFlasherWidget) ecuRecover(filename string) {
-	dev, err := t.cfg.CSW.GetAdapterWithExtraFilters(t.ecuSelect.Selected, []uint32{0x011, 0x311}, true)
+	dev, err := t.adapter(0x011, 0x311)
 	if err != nil {
 		t.log(err.Error())
 		return

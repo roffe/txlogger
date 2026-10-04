@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -173,13 +174,10 @@ func (mw *MainWindow) newLogBtn() *ttwidget.Button {
 			}
 			return
 		}
+		p := mw.profile()
 		for _, v := range mw.symbolList.Symbols() {
-			if v.Name == "AirMassMast.m_Request" && mw.selects.ecuSelect.Selected == "T7" {
-				mw.Error(fmt.Errorf("AirMassMast.m_Request is not supported on T7, Did you forget to change preset?"))
-				return
-			}
-			if v.Name == "m_Request" && mw.selects.ecuSelect.Selected == "T8" {
-				mw.Error(fmt.Errorf("m_Request is not supported on T8, Did you forget to change preset?"))
+			if slices.Contains(p.ForeignSymbols, v.Name) {
+				mw.Error(fmt.Errorf("%s is not supported on %s, Did you forget to change preset?", v.Name, p.Name))
 				return
 			}
 		}
@@ -203,13 +201,7 @@ func (mw *MainWindow) newDashboardBtn() *ttwidget.Button {
 			High:           1.5,
 			Low:            0.5,
 			WidebandSymbol: mw.settings.GetWidebandSymbolName(),
-		}
-
-		switch mw.selects.ecuSelect.Selected {
-		case "T7":
-			dbcfg.AirDemToString = datalogger.AirDemToStringT7
-		case "T8":
-			dbcfg.AirDemToString = datalogger.AirDemToStringT8
+			AirDemToString: mw.profile().AirDemToString,
 		}
 
 		db := dashboard.NewDashboard(dbcfg)
@@ -246,7 +238,12 @@ func (mw *MainWindow) newDashboardBtn() *ttwidget.Button {
 		cancelFuncs = append(
 			cancelFuncs,
 			ebus.SubscribeFunc(ebus.TOPIC_WBLSYMBOL, func(float64) { fyne.Do(followWBL) }),
-			ebus.SubscribeFunc(ebus.TOPIC_ECU, func(float64) { fyne.Do(followWBL) }),
+			ebus.SubscribeFunc(ebus.TOPIC_ECU, func(float64) {
+				fyne.Do(func() {
+					followWBL()
+					db.SetAirDemToString(mw.profile().AirDemToString)
+				})
+			}),
 		)
 
 		dbw := multiwindow.NewInnerWindow("Dashboard", db)
@@ -300,9 +297,10 @@ func (mw *MainWindow) startLogging() {
 		deviceName = gocan.AdapterName(device)
 	}
 
-	if mw.selects.ecuSelect.Selected == "T5" {
-		if strings.Contains(deviceName, "J2534") || strings.Contains(deviceName, "ELM327") {
-			mw.Error(fmt.Errorf("%s is not supported for T5", deviceName))
+	p := mw.profile()
+	for _, a := range p.UnsupportedAdapters {
+		if strings.Contains(deviceName, a) {
+			mw.Error(fmt.Errorf("%s is not supported for %s", deviceName, p.Name))
 			return
 		}
 	}

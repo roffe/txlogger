@@ -21,7 +21,7 @@ func (t *CanFlasherWidget) ecuDump(filename string) {
 			return
 		}
 	*/
-	dev, err := t.cfg.CSW.GetAdapterWithOverrideFilters(t.ecuSelect.Selected, ecu.Filters(t.ecuSelect.Selected))
+	dev, err := t.adapter()
 	if err != nil {
 		t.log(err.Error())
 		return
@@ -71,7 +71,7 @@ func (t *CanFlasherWidget) ecuDump(filename string) {
 		}
 
 		time.Sleep(200 * time.Millisecond)
-		if t.ecuSelect.Selected != "Trionic 7" {
+		if !ecu.Info(t.ecuSelect.Selected).ManualReset {
 			_ = tr.ResetECU(ctx)
 		}
 	}()

@@ -3,9 +3,8 @@ package windows
 import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/widget"
-	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/ebus"
+	"github.com/roffe/txlogger/pkg/ecu"
 )
 
 func (mw *MainWindow) createSelects() {
@@ -27,10 +26,9 @@ func (mw *MainWindow) createSelects() {
 		}
 	})
 
-	mw.selects.ecuSelect = widget.NewSelect(common.EcuList, func(s string) {
+	mw.selects.ecuSelect = widget.NewSelect(ecu.ProfileNames(), func(s string) {
 		mw.app.Preferences().SetString(prefsSelectedECU, s)
-		idx := symbol.ECUTypeFromString(s)
-		ebus.Publish(ebus.TOPIC_ECU, float64(idx))
+		ebus.Publish(ebus.TOPIC_ECU, float64(ecu.GetProfile(s).Type))
 		mw.SetMainMenu(mw.GetMenu(s))
 		mw.symbolList.SelectPresetForECU(s)
 	})
@@ -47,4 +45,9 @@ func (mw *MainWindow) createSelects() {
 		mw.app.Preferences().SetString(prefsRemoteMode, s)
 	})
 	mw.selects.remoteSelect.SetSelected(mw.app.Preferences().StringWithFallback(prefsRemoteMode, "Local"))
+}
+
+// profile is the selected ECU's profile.
+func (mw *MainWindow) profile() *ecu.Profile {
+	return ecu.GetProfile(mw.selects.ecuSelect.Selected)
 }

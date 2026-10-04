@@ -10,6 +10,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/numericentry"
@@ -39,11 +40,12 @@ type veSignals struct{ rpm, air, map_, iat, pedal string }
 // m_AirInlet falls back to the pressure model, and VE then measures that
 // model rather than the engine.
 //
-// T5 is missing on purpose: it logs no airmass, so there is nothing to
-// divide by the reference mass.
-var veSignalsByECU = map[string]veSignals{
-	"T7": {"ActualIn.n_Engine", "MAF.m_AirInlet", "ActualIn.p_AirInlet", "ActualIn.T_AirInlet", "Out.X_AccPedal"},
-	"T8": {"ActualIn.n_Engine", "MAF.m_AirInlet", "In.p_AirInlet", "ActualIn.T_AirInlet", "Out.X_AccPos"},
+// ECUs without an airmass signal (T5) have nothing to divide by the
+// reference mass.
+func veSignalsFor(ecuName string) (sig veSignals, ok bool) {
+	s := ecu.GetProfile(ecuName).Signals
+	sig = veSignals{s[ecu.RPM], s[ecu.Airmass], s[ecu.MAP], s[ecu.IAT], s[ecu.Throttle]}
+	return sig, sig.rpm != "" && sig.air != "" && sig.map_ != "" && sig.iat != ""
 }
 
 type veSample struct{ rpm, air, bar, iat, pedal float64 }
@@ -105,7 +107,7 @@ func newVETab(w *Widget) *veTab {
 func (v *veTab) setCamInfo(s string) { v.camInfo.SetText(s) }
 
 func (v *veTab) load() {
-	sig, ok := veSignalsByECU[v.w.cfg.ECU]
+	sig, ok := veSignalsFor(v.w.cfg.ECU)
 	if !ok {
 		v.info.SetText(fmt.Sprintf("Measured VE needs airmass, manifold pressure and inlet air "+
 			"temperature in the log; %q does not log all three.", v.w.cfg.ECU))

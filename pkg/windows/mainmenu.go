@@ -6,6 +6,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
 	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/txlogger/pkg/ecu"
 )
 
 type MenuItem struct {
@@ -19,21 +20,20 @@ type MenuItem struct {
 	Region string
 }
 
+// ecuMenus builds each ECU's own menus (mainmenu_<ecu>.go); ECUs without
+// one only get the shared menus.
+var ecuMenus = map[string]func(*MainWindow) []MenuItem{
+	"T5": (*MainWindow).t5Menu,
+	"T7": (*MainWindow).t7Menu,
+	"T8": (*MainWindow).t8Menu,
+}
+
 func (mw *MainWindow) GetMenu(name string) *fyne.MainMenu {
 	var tree []MenuItem
-	var typ symbol.ECUType
-
-	switch name {
-	case "T5":
-		tree = mw.t5Menu()
-		typ = symbol.ECU_T5
-	case "T7":
-		tree = mw.t7Menu()
-		typ = symbol.ECU_T7
-	case "T8":
-		tree = mw.t8Menu()
-		typ = symbol.ECU_T8
+	if build := ecuMenus[name]; build != nil {
+		tree = build(mw)
 	}
+	typ := ecu.GetProfile(name).Type
 
 	menus := append([]*fyne.Menu{}, mw.leadingMenus...)
 	for _, category := range tree {

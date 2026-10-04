@@ -786,19 +786,12 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 
 	var mv *mapviewer.MapViewer
 
+	// only RAM-backed maps get ECU load/save
 	var ecuAddr uint32
-	switch mw.selects.ecuSelect.Selected {
-	case "T5":
-		ecuAddr = symZ.SramOffset
-	case "T7":
-		ecuAddr = symZ.Address
-	case "T8":
-		ecuAddr = symZ.Address + symZ.SramOffset
+	var ecuLive bool
+	if p := mw.profile(); p.RAMAddress != nil {
+		ecuAddr, ecuLive = p.RAMAddress(symZ)
 	}
-	// T7 closed binaries keep calibration in flash (< 0x80000): the stock ECU
-	// refuses 0x23 reads there (NRC 0x12), MapTun-patched ones reset, and flash
-	// can't be written live anyway. Only RAM-backed maps get ECU load/save.
-	ecuLive := mw.selects.ecuSelect.Selected != "T7" || ecuAddr >= 0x80000
 
 	updateFunc := func(idx int, value []float64) {
 		if mw.dlc != nil && ecuLive && mw.settings.GetAutoSave() {

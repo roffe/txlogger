@@ -14,8 +14,8 @@ import (
 
 	// Import ecu packages
 
+	"github.com/roffe/txlogger/pkg/ecu"
 	_ "github.com/roffe/txlogger/pkg/ecu/t5"
-	_ "github.com/roffe/txlogger/pkg/ecu/t5legion"
 	_ "github.com/roffe/txlogger/pkg/ecu/t7"
 	_ "github.com/roffe/txlogger/pkg/ecu/t8"
 	_ "github.com/roffe/txlogger/pkg/ecu/t8mcp"
@@ -129,7 +129,7 @@ func (t *CanFlasherWidget) progress(v float64) {
 }
 
 func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
-	t.ecuSelect = widget.NewSelect([]string{"Trionic 5", "Trionic 7", "Trionic 8", "Trionic 8 MCP", "Z22SE", "Z22SE MCP"}, nil)
+	t.ecuSelect = widget.NewSelect(ecu.List(), nil)
 
 	t.logText = widget.NewLabel("")
 	t.logText.TextStyle.Monospace = true
@@ -199,7 +199,7 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	})
 
 	t.resetBTN = widget.NewButton("Reset ECU", func() {
-		if t.ecuSelect.Selected != "Trionic 7" {
+		if !ecu.Info(t.ecuSelect.Selected).ManualReset {
 			t.ecuReset()
 			return
 		}

@@ -6,6 +6,7 @@ import (
 	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/datalogger"
+	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ollama"
 	"github.com/roffe/txlogger/pkg/wbl/aem"
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
@@ -80,23 +81,14 @@ func (sw *Widget) GetUseADScanner() bool {
 func (sw *Widget) GetWidebandSymbolName() string {
 	switch sw.GetWidebandName() {
 	case "ECU":
-		useADScanner := prefUseADScanner.get()
-		switch sw.cfg.SelectedEcuFunc() {
-		case "T5":
-			return datalogger.LAMBDAADSCANNER
-		case "T7":
-			if useADScanner {
-				return datalogger.LAMBDAADSCANNER
-			}
-			return "DisplProt.LambdaScanner"
-		case "T8":
-			if useADScanner {
-				return datalogger.LAMBDAADSCANNER
-			}
-			return "LambdaScan.LambdaScanner"
-		default:
+		p := ecu.GetProfile(sw.cfg.SelectedEcuFunc())
+		switch {
+		case p.ADResolution == 0 && p.WidebandSymbol == "":
 			return "None"
+		case p.WidebandSymbol == "" || prefUseADScanner.get():
+			return datalogger.LAMBDAADSCANNER
 		}
+		return p.WidebandSymbol
 	case aem.ProductString,
 		ecumaster.ProductString,
 		innovate.ProductString,

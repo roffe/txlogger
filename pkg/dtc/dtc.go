@@ -1,23 +1,34 @@
 package dtc
 
 import (
+	"fmt"
 	"strings"
-)
 
-type ECU int
-
-const (
-	ECU_T5 ECU = iota
-	ECU_T7
-	ECU_T8
+	symbol "github.com/roffe/ecusymbol"
+	"github.com/roffe/gocan/v2/gmlan"
 )
 
 type DTC struct {
-	ECU         ECU
+	ECU         symbol.ECUType
 	Code        string
 	FailureType byte // T8/GMLAN DTCFailureTypeByte, the " 02" suffix in Code
 	Status      byte
 }
+
+// Per-ECU DTC knowledge; a new ECU adds its entries here.
+var (
+	infoDB = map[symbol.ECUType]map[string]DTCInfo{
+		symbol.ECU_T5: T5DTCS,
+		symbol.ECU_T7: T7DTCS,
+		symbol.ECU_T8: T8DTCS,
+	}
+	// wisModels are the WIS car models an ECU appears in. T5 cars
+	// (9000/NG900) are not covered by the WIS archive.
+	wisModels = map[symbol.ECUType][]string{
+		symbol.ECU_T7: {"9400", "9600"},
+		symbol.ECU_T8: {"9440"},
+	}
+)
 
 func (d DTC) String() string {
 	return d.Code
@@ -27,25 +38,29 @@ func (d DTC) StatusString() string {
 	return StatusBytetoString(d.Status)
 }
 
-func (d DTC) Info() DTCInfo {
+// Title is the code with its status decoded the way the ECU reports it.
+func (d DTC) Title() string {
 	switch d.ECU {
-	case ECU_T5:
-		if info, ok := T5DTCS[d.Code]; ok {
-			return info
-		}
-	case ECU_T7:
-		if info, ok := T7DTCS[d.Code]; ok {
-			return info
-		}
-	case ECU_T8:
-		if info, ok := T8DTCS[d.Code]; ok {
-			return info
-		}
+	case symbol.ECU_T5:
+		return fmt.Sprintf("%s: %d", d.Code, d.Status)
+	case symbol.ECU_T7:
+		// full wire code (status byte included), then its meaning
+		return fmt.Sprintf("%s %02X (%s)", d.Code, d.Status, T7StatusString(d.Status))
+	case symbol.ECU_T8:
+		// Code already carries the failure type ("B0165 02"); add the
+		// GMW3110 meaning of that suffix
+		return d.Code + " (" + gmlan.FailureTypeString(d.FailureType) + ")"
 	}
+	return d.Code
+}
 
-	return DTCInfo{
-		Name: "",
-	}
+// WISModels are the WIS car models to search for this DTC, nil if none.
+func (d DTC) WISModels() []string {
+	return wisModels[d.ECU]
+}
+
+func (d DTC) Info() DTCInfo {
+	return infoDB[d.ECU][d.Code]
 }
 
 /*

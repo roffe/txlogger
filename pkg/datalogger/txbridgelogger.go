@@ -74,28 +74,30 @@ func (c *TxBridge) Start(ctx context.Context) error {
 		return err
 	}
 
-	switch c.ECU {
-	case "T5":
-		if err := c.setECU("5"); err != nil {
-			return err
-		}
+	e, ok := txbridgeECUs[c.ECU]
+	if !ok {
+		return errors.New("unknown ECU type: " + c.ECU)
+	}
+	if err := c.setECU(e.id); err != nil {
+		return err
+	}
+	return e.run(c, ctx, cl)
+}
+
+// txbridgeECUs is the dongle's ECU id and the logging loop for each ECU the
+// txbridge firmware can log.
+var txbridgeECUs = map[string]struct {
+	id  string
+	run func(*TxBridge, context.Context, *gocan.Bus) error
+}{
+	"T5": {"5", func(c *TxBridge, ctx context.Context, cl *gocan.Bus) error {
 		if c.ExperimentalT5FastLogging {
 			debug.Log("Using experimental T5 fast logger")
 		}
 		return c.t5(ctx, cl, c.ExperimentalT5FastLogging)
-	case "T7":
-		if err := c.setECU("7"); err != nil {
-			return err
-		}
-		return c.t7(ctx, cl)
-	case "T8":
-		if err := c.setECU("8"); err != nil {
-			return err
-		}
-		return c.t8(ctx, cl)
-	default:
-		return errors.New("unknown ECU type: " + c.ECU)
-	}
+	}},
+	"T7": {"7", (*TxBridge).t7},
+	"T8": {"8", (*TxBridge).t8},
 }
 
 func (c *TxBridge) setECU(ecuType string) error {

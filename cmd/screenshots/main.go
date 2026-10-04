@@ -18,8 +18,8 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 	symbol "github.com/roffe/ecusymbol"
-	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/ebus"
+	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/theme"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
@@ -65,7 +65,7 @@ func main() {
 
 	db := dashboard.NewDashboard(&dashboard.Config{
 		WidebandSymbol: "DisplProt.LambdaScanner",
-		AirDemToString: datalogger.AirDemToStringT7,
+		AirDemToString: ecu.GetProfile("T7").AirDemToString,
 	})
 	snap("dashboard.jpg", fyne.NewSize(1280, 720), db, func() {
 		for k, v := range demoValues {

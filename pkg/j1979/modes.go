@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/dtc"
 )
 
@@ -109,7 +110,7 @@ func (c *Client) FreezeFrame(ctx context.Context, frame byte) (*FreezeFrame, err
 	if code[0] == 0 && code[1] == 0 {
 		return nil, nil // no freeze frame stored
 	}
-	ff := &FreezeFrame{DTC: dtc.DTC{ECU: dtc.ECU_T7, Code: DecodeDTC(code[0], code[1])}}
+	ff := &FreezeFrame{DTC: dtc.DTC{ECU: symbol.ECU_T7, Code: DecodeDTC(code[0], code[1])}}
 
 	sup, err := c.ReadFreezeFramePID(ctx, 0x00, frame)
 	if err != nil {
@@ -154,7 +155,7 @@ func (c *Client) readDTCs(ctx context.Context, mode byte) ([]dtc.DTC, error) {
 		if data[i] == 0 && data[i+1] == 0 {
 			continue // zero padding
 		}
-		dtcs = append(dtcs, dtc.DTC{ECU: dtc.ECU_T7, Code: DecodeDTC(data[i], data[i+1])})
+		dtcs = append(dtcs, dtc.DTC{ECU: symbol.ECU_T7, Code: DecodeDTC(data[i], data[i+1])})
 	}
 	return dtcs, nil
 }

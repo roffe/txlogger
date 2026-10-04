@@ -30,6 +30,21 @@ type WBLConfig struct {
 	Txbridge bool
 }
 
+// aemCANID is the (extended) frame an AEM UEGO sends when wired to CAN.
+const aemCANID uint32 = 0x180
+
+// CANIDs returns the ids the selected wideband reads off the ECU's CAN bus,
+// for the adapter acceptance filter; nil when it doesn't use CAN.
+func CANIDs(wblType, port string) []uint32 {
+	switch {
+	case wblType == ecumaster.ProductString: // CAN only, no port choice
+		return ecumaster.CANIDs
+	case wblType == aem.ProductString && port == "CAN":
+		return []uint32{aemCANID}
+	}
+	return nil
+}
+
 // txbridge WBL config and readings travel as the dongle's 'w' serial
 // commands, reached through the native txbridge adapter's methods.
 func New(ctx context.Context, cl *gocan.Bus, cfg *WBLConfig) (LambdaProvider, error) {
@@ -145,7 +160,7 @@ func newAEM(ctx context.Context, cl *gocan.Bus, cfg *WBLConfig) (LambdaProvider,
 		}()
 	case "CAN":
 		cfg.Log("Starting AEM CAN client")
-		ch := cl.Subscribe(ctx, 0x180)
+		ch := cl.Subscribe(ctx, aemCANID)
 		go func() {
 			defer cfg.Log("wbl channel closed")
 			for msg := range ch {

@@ -3,6 +3,7 @@ package t7
 import (
 	"context"
 
+	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/dtc"
 )
 
@@ -21,7 +22,7 @@ func (t *Client) ReadDTC(ctx context.Context) ([]dtc.DTC, error) {
 	}
 	out := make([]dtc.DTC, 0, len(raw))
 	for _, d := range raw {
-		out = append(out, dtc.DTC{ECU: dtc.ECU_T7, Code: d.Code, Status: d.Status})
+		out = append(out, dtc.DTC{ECU: symbol.ECU_T7, Code: d.Code, Status: d.Status})
 	}
 	return out, nil
 }

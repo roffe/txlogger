@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/common"
+	"github.com/roffe/txlogger/pkg/ecu"
 	xlayout "github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
@@ -145,11 +146,9 @@ func (sw *Widget) wblTab() *container.TabItem {
 
 	sw.wblADscanner = sw.newADscannerCheck()
 
-	adSymbols := []string{
-		"AD_EGR",
-		"DisplProt.AD_Scanner",
-		"LambdaScan.AD_Scanner",
-		"LambdaScan.AD_Scanner2",
+	var adSymbols []string
+	for _, p := range ecu.Profiles() {
+		adSymbols = append(adSymbols, p.ADScannerSymbols...)
 	}
 	sw.wblADScannerSymbol = widget.NewSelect(adSymbols, prefWBLADScannerSymbol.set)
 	sw.wblADScannerSymbol.SetSelected(sw.GetADScannerSymbolName())

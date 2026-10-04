@@ -14,7 +14,7 @@ func (t *CanFlasherWidget) ecuInfo() {
 	// 	return
 	// }
 
-	dev, err := t.cfg.CSW.GetAdapterWithOverrideFilters(t.ecuSelect.Selected, ecu.Filters(t.ecuSelect.Selected))
+	dev, err := t.adapter()
 	if err != nil {
 		t.log(err.Error())
 		return

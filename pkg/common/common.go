@@ -12,8 +12,6 @@ import (
 	"time"
 )
 
-var EcuList = []string{"T5", "T7", "T8", "AW55"}
-
 const (
 	Pi15            = math.Pi * 1.5
 	Pi43            = math.Pi / 4 * 3
@@ -140,7 +138,8 @@ func GetUserHomeDir() (string, error) {
 	return dir, nil
 }
 
-func CreatetxloggerDirs() error {
+// CreatetxloggerDirs creates the txlogger home tree, with a scripts dir per ECU.
+func CreatetxloggerDirs(ecus []string) error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("could not determine user home directory: %w", err)
@@ -154,7 +153,7 @@ func CreatetxloggerDirs() error {
 	dashboards := filepath.Join(path, "dashboards")
 
 	dirs := []string{logs, layouts, bins, adscanner, dashboards}
-	for _, ecu := range EcuList {
+	for _, ecu := range ecus {
 		dirs = append(dirs, filepath.Join(path, "scripts", ecu))
 	}
 

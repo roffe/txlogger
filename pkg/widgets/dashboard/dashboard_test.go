@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"slices"
 	"sync"
 	"testing"
 
@@ -174,5 +175,32 @@ func TestSetValueWhileRelayingOut(t *testing.T) {
 	onUI(func() { got = db.text.ign.Text })
 	if got != "Ign: 12.3" {
 		t.Errorf("ign text %q, want %q", got, "Ign: 12.3")
+	}
+}
+
+// The router is built from the ECU profiles' signals; this is every symbol
+// the hand-written per-ECU router fed before, so none silently loses its
+// gauge.
+func TestRouterCoversProfileSymbols(t *testing.T) {
+	test.NewApp()
+	db := NewDashboard(&Config{WidebandSymbol: "Lambda.External"})
+	names := db.GetMetricNames()
+	for _, sym := range []string{
+		"In.v_Vehicle", "Bil_hast", "ActualIn.n_Engine", "Rpm",
+		"ActualIn.T_AirInlet", "Lufttemp", "ActualIn.T_Engine", "Kyl_temp",
+		"P_medel", "In.p_AirInlet", "ActualIn.p_AirInlet",
+		"Max_tryck", "In.p_AirBefThrottle", "ActualIn.p_AirBefThrottle",
+		"Medeltrot", "Out.X_AccPedal", "Out.X_AccPos",
+		"Out.PWM_BoostCntrl", "PWM_ut10", "AdpFuelProt.MulFuelAdapt",
+		"Lambda.LambdaInt", "Lambdaint",
+		"MAF.m_AirInlet", "m_Request", "AirMassMast.m_Request",
+		"Out.fi_Ignition", "Ign_angle", "ECMStat.ST_ActiveAirDem",
+		"IgnProt.fi_Offset", "IgnMastProt.fi_Offset",
+		"CRUISE", "CEL", "LIMP", "Knock_offset1234", "KnkDet.KnockCyl",
+		"Myrtilos.InjectorDutyCycle", "Insptid_ms10", "Lambda.External",
+	} {
+		if !slices.Contains(names, sym) {
+			t.Errorf("%s is not routed", sym)
+		}
 	}
 }

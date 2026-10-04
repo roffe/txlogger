@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
+	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/ecu"
 )
 
@@ -68,3 +69,13 @@ func translateName(s string) string {
 	}
 }
 */
+
+// adapter returns the configured adapter set up for the selected client;
+// filter replaces its acceptance ids when given.
+func (t *CanFlasherWidget) adapter(filter ...uint32) (gocan.Adapter, error) {
+	info := ecu.Info(t.ecuSelect.Selected)
+	if filter == nil {
+		filter = info.Filter
+	}
+	return t.cfg.CSW.GetAdapterWith(info.CANRate, filter)
+}

@@ -2,22 +2,36 @@ package settings
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/roffe/gocan/v2"
+	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ota"
+	"github.com/roffe/txlogger/pkg/wbl"
 )
 
-func (sw *Widget) GetAdapter(ecuType string) (gocan.Adapter, error) {
-	return sw.GetAdapterWithExtraFilters(ecuType, nil, false)
+// GetAdapter returns the configured adapter set up for talking to the named
+// ECU (see ecu.Profile).
+func (sw *Widget) GetAdapter(ecuName string) (gocan.Adapter, error) {
+	p := ecu.GetProfile(ecuName)
+	if p.CANFilter == nil {
+		return nil, fmt.Errorf("%s can't be reached over CAN", ecuName)
+	}
+	adapterName := prefAdapter.get()
+	filter := p.CANFilter(adapterName)
+	// STN/ELM dongles have no passive listen mode, so a CAN wideband can't
+	// work on them; its ids would only widen their single ATCF/ATCM mask
+	// until broadcasts (0x1A0, 0x3A0...) fill the STPX r: reply slots.
+	if p.CANWideband && !ecu.IsOBDAdapter(adapterName) {
+		filter = append(filter, wbl.CANIDs(prefWblSource.get(), prefWBLPort.get())...)
+	}
+	return sw.GetAdapterWith(p.CANRate, filter)
 }
 
-func (sw *Widget) GetAdapterWithOverrideFilters(ecuType string, filters []uint32) (gocan.Adapter, error) {
-	return sw.GetAdapterWithExtraFilters(ecuType, filters, true)
-}
-
-func (sw *Widget) GetAdapterWithExtraFilters(ecuType string, filters []uint32, overrideFilters bool) (gocan.Adapter, error) {
+// GetAdapterWith returns the configured adapter set up with an explicit CAN
+// rate (kbit/s) and acceptance filter.
+func (sw *Widget) GetAdapterWith(canRate float64, canFilter []uint32) (gocan.Adapter, error) {
 	baudrate, err := parseBaudrate(prefSpeed.getOr(""))
 	if err != nil {
 		return nil, err
@@ -31,12 +45,6 @@ func (sw *Widget) GetAdapterWithExtraFilters(ecuType string, filters []uint32, o
 	port := prefPort.get()
 	if ad, found := sw.adapters[adapterName]; found && ad.RequiresSerialPort && port == "" && !ad.SerialPortOptional {
 		return nil, errors.New("Select port in setings") //lint:ignore ST1005 This is ok
-	}
-
-	canFilter, canRate := canFilterAndRate(ecuType, adapterName, filters)
-
-	if overrideFilters && len(filters) > 0 {
-		canFilter = filters
 	}
 
 	cfg := gocan.Config{
@@ -70,47 +78,4 @@ func parseBaudrate(speed string) (int, error) {
 		speed = "1000000"
 	}
 	return strconv.Atoi(speed)
-}
-
-// canFilterAndRate returns the CAN acceptance filter and bus rate for the given
-// ECU type and adapter. extraFilters are appended for the Trionic 8 family.
-func canFilterAndRate(ecuType, adapterName string, extraFilters []uint32) ([]uint32, float64) {
-	wblOnCAN := prefWBLPort.get() == "CAN"
-
-	switch ecuType {
-	case "T5", "Trionic 5":
-		return []uint32{0xC}, 615.384
-
-	case "T7", "Trionic 7":
-		var filter []uint32
-		if isOBDAdapter(adapterName) || strings.HasSuffix(adapterName, "Wifi") {
-			filter = []uint32{0x238, 0x258, 0x270}
-		} else {
-			filter = []uint32{0x1A0, 0x238, 0x258, 0x270, 0x280, 0x3A0, 0x664, 0x665}
-		}
-		if wblOnCAN {
-			filter = append(filter, 0x180)
-		}
-		return filter, 500
-
-	case "T8", "Trionic 8", "Trionic 8 MCP", "Z22SE", "Z22SE MCP":
-		var filter []uint32
-		if isOBDAdapter(adapterName) {
-			filter = []uint32{0x5E8, 0x7E8}
-		} else {
-			filter = []uint32{0x5E8, 0x7E8, 0x664, 0x665}
-		}
-		if wblOnCAN {
-			filter = append(filter, 0x180)
-		}
-		return append(filter, extraFilters...), 500
-	}
-
-	return nil, 0
-}
-
-func isOBDAdapter(name string) bool {
-	return strings.Contains(name, "ELM327") ||
-		strings.Contains(name, "STN") ||
-		strings.Contains(name, "OBDLink")
 }

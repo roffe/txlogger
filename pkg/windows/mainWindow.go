@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"time"
 
@@ -29,6 +28,7 @@ import (
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ebus"
+	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
@@ -365,20 +365,8 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 		WidebandSymbol: mw.settings.GetWidebandSymbolName(),
 	}
 
-	switch cols := logz.Columns(); {
-	case slices.Contains(cols, "AirMassMast.m_Request"):
-		dbcfg.AirDemToString = datalogger.AirDemToStringT8
-	case slices.Contains(cols, "Lufttemp"): // T5
-	case len(cols) > 0:
-		dbcfg.AirDemToString = datalogger.AirDemToStringT7
-	}
-
-	switch mw.selects.ecuSelect.Selected {
-	case "T7":
-		dbcfg.AirDemToString = datalogger.AirDemToStringT7
-	case "T8":
-		dbcfg.AirDemToString = datalogger.AirDemToStringT8
-	}
+	// the log may come from another ECU than the selected one
+	dbcfg.AirDemToString = ecu.ProfileForLog(logz.Columns(), mw.profile()).AirDemToString
 
 	cpCfg := &combinedlogplayer.CombinedLogplayerConfig{
 		Logfile: logz,

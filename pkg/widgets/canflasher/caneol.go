@@ -82,7 +82,7 @@ func (t *CanFlasherWidget) eolForm(bin []byte) {
 }
 
 func (t *CanFlasherWidget) runEOL(bin []byte, params t7.EOLParams) {
-	dev, err := t.cfg.CSW.GetAdapterWithOverrideFilters(t.ecuSelect.Selected, ecu.Filters(t.ecuSelect.Selected))
+	dev, err := t.adapter()
 	if err != nil {
 		t.log(err.Error())
 		return

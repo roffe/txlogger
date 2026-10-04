@@ -340,7 +340,7 @@ func TestPullDetectionTallGear(t *testing.T) {
 // A dead rear ABS ring reads a constant 0 — using it yields v=0 everywhere
 // and a confidently wrong ~0 hp curve.
 func TestSpeedAltValidation(t *testing.T) {
-	sig := logSignalsByECU["T7"]
+	sig, _ := logSignalsFor("T7")
 	makeLog := func(alt func(kmh float64) float64) logfile.Logfile {
 		var times []time.Time
 		var rows []map[string]float64

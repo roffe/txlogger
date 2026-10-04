@@ -69,11 +69,17 @@ func LoadConfig(cfg *Config) *Config {
 
 var ecuMap = map[string]*EcuInfo{}
 
+// EcuInfo registers a flashing/diagnostics client (canflasher). Name is the
+// flasher's own name ("Trionic 7"), not the Profile name.
 type EcuInfo struct {
 	Name    string
 	NewFunc func(c *gocan.Bus, cfg *Config) Client
 	CANRate float64
 	Filter  []uint32
+	// ManualReset: resetting over CAN with the ignition on puts the throttle
+	// body in limp mode, so flash and dump leave the reset to the user and
+	// the reset button asks first.
+	ManualReset bool
 }
 
 func Register(t *EcuInfo) {
@@ -98,18 +104,10 @@ func List() (ecus []string) {
 	return
 }
 
-func Filters(ecuName string) []uint32 {
-	e, found := ecuMap[ecuName]
-	if !found {
-		return []uint32{}
+// Info returns the named client's registration, zero if unknown.
+func Info(ecuName string) EcuInfo {
+	if e, found := ecuMap[ecuName]; found {
+		return *e
 	}
-	return e.Filter
-}
-
-func CANRate(ecuName string) float64 {
-	e, found := ecuMap[ecuName]
-	if !found {
-		return 0
-	}
-	return e.CANRate
+	return EcuInfo{}
 }

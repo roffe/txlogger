@@ -11,7 +11,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"github.com/roffe/txlogger/pkg/common"
+	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/layout"
 )
 
@@ -31,7 +31,7 @@ var Actions = []string{ActionSettings, ActionSymbolList, ActionMap, ActionLayout
 // ECUAll makes a binding apply whichever ECU is selected.
 const ECUAll = "All"
 
-var ECUs = append([]string{ECUAll}, common.EcuList...)
+var ECUs = append([]string{ECUAll}, ecu.ProfileNames()...)
 
 // Binding is one user-configured shortcut.
 type Binding struct {

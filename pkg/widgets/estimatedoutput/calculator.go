@@ -64,19 +64,13 @@ type Calculator interface {
 	Calculate(fw symbol.FirmwareFile, opts map[string]float64) (*Result, error)
 }
 
+// calculators is the estimator for each ECU that has one; new ECUs are
+// added here.
+var calculators = map[string]Calculator{"T5": t5{}, "T7": t7{}, "T8": t8{}}
+
 // For returns the Calculator for the given ECU name, or nil when the ECU
-// has no estimator. New ECUs are added here.
-func For(ecu string) Calculator {
-	switch ecu {
-	case "T5":
-		return t5{}
-	case "T7":
-		return t7{}
-	case "T8":
-		return t8{}
-	}
-	return nil
-}
+// has no estimator.
+func For(ecu string) Calculator { return calculators[ecu] }
 
 func has(fw symbol.FirmwareFile, name string) bool {
 	return fw.GetByName(name) != nil

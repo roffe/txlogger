@@ -17,9 +17,9 @@ import (
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan/v2"
-	"github.com/roffe/gocan/v2/gmlan"
 	"github.com/roffe/txlogger/pkg/dtc"
 	"github.com/roffe/txlogger/pkg/dtc/wis"
+	"github.com/roffe/txlogger/pkg/ecu"
 )
 
 var _ fyne.Widget = (*DTCReader)(nil)
@@ -67,22 +67,11 @@ func (d *DTCReader) render() {
 			info := code.Info()
 
 			var results []wis.Result
-			if models := wisModels(code.ECU); models != nil {
+			if models := code.WISModels(); models != nil {
 				results = wis.Search(code.Code, models...)
 			}
 
-			dtcTitle := code.String()
-			switch code.ECU {
-			case dtc.ECU_T5:
-				dtcTitle += fmt.Sprintf(": %d", code.Status)
-			case dtc.ECU_T7:
-				// full wire code (status byte included), then its meaning
-				dtcTitle += fmt.Sprintf(" %02X (%s)", code.Status, dtc.T7StatusString(code.Status))
-			case dtc.ECU_T8:
-				// Code already carries the failure type ("B0165 02"); add
-				// the GMW3110 meaning of that suffix
-				dtcTitle += " (" + gmlan.FailureTypeString(code.FailureType) + ")"
-			}
+			dtcTitle := code.Title()
 			switch {
 			case info.Name != "":
 				dtcTitle += " - " + info.Name
@@ -157,105 +146,71 @@ func (d *DTCReader) Refresh() {
 }
 
 func (d *DTCReader) ReadDTCS() error {
-	ecu := d.getECU()
-
-	var readDTCSFunc func(context.Context, *gocan.Bus)
-	switch ecu {
-	case "T5":
-		readDTCSFunc = d.readT5DTCS
-	case "T7":
-		readDTCSFunc = d.readT7DTCS
-	case "T8":
-		readDTCSFunc = d.readT8DTCS
-	default:
-		d.readBtn.Enable()
-		d.clearBtn.Enable()
-		return fmt.Errorf("DTC reading not supported for ECU %s", ecu)
+	p := ecu.GetProfile(d.getECU())
+	if p.ReadDTC == nil {
+		d.Enable()
+		return fmt.Errorf("DTC reading not supported for ECU %s", p.Name)
 	}
-
-	go func() {
-		defer fyne.Do(d.Enable)
-
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-		defer cancel()
-
-		dev, err := d.getAdapter()
+	go d.withBus(60*time.Second, func(ctx context.Context, cl *gocan.Bus) {
+		dtcs, err := p.ReadDTC(ctx, cl, d.getFW())
 		if err != nil {
 			d.err(err)
-			return
 		}
-
-		d.log("Connecting to device " + gocan.AdapterName(dev))
-
-		// Events (incl. the final fatal) stream to the log; a fatal adapter
-		// failure also aborts any in-flight call below with that error.
-		cl, err := gocan.OpenAdapter(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
-			d.log(e.String())
-		}))
-		if err != nil {
-			d.err(err)
-			return
+		if err == nil || dtcs != nil {
+			fyne.Do(func() {
+				d.dtcs = dtcs
+				d.Refresh()
+			})
 		}
-		defer cl.Close()
-
-		readDTCSFunc(ctx, cl)
-	}()
+	})
 	return nil
 }
 
 func (d *DTCReader) ClearDTCS() error {
-	ecu := d.getECU()
-	var clearDTCSFunc func(context.Context, *gocan.Bus)
-	switch ecu {
-	case "T5":
-		clearDTCSFunc = d.clearT5DTCS
-	case "T7":
-		clearDTCSFunc = d.clearT7DTCS
-	case "T8":
-		clearDTCSFunc = d.clearT8DTCS
-	default:
-		d.clearBtn.Enable()
-		return fmt.Errorf("DTC clearing not supported for ECU %s", ecu)
+	p := ecu.GetProfile(d.getECU())
+	if p.ClearDTC == nil {
+		d.Enable()
+		return fmt.Errorf("DTC clearing not supported for ECU %s", p.Name)
 	}
-	go func() {
-		defer fyne.Do(d.Enable)
-
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		defer cancel()
-
-		dev, err := d.getAdapter()
-		if err != nil {
+	go d.withBus(20*time.Second, func(ctx context.Context, cl *gocan.Bus) {
+		if err := p.ClearDTC(ctx, cl, d.getFW()); err != nil {
 			d.err(err)
 			return
 		}
-		d.log("Connecting to device " + gocan.AdapterName(dev))
-
-		// Events (incl. the final fatal) stream to the log; a fatal adapter
-		// failure also aborts any in-flight call below with that error.
-		cl, err := gocan.OpenAdapter(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
-			d.log(e.String())
-		}))
-		if err != nil {
-			d.err(err)
-			return
-		}
-		defer cl.Close()
-
-		clearDTCSFunc(ctx, cl)
-	}()
+		fyne.Do(func() {
+			d.dtcs = nil
+			d.Refresh()
+		})
+	})
 	return nil
 }
 
-// wisModels maps an ECU to the WIS car models it appears in. T5 cars
-// (9000/NG900) are not covered by the WIS archive.
-func wisModels(ecu dtc.ECU) []string {
-	switch ecu {
-	case dtc.ECU_T7:
-		return []string{"9400", "9600"}
-	case dtc.ECU_T8:
-		return []string{"9440"}
+// withBus opens the adapter and runs fn on it, re-enabling the buttons after.
+func (d *DTCReader) withBus(timeout time.Duration, fn func(context.Context, *gocan.Bus)) {
+	defer fyne.Do(d.Enable)
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	dev, err := d.getAdapter()
+	if err != nil {
+		d.err(err)
+		return
 	}
-	return nil
+	d.log("Connecting to device " + gocan.AdapterName(dev))
+
+	// Events (incl. the final fatal) stream to the log; a fatal adapter
+	// failure also aborts any in-flight call below with that error.
+	cl, err := gocan.OpenAdapter(ctx, dev, gocan.WithEventFunc(func(e gocan.Event) {
+		d.log(e.String())
+	}))
+	if err != nil {
+		d.err(err)
+		return
+	}
+	defer cl.Close()
+
+	fn(ctx, cl)
 }
 
 // openWIS opens the fault diagnosis document for a DTC, showing a picker

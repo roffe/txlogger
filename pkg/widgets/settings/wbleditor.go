@@ -16,6 +16,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/debug"
+	"github.com/roffe/txlogger/pkg/ecu"
 )
 
 var builtInPresets = map[string]adScannerPreset{
@@ -38,12 +39,14 @@ type adScannerPreset struct {
 	Z   []float64 `json:"z"`
 }
 
-// adResolutionForECU returns the AD converter resolution for an ECU type.
-func adResolutionForECU(ecu string) int {
-	if ecu == "T5" {
-		return 255
+// adScannerECUs are the ECUs with an AD scanner input.
+func adScannerECUs() (names []string) {
+	for _, p := range ecu.Profiles() {
+		if p.ADResolution > 0 {
+			names = append(names, p.Name)
+		}
 	}
-	return 1023
+	return names
 }
 
 type mapRow struct {
@@ -75,7 +78,7 @@ func NewWBLEditor(yAxis []int, zValues []float64) *WBLEditor {
 		m.rows = append(m.rows, &mapRow{y: yAxis[i], z: zValues[i]})
 	}
 	m.ExtendBaseWidget(m)
-	m.adresolution = adResolutionForECU(prefLastADScannerECU.get())
+	m.adresolution = ecu.GetProfile(prefLastADScannerECU.get()).ADResolution
 	return m
 }
 
@@ -265,8 +268,8 @@ func (m *WBLEditor) CreateRenderer() fyne.WidgetRenderer {
 		m.presetSelect.Selected = lastPreset
 	}
 
-	m.ecuSelect = widget.NewSelect([]string{"T5", "T7", "T8"}, func(s string) {
-		m.adresolution = adResolutionForECU(s)
+	m.ecuSelect = widget.NewSelect(adScannerECUs(), func(s string) {
+		m.adresolution = ecu.GetProfile(s).ADResolution
 		prefLastADScannerECU.set(s)
 		for _, r := range m.rows {
 			if r.vo != nil {

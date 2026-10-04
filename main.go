@@ -20,6 +20,7 @@ import (
 	_ "github.com/roffe/gocan/v2/adapters/combi"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/debug"
+	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ipc"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/theme"
@@ -70,7 +71,7 @@ func main() {
 
 	InitConsole()
 	// create txlogger dir in user home for debug log and such
-	if err := common.CreatetxloggerDirs(); err != nil {
+	if err := common.CreatetxloggerDirs(ecu.ProfileNames()); err != nil {
 		log.Printf("error creating txlogger dir in user home: %v", err)
 	}
 

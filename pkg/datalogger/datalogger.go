@@ -65,10 +65,32 @@ type WidebandConfig struct {
 	LambdaValues    []float64
 }
 
+// loggers builds the logging client for each ECU that can be logged over a
+// plain CAN adapter; txbridgeECUs is the txbridge counterpart. A new ECU's
+// logger is one entry in each.
+var loggers = map[string]func(Config, LogWriter) (IClient, error){
+	"T5": func(cfg Config, lw LogWriter) (IClient, error) {
+		if cfg.ExperimentalT5FastLogging {
+			debug.Log("Using experimental T5 fast logger")
+			return NewT5Fast(cfg, lw)
+		}
+		return NewT5(cfg, lw)
+	},
+	"T7": NewT7,
+	"T8": NewT8,
+}
+
 func New(cfg Config) (IClient, string, error) {
 	log.Println("RemoteMode", cfg.RemoteMode)
-	datalogger := &Client{
-		cfg: cfg,
+
+	devName := gocan.AdapterName(cfg.Device)
+	txbridge := devName == "txbridge wifi" || devName == "txbridge bluetooth"
+	newLogger, ok := loggers[cfg.ECU]
+	if txbridge {
+		_, ok = txbridgeECUs[cfg.ECU]
+	}
+	if !ok && cfg.RemoteMode != 2 {
+		return nil, "", fmt.Errorf("%s not supported yet", cfg.ECU)
 	}
 
 	filename, lw, err := NewWriter(cfg)
@@ -78,49 +100,21 @@ func New(cfg Config) (IClient, string, error) {
 
 	cfg.OnMessage(fmt.Sprintf("Logging to %s", filename))
 
-	if cfg.RemoteMode == 2 {
+	datalogger := &Client{
+		cfg: cfg,
+	}
+	switch {
+	case cfg.RemoteMode == 2:
 		datalogger.IClient, err = NewRemote(cfg, lw)
-		if err != nil {
-			return nil, "", err
-		}
-		return datalogger, filename, nil
-	}
-
-	devName := gocan.AdapterName(cfg.Device)
-	if devName == "txbridge wifi" || devName == "txbridge bluetooth" {
-		dc, err := NewTxbridge(cfg, lw)
-		if err != nil {
-			return nil, "", err
-		}
-		return dc, filename, nil
-	}
-
-	switch cfg.ECU {
-	case "T5":
-		if cfg.ExperimentalT5FastLogging {
-			debug.Log("Using experimental T5 fast logger")
-			datalogger.IClient, err = NewT5Fast(cfg, lw)
-		} else {
-			datalogger.IClient, err = NewT5(cfg, lw)
-		}
-		if err != nil {
-			return nil, "", err
-		}
-	case "T7":
-		datalogger.IClient, err = NewT7(cfg, lw)
-		// datalogger.IClient, err = NewRemote(cfg, lw)
-		if err != nil {
-			return nil, "", err
-		}
-	case "T8":
-		datalogger.IClient, err = NewT8(cfg, lw)
-		if err != nil {
-			return nil, "", err
-		}
+	case txbridge:
+		datalogger.IClient, err = NewTxbridge(cfg, lw)
 	default:
-		return nil, "", fmt.Errorf("%s not supported yet", cfg.ECU)
+		datalogger.IClient, err = newLogger(cfg, lw)
 	}
-
+	if err != nil {
+		lw.Close()
+		return nil, "", err
+	}
 	return datalogger, filename, nil
 }
 
