@@ -14,7 +14,7 @@ replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20261007215003-cc6bf8
 replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
 
 require (
-	fyne.io/fyne/v2 v2.8.0
+	fyne.io/fyne/v2 v2.8.2-0.20260910171750-900a0401dbe4
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/dweymouth/fyne-tooltip v0.4.0
@@ -22,6 +22,7 @@ require (
 	github.com/go-gl/gl v0.0.0-20260331235117-4566fea9a276
 	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.2
 	github.com/hajimehoshi/go-mp3 v0.3.4
+	github.com/roffe/bdmtool v0.0.0-20261004110333-9774d0fcc770
 	github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974
 	github.com/roffe/ecusymbol v1.2.6-0.20260924192406-eb1f987c0234
 	github.com/roffe/gocan/v2 v2.1.1-0.20261007204440-c6c3b275db73
@@ -64,6 +65,7 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.6.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+	github.com/roffe/avrflash v0.0.0-20260923171743-6502105c9b8d // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/rymdport/portal v0.4.2 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect

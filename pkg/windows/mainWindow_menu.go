@@ -19,6 +19,8 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/bdmtool/bdm"
+	"github.com/roffe/bdmtool/icons"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan/v2"
 	"github.com/roffe/txlogger/pkg/assets"
@@ -187,6 +189,7 @@ func (mw *MainWindow) setupMenu() {
 			fyne.NewMenuItemWithIcon("Estimated output", theme.InfoIcon(), mw.openEstimatedOutput),
 			fyne.NewMenuItemWithIcon("Cam timing", theme.InfoIcon(), mw.openCamTiming),
 			fyne.NewMenuItemWithIcon("T5 CLI", theme.ComputerIcon(), mw.openT5CLI),
+			fyne.NewMenuItemWithIcon("BDM Tool", icons.Get("app"), mw.openBDMTool),
 			//fyne.NewMenuItemWithIcon("Rescale AccPedalMap", theme.GridIcon(), func() {
 			//	mw.openRescaler(symbol.ECU_T8, "TrqMastCal.X_AccPedalMAP")
 			//}),
@@ -272,6 +275,28 @@ func (mw *MainWindow) openEstimatedOutput() {
 	inner := multiwindow.NewInnerWindowWithIcon(title, eo, theme.InfoIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(920, 560))
+}
+
+func (mw *MainWindow) openBDMTool() {
+	if w := mw.wm.HasWindow("BDM Tool"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	var inner *multiwindow.InnerWindow
+	ui := bdm.New(&bdm.Config{
+		Window: mw.Window,
+		OpenFile: func(ext string, fn func(string)) {
+			widgets.SelectFile(func(r fyne.URIReadCloser) { r.Close(); fn(r.URI().Path()) }, ext[1:]+" file", ext[1:])
+		},
+		SaveFile: func(name, ext string, fn func(string)) { widgets.SaveFile(fn, ext[1:]+" file", ext[1:], name) },
+		OnExit:   func() { inner.Close() },
+	})
+	// File duplicates the panel buttons, so only Firmware and Help go in the bar.
+	bar := multiwindow.NewMenuBar(ui.Menu().Items...)
+	inner = multiwindow.NewInnerWindowWithIcon("BDM Tool", container.NewBorder(bar, nil, nil, nil, ui), icons.Get("app"))
+	inner.OnClose = ui.Disconnect
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(470, 500))
 }
 
 // openMBT opens (or raises) the "T7 MBT ignition analyser": an offline
