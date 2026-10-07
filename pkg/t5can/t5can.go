@@ -1,6 +1,7 @@
 package t5can
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -31,11 +32,23 @@ func NewClient(c *gocan.Bus) *Client {
 	}
 }
 
-// request sends a command frame on canID and waits for the reply on replyID.
-func request(ctx context.Context, c *gocan.Bus, payload []byte, timeout time.Duration) (gocan.Frame, error) {
+// request sends a command frame on canID and returns the first reply on
+// replyID whose byte 0 is echo (the ECU echoes the command's first byte, C4
+// answers with C6). Other replyID frames are skipped: right after an ECU reset
+// the first one can be a stray frame with a 0xFF status instead of the reply.
+func request(ctx context.Context, c *gocan.Bus, payload []byte, echo byte, timeout time.Duration) (gocan.Frame, error) {
 	rctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	return c.Request(rctx, gocan.NewFrame(canID, payload), replyID)
+	replies := c.Subscribe(rctx, replyID)
+	if err := c.Send(gocan.WithExpectedResponses(rctx, 1), gocan.NewFrame(canID, payload)); err != nil {
+		return gocan.Frame{}, err
+	}
+	for f := range replies {
+		if f.Length > 0 && f.Data[0] == echo {
+			return f, nil
+		}
+	}
+	return gocan.Frame{}, cmp.Or(c.Err(), context.Cause(rctx), gocan.ErrClosed)
 }
 
 func (c *Client) ReadRam(ctx context.Context, address, length uint32) ([]byte, error) {
@@ -57,16 +70,13 @@ func (c *Client) ReadRam(ctx context.Context, address, length uint32) ([]byte, e
 
 func (c *Client) sendReadCommand(ctx context.Context, address uint32) ([]byte, error) {
 	const cmdByte = 0xC7
-	resp, err := request(ctx, c.c, []byte{cmdByte, 0x00, 0x00, byte(address >> 8), byte(address)}, c.defaultTimeout)
+	resp, err := request(ctx, c.c, []byte{cmdByte, 0x00, 0x00, byte(address >> 8), byte(address)}, cmdByte, c.defaultTimeout)
 	if err != nil {
 		return nil, err
 	}
 
 	if resp.Length < 8 { // need at least cmd + ? + 6 data bytes
 		return nil, fmt.Errorf("short response: got %d bytes", resp.Length)
-	}
-	if resp.Data[0] != cmdByte {
-		return nil, fmt.Errorf("invalid response: expected 0x%X, got 0x%X", cmdByte, resp.Data[0])
 	}
 	if resp.Data[1] != respOK { // D2 code: 4 = error (e.g. address out of range)
 		return nil, fmt.Errorf("read error at 0x%X: code 0x%02X", address, resp.Data[1])
@@ -136,7 +146,7 @@ func (c *Client) sendBlock(ctx context.Context, addr uint32, block []byte, maxBl
 		byte(addr >> 24), byte(addr >> 16), byte(addr >> 8), byte(addr),
 		byte(len(block)),
 		0x00, 0x00,
-	}, c.defaultTimeout)
+	}, 0xA5, c.defaultTimeout)
 	if err != nil {
 		return fmt.Errorf("set-address send failed: %w", err)
 	}
@@ -167,7 +177,7 @@ func (c *Client) sendBlock(ctx context.Context, addr uint32, block []byte, maxBl
 		}
 		copy(payload[1:], block[offset:offset+n])
 
-		dataResp, err := request(ctx, c.c, payload[:], c.defaultTimeout)
+		dataResp, err := request(ctx, c.c, payload[:], byte(offset), c.defaultTimeout)
 		if err != nil {
 			return fmt.Errorf("data send failed at offset %d: %w", offset, err)
 		}
@@ -186,12 +196,8 @@ func (c *Client) sendBlock(ctx context.Context, addr uint32, block []byte, maxBl
 
 func sendCommand(ctx context.Context, c *gocan.Bus, cmd []byte, timeout time.Duration) error {
 	for _, cmdByte := range cmd {
-		resp, err := request(ctx, c, []byte{0xC4, cmdByte}, timeout)
-		if err != nil {
+		if _, err := request(ctx, c, []byte{0xC4, cmdByte}, 0xC6, timeout); err != nil {
 			return err
-		}
-		if resp.Data[0] != 0xC6 {
-			return fmt.Errorf("invalid response")
 		}
 	}
 	return nil
