@@ -5,12 +5,14 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestHPortion(t *testing.T) {
+	test.NewTempApp(t)
 	cont := container.New(&HPortion{Portions: []float64{50, 50}}, widget.NewEntry(), widget.NewEntry())
 	cont.Resize(fyne.NewSize(100, 100))
 
@@ -41,6 +43,7 @@ func TestHPortion(t *testing.T) {
 }
 
 func TestVPortion(t *testing.T) {
+	test.NewTempApp(t)
 	cont := container.New(&VPortion{Portions: []float64{50, 50}}, widget.NewEntry(), widget.NewEntry())
 	cont.Resize(fyne.NewSize(100, 100))
 

@@ -4,7 +4,6 @@ import (
 	"slices"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/widget"
 )
@@ -103,17 +102,11 @@ func (mv *MapViewer) handlePrimaryCtrlClick(event *desktop.MouseEvent) {
 	// Toggle the clicked cell while keeping the rest of the selection.
 	if index := slices.Index(mv.selectedCells, newCell); index != -1 {
 		mv.selectedCells = append(mv.selectedCells[:index], mv.selectedCells[index+1:]...)
-		mv.selectionRects[newCell].Hide()
+		mv.highlightCell(newCell, false)
 	} else {
 		mv.selectedCells = append(mv.selectedCells, newCell)
-		mv.selectionRects[newCell].Show()
+		mv.highlightCell(newCell, true)
 	}
-	// Show()/Hide() only flip the Hidden flag, and canvas.Refresh on a rect
-	// that has never been painted (a hidden overlay cell) is a no-op because the
-	// object isn't in the canvas cache. Refresh the always-visible value rect for
-	// this cell instead to dirty the canvas and force an immediate repaint that
-	// draws the toggled highlight.
-	canvas.Refresh(mv.zDataRects[newCell])
 }
 
 // handlePrimaryCtrlShiftClick adds the rectangular block between the anchor cell
@@ -180,11 +173,10 @@ func (mv *MapViewer) handleSecondaryClick(event *desktop.MouseEvent) {
 	mv.showPopupMenu(event.AbsolutePosition)
 }
 
-// calculateCellDimensions calculates and returns the width and height of a cell.
+// calculateCellDimensions returns the distance between cell origins.
 func (mv *MapViewer) calculateCellDimensions() (float32, float32) {
-	cellWidth := mv.innerView.Size().Width / float32(mv.numColumns)
-	cellHeight := mv.innerView.Size().Height / float32(mv.numRows)
-	return cellWidth, cellHeight
+	size := mv.innerView.Size()
+	return cellPitch(size.Width, mv.numColumns), cellPitch(size.Height, mv.numRows)
 }
 
 // calculateSelectionBounds computes the bounding box of the selection area.
