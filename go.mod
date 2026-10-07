@@ -2,10 +2,6 @@ module github.com/roffe/txlogger
 
 go 1.27.1
 
-replace github.com/roffe/gocan/v2 => ../gocan
-
-replace github.com/roffe/browse => ../browse
-
 //replace github.com/roffe/ecusymbol => ../ecusymbol
 replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20261007215003-cc6bf888ecea
 
