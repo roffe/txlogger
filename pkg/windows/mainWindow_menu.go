@@ -21,6 +21,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan/v2"
+	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu/t8/t8file"
@@ -232,14 +233,14 @@ func (mw *MainWindow) setupMenu() {
 		leading[len(leading)-1].Items = append(
 			leading[len(leading)-1].Items,
 			fyne.NewMenuItemWithIcon("AI chat (local)", theme.ComputerIcon(), mw.openAIChat),
-			fyne.NewMenuItemWithIcon("Canflasher", theme.UploadIcon(), func() {
+			fyne.NewMenuItemWithIcon("Canflasher", canflasherIcon, func() {
 				if w := mw.wm.HasWindow("Canflasher"); w != nil {
 					mw.wm.Raise(w)
 					return
 				}
 				inner := multiwindow.NewInnerWindowWithIcon("Canflasher", canflasher.New(&canflasher.Config{
 					CSW: mw.settings,
-				}), theme.UploadIcon())
+				}), canflasherIcon)
 				mw.wm.Add(inner)
 				inner.Resize(fyne.NewSize(450, 250))
 			}),
@@ -661,6 +662,8 @@ func (mw *MainWindow) loadBinary() {
 }
 
 var openMapLock sync.Mutex
+
+var canflasherIcon = fyne.NewStaticResource("canflasher.png", assets.CanFlasher)
 
 // newMapViewer builds a fully wired MapViewer for a single symbol (file/ECU
 // load+save funcs, live X/Y crosshair subscriptions) but does not create a

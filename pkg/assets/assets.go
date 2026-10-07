@@ -72,3 +72,6 @@ var STAGAfr []byte
 
 //go:embed zonedout.png
 var ZonedOut []byte
+
+//go:embed canflasher.png
+var CanFlasher []byte

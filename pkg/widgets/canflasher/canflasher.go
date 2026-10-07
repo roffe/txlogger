@@ -287,7 +287,7 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 		t.dumpBTN,
 		// t.sramBTN,
 		t.flashBTN,
-		t.eolBTN,
+		// t.eolBTN,
 		t.marryBTN,
 		t.recoveryBTN,
 		t.resetBTN,
