@@ -121,8 +121,7 @@ func (mw *MainWindow) openSettings() {
 		mw.wm.Raise(w)
 		return
 	}
-	inner := multiwindow.NewInnerWindow("Settings", mw.settings)
-	inner.Icon = theme.SettingsIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("Settings", mw.settings, theme.SettingsIcon())
 	mw.wm.Add(inner)
 }
 

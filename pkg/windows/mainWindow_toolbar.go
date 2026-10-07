@@ -65,8 +65,7 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 				}
 				return nil
 			}
-			inner := multiwindow.NewInnerWindow("txweb", txb)
-			inner.Icon = theme.FileApplicationIcon()
+			inner := multiwindow.NewInnerWindowWithIcon("txweb", txb, theme.FileApplicationIcon())
 			mw.wm.Add(inner)
 			inner.Resize(fyne.NewSize(700, 500))
 		}),
@@ -90,8 +89,7 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 				mapp,
 			)
 
-			inner := multiwindow.NewInnerWindow("Map", cnt)
-			inner.Icon = theme.NavigateNextIcon()
+			inner := multiwindow.NewInnerWindowWithIcon("Map", cnt, theme.NavigateNextIcon())
 			mw.wm.Add(inner)
 		}),
 	*/

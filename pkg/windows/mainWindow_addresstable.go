@@ -88,8 +88,7 @@ func (mw *MainWindow) openFirmwareInfo() {
 		mw.wm.Raise(w)
 		return
 	}
-	inner := multiwindow.NewInnerWindow("Firmware information", t7fwinfo.New(t7fwinfo.Config{FW: t7, Save: mw.saveLoadedBinary, Log: mw.Log}))
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("Firmware information", t7fwinfo.New(t7fwinfo.Config{FW: t7, Save: mw.saveLoadedBinary, Log: mw.Log}), theme.InfoIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(900, 760))
 }

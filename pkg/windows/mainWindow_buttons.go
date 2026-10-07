@@ -53,8 +53,7 @@ func (mw *MainWindow) newLivePlotBtn() *ttwidget.Button {
 			Window: 120 * time.Second,
 		})
 
-		lpw := multiwindow.NewInnerWindow("Live plot", lp)
-		lpw.Icon = theme.MediaSkipNextIcon()
+		lpw := multiwindow.NewInnerWindowWithIcon("Live plot", lp, theme.MediaSkipNextIcon())
 		lpw.OnClose = lp.Close
 		mw.wm.Add(lpw)
 		lpw.Resize(fyne.NewSize(900, 500))
@@ -70,8 +69,7 @@ func (mw *MainWindow) newaddGaugeBtn() *ttwidget.Button {
 			return
 		}
 		gs := NewGaugeCreator(mw)
-		iw := multiwindow.NewSystemWindow("Create gauge", gs)
-		iw.Icon = theme.ContentAddIcon()
+		iw := multiwindow.NewSystemWindowWithIcon("Create gauge", gs, theme.ContentAddIcon())
 		mw.wm.Add(iw)
 	})
 	bt.SetToolTip("Create a new gauge")
@@ -85,8 +83,7 @@ func (mw *MainWindow) newSymbolListBtn() *ttwidget.Button {
 			return
 		}
 
-		symbolListWindow := multiwindow.NewSystemWindow("Symbol list", mw.symbolList)
-		symbolListWindow.Icon = theme.ListIcon()
+		symbolListWindow := multiwindow.NewSystemWindowWithIcon("Symbol list", mw.symbolList, theme.ListIcon())
 		symbolListWindow.IgnoreSave = false
 
 		// Fixa så livepreview values kan togglas på/av. med nya ui't så funkar det inte som det ska
@@ -108,8 +105,7 @@ func (mw *MainWindow) newDebugBtn() *ttwidget.Button {
 			return
 		}
 		dbl := msglist.New(mw.outputData)
-		debugWindow := multiwindow.NewSystemWindow("Debug log", dbl)
-		debugWindow.Icon = theme.ContentCopyIcon()
+		debugWindow := multiwindow.NewSystemWindowWithIcon("Debug log", dbl, theme.ContentCopyIcon())
 		debugWindow.OnTappedIcon = func() {
 			str, err := mw.outputData.Get()
 			if err != nil {
@@ -246,8 +242,7 @@ func (mw *MainWindow) newDashboardBtn() *ttwidget.Button {
 			}),
 		)
 
-		dbw := multiwindow.NewInnerWindow("Dashboard", db)
-		dbw.Icon = theme.InfoIcon()
+		dbw := multiwindow.NewInnerWindowWithIcon("Dashboard", db, theme.InfoIcon())
 
 		dbcfg.FullscreenFunc = func(b bool) {
 			if b {

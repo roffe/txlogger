@@ -133,8 +133,7 @@ func (mw *MainWindow) showSymbolCompare(typ symbol.ECUType, otherName string, ot
 	})
 	split := container.NewHSplit(cmp, mapTabs)
 	split.Offset = 0.3
-	inner := multiwindow.NewInnerWindow("Compare with "+otherName, split)
-	inner.Icon = theme.SearchReplaceIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("Compare with "+otherName, split, theme.SearchReplaceIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(1200, 700))
 }
@@ -199,8 +198,7 @@ func (mw *MainWindow) showAIMapDiff(mapName string, proposed []float64) error {
 	if w := mw.wm.HasWindow(title); w != nil {
 		w.Close() // replace the previous suggestion for this map
 	}
-	inner := multiwindow.NewInnerWindow(title, content)
-	inner.Icon = theme.SearchReplaceIcon()
+	inner := multiwindow.NewInnerWindowWithIcon(title, content, theme.SearchReplaceIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(900, 600))
 	return nil

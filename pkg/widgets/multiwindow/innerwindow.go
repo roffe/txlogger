@@ -110,6 +110,17 @@ func NewInnerWindow(title string, content fyne.CanvasObject) *InnerWindow {
 	return w
 }
 
+func NewInnerWindowWithIcon(title string, content fyne.CanvasObject, icon fyne.Resource) *InnerWindow {
+	w := &InnerWindow{
+		title:       title,
+		content:     container.NewPadded(content),
+		bgFillColor: theme.ColorNameOverlayBackground,
+		Icon:        icon,
+	}
+	w.ExtendBaseWidget(w)
+	return w
+}
+
 func NewSystemWindow(title string, content fyne.CanvasObject) *InnerWindow {
 	w := &InnerWindow{
 		title:       title,
@@ -119,6 +130,12 @@ func NewSystemWindow(title string, content fyne.CanvasObject) *InnerWindow {
 		IgnoreSave:  true,
 	}
 	w.ExtendBaseWidget(w)
+	return w
+}
+
+func NewSystemWindowWithIcon(title string, content fyne.CanvasObject, icon fyne.Resource) *InnerWindow {
+	w := NewSystemWindow(title, content)
+	w.Icon = icon
 	return w
 }
 

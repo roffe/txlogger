@@ -489,8 +489,7 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Positio
 						return
 					}
 
-					iw := multiwindow.NewInnerWindow("Lambda feedback", mv)
-					iw.Icon = theme.InfoIcon()
+					iw := multiwindow.NewInnerWindowWithIcon("Lambda feedback", mv, theme.InfoIcon())
 
 				}),
 			),
@@ -500,8 +499,7 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Positio
 			lp,
 		)
 	*/
-	iw := multiwindow.NewSystemWindow(fp, lp)
-	iw.Icon = theme.MediaPlayIcon()
+	iw := multiwindow.NewSystemWindowWithIcon(fp, lp, theme.MediaPlayIcon())
 
 	lp.OnMouseDown = func() {
 		mw.wm.Raise(iw)

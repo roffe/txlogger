@@ -28,8 +28,7 @@ func (mw *MainWindow) showWhatsNew() {
 	}
 	md := widget.NewRichTextFromMarkdown(assets.WhatsNew)
 	md.Wrapping = fyne.TextWrapWord
-	iw := multiwindow.NewSystemWindow("What's new", container.NewVScroll(md))
-	iw.Icon = theme.InfoIcon()
+	iw := multiwindow.NewSystemWindowWithIcon("What's new", container.NewVScroll(md), theme.InfoIcon())
 	mw.wm.Add(iw)
 	iw.Resize(fyne.NewSize(700, 400))
 }

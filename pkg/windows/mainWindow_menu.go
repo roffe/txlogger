@@ -62,7 +62,8 @@ func (mw *MainWindow) setupMenu() {
 	}
 
 	openItem := fyne.NewMenuItemWithIcon("Open", theme.FolderIcon(), nil)
-	openItem.ChildMenu = fyne.NewMenu("File",
+	openItem.ChildMenu = fyne.NewMenu(
+		"File",
 		fyne.NewMenuItemWithIcon("Open binary", theme.DocumentIcon(), mw.loadBinary),
 		fyne.NewMenuItemWithIcon("Open log", theme.DocumentIcon(), func() {
 			cb := func(r fyne.URIReadCloser) {
@@ -111,15 +112,15 @@ func (mw *MainWindow) setupMenu() {
 	)
 
 	settingsMenuItem := fyne.NewMenuItemWithIcon("Settings", theme.SettingsIcon(), mw.openSettings)
-	settingsMenuItem.ChildMenu = fyne.NewMenu("Settings",
+	settingsMenuItem.ChildMenu = fyne.NewMenu(
+		"Settings",
 		fyne.NewMenuItemWithIcon("General", theme.SettingsIcon(), mw.openSettings),
 		fyne.NewMenuItemWithIcon("Colors", theme.ColorChromaticIcon(), func() {
 			if w := mw.wm.HasWindow("Custom Colors"); w != nil {
 				mw.wm.Raise(w)
 				return
 			}
-			w := multiwindow.NewInnerWindow("Custom Colors", customcolors.New())
-			w.Icon = theme.ColorChromaticIcon()
+			w := multiwindow.NewInnerWindowWithIcon("Custom Colors", customcolors.New(), theme.ColorChromaticIcon())
 			mw.wm.Add(w)
 		}),
 		fyne.NewMenuItemWithIcon("Keyboard shortcuts", theme.SettingsIcon(), func() {
@@ -127,8 +128,7 @@ func (mw *MainWindow) setupMenu() {
 				mw.wm.Raise(w)
 				return
 			}
-			inner := multiwindow.NewInnerWindow("Keyboard shortcuts", shortcuts.New(listLayouts, mw.applyShortcuts))
-			inner.Icon = theme.SettingsIcon()
+			inner := multiwindow.NewInnerWindowWithIcon("Keyboard shortcuts", shortcuts.New(listLayouts, mw.applyShortcuts), theme.SettingsIcon())
 			mw.wm.Add(inner)
 			inner.Resize(fyne.NewSize(760, 300))
 		}),
@@ -138,21 +138,20 @@ func (mw *MainWindow) setupMenu() {
 				mw.wm.Raise(w)
 				return
 			}
-			inner := multiwindow.NewInnerWindow("txbridge", txconfigurator.NewConfigurator(mw.settings.GetPort))
-			inner.Icon = theme.SettingsIcon()
+			inner := multiwindow.NewInnerWindowWithIcon("txbridge", txconfigurator.NewConfigurator(mw.settings.GetPort), theme.SettingsIcon())
 			mw.wm.Add(inner)
 		}),
 	)
 
 	leading := []*fyne.Menu{
-		fyne.NewMenu("File",
+		fyne.NewMenu(
+			"File",
 			fyne.NewMenuItemWithIcon("About", theme.HelpIcon(), func() {
 				if w := mw.wm.HasWindow("About"); w != nil {
 					mw.wm.Raise(w)
 					return
 				}
-				inner := multiwindow.NewInnerWindow("About", mw.about())
-				inner.Icon = theme.HelpIcon()
+				inner := multiwindow.NewInnerWindowWithIcon("About", mw.about(), theme.HelpIcon())
 				mw.wm.Add(inner)
 			}),
 			openItem,
@@ -163,7 +162,8 @@ func (mw *MainWindow) setupMenu() {
 				update.UpdateCheck(mw.app, mw.Window)
 			}),
 		),
-		fyne.NewMenu("Tools",
+		fyne.NewMenu(
+			"Tools",
 			fyne.NewMenuItemWithIcon("Symbol Browser", theme.ListIcon(), func() {
 				if w := mw.wm.HasWindow("Symbol Browser"); w != nil {
 					mw.wm.Raise(w)
@@ -176,8 +176,7 @@ func (mw *MainWindow) setupMenu() {
 					mw.openMap(typ, title, mapName, "")
 				}
 				browser := symbolbrowser.New(getFW, getECU, openMap, mw.Error)
-				inner := multiwindow.NewInnerWindow("Symbol Browser", browser)
-				inner.Icon = theme.ListIcon()
+				inner := multiwindow.NewInnerWindowWithIcon("Symbol Browser", browser, theme.ListIcon())
 				mw.wm.Add(inner)
 				inner.Resize(fyne.Size{Width: 760, Height: 520})
 			}),
@@ -208,7 +207,8 @@ func (mw *MainWindow) setupMenu() {
 	closeItem.Shortcut = &desktop.CustomShortcut{KeyName: fyne.KeyW, Modifier: fyne.KeyModifierControl}
 
 	trailing := []*fyne.Menu{
-		fyne.NewMenu("Arrange",
+		fyne.NewMenu(
+			"Arrange",
 			cycleItem,
 			cycleBackItem,
 			closeItem,
@@ -237,10 +237,9 @@ func (mw *MainWindow) setupMenu() {
 					mw.wm.Raise(w)
 					return
 				}
-				inner := multiwindow.NewInnerWindow("Canflasher", canflasher.New(&canflasher.Config{
+				inner := multiwindow.NewInnerWindowWithIcon("Canflasher", canflasher.New(&canflasher.Config{
 					CSW: mw.settings,
-				}))
-				inner.Icon = theme.UploadIcon()
+				}), theme.UploadIcon())
 				mw.wm.Add(inner)
 				inner.Resize(fyne.NewSize(450, 250))
 			}),
@@ -269,8 +268,7 @@ func (mw *MainWindow) openEstimatedOutput() {
 		GetFW:      func() symbol.FirmwareFile { return mw.fw },
 		Colorblind: mw.settings.GetColorBlindMode(),
 	})
-	inner := multiwindow.NewInnerWindow(title, eo)
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon(title, eo, theme.InfoIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(920, 560))
 }
@@ -291,7 +289,7 @@ func (mw *MainWindow) openMBT() {
 		mw.wm.Raise(w)
 		return
 	}
-	inner := multiwindow.NewInnerWindow(title, mbt.New(&mbt.Config{
+	inner := multiwindow.NewInnerWindowWithIcon(title, mbt.New(&mbt.Config{
 		GetFW:      func() symbol.FirmwareFile { return mw.fw },
 		Colorblind: mw.settings.GetColorBlindMode(),
 		OpenWindow: func(title string, content fyne.CanvasObject) {
@@ -299,13 +297,11 @@ func (mw *MainWindow) openMBT() {
 				mw.wm.Raise(w)
 				return
 			}
-			help := multiwindow.NewSystemWindow(title, content)
-			help.Icon = theme.HelpIcon()
+			help := multiwindow.NewSystemWindowWithIcon(title, content, theme.HelpIcon())
 			mw.wm.Add(help)
 			help.Resize(fyne.NewSize(820, 620))
 		},
-	}))
-	inner.Icon = theme.InfoIcon()
+	}), theme.InfoIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(1100, 640))
 }
@@ -318,8 +314,7 @@ func (mw *MainWindow) openT5CLI() {
 	cli := t5cli.New(func() (gocan.Adapter, error) {
 		return mw.settings.GetAdapter("T5")
 	})
-	inner := multiwindow.NewInnerWindow("T5 CLI", cli)
-	inner.Icon = theme.ComputerIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("T5 CLI", cli, theme.ComputerIcon())
 	inner.OnClose = cli.Close
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(700, 480))
@@ -334,10 +329,9 @@ func (mw *MainWindow) openCamTiming() {
 		mw.wm.Raise(w)
 		return
 	}
-	inner := multiwindow.NewInnerWindow(title, camtiming.New(&camtiming.Config{
+	inner := multiwindow.NewInnerWindowWithIcon(title, camtiming.New(&camtiming.Config{
 		ECU: mw.selects.ecuSelect.Selected,
-	}))
-	inner.Icon = theme.SettingsIcon()
+	}), theme.SettingsIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(980, 620))
 }
@@ -347,8 +341,7 @@ func (mw *MainWindow) openT7GearCalc() {
 		mw.wm.Raise(w)
 		return
 	}
-	inner := multiwindow.NewInnerWindow("T7 gear calculator", gearcalc.New())
-	inner.Icon = theme.SettingsIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("T7 gear calculator", gearcalc.New(), theme.SettingsIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(880, 480))
 }
@@ -375,8 +368,7 @@ func (mw *MainWindow) openAIChat() {
 			return err
 		},
 	})
-	inner := multiwindow.NewInnerWindow("AI chat", chat)
-	inner.Icon = theme.ComputerIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("AI chat", chat, theme.ComputerIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(700, 560))
 }
@@ -386,8 +378,7 @@ func (mw *MainWindow) openSeedKey() {
 		mw.wm.Raise(w)
 		return
 	}
-	inner := multiwindow.NewInnerWindow("T7 Seed/Key patcher", seedkey.New())
-	inner.Icon = theme.SearchReplaceIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("T7 Seed/Key patcher", seedkey.New(), theme.SearchReplaceIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(560, 300))
 }
@@ -408,8 +399,7 @@ func (mw *MainWindow) openDTCReader() {
 	}
 	getFW := func() symbol.FirmwareFile { return mw.fw }
 	getECU := func() string { return mw.selects.ecuSelect.Selected }
-	inner := multiwindow.NewInnerWindow("DTC Reader", dtcreader.New(getFW, getECU, mw.getAdapter, mw.Log, mw.Error))
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("DTC Reader", dtcreader.New(getFW, getECU, mw.getAdapter, mw.Log, mw.Error), theme.InfoIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.Size{Width: 600, Height: 400})
 }
@@ -426,8 +416,7 @@ func (mw *MainWindow) openJ1979() {
 		return mw.settings.GetAdapter("T7")
 	}
 	j := j1979diag.New(getAdapter, mw.Log, mw.Error)
-	inner := multiwindow.NewInnerWindow("J1979", j)
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("J1979", j, theme.InfoIcon())
 	inner.OnClose = j.Close
 	mw.wm.Add(inner)
 	inner.Resize(fyne.Size{Width: 700, Height: 500})
@@ -439,8 +428,7 @@ func (mw *MainWindow) openEditParameters() {
 		return
 	}
 	param := editparameters.NewEditParameters(mw.getAdapter, mw.Error, mw.Log)
-	inner := multiwindow.NewInnerWindow("Edit Parameters", param)
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("Edit Parameters", param, theme.InfoIcon())
 	mw.wm.Add(inner)
 }
 
@@ -449,8 +437,7 @@ func (mw *MainWindow) openRegisterEU0D() {
 		mw.wm.Raise(w)
 		return
 	}
-	inner := multiwindow.NewInnerWindow("Register EU0D", NewMyrtilosRegistration(mw))
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("Register EU0D", NewMyrtilosRegistration(mw), theme.InfoIcon())
 	mw.wm.Add(inner)
 }
 
@@ -465,8 +452,7 @@ func (mw *MainWindow) openESPCalibration() {
 		return
 	}
 	esp := t7esp.New(mw.filename, t)
-	inner := multiwindow.NewInnerWindow("ESP Calibration selection", esp)
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("ESP Calibration selection", esp, theme.InfoIcon())
 	inner.DisableResize = true
 	mw.wm.Add(inner)
 }
@@ -483,8 +469,7 @@ func (mw *MainWindow) openPIAreaEditor() {
 		mw.Error(errors.New("not a T7 file"))
 		return
 	}
-	inner := multiwindow.NewInnerWindow("PI area editor", t7piarea.New(mw.filename, t))
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("PI area editor", t7piarea.New(mw.filename, t), theme.InfoIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.Size{Width: 700, Height: 500})
 }
@@ -501,8 +486,7 @@ func (mw *MainWindow) openNVDMEditor() {
 		mw.Error(errors.New("not a T8 file"))
 		return
 	}
-	inner := multiwindow.NewInnerWindow("NVDM editor", t8nvdm.New(mw.filename, t))
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("NVDM editor", t8nvdm.New(mw.filename, t), theme.InfoIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.Size{Width: 600, Height: 600})
 }
@@ -583,8 +567,7 @@ func (mw *MainWindow) openHexEditor() {
 		OnSave:   onSave,
 		SymbolAt: symAt,
 	})
-	inner := multiwindow.NewInnerWindow("Hex editor", he)
-	inner.Icon = theme.DocumentIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("Hex editor", he, theme.DocumentIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(760, 620))
 }
@@ -640,8 +623,7 @@ func (mw *MainWindow) openPgmMod() {
 	}
 
 	pgm.Set(symZ.Bytes())
-	mapWindow := multiwindow.NewInnerWindow("Pgm_mod!", pgm)
-	mapWindow.Icon = theme.GridIcon()
+	mapWindow := multiwindow.NewInnerWindowWithIcon("Pgm_mod!", pgm, theme.GridIcon())
 	mw.wm.Add(mapWindow)
 }
 
@@ -651,8 +633,7 @@ func (mw *MainWindow) openPgmStatus() {
 	}
 	pgs := pgmstatus.New()
 	cancel := ebus.SubscribeFunc("Pgm_status", pgs.Set)
-	iw := multiwindow.NewInnerWindow("Pgm_status", pgs)
-	iw.Icon = theme.InfoIcon()
+	iw := multiwindow.NewInnerWindowWithIcon("Pgm_status", pgs, theme.InfoIcon())
 	iw.OnClose = func() {
 		if cancel != nil {
 			cancel()
@@ -1044,8 +1025,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string, 
 		return
 	}
 
-	mapWindow := multiwindow.NewInnerWindow(axis.Z+" - "+axis.ZDescription, mv)
-	mapWindow.Icon = theme.GridIcon()
+	mapWindow := multiwindow.NewInnerWindowWithIcon(axis.Z+" - "+axis.ZDescription, mv, theme.GridIcon())
 
 	cfg.OnMouseDown = func() {
 		mw.wm.Raise(mapWindow)
@@ -1112,8 +1092,7 @@ func (mw *MainWindow) openMultiMap(typ symbol.ECUType, title string, data string
 		return
 	}
 
-	mapWindow := multiwindow.NewInnerWindow(title, grid)
-	mapWindow.Icon = theme.GridIcon()
+	mapWindow := multiwindow.NewInnerWindowWithIcon(title, grid, theme.GridIcon())
 
 	for _, cfg := range cfgs {
 		cfg.OnMouseDown = func() {
@@ -1293,8 +1272,7 @@ func (mw *MainWindow) openBoostTuner() {
 		MeshRenderer: mw.settings.GetMeshRenderer(),
 		Colorblind:   mw.settings.GetColorBlindMode(),
 	})
-	inner := multiwindow.NewInnerWindow("Boost Auto-Tuner", bt)
-	inner.Icon = theme.GridIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("Boost Auto-Tuner", bt, theme.GridIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(1100, 760))
 }
@@ -1311,8 +1289,7 @@ func (mw *MainWindow) openMatrixBuilder() {
 		mw.wm.Raise(w)
 		return
 	}
-	inner := multiwindow.NewInnerWindow("Matrix builder", matrixbuilder.New(mw.settings.GetMeshRenderer()))
-	inner.Icon = theme.GridIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("Matrix builder", matrixbuilder.New(mw.settings.GetMeshRenderer()), theme.GridIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(1000, 720))
 }
@@ -1386,8 +1363,7 @@ func (mw *MainWindow) openRescaler(typ symbol.ECUType, mapName string) {
 		},
 	}
 
-	inner := multiwindow.NewInnerWindow(winName, rescaler.New(cfg))
-	inner.Icon = theme.GridIcon()
+	inner := multiwindow.NewInnerWindowWithIcon(winName, rescaler.New(cfg), theme.GridIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(900, 720))
 }
