@@ -36,7 +36,7 @@ func (t *CanFlasherWidget) ecuEOL() {
 			return
 		}
 		t.eolForm(bin)
-	}, "Bin file", "bin")
+	}, "Binary file", "bin")
 }
 
 func (t *CanFlasherWidget) eolForm(bin []byte) {

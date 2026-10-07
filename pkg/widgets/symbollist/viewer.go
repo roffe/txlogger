@@ -291,7 +291,7 @@ func (v *Viewer) exportPreset() {
 			v.cfg.Error(err)
 			return
 		}
-	}, "Preset file", "txp")
+	}, "Preset file", "txp", "")
 }
 
 func (v *Viewer) deletePreset() {

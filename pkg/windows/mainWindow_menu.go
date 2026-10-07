@@ -82,7 +82,7 @@ func (mw *MainWindow) setupMenu() {
 				filename := r.URI().Path()
 				mw.LoadLogfileCombined(filename, r, fyne.Position{}, true)
 			}
-			widgets.SelectFile(cb, "logfile", "t5l", "t7l", "t8l", "csv", "bpl")
+			widgets.SelectFile(cb, "Log file", "t5l", "t7l", "t8l", "csv", "bpl")
 		}),
 		fyne.NewMenuItemWithIcon("Open log folder", theme.FolderIcon(), func() {
 			var cmd *exec.Cmd

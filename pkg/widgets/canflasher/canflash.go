@@ -11,16 +11,6 @@ import (
 )
 
 func (t *CanFlasherWidget) ecuFlash(filename string) {
-	/*
-		filename, err := native.OpenFileDialog("Bin file", native.FileFilter{
-			Description: "Bin file",
-			Extensions:  []string{"bin"},
-		})
-		if err != nil {
-			t.log(err.Error())
-			return
-		}
-	*/
 	dev, err := t.adapter()
 	if err != nil {
 		t.log(err.Error())

@@ -1,80 +1,101 @@
 package widgets
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 
-	"github.com/roffe/txlogger/pkg/native"
+	"github.com/roffe/browse"
+	"kernel.org/pub/linux/libs/security/libcap/cap"
 )
 
-func selectFile(desc string, exts ...string) (string, error) {
-	return runChild("open_file", "Open "+desc, desc, exts...)
+// dialogChildEnv is set for a copy of the program started to show one file
+// dialog.
+const dialogChildEnv = "FP"
+
+type dialogRequest struct {
+	Op      string
+	Options browse.Options
 }
 
-func selectFiles(desc string, exts ...string) ([]string, error) {
-	resp, err := runChildResp("open_files", "Open "+desc, desc, exts...)
+type dialogResponse struct {
+	Paths     []string
+	Cancelled bool
+	Err       string
+}
+
+// dialog shows the dialog from a child process that has given up
+// CAP_NET_ADMIN, see RunFileChild.
+func dialog(op string, o browse.Options) ([]string, error) {
+	req, err := json.Marshal(dialogRequest{Op: op, Options: o})
 	if err != nil {
 		return nil, err
+	}
+	child := exec.Command("/proc/self/exe") // re-exec self
+	child.Env = append(os.Environ(), dialogChildEnv+"=1")
+	child.Stdin = bytes.NewReader(req)
+	child.Stderr = os.Stderr
+	out, err := child.Output()
+	if err != nil {
+		return nil, fmt.Errorf("file dialog child: %w", err)
+	}
+	var resp dialogResponse
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return nil, fmt.Errorf("file dialog child: %w", err)
+	}
+	switch {
+	case resp.Cancelled:
+		return nil, browse.ErrCancelled
+	case resp.Err != "":
+		return nil, errors.New(resp.Err)
 	}
 	return resp.Paths, nil
 }
 
-func saveFile(desc string, ext string) (string, error) {
-	return runChild("save_file", "Save "+desc, desc, ext)
+// RunFileChild reports whether this process was started by dialog. If it was,
+// the dialog has been shown and answered on stdout, and the program should
+// exit.
+func RunFileChild() bool {
+	if os.Getenv(dialogChildEnv) != "1" {
+		return false
+	}
+	if err := dropNetAdmin(); err != nil {
+		log.Fatalf("failed to drop NET_ADMIN capability: %v", err)
+	}
+	var req dialogRequest
+	if err := json.NewDecoder(os.Stdin).Decode(&req); err != nil {
+		log.Fatalf("error decoding request: %v", err)
+	}
+	resp := dialogResponse{}
+	var err error
+	if resp.Paths, err = showDialog(req.Op, req.Options); err != nil {
+		resp.Cancelled = errors.Is(err, browse.ErrCancelled)
+		resp.Err = err.Error()
+	}
+	if err := json.NewEncoder(os.Stdout).Encode(resp); err != nil {
+		log.Fatalf("error encoding response: %v", err)
+	}
+	return true
 }
 
-func selectFolder() (string, error) {
-	return runChild("select_folder", "Select folder", "", "")
-}
-
-func runChild(op, title, desc string, exts ...string) (string, error) {
-	resp, err := runChildResp(op, title, desc, exts...)
+// dropNetAdmin removes CAP_NET_ADMIN from the effective, inheritable and
+// permitted sets of the process.
+func dropNetAdmin() error {
+	caps, err := cap.GetPID(0) // 0 = current process
 	if err != nil {
-		return resp.Path, err
+		return fmt.Errorf("get caps: %w", err)
 	}
-	return resp.Path, nil
-}
-
-func runChildResp(op, title, desc string, exts ...string) (native.FileResponse, error) {
-	child := exec.Command("/proc/self/exe") // re-exec self
-	child.Env = append(os.Environ(), "FP=1")
-	childIn, _ := child.StdinPipe()
-	childOut, _ := child.StdoutPipe()
-	child.Stderr = os.Stderr
-	defer childIn.Close()
-
-	if err := child.Start(); err != nil {
-		return native.FileResponse{}, fmt.Errorf("failed to start child: %w\n", err)
+	for _, flag := range []cap.Flag{cap.Effective, cap.Inheritable, cap.Permitted} {
+		if err := caps.SetFlag(flag, false, cap.NET_ADMIN); err != nil {
+			return fmt.Errorf("drop cap: %w", err)
+		}
 	}
-
-	enc := json.NewEncoder(childIn)
-	dec := json.NewDecoder(childOut)
-
-	req := native.FileRequest{
-		Op:    op,
-		Title: title,
-		Desc:  desc,
-		Exts:  exts,
+	if err := caps.SetProc(); err != nil {
+		return fmt.Errorf("set caps: %w", err)
 	}
-	if err := enc.Encode(req); err != nil {
-		return native.FileResponse{}, fmt.Errorf("error decoding response: %w", err)
-	}
-
-	var resp native.FileResponse
-	decodeErr := dec.Decode(&resp)
-
-	waitErr := child.Wait()
-
-	if decodeErr != nil {
-		return native.FileResponse{}, decodeErr
-	}
-
-	if resp.Err != "" {
-		return resp, errors.New(resp.Err)
-	}
-
-	return resp, waitErr
+	return nil
 }

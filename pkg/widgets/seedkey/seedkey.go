@@ -185,7 +185,7 @@ func New() fyne.CanvasObject {
 				return
 			}
 			info.SetText(fmt.Sprintf("Saved with XOR 0x%04X, SUB 0x%04X (%s) → %s", xor, sub, MethodName(xor, sub), dst))
-		}, "T7 binary", "bin")
+		}, "T7 binary", "bin", "")
 	})
 
 	form := container.New(layout.NewFormLayout(),

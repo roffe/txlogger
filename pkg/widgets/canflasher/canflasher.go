@@ -151,7 +151,7 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	t.dumpBTN = widget.NewButton("Dump", func() {
 		widgets.SaveFile(func(filename string) {
 			t.ecuDump(filename)
-		}, "Bin file", "bin")
+		}, "Binary file", "bin", "")
 	})
 	// t.sramBTN = widget.NewButton("Dump SRAM", nil) //t.dumpSRAM)
 	t.flashBTN = widget.NewButton("Flash", func() {
@@ -162,14 +162,14 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 				}
 				widgets.SelectFile(func(r fyne.URIReadCloser) {
 					t.ecuFlash(r.URI().Path())
-				}, "Bin file", "bin")
+				}, "Binary file", "bin")
 			}, fyne.CurrentApp().Driver().AllWindows()[0])
 			return
 		}
 
 		widgets.SelectFile(func(r fyne.URIReadCloser) {
 			t.ecuFlash(r.URI().Path())
-		}, "Bin file", "bin")
+		}, "Binary file", "bin")
 	})
 	// EOL programming: the full factory sequence (T7 only). Unlike Flash it also
 	// writes VIN/date/tester serial and runs end-of-procedure, which verifies the
@@ -195,7 +195,7 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	t.recoveryBTN = widget.NewButton("Recovery", func() {
 		widgets.SelectFile(func(r fyne.URIReadCloser) {
 			t.ecuRecover(r.URI().Path())
-		}, "Bin file", "bin")
+		}, "Binary file", "bin")
 	})
 
 	t.resetBTN = widget.NewButton("Reset ECU", func() {

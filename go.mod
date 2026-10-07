@@ -4,6 +4,8 @@ go 1.27.1
 
 replace github.com/roffe/gocan/v2 => ../gocan
 
+replace github.com/roffe/browse => ../browse
+
 //replace github.com/roffe/ecusymbol => ../ecusymbol
 replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20261007215003-cc6bf888ecea
 
@@ -19,8 +21,8 @@ require (
 	github.com/ebitengine/oto/v3 v3.4.0
 	github.com/go-gl/gl v0.0.0-20260331235117-4566fea9a276
 	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.2
-	github.com/godbus/dbus/v5 v5.2.2
 	github.com/hajimehoshi/go-mp3 v0.3.4
+	github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974
 	github.com/roffe/ecusymbol v1.2.6-0.20260924192406-eb1f987c0234
 	github.com/roffe/gocan/v2 v2.1.1-0.20261007204440-c6c3b275db73
 	github.com/stretchr/testify v1.11.1
@@ -29,7 +31,7 @@ require (
 	golang.org/x/image v0.40.0
 	golang.org/x/mod v0.36.0
 	golang.org/x/sync v0.20.0
-	golang.org/x/sys v0.46.0
+	golang.org/x/sys v0.48.0
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.78
 )
 
@@ -48,6 +50,7 @@ require (
 	github.com/fyne-io/oksvg v0.2.1-0.20260918172519-a9af55fa95d9 // indirect
 	github.com/go-text/render v0.2.1 // indirect
 	github.com/go-text/typesetting v0.3.5 // indirect
+	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/gotmc/libusb/v2 v2.6.0 // indirect
 	github.com/hack-pad/go-indexeddb v0.3.2 // indirect

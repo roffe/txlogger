@@ -24,6 +24,7 @@ import (
 	"github.com/roffe/txlogger/pkg/ipc"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/theme"
+	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/windows"
 )
 
@@ -55,8 +56,7 @@ func signalHandler(mw *windows.MainWindow) {
 }
 
 func main() {
-	if os.Getenv("FP") == "1" {
-		runFileChild()
+	if widgets.RunFileChild() {
 		return
 	}
 

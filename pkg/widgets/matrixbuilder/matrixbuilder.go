@@ -1245,7 +1245,7 @@ func (mb *MatrixBuilder) openLogDialog() {
 				}
 			})
 		}()
-	}, "logfile", "t5l", "t7l", "t8l", "csv", "bpl")
+	}, "Log file", "t5l", "t7l", "t8l", "csv", "bpl")
 }
 
 // parseLog reads a single log file into a row-aligned series map, padding gaps

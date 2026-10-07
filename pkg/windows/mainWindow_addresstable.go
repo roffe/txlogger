@@ -54,7 +54,7 @@ func (mw *MainWindow) importAddressTable() {
 			if err := mw.LoadSymbolsFromFile(filename); err != nil {
 				mw.Error(err)
 			}
-		}, "Binary file", "bin")
+		}, "Binary file", "bin", "")
 	}, "Donor binary (same software)", "bin")
 }
 
