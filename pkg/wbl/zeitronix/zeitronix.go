@@ -175,30 +175,32 @@ func (z *Zeitronix) serialHandler(ctx context.Context) {
 			continue
 		}
 		for _, b := range buff[:n] {
-			switch step {
-			case 0, 1, 2:
-				if b == byte(step) {
-					cmd[step] = b
-					step++
-					continue
-				}
-				step = 0
-				continue
-			case 3, 4, 5, 6, 7, 8, 9, 10, 11, 12:
-				cmd[step] = b
-				step++
-				continue
-			case 13:
-				cmd[13] = b
-				// Got full packet parse it
-				z.SetData(cmd)
-				step = 0
-				continue
-			default:
-				step = 0
-			}
+			step = z.feed(cmd, step, b)
 		}
+	}
+}
 
+// feed adds one byte to the packet being assembled in cmd and returns the
+// next step; a complete packet is passed to SetData.
+func (z *Zeitronix) feed(cmd []byte, step int, b byte) int {
+	switch {
+	case step <= 2:
+		if b == byte(step) {
+			cmd[step] = b
+			return step + 1
+		}
+		if b == 0 { // the byte that broke the header may start the next one
+			cmd[0] = 0
+			return 1
+		}
+		return 0
+	case step < 13:
+		cmd[step] = b
+		return step + 1
+	default:
+		cmd[13] = b
+		z.SetData(cmd)
+		return 0
 	}
 }
 
@@ -209,7 +211,9 @@ func (z *Zeitronix) SetData(data []byte) error {
 	if data[0] != 0 || data[1] != 1 || data[2] != 2 {
 		return errors.New("invalid data format")
 	}
-	z.lambdaValue = float64(data[3]) * 0.01
+	z.mu.Lock()
+	defer z.mu.Unlock()
+	z.lambdaValue = float64(data[3]) / 147 // gasoline AFR x10, 147 = λ 1.00
 	z.egtValue = uint16(data[4]) | (uint16(data[5]) << 8)
 	z.rpmValue = uint16(data[6]) | (uint16(data[7]) << 8)
 	z.mapValue = uint16(data[8]) | (uint16(data[9]) << 8)
@@ -228,9 +232,13 @@ func (z *Zeitronix) Stop() {
 }
 
 func (z *Zeitronix) GetLambda() float64 {
+	z.mu.Lock()
+	defer z.mu.Unlock()
 	return z.lambdaValue
 }
 
 func (z *Zeitronix) String() string {
+	z.mu.Lock()
+	defer z.mu.Unlock()
 	return fmt.Sprintf("Lambda: %.3f, EGT: %d, RPM: %d, MAP: %d", z.lambdaValue, z.egtValue, z.rpmValue, z.mapValue)
 }
