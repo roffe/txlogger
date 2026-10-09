@@ -16,12 +16,21 @@ const ProductString = "Stag AFR"
 // serial port drops (a common occurrence on Windows).
 const reconnectDelay = time.Second
 
+// replyTimeout is how long session() waits for a valid frame before it
+// restarts the handshake. The STAG only answers requests, and every request
+// is sent in reaction to a reply, so one lost reply stalls both sides.
+const replyTimeout = time.Second
+
+// initRequest starts the handshake; the STAG answers with a 0x80 frame.
+var initRequest = []byte{0xAC, 0x00, 0x00, 0x04, 0x00, 0x00, 0x32, 0xE2}
+
 type STAG struct {
 	port string
 	sp   serial.Port
 
 	lambda float64
 	oxygen float64
+	status byte // last reported sensor status, logged on change
 
 	log func(string)
 
@@ -33,9 +42,10 @@ type STAG struct {
 
 func NewSTAGClient(port string, logFunc func(string)) (*STAG, error) {
 	return &STAG{
-		port: port,
-		done: make(chan struct{}),
-		log:  logFunc,
+		port:   port,
+		done:   make(chan struct{}),
+		log:    logFunc,
+		status: 0xFF, // unknown, so the first status gets logged
 	}, nil
 }
 
@@ -157,17 +167,18 @@ func (a *STAG) session(ctx context.Context, sp serial.Port) {
 	sessionCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	packetContentBuffer := make([]byte, 0, 64)
+	var p parser
 	buf := make([]byte, 8)
-	packetStarted := false
-	byteCounter := 0
-	packetSize := 0
+	stalled := false
+
+	watchdog := time.NewTimer(replyTimeout)
+	defer watchdog.Stop()
 
 	// Create a channel to receive bytes
 	byteChan := make(chan byte, 100)
 	errChan := make(chan error, 1)
 
-	a.sendRequest([]byte{0xAC, 0x00, 0x00, 0x04, 0x00, 0x00, 0x32, 0xE2})
+	a.sendRequest(initRequest)
 	// Start a goroutine to read bytes
 	go func() {
 		for {
@@ -206,25 +217,53 @@ func (a *STAG) session(ctx context.Context, sp serial.Port) {
 			a.log(err.Error())
 			// Port dropped; let run() handle reconnection.
 			return
-		case aByte := <-byteChan:
-			if !packetStarted && aByte == 0x32 {
-				packetContentBuffer = packetContentBuffer[:0] // Clear buffer
-				packetContentBuffer = append(packetContentBuffer, aByte)
-				packetStarted = true
-				byteCounter = 1
-			} else {
-				packetContentBuffer = append(packetContentBuffer, aByte)
-				byteCounter++
-				if byteCounter == 4 {
-					packetSize = int(aByte) + 4
-				}
-				if packetSize == byteCounter {
-					packetStarted = false
-					a.processPacket(packetContentBuffer)
-				}
+		case <-watchdog.C:
+			if !stalled {
+				a.log("Stag: no reply, restarting handshake")
+				stalled = true
+			}
+			p = parser{}
+			a.sendRequest(initRequest)
+			watchdog.Reset(replyTimeout)
+		case b := <-byteChan:
+			if frame := p.feed(b); frame != nil {
+				stalled = false
+				watchdog.Reset(replyTimeout)
+				a.processPacket(frame)
 			}
 		}
 	}
+}
+
+// parser assembles frames: 0x32, two bytes, a length byte, that many bytes and
+// a checksum that is the sum of all earlier bytes.
+type parser struct {
+	frame []byte
+	size  int
+}
+
+// feed adds b and returns a complete frame with a valid checksum, or nil.
+func (p *parser) feed(b byte) []byte {
+	if len(p.frame) == 0 && b != 0x32 {
+		return nil // junk before the start byte
+	}
+	p.frame = append(p.frame, b)
+	if len(p.frame) == 4 {
+		p.size = int(b) + 4
+	}
+	if len(p.frame) < 4 || len(p.frame) < p.size {
+		return nil
+	}
+	frame := p.frame
+	p.frame = nil
+	var sum byte
+	for _, c := range frame[:len(frame)-1] {
+		sum += c
+	}
+	if sum != frame[len(frame)-1] {
+		return nil
+	}
+	return frame
 }
 
 func (a *STAG) Stop() {
@@ -251,7 +290,9 @@ func (a *STAG) processPacket(packetContentBuffer []byte) {
 	case 0xF0:
 		a.sendRequest([]byte{0x32, 0x00, 0x00, 0x03, 0x64, 0x00, 0x99})
 	case 0xE4:
-		a.SetData(packetContentBuffer)
+		if err := a.SetData(packetContentBuffer); err != nil {
+			a.log(err.Error())
+		}
 		a.sendRequest([]byte{0x32, 0x00, 0x00, 0x03, 0x64, 0x00, 0x99})
 	default:
 		// Not handled
@@ -266,25 +307,34 @@ func (a *STAG) sendRequest(data []byte) {
 }
 
 func (a *STAG) SetData(data []byte) error {
+	if len(data) < 18 {
+		return fmt.Errorf("stag: data frame too short: %d bytes", len(data))
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	switch data[6] {
-	case 0x00:
-		a.log("status_sleep")
-	case 0x01:
-		a.log("status_warming")
-	case 0x02:
-		// status_work
+	if data[6] != a.status {
+		a.status = data[6]
+		switch a.status {
+		case 0x00:
+			a.log("Stag: status_sleep")
+		case 0x01:
+			a.log("Stag: status_warming")
+		case 0x02:
+			a.log("Stag: status_work")
+		case 0x03:
+			a.log("Stag: status_breakdown")
+		}
+	}
+	if a.status == 0x02 {
 		a.lambda = float64(uint32(data[12])<<24|uint32(data[13])<<16|uint32(data[14])<<8|uint32(data[15])) * 0.001
 		a.oxygen = float64((uint16(data[16])<<8)|uint16(data[17])) * 0.1
-	case 0x03:
-		a.log("status_breakdown")
-	default:
 	}
 	return nil
 }
 
 func (a *STAG) String() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	return fmt.Sprintf("Lambda: %.4f, Oxygen: %.3f", a.lambda, a.oxygen)
 }
