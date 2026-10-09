@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"log"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -288,38 +288,35 @@ func (c *ISP2Client) processBytes(data []byte) {
 	// Try to find the header and process data
 	for len(c.syncBuffer) >= 2 {
 		headerWord := binary.BigEndian.Uint16(c.syncBuffer)
-		if headerWord&ISP2_HEADER_BITS == ISP2_HEADER_BITS {
-			// Found a valid header
-			if len(c.syncBuffer) < 6 {
-				// Not enough data to process a complete message, wait for more
-				return
-			}
-
-			c.wordLength = c.syncBuffer[0]&0x01<<7 | c.syncBuffer[1]&0x7F
-			if c.wordLength > 10 {
-				log.Println("Invalid word length:", c.wordLength)
-				// Invalid word length, remove the first byte and continue searching
-				c.syncBuffer = c.syncBuffer[1:]
-				continue
-			}
-			// log.Println("Word length:", c.wordLength)
-			totalLength := int(c.wordLength*2) + 2 // +2 for the header word
-
-			if len(c.syncBuffer) < totalLength {
-				// Not enough data for the complete message, wait for more
-				return
-			}
-
-			// Process the complete message
-			c.processMessage(c.syncBuffer[:totalLength])
-
-			// Remove the processed message from the buffer
-			c.syncBuffer = c.syncBuffer[totalLength:]
-			c.wordIndex = 0
-		} else {
+		if headerWord&ISP2_HEADER_BITS != ISP2_HEADER_BITS {
 			// Invalid header, remove the first byte and continue searching
 			c.syncBuffer = c.syncBuffer[1:]
+			continue
 		}
+
+		// Up to 255 words: a chained MTS bus appends every device's words
+		c.wordLength = c.syncBuffer[0]&0x01<<7 | c.syncBuffer[1]&0x7F
+		totalLength := int(c.wordLength)*2 + 2 // +2 for the header word
+
+		// Only header bytes have bit 7 set, so one inside the body means bytes
+		// were lost: resync on it instead of swallowing the next packet
+		body := c.syncBuffer[2:min(len(c.syncBuffer), totalLength)]
+		if i := slices.IndexFunc(body, func(b byte) bool { return b&0x80 != 0 }); i >= 0 {
+			c.syncBuffer = c.syncBuffer[2+i:]
+			continue
+		}
+
+		if len(c.syncBuffer) < totalLength {
+			// Not enough data for the complete message, wait for more
+			return
+		}
+
+		// Process the complete message
+		c.processMessage(c.syncBuffer[:totalLength])
+
+		// Remove the processed message from the buffer
+		c.syncBuffer = c.syncBuffer[totalLength:]
+		c.wordIndex = 0
 	}
 }
 
