@@ -37,10 +37,10 @@ var ErrDataTooShort = errors.New("data is too short to decode, expected at least
 var CANIDs = []uint32{0x664, 0x665}
 
 type LambdaToCAN struct {
-	c       *gocan.Bus
-	st      LambdaToCANStatus
-	running bool
-	mu      sync.Mutex
+	c      *gocan.Bus
+	st     LambdaToCANStatus
+	cancel context.CancelFunc
+	mu     sync.Mutex
 }
 
 func NewLambdaToCAN(c *gocan.Bus) *LambdaToCAN {
@@ -48,10 +48,10 @@ func NewLambdaToCAN(c *gocan.Bus) *LambdaToCAN {
 }
 
 func (l *LambdaToCAN) Start(ctx context.Context) error {
-	l.running = true
+	ctx, l.cancel = context.WithCancel(ctx)
 	ch := l.c.Subscribe(ctx, CANIDs...)
 	go func() {
-		for l.running {
+		for {
 			select {
 			case msg, ok := <-ch:
 				if !ok {
@@ -69,8 +69,11 @@ func (l *LambdaToCAN) Start(ctx context.Context) error {
 	return nil
 }
 
+// Stop ends the reader and releases its bus subscription.
 func (l *LambdaToCAN) Stop() {
-	l.running = false
+	if l.cancel != nil {
+		l.cancel()
+	}
 }
 
 func (l *LambdaToCAN) Status() LambdaToCANStatus {

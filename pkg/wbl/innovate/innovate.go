@@ -299,10 +299,11 @@ func (c *ISP2Client) processBytes(data []byte) {
 		totalLength := int(c.wordLength)*2 + 2 // +2 for the header word
 
 		// Only header bytes have bit 7 set, so one inside the body means bytes
-		// were lost: resync on it instead of swallowing the next packet
+		// were lost: drop a byte and search again instead of swallowing the
+		// next packet, whose header may start at the second byte
 		body := c.syncBuffer[2:min(len(c.syncBuffer), totalLength)]
-		if i := slices.IndexFunc(body, func(b byte) bool { return b&0x80 != 0 }); i >= 0 {
-			c.syncBuffer = c.syncBuffer[2+i:]
+		if slices.ContainsFunc(body, func(b byte) bool { return b&0x80 != 0 }) {
+			c.syncBuffer = c.syncBuffer[1:]
 			continue
 		}
 

@@ -121,7 +121,9 @@ func newInnovate(ctx context.Context, cl *gocan.Bus, cfg *WBLConfig) (LambdaProv
 			return nil, err
 		}
 	}
-	wblClient.Start(ctx)
+	if err := wblClient.Start(ctx); err != nil {
+		return nil, err
+	}
 	if cfg.Txbridge {
 		go func() {
 			defer cfg.Log("wbl channel closed")

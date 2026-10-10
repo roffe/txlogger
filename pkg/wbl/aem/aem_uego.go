@@ -292,7 +292,7 @@ func (a *AEMuego) SetData(data []byte) error {
 	binary.Read(r, binary.BigEndian, &wbl)
 	a.lamba = float64(wbl) * 0.0001
 
-	var oxygen uint16
+	var oxygen int16
 	binary.Read(r, binary.BigEndian, &oxygen)
 	a.oxygen = float64(oxygen) * 0.001
 

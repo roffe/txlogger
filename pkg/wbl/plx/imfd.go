@@ -3,7 +3,6 @@ package plx
 import (
 	"context"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -238,6 +237,41 @@ var DefaultIMFDClientConfig = &IMFDClientConfig{
 	VehicleSpeed: 1,
 }
 
+// unit returns the configured unit for a sensor, 0 for sensors without a
+// unit choice.
+func (c *IMFDClientConfig) unit(st sensorType) uint16 {
+	var u int
+	switch st {
+	case WidebandAirFuel:
+		u = c.WidebandAirFuel
+	case ExhaustGasTemperature:
+		u = c.ExhaustGasTemperature
+	case FluidTemperature:
+		u = c.FluidTemperature
+	case Vacuum:
+		u = c.Vacuum
+	case Boost:
+		u = c.Boost
+	case AirIntakeTemperature:
+		u = c.AirIntakeTemperature
+	case VehicleSpeed:
+		u = c.VehicleSpeed
+	case FuelPressure:
+		u = c.FuelPressure
+	case MAP:
+		u = c.MAP
+	case MAF:
+		u = c.MAF
+	case NarrowbandOxygenSensor:
+		u = c.NarrowbandOxygenSensor
+	case DutyCycle:
+		u = c.DutyCycle
+	case FuelEfficiency:
+		u = c.FuelEfficiency
+	}
+	return uint16(u)
+}
+
 func NewIMFDClient(port string, cfg *IMFDClientConfig, logFunc func(string)) (*IMFDClient, error) {
 	if cfg == nil {
 		cfg = DefaultIMFDClientConfig
@@ -300,17 +334,19 @@ func (s *IMFDClient) Start(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
 				return
+			case <-s.closed:
+				return
 			default:
 				n, err := p.Read(buf)
 				if err != nil {
-					log.Println(err)
+					s.logFunc(err.Error())
 					return
 				}
 				if n == 0 {
 					continue
 				}
 				if err := s.Parse(buf[:n]); err != nil {
-					log.Println(err)
+					s.logFunc(err.Error())
 				}
 			}
 		}
@@ -392,7 +428,7 @@ func (s *IMFDClient) parsePacket(packet []byte) error {
 	address := uint16(addrMSB)<<6 | uint16(addrLSB)
 	data := uint16(dataMSB)<<6 | uint16(dataLSB)
 	st := sensorType(address)
-	value, _ := convertData(st, 0, data)
+	value, _ := convertData(st, s.cfg.unit(st), data)
 	key := createMapkey(st, instance)
 	s.values[key] = value
 	return nil
