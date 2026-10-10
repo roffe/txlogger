@@ -20,7 +20,7 @@ require (
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/roffe/bdmtool v0.0.0-20261004110333-9774d0fcc770
 	github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974
-	github.com/roffe/ecusymbol v1.2.6-0.20260924192406-eb1f987c0234
+	github.com/roffe/ecusymbol v1.2.6-0.20261010153340-04c0b9f977ec
 	github.com/roffe/gocan/v2 v2.1.1-0.20261007204440-c6c3b275db73
 	github.com/stretchr/testify v1.11.1
 	github.com/yuin/gopher-lua v1.1.2

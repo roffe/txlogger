@@ -13,7 +13,9 @@ import (
 	"github.com/roffe/txlogger/pkg/ecu/t8util"
 )
 
-var T8MagicBytes = []byte{0x00, 0x10, 0x0C, 0x00}
+// T8ResetVector is the second longword of every T8 image; the first (the
+// initial stack pointer) is not the same in every dump.
+var T8ResetVector = []byte{0x00, 0x00, 0x04, 0x8C}
 
 type T8File struct {
 	filePath string
@@ -118,7 +120,7 @@ func isValidT8Bin(data []byte) bool {
 		return false
 	}
 
-	return bytes.HasPrefix(data, T8MagicBytes)
+	return bytes.Equal(data[4:8], T8ResetVector)
 }
 
 func (tf *T8File) ShowEditT8Dialog(win fyne.Window) {

@@ -84,8 +84,8 @@ github.com/roffe/bdmtool v0.0.0-20261004110333-9774d0fcc770 h1:Jr/lXlo69IO8wOohg
 github.com/roffe/bdmtool v0.0.0-20261004110333-9774d0fcc770/go.mod h1:e6D/NUlzEO/nDgcj7CzBz+J08za8oYCRP1i3RgtD/t8=
 github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974 h1:0sTHqcaQMYaRote/EYtlRXixwaCrR7nUkFQqEAioX5A=
 github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974/go.mod h1:qJAMUtwoSym/Ybjw8xt/iwCm19aAGiJtmSILHm6QHmY=
-github.com/roffe/ecusymbol v1.2.6-0.20260924192406-eb1f987c0234 h1:KhSLtnXXj3EBzxv65Xt/sqBndOkZgJ/mlkWNSbcSwyE=
-github.com/roffe/ecusymbol v1.2.6-0.20260924192406-eb1f987c0234/go.mod h1:Y6vMPbT3P6nVXfUetMZBJKc6N4jPuzpNJfk8bHAfx5Q=
+github.com/roffe/ecusymbol v1.2.6-0.20261010153340-04c0b9f977ec h1:lUaOf1hRjWYGwCOPewusmsLy9GtB8QIpWB5v1VRRPTo=
+github.com/roffe/ecusymbol v1.2.6-0.20261010153340-04c0b9f977ec/go.mod h1:Y6vMPbT3P6nVXfUetMZBJKc6N4jPuzpNJfk8bHAfx5Q=
 github.com/roffe/fyne/v2 v2.0.0-20261007215003-cc6bf888ecea h1:DI+Rf6uLYWCZTlGljlExZrKFnZ8gIkajkqbpFavz5AQ=
 github.com/roffe/fyne/v2 v2.0.0-20261007215003-cc6bf888ecea/go.mod h1:eXHJ/D9Y58UcDw7SkguadCRI64M4flXyjoMn827Q5SI=
 github.com/roffe/gocan/v2 v2.1.1-0.20261007204440-c6c3b275db73 h1:0m25hcIdTPQO2LRxwEWeUWrihJ4v81jmAIQLDylTh2I=
