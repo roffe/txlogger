@@ -25,12 +25,15 @@ func CreateIPCRouter(mw *windows.MainWindow) Router {
 		"open": func(filename string) *Message {
 			fyne.DoAndWait(mw.Window.RequestFocus)
 			if strings.HasSuffix(filename, ".bin") {
-				mw.LoadSymbolsFromFile(filename)
+				if err := mw.LoadSymbolsFromFile(filename); err != nil {
+					mw.Error(err)
+				}
 			}
 			if isLogfile(filename) {
 				f, err := os.Open(filename)
 				if err != nil {
 					mw.Error(err)
+					return nil
 				}
 				defer f.Close()
 				sz := mw.Canvas().Size()

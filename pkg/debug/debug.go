@@ -18,7 +18,7 @@ var (
 func start() {
 	dir, err := os.UserHomeDir()
 	if err != nil {
-		log.Println("error getting user home dir: %w", err)
+		log.Printf("error getting user home dir: %v", err)
 	} else {
 		dir = filepath.Join(dir, "txlogger")
 	}

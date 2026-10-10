@@ -119,6 +119,12 @@ func (srs *Srec) Parse(fileReader io.Reader) error {
 
 	for scanner.Scan() {
 		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+		if len(line) < TypeLen*2+LengthLen*2 {
+			return fmt.Errorf("%q is too short for an S record", line)
+		}
 
 		srectype := line[:2]
 		switch srectype {
@@ -148,6 +154,9 @@ func (rec *Record) getRecordFields(line string) error {
 	dataLen, err := strconv.ParseUint(line[2:4], 16, 32)
 	if err != nil {
 		return err
+	}
+	if int(dataLen) < addrLen+CSumLen || len(line) < (TypeLen+LengthLen+int(dataLen))*2 {
+		return fmt.Errorf("%s: record does not match its length field %d", line, dataLen)
 	}
 	// address
 	// Since there is no address part in S5, leave the initial value at 0 (since null character does not become 0 in ParseUint)
@@ -189,21 +198,19 @@ func (rec *Record) getRecordFields(line string) error {
 // Since the end address of the S record is (address of the last record + data length -1), 1 is subtracted
 // Please be aware that processing costs are high as it traverses the entire object
 func (srs *Srec) EndAddr() uint32 {
-	if len(srs.Records) == 0 {
-		return 0
-	}
-	max := uint32(0x00000000)
-	dLen := uint32(0)
+	var last *Record
 	for _, r := range srs.Records {
 		switch r.Srectype {
 		case "S1", "S2", "S3":
-			if r.Address > max {
-				max = r.Address
-				dLen = uint32(len(r.Data))
+			if last == nil || r.Address > last.Address {
+				last = r
 			}
 		}
 	}
-	return max + dLen - 1
+	if last == nil {
+		return 0
+	}
+	return last.EndAddress()
 }
 
 // MakeRec creates and returns a new Record object from the argument information
@@ -228,6 +235,9 @@ func MakeRec(srectype string, addr uint32, data []byte) (*Record, error) {
 	if err != nil {
 		return nil, err
 	}
+	if l+len(data)+CSumLen > 0xFF {
+		return nil, fmt.Errorf("%d data bytes do not fit in an %s record", len(data), r.Srectype)
+	}
 	r.Length = uint8(l) + uint8(len(data)) + CSumLen
 	r.Checksum, err = calcChecksum(r.Srectype, r.Length, r.Address, r.Data)
 	if err != nil {
@@ -250,6 +260,11 @@ func scanLinesCustom(data []byte, atEOF bool) (advance int, token []byte, err er
 		// if CRLF
 		if j < len(data)-1 && isLF(data[j+1]) {
 			return j + 2, data[0:j], nil
+		}
+		// a CR ending the buffer may be followed by the LF of a CRLF;
+		// request more data
+		if j == len(data)-1 && !atEOF {
+			return 0, nil, nil
 		}
 		// if CR
 		return j + 1, data[0:j], nil

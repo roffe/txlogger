@@ -72,6 +72,9 @@ func (p *HPortion) MinSize(objects []fyne.CanvasObject) fyne.Size {
 	}
 
 	totalPadding := float32(len(objects)-1) * theme.Padding()
+	if maxIndex < 0 {
+		return fyne.NewSize(totalPadding, height)
+	}
 	return fyne.NewSize(maxMinWidth/float32(p.Portions[maxIndex]/sum)+totalPadding, height)
 }
 
@@ -103,7 +106,7 @@ func (p *VPortion) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	}
 
 	padding := theme.Padding()
-	height := size.Width - padding*float32(len(objects)-1)
+	height := size.Height - padding*float32(len(objects)-1)
 	ypos := float32(0)
 
 	for i, child := range objects {
@@ -147,6 +150,9 @@ func (p *VPortion) MinSize(objects []fyne.CanvasObject) fyne.Size {
 	}
 
 	totalPadding := float32(len(objects)-1) * theme.Padding()
+	if maxIndex < 0 {
+		return fyne.NewSize(width, totalPadding)
+	}
 	return fyne.NewSize(width, maxMinHeight/float32(p.Portions[maxIndex]/sum)+totalPadding)
 }
 

@@ -357,7 +357,10 @@ func (c *Client) uploadMultipart(partName string, src io.Reader) error {
 	defer cancel()
 	req = req.WithContext(ctx)
 
-	resp, err := c.client.Do(req)
+	// The context bounds the upload; the client's short API timeout would cut it off.
+	hc := *c.client
+	hc.Timeout = 0
+	resp, err := hc.Do(req)
 	if err != nil {
 		return fmt.Errorf("post: %w", err)
 	}
@@ -366,5 +369,8 @@ func (c *Client) uploadMultipart(partName string, src io.Reader) error {
 	log.Printf("server responded: %s\n", resp.Status)
 	body, _ := io.ReadAll(resp.Body)
 	log.Println(string(body))
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return fmt.Errorf("failed to upload file (%d)", resp.StatusCode)
+	}
 	return nil
 }

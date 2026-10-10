@@ -191,6 +191,11 @@ func (c *Client) Models(ctx context.Context) ([]string, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return nil, fmt.Errorf("ollama %s: %s", resp.Status, strings.TrimSpace(string(msg)))
+	}
+
 	var tags struct {
 		Models []struct {
 			Name string `json:"name"`

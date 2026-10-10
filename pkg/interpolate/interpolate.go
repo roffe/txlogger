@@ -22,6 +22,9 @@ func clamp(offset, max int) int {
 
 // Finds the index and fraction of the nearest value in the given array
 func findIndexAndFrac(arr []int, value int) (int, float64) {
+	if value <= arr[0] {
+		return 1, 0.0
+	}
 	idx := len(arr) - 1
 	frac := 0.0
 
@@ -215,12 +218,15 @@ func SetInterpolated2(xAxis, yAxis []int, data []int, xValue, yValue, zValue int
 	// Calculate the differences to apply to the surrounding data points to make the interpolated value match zValue
 	diff := float64(zValue) - ((1.0-yFrac)*((1.0-xFrac)*float64(data[offsets[0]])+xFrac*float64(data[offsets[1]])) + yFrac*((1.0-xFrac)*float64(data[offsets[2]])+xFrac*float64(data[offsets[3]])))
 
-	// Distribute the difference based on the interpolation weights
+	// Distribute the difference based on the interpolation weights, divided
+	// by the sum of the squared weights so the interpolated value moves by
+	// the whole difference
+	norm := ((1.0-xFrac)*(1.0-xFrac) + xFrac*xFrac) * ((1.0-yFrac)*(1.0-yFrac) + yFrac*yFrac)
 	adjValues := [4]int{
-		int(diff * (1.0 - xFrac) * (1.0 - yFrac)),
-		int(diff * xFrac * (1.0 - yFrac)),
-		int(diff * (1.0 - xFrac) * yFrac),
-		int(diff * xFrac * yFrac),
+		int(diff * (1.0 - xFrac) * (1.0 - yFrac) / norm),
+		int(diff * xFrac * (1.0 - yFrac) / norm),
+		int(diff * (1.0 - xFrac) * yFrac / norm),
+		int(diff * xFrac * yFrac / norm),
 	}
 
 	// Update the data array based on the calculated adjustments
@@ -257,12 +263,17 @@ func U16_u16_int2(xAxis, yAxis []uint16, data []int, xValue uint16, yValue uint1
 		yIdx = len(yAxis) - 1
 	}
 
+	// a value on or below the first breakpoint sits on the first row/column
 	var xFrac, yFrac float64
 	if xIdx > 0 {
 		xFrac = float64(xValue-xAxis[xIdx-1]) / float64(xAxis[xIdx]-xAxis[xIdx-1])
+	} else {
+		xIdx = 1
 	}
 	if yIdx > 0 {
 		yFrac = float64(yValue-yAxis[yIdx-1]) / float64(yAxis[yIdx]-yAxis[yIdx-1])
+	} else {
+		yIdx = 1
 	}
 
 	dataLen := len(data)

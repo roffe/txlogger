@@ -13,7 +13,7 @@ import (
 
 func Screenshot(c fyne.Canvas) {
 	cap := c.Capture()
-	filename := fmt.Sprintf("capture-%s.jpg", time.Now().Format("2006-01-02-15-04-05"))
+	filename := fmt.Sprintf("capture-%s.png", time.Now().Format("2006-01-02-15-04-05"))
 	f, err := os.Create(filename)
 	if err != nil {
 		log.Println(err)
