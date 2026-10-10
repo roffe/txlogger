@@ -2,6 +2,7 @@ package windows
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -695,6 +696,11 @@ var canflasherIcon = fyne.NewStaticResource("canflasher.png", assets.CanFlasher)
 // window. openMap wraps one; openMultiMap arranges several in a grid. The
 // returned cancelFuncs must be called when the containing window closes.
 func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap string) (*mapviewer.MapViewer, *mapviewer.Config, symbol.Axis, []func(), error) {
+	if mw.fw.GetByName(mapName) == nil {
+		if alt := mw.profile().SymbolAliases[mapName]; alt != "" && mw.fw.GetByName(alt) != nil {
+			mapName = alt
+		}
+	}
 	var axis symbol.Axis
 	if mw.as2 != nil {
 		axis.Z = mapName
@@ -791,6 +797,14 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 
 	if axis.X == "Pwm_ind_trot!" {
 		xData = xData[:8]
+	}
+
+	// Reg_kon_mat! changed layout: 0x80 bytes is a throttle x rpm matrix,
+	// later firmware stores one 16-bit value per rpm step from 2500 rpm.
+	if strings.HasPrefix(symZ.Name, "Reg_kon_mat") && symZ.Length != 0x80 {
+		xData = []float64{0}
+		yData = regKonMatRPMAxis(mw.fw, len(zData))
+		axis.X, axis.XDescription = "", ""
 	}
 
 	var mv *mapviewer.MapViewer
@@ -1394,4 +1408,23 @@ func (mw *MainWindow) openRescaler(typ symbol.ECUType, mapName string) {
 	inner := multiwindow.NewInnerWindowWithIcon(winName, rescaler.New(cfg), theme.GridIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(900, 720))
+}
+
+// regKonMatRPMAxis is the rpm axis of the 31-row Reg_kon_mat!: 2500 rpm plus
+// n times the step stored as a word 0x1E4 bytes before the end of the binary,
+// 10 when unprogrammed (T5Suite GetRegulationDivisorValue).
+func regKonMatRPMAxis(fw symbol.FirmwareFile, n int) []float64 {
+	step := 10
+	if raw, ok := fw.(interface{ Bytes() []byte }); ok {
+		if d := raw.Bytes(); len(d) > 0x1E4 {
+			if v := int(binary.BigEndian.Uint16(d[len(d)-0x1E4:])); v != 0xFFFF {
+				step = v
+			}
+		}
+	}
+	axis := make([]float64, n)
+	for i := range axis {
+		axis[i] = float64(2500 + i*step*10)
+	}
+	return axis
 }

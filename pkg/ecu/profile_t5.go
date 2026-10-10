@@ -48,9 +48,13 @@ var t5Profile = Profile{
 		},
 	},
 	ADScannerSymbols: []string{"AD_EGR"},
-	ADResolution:     255,
-	ReadDTC:          readT5DTC,
-	ClearDTC:         clearT5DTC,
+	SymbolAliases: map[string]string{ // T5.2 names
+		"Knock_ref_matrix!": "Knock_ref_tab!",
+		"Regl_tryck_fgaut!": "Regl_tryck_fga!",
+	},
+	ADResolution: 255,
+	ReadDTC:      readT5DTC,
+	ClearDTC:     clearT5DTC,
 }
 
 // t5DTCSymbols are the one-byte error flags in the loaded binary; T5 has no

@@ -66,6 +66,9 @@ type Profile struct {
 	Scale map[string]func(float64) float64
 	// ForeignSymbols betray a symbol preset made for another ECU.
 	ForeignSymbols []string
+	// SymbolAliases maps a map name to the name an older firmware variant
+	// uses for the same map (T5.2 vs T5.5), tried when the first is absent.
+	SymbolAliases map[string]string
 	// AirDemToString names an ActiveAirDem value.
 	AirDemToString func(float64) string
 
