@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/roffe/gocan/v2"
@@ -27,8 +28,9 @@ type BaseLogger struct {
 
 	capturePerSecond int
 	captureCount     int
-	errPerSecond     int
-	errCount         int
+	// The error counters are also bumped from the adapter's event goroutine.
+	errPerSecond atomic.Int64
+	errCount     atomic.Int64
 
 	closeOnce sync.Once
 
@@ -138,14 +140,14 @@ func (bl *BaseLogger) onCapture(t time.Time) {
 }
 
 func (bl *BaseLogger) onError() {
-	bl.errCount++
-	bl.errPerSecond++
-	bl.ErrorCounter(bl.errCount)
+	n := bl.errCount.Add(1)
+	bl.errPerSecond.Add(1)
+	bl.ErrorCounter(int(n))
 }
 
 func (bl *BaseLogger) resetPerSecond() {
 	bl.capturePerSecond = 0
-	bl.errPerSecond = 0
+	bl.errPerSecond.Store(0)
 }
 
 func (bl *BaseLogger) calculateCompensatedTimestamp() time.Time {

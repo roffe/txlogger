@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/roffe/gocan/v2"
@@ -52,7 +53,10 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Bus) error {
 		return fmt.Errorf("error starting logging: %w", err)
 	}
 
-	go func() {
+	// Wait for the logging loop to exit before the deferred closes above run.
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	wg.Go(func() {
 		defer cl.Close()
 
 		adScanner := c.adScannerFunc()
@@ -88,8 +92,9 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Bus) error {
 				}
 				lastData = time.Now()
 				if len(msg.Data) != int(expectedPayloadSize+4) {
+					c.onError()
 					c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize+4, len(msg.Data)))
-					return
+					continue
 				}
 
 				r, timeStamp, err := c.readFrameHeader(msg.Data)
@@ -123,6 +128,6 @@ func (c *TxBridge) t8(pctx context.Context, cl *gocan.Bus) error {
 				testerPresent()
 			}
 		}
-	}()
+	})
 	return cl.Wait(ctx)
 }

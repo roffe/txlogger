@@ -149,7 +149,7 @@ func (c *TxBridge) stopLogging() error {
 // returns why the session should abort, or "" to keep logging.
 func (c *TxBridge) perSecond(lastData time.Time) string {
 	c.FpsCounter(c.capturePerSecond)
-	if c.errPerSecond > 5 {
+	if c.errPerSecond.Load() > 5 {
 		return "too many errors, aborting logging"
 	}
 	if time.Since(lastData) > dataTimeout {

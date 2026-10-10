@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
@@ -230,7 +231,10 @@ func (c *T7Client) Start(pctx context.Context) error {
 		}
 	*/
 
-	go func() {
+	// Wait for the logging loop to exit before the deferred closes above run.
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	wg.Go(func() {
 		defer cl.Close()
 		defer func() {
 			_ = kwp.StopSession(ctx)
@@ -246,7 +250,7 @@ func (c *T7Client) Start(pctx context.Context) error {
 				return
 			case <-c.secondTicker.C:
 				c.FpsCounter(c.capturePerSecond)
-				if c.errPerSecond > 5 {
+				if c.errPerSecond.Load() > 5 {
 					c.OnMessage("too many errors, aborting logging")
 					return
 				}
@@ -322,7 +326,7 @@ func (c *T7Client) Start(pctx context.Context) error {
 				c.onCapture(timeStamp)
 			}
 		}
-	}()
+	})
 	return cl.Wait(ctx)
 }
 

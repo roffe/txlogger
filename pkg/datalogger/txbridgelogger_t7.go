@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/roffe/gocan/v2"
@@ -27,10 +28,13 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Bus) error {
 	if err := sendBroadcastCollect(c.tb, t7BroadcastIDs); err != nil {
 		return fmt.Errorf("failed to set broadcast collect: %w", err)
 	}
+	// Seed their sysvars so buildChannels gives them log columns before the
+	// first trailer arrives.
 	for _, sym := range c.Symbols {
 		if _, ok := t7BroadcastSymbols[sym.Name]; ok {
 			log.Println("Skipping", sym.Name, "in broadcast")
 			sym.Number = -1
+			c.sysvars.Set(sym.Name, 0)
 		}
 	}
 
@@ -58,7 +62,10 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Bus) error {
 
 	publishSpecial := c.t7SpecialPublisher()
 
-	go func() {
+	// Wait for the logging loop to exit before the deferred closes above run.
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	wg.Go(func() {
 		defer cl.Close()
 		defer func() {
 			_ = c.stopLogging() // stop the dongle's read loop before ending the session
@@ -160,6 +167,6 @@ func (c *TxBridge) t7(pctx context.Context, cl *gocan.Bus) error {
 				c.onCapture(timeStamp)
 			}
 		}
-	}()
+	})
 	return cl.Wait(ctx)
 }

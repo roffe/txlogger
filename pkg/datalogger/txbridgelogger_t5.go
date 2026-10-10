@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/avast/retry-go/v4"
@@ -40,7 +41,10 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Bus, gather bool) error {
 
 	publish := c.t5Publisher()
 
-	go func() {
+	// Wait for the logging loop to exit before the deferred closes above run.
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	wg.Go(func() {
 		defer cl.Close()
 		defer func() {
 			_ = c.stopLogging() // stop the dongle's read loop before closing the connection
@@ -99,7 +103,7 @@ func (c *TxBridge) t5(pctx context.Context, cl *gocan.Bus, gather bool) error {
 				c.onCapture(timeStamp)
 			}
 		}
-	}()
+	})
 	return cl.Wait(ctx)
 }
 

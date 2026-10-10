@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"sync"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
@@ -27,9 +28,7 @@ func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
 	if address+length <= 0x100000 {
 		return nil, fmt.Errorf("GetRAM: address not in SRAM: $%X", address)
 	}
-	req := NewReadDataRequest(address, length)
-	c.readChan <- req
-	return req.Data, req.Wait()
+	return c.BaseLogger.GetRAM(address, length)
 }
 
 const (
@@ -82,7 +81,10 @@ func (c *T8Client) Start(pctx context.Context) error {
 		return fmt.Errorf("failed to init t8 logging: %w", err)
 	}
 
-	go c.run(ctx, cl, gm, channels)
+	// Wait for the logging loop to exit before the deferred closes above run.
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	wg.Go(func() { c.run(ctx, cl, gm, channels) })
 
 	return cl.Wait(ctx)
 }
@@ -130,7 +132,7 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Bus, gm *gmlan.Client, cha
 			return
 		case <-c.secondTicker.C:
 			c.FpsCounter(c.capturePerSecond)
-			if c.errPerSecond > 5 {
+			if c.errPerSecond.Load() > 5 {
 				c.OnMessage("too many errors, aborting logging")
 				return
 			}

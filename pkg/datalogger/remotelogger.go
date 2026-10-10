@@ -58,7 +58,7 @@ func (c *RemoteClient) Start(ctx context.Context) error {
 			return nil
 		case <-c.secondTicker.C:
 			c.FpsCounter(c.capturePerSecond)
-			if c.errPerSecond > 5 {
+			if c.errPerSecond.Load() > 5 {
 				return ErrToManyErrors
 			}
 			c.resetPerSecond()

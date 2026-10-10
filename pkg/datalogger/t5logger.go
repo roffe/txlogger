@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"math"
+	"sync"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
@@ -58,7 +59,10 @@ func (c *T5Client) Start(pctx context.Context) error {
 	channels := c.t5Channels()
 	publish := c.t5Publisher()
 
-	go func() {
+	// Wait for the logging loop to exit before the deferred closes above run.
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	wg.Go(func() {
 		defer cl.Close()
 		for {
 			select {
@@ -69,7 +73,7 @@ func (c *T5Client) Start(pctx context.Context) error {
 				return
 			case <-c.secondTicker.C:
 				c.FpsCounter(c.capturePerSecond)
-				if c.errPerSecond > 5 {
+				if c.errPerSecond.Load() > 5 {
 					c.OnMessage("too many errors, aborting logging")
 					return
 				}
@@ -79,6 +83,7 @@ func (c *T5Client) Start(pctx context.Context) error {
 				if err != nil {
 					c.onError()
 					c.OnMessage(err.Error())
+					read.Complete(err)
 					continue
 				}
 				read.Data = data
@@ -114,7 +119,7 @@ func (c *T5Client) Start(pctx context.Context) error {
 				c.onCapture(ts)
 			}
 		}
-	}()
+	})
 	return cl.Wait(ctx)
 }
 
