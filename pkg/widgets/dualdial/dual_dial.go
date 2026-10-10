@@ -64,7 +64,6 @@ type DualDial struct {
 	radius                     float32
 	middle                     fyne.Position
 	needleOffset, needleLength float32
-	needleRotConst             float64
 	lineRotConst               float64
 	invRange                   float64 // = 1/(Max-Min), for value-arc fraction
 
@@ -160,7 +159,7 @@ func New(cfg *widgets.GaugeConfig) *DualDial {
 		s.pips = append(s.pips, pip)
 
 		if i%2 == 0 {
-			val := s.cfg.Min + (float64(i)/float64(s.cfg.Steps))*(s.cfg.Max-s.cfg.Min)
+			val := s.cfg.Min + (float64(i)/s.steps)*(s.cfg.Max-s.cfg.Min)
 			txt := strconv.FormatFloat(val, 'f', s.gaugePrec, 64)
 			lbl := &canvas.Text{
 				Text:      txt,
@@ -181,7 +180,6 @@ func New(cfg *widgets.GaugeConfig) *DualDial {
 	if totalRange <= 0 {
 		totalRange = 1
 	}
-	s.needleRotConst = common.Pi15 / totalRange
 	s.lineRotConst = common.Pi15 / s.steps
 	s.invRange = 1 / totalRange
 
@@ -200,12 +198,11 @@ func New(cfg *widgets.GaugeConfig) *DualDial {
 
 func (c *DualDial) GetConfig() *widgets.GaugeConfig { return c.cfg }
 
+// rotateNeedleNoRefresh points a needle at facePosition, pinned to the
+// Min..Max ends of the scale.
 func (c *DualDial) rotateNeedleNoRefresh(hand *canvas.Line, facePosition float64, offset, length float32) {
-	normalized := facePosition - c.cfg.Min
-	if normalized < 0 {
-		normalized = 0
-	}
-	s, co := math.Sincos(c.needleRotConst*normalized - common.Pi43)
+	frac := min(max((facePosition-c.cfg.Min)*c.invRange, 0), 1)
+	s, co := math.Sincos(common.Pi15*frac - common.Pi43)
 	c.applySinCos(hand, float32(s), float32(co), offset, length)
 }
 

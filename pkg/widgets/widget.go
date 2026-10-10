@@ -39,9 +39,13 @@ func showDialog(op string, o browse.Options) ([]string, error) {
 	return []string{path}, nil
 }
 
+// FileDialog shows a file dialog and returns the chosen paths. Tests replace
+// it to answer without showing a real dialog.
+var FileDialog = dialog
+
 // pick shows a file dialog and reports whether the user chose anything.
 func pick(op string, o browse.Options) ([]string, bool) {
-	paths, err := dialog(op, o)
+	paths, err := FileDialog(op, o)
 	if err != nil {
 		if !errors.Is(err, browse.ErrCancelled) {
 			log.Println("File dialog:", err)

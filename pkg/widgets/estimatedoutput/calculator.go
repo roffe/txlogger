@@ -123,13 +123,27 @@ type symLoader struct {
 	missing []string
 }
 
-func (l *symLoader) ints(name string) []int {
+func (l *symLoader) sym(name string) *symbol.Symbol {
 	s := l.fw.GetByName(name)
 	if s == nil {
 		l.missing = append(l.missing, name)
-		return nil
 	}
-	return s.Ints()
+	return s
+}
+
+func (l *symLoader) ints(name string) []int {
+	if s := l.sym(name); s != nil {
+		return s.Ints()
+	}
+	return nil
+}
+
+// uint8s reads a table byte by byte, whatever width the loader typed it as.
+func (l *symLoader) uint8s(name string) []int {
+	if s := l.sym(name); s != nil {
+		return s.Uint8s()
+	}
+	return nil
 }
 
 func (l *symLoader) first(name string) int {

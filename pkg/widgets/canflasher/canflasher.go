@@ -117,8 +117,8 @@ func (t *CanFlasherWidget) log(s string) {
 
 func (t *CanFlasherWidget) progress(v float64) {
 	if v < 0 {
-		t.progressBar.Max = math.Abs(v)
 		fyne.Do(func() {
+			t.progressBar.Max = math.Abs(v)
 			t.progressBar.SetValue(0)
 		})
 		return
@@ -177,19 +177,13 @@ func (t *CanFlasherWidget) CreateRenderer() fyne.WidgetRenderer {
 	t.eolBTN = widget.NewButton("EOL Flash", t.ecuEOL)
 
 	t.marryBTN = widget.NewButton("MarryECM", func() {
-		done := make(chan bool)
 		d := dialog.NewConfirm("Confirmation", "You must do it with ignition ON. "+
 			"This operation will erase NVDM flash, are you sure to continue ??", func(b bool) {
-			done <- b
-		}, fyne.CurrentApp().Driver().AllWindows()[0])
-		d.Show()
-
-		go func() {
-			result := <-done
-			if result {
+			if b {
 				t.ecuMarry(t.pinEntry.Text)
 			}
-		}()
+		}, fyne.CurrentApp().Driver().AllWindows()[0])
+		d.Show()
 	})
 
 	t.recoveryBTN = widget.NewButton("Recovery", func() {

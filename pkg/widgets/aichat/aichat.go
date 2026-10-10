@@ -135,12 +135,15 @@ func (w *Widget) submit() {
 	go func() {
 		defer cancel()
 		err := w.converse(ctx)
+		if ctx.Err() != nil {
+			err = nil // stopped or reset by the user
+		}
 		fyne.Do(func() {
 			w.busy = false
 			w.send.Enable()
 			w.stop.Disable()
 			w.status.SetText("")
-			if err != nil && ctx.Err() == nil {
+			if err != nil {
 				w.appendf("\n> **Error:** %s\n\n", err)
 				if w.cfg.Logger != nil {
 					w.cfg.Logger("ai chat: " + err.Error())
@@ -161,9 +164,11 @@ func (w *Widget) converse(ctx context.Context) error {
 	tools := w.tools()
 
 	for turn := 0; turn < maxTurns; turn++ {
-		fyne.Do(func() { w.status.SetText("thinking…") })
-
-		msgs := append([]ollama.Message{{Role: "system", Content: w.systemPrompt()}}, w.msgs...)
+		var msgs []ollama.Message
+		fyne.DoAndWait(func() {
+			w.status.SetText("thinking…")
+			msgs = append([]ollama.Message{{Role: "system", Content: w.systemPrompt()}}, w.msgs...)
+		})
 		reply, err := client.Chat(ctx, msgs, tools, func(tok string) {
 			fyne.Do(func() {
 				w.pending += tok
@@ -173,9 +178,9 @@ func (w *Widget) converse(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		w.msgs = append(w.msgs, reply)
 
 		if len(reply.ToolCalls) == 0 {
+			w.addMsgs(ctx, reply)
 			fyne.Do(func() {
 				w.appendf("**Assistant:** %s\n\n", strings.TrimSpace(reply.Content))
 			})
@@ -190,6 +195,7 @@ func (w *Widget) converse(ctx context.Context) error {
 			fyne.Do(func() { w.pending = "" })
 		}
 
+		turnMsgs := []ollama.Message{reply}
 		for _, call := range reply.ToolCalls {
 			name := call.Function.Name
 			fyne.Do(func() {
@@ -204,10 +210,22 @@ func (w *Widget) converse(ctx context.Context) error {
 			if err, _, _ := strings.Cut(out, "\n"); strings.HasPrefix(err, "Error:") {
 				fyne.Do(func() { w.appendf("> %s\n\n", err) })
 			}
-			w.msgs = append(w.msgs, ollama.Message{Role: "tool", ToolName: name, Content: out})
+			turnMsgs = append(turnMsgs, ollama.Message{Role: "tool", ToolName: name, Content: out})
 		}
+		w.addMsgs(ctx, turnMsgs...)
 	}
 	return fmt.Errorf("gave up after %d tool-calling turns without an answer", maxTurns)
+}
+
+// addMsgs appends to the history on the UI goroutine, where reset clears it.
+// Nothing is added once the turn is cancelled, so a tool that finishes after
+// stop or reset leaves the history as the user left it.
+func (w *Widget) addMsgs(ctx context.Context, msgs ...ollama.Message) {
+	fyne.DoAndWait(func() {
+		if ctx.Err() == nil {
+			w.msgs = append(w.msgs, msgs...)
+		}
+	})
 }
 
 func (w *Widget) systemPrompt() string {

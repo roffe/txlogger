@@ -3,6 +3,7 @@ package aichat
 import (
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -389,18 +390,13 @@ func (w *Widget) logSamples(channels string, start, count, stride int) string {
 	if start < 0 {
 		start = 0
 	}
-	// Range-check before touching a record: column discovery below reads
-	// RecordAt(start), and the Logfile interface doesn't promise clamping.
 	if start >= lf.Len() {
 		return fmt.Sprintf("Error: start index %d is past the end of the log (%d samples, indices 0-%d).", start, lf.Len(), lf.Len()-1)
 	}
 
 	cols := splitList(channels)
 	if len(cols) == 0 {
-		for k := range lf.RecordAt(start).All() {
-			cols = append(cols, k)
-		}
-		sort.Strings(cols)
+		cols = slices.Sorted(slices.Values(lf.Columns()))
 	}
 
 	var b strings.Builder

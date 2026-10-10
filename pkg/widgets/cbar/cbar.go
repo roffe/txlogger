@@ -4,7 +4,9 @@ import (
 	"image/color"
 	"math"
 	"strconv"
+	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -169,6 +171,7 @@ func (s *CBar) initializeVisualElements() {
 		Alignment: fyne.TextAlignLeading,
 	}
 
+	s.bars = make([]*canvas.Line, 0, s.cfg.Steps+1)
 	for i := 0; i <= s.cfg.Steps; i++ {
 		tick := widgets.TickMajor
 		switch {
@@ -219,19 +222,17 @@ func (s *CBar) applyBar() {
 	s.applyPeaks()
 }
 
-// syncPeaks latches target into whichever marker it exceeds and decays both
-// back toward center. Reports whether either moved. Caller holds mu.
+// syncPeaks decays both markers back toward center, then latches target into
+// whichever one it reaches past, so a marker never sits inside the value.
+// Reports whether either moved. Caller holds mu.
 func (s *CBar) syncPeaks() bool {
-	lo, hi := s.targetLo, s.targetHi
+	lo := s.targetLo + (s.cfg.Center-s.targetLo)*peakDecay
+	hi := s.targetHi + (s.cfg.Center-s.targetHi)*peakDecay
 	if s.target < lo {
 		lo = s.target
-	} else {
-		lo += (s.cfg.Center - lo) * peakDecay
 	}
 	if s.target > hi {
 		hi = s.target
-	} else {
-		hi += (s.cfg.Center - hi) * peakDecay
 	}
 	if lo == s.targetLo && hi == s.targetHi {
 		return false
@@ -307,19 +308,12 @@ func (s *CBar) updateDisplayTextPosition() {
 		return
 	}
 
-	dotIdx := -1
-	for i := 0; i < len(text); i++ {
-		if text[i] == '.' {
-			dotIdx = i
-			break
-		}
-	}
-
+	// Offsets count glyphs, not bytes: a "λ" prefix is one glyph wide
 	var x float32
-	if dotIdx >= 0 {
-		x = s.lastSize.Width*0.5 - s.charWidth*(float32(dotIdx)+0.5)
+	if dotIdx := strings.IndexByte(text, '.'); dotIdx >= 0 {
+		x = s.lastSize.Width*0.5 - s.charWidth*(float32(utf8.RuneCountInString(text[:dotIdx]))+0.5)
 	} else {
-		x = s.lastSize.Width*0.5 - s.charWidth*float32(len(text))*0.5
+		x = s.lastSize.Width*0.5 - s.charWidth*float32(utf8.RuneCountInString(text))*0.5
 	}
 
 	s.displayText.Move(fyne.Position{X: x, Y: s.displayY})
@@ -328,6 +322,7 @@ func (s *CBar) updateDisplayTextPosition() {
 func (s *CBar) CreateRenderer() fyne.WidgetRenderer {
 	// Initialize visual elements
 	s.initializeVisualElements()
+	s.lastSize = fyne.Size{} // the new objects need the next Layout, even at the same size
 	return &CBarRenderer{CBar: s}
 }
 
@@ -354,11 +349,11 @@ func (r *CBarRenderer) Layout(space fyne.Size) {
 	r.lastSize = space
 
 	// Cache frequently used calculations
-	r.center = space.Width * 0.5
+	r.widthFactor = space.Width / float32(r.valueRange)
+	r.center = float32(r.cfg.Center-r.cfg.Min) * r.widthFactor
 	r.middleHeight = space.Height * 0.5
 	r.heightOneThird = space.Height * common.OneThird
 	r.heightOneSeventh = space.Height * common.OneSeventh
-	r.widthFactor = space.Width / float32(r.valueRange)
 	r.barHeight = space.Height
 	r.stepFactor = space.Width / float32(r.cfg.Steps)
 

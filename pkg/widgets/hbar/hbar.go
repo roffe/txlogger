@@ -57,7 +57,7 @@ func New(cfg *widgets.GaugeConfig) *HBar {
 		lastColorIdx: -1,
 	}
 
-	if s.cfg.Steps == 0 {
+	if s.cfg.Steps <= 0 {
 		s.cfg.Steps = 10
 	}
 
@@ -248,6 +248,7 @@ func (s *HBar) CreateRenderer() fyne.WidgetRenderer {
 		s.lines[i] = line
 	}
 
+	s.size = fyne.Size{} // the new objects need the next Layout, even at the same size
 	return &HBarRenderer{HBar: s}
 }
 

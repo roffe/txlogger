@@ -61,7 +61,7 @@ func (t *CanFlasherWidget) ecuDump(filename string) {
 		}
 
 		time.Sleep(200 * time.Millisecond)
-		if !ecu.Info(t.ecuSelect.Selected).ManualReset {
+		if !ecu.Info(cfg.Name).ManualReset {
 			_ = tr.ResetECU(ctx)
 		}
 	}()

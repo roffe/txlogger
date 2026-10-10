@@ -59,7 +59,7 @@ func (t *CanFlasherWidget) ecuFlash(filename string) {
 		}
 
 		time.Sleep(200 * time.Millisecond)
-		if ecu.Info(t.ecuSelect.Selected).ManualReset {
+		if ecu.Info(cfg.Name).ManualReset {
 			t.log("Flash done, reset ECU or pull fuse to finnish")
 		} else {
 			if err := tr.ResetECU(ctx); err != nil {

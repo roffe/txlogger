@@ -47,7 +47,6 @@ type Dial struct {
 	radius                     float32
 	middle                     fyne.Position
 	needleOffset, needleLength float32
-	needleRotConst             float64 // = common.Pi15/(Max-Min)
 	lineRotConst               float64 // = common.Pi15/steps
 	invRange                   float64 // = 1/(Max-Min), for value-arc fraction
 
@@ -88,6 +87,9 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 	}
 	if cfg.GaugeFactor == 0 {
 		cfg.GaugeFactor = 1.0
+	}
+	if cfg.Steps <= 0 {
+		cfg.Steps = 10
 	}
 	if cfg.MinSize.Width > 0 && cfg.MinSize.Height > 0 {
 		c.minsize = cfg.MinSize
@@ -156,7 +158,6 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 	}
 
 	// Constants
-	c.needleRotConst = common.Pi15 / totalRange
 	c.lineRotConst = common.Pi15 / steps
 	c.invRange = 1 / totalRange
 
@@ -192,12 +193,11 @@ func (c *Dial) applySinCos(hand *canvas.Line, sinRot, cosRot float32, offset, le
 	hand.Position2 = fyne.Position{X: midxOffX + x2, Y: midY + y2}
 }
 
+// rotateNeedleNoRefresh points the needle at facePosition, pinned to the
+// Min..Max ends of the scale.
 func (c *Dial) rotateNeedleNoRefresh(hand *canvas.Line, facePosition float64, offset, length float32) {
-	normalized := facePosition - c.cfg.Min
-	if normalized < 0 {
-		normalized = 0
-	}
-	c.rotateNoRefresh(hand, c.needleRotConst*normalized-common.Pi43, offset, length)
+	frac := min(max((facePosition-c.cfg.Min)*c.invRange, 0), 1)
+	c.rotateNoRefresh(hand, common.Pi15*frac-common.Pi43, offset, length)
 }
 
 // syncValueArcNoRefresh recomputes the value arc sweep and color from the

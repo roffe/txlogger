@@ -163,6 +163,10 @@ func (ed *pidEditor) rebuildViewer(host *fyne.Container) {
 // scaleRows multiplies whole rpm rows (indexed by PIDYSP) by per-row factors and
 // refreshes the viewer. Used by the heuristic suggestions in pidtune.go.
 func (ed *pidEditor) scaleRows(factors map[int]float64) {
+	if len(ed.data) != ed.cols*ed.rows {
+		ed.status.SetText(fmt.Sprintf("%s size %d != %d x %d axes", ed.symbolName, len(ed.data), ed.cols, ed.rows))
+		return
+	}
 	for row, f := range factors {
 		if row < 0 || row >= ed.rows {
 			continue

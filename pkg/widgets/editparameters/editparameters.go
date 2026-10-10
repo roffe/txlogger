@@ -602,6 +602,9 @@ func (t *T8) GetOilQuality(ctx context.Context) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
+	if len(resp) < 4 {
+		return 0, fmt.Errorf("short oil quality answer: % X", resp)
+	}
 	quality := binary.BigEndian.Uint32(resp)
 	return float64(quality) / 256, nil
 }
@@ -648,8 +651,10 @@ func (t *T8) GetE85Percent(ctx context.Context) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
-	val := binary.LittleEndian.Uint32(resp[2:6])
-	return float64(val), nil
+	if len(resp) < 3 {
+		return 0, fmt.Errorf("short E85 answer: % X", resp)
+	}
+	return float64(resp[2]), nil
 }
 
 func (t *T8) SetE85Percent(ctx context.Context, percent float64) error {

@@ -81,3 +81,76 @@ func TestAcceptSample_Steadiness(t *testing.T) {
 		t.Fatal("expected acceptance for first in-band sample")
 	}
 }
+
+// acceptSample rejects off-target, open-loop, rail-clamped and unsteady samples
+// and accepts the boundaries of each band.
+func TestAcceptSample_Gates(t *testing.T) {
+	p := regMapParams{onTarget: 30, rpmStab: 150, loadStab: 50}
+	nan := math.NaN()
+	cases := []struct {
+		name                                  string
+		loadDiff, pwm, twopct, prevRPM, prevL float64
+		want                                  bool
+	}{
+		{"in band", 0, 500, 0, 3000, 900, true},
+		{"on-target edge", -30, 500, 0, 3000, 900, true},
+		{"off target", 31, 500, 0, 3000, 900, false},
+		{"open loop", 0, 500, 1, 3000, 900, false},
+		{"lower rail", 0, 20, 0, 3000, 900, false},
+		{"just above lower rail", 0, 21, 0, 3000, 900, true},
+		{"upper rail", 0, 980, 0, 3000, 900, false},
+		{"rpm step edge", 0, 500, 0, 3150, 900, true},
+		{"load step", 0, 500, 0, 3000, 951, false},
+		{"load step edge", 0, 500, 0, 3000, 850, true},
+		{"no previous", 0, 500, 0, nan, nan, true},
+	}
+	for _, c := range cases {
+		if got := acceptSample(p, 3000, 900, c.loadDiff, c.pwm, c.twopct, c.prevRPM, c.prevL); got != c.want {
+			t.Errorf("%s: accept = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+// learnRegMap skips samples with any missing channel without counting them as
+// filtered, and a gap in rpm/load restarts the steadiness check.
+func TestLearnRegMap_SkipsGaps(t *testing.T) {
+	nan := math.NaN()
+	row := func(rpm, pFac float64) []float64 {
+		// rpm, setv, regCon, p, i, d, adap, loadDiff, pwm, 2%
+		return []float64{rpm, 900, 400, pFac, 0, 0, 0, 0, 500, 0}
+	}
+	rows := [][]float64{
+		row(2000, 10),
+		row(2000, nan), // missing P: skipped
+		row(nan, 10),   // missing rpm: skipped, and forgets the previous rpm
+		row(4000, 10),  // 2000 rpm away from the last real rpm, but accepted
+	}
+	var in regMapInputs
+	for _, r := range rows {
+		in.rpm = append(in.rpm, r[0])
+		in.setv = append(in.setv, r[1])
+		in.regCon = append(in.regCon, r[2])
+		in.pFac = append(in.pFac, r[3])
+		in.iFac = append(in.iFac, r[4])
+		in.dFac = append(in.dFac, r[5])
+		in.adap = append(in.adap, r[6])
+		in.loadDiff = append(in.loadDiff, r[7])
+		in.pwmCalc = append(in.pwmCalc, r[8])
+		in.pwm2pct = append(in.pwm2pct, r[9])
+	}
+	in.n = len(rows)
+	p := regMapParams{
+		axisX: []float64{900}, axisY: []float64{2000, 4000}, cols: 1, rows: 2,
+		current: []float64{0, 0}, onTarget: 30, rpmStab: 150, loadStab: 50,
+	}
+	learned, counts, used, filtered := learnRegMap(in, p)
+	if used != 2 || filtered != 0 {
+		t.Fatalf("used = %d, filtered = %d; want 2, 0", used, filtered)
+	}
+	if counts[0] != 1 || counts[1] != 1 {
+		t.Fatalf("counts = %v, want [1 1]", counts)
+	}
+	if math.Abs(learned[0]-41) > 1e-9 || math.Abs(learned[1]-41) > 1e-9 {
+		t.Fatalf("learned = %v, want [41 41]", learned)
+	}
+}
