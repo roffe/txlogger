@@ -104,6 +104,16 @@ func (t *Client) GetHeader(ctx context.Context, id byte) (string, error) {
 	return string(b), nil
 }
 
+// wait pauses for d or until ctx ends. Tests replace it to skip the delays.
+var wait = func(ctx context.Context, d time.Duration) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(d):
+		return nil
+	}
+}
+
 func (t *Client) KnockKnock(ctx context.Context) (bool, error) {
 	if err := t.DataInitialization(ctx); err != nil {
 		return false, err
@@ -118,7 +128,9 @@ func (t *Client) KnockKnock(ctx context.Context) (bool, error) {
 		ok, err := t.kwp.SecurityAccess(ctx, t7kwp.DEVELOPMENT_PRIORITY, k)
 		if err != nil {
 			t.cfg.OnError(fmt.Errorf("/!\\ Failed to obtain security access: %v", err))
-			time.Sleep(3 * time.Second)
+			if err := wait(ctx, 3*time.Second); err != nil {
+				return false, err
+			}
 			continue
 		}
 		if ok {

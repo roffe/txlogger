@@ -40,10 +40,15 @@ func GetPartitionMD5(filebytes []byte, device byte, partition int) []byte {
 		case partition > 9 && partition < 13:
 			start = t8parts[partition]
 			end = GetLasAddress(filebytes)
+		default:
+			return make([]byte, 16)
 		}
 	case 5:
+		if partition < 0 || partition > 9 {
+			return make([]byte, 16)
+		}
 		byteswapped = MCPSwapped(filebytes)
-		if partition > 0 && partition < 10 {
+		if partition > 0 {
 			if partition == 9 {
 				start = 0x40000
 				end = 0x40100

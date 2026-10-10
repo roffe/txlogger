@@ -61,7 +61,7 @@ func (fb *FlashBlock) EncodeBlock(th *T8Header) []byte {
 		data[t] ^= 0xA4
 	}
 
-	copy(data[0xAF:0xAF+10], th.ecuDescription)
+	copy(data[0xAF:0xAF+0x10], th.ecuDescription)
 
 	copy(data[0xE0:0xE0+17], th.vin)
 
@@ -90,6 +90,6 @@ func (fb *FlashBlock) isValid() bool {
 		return false
 	}
 
-	invalidPattern := []byte{0xed, 0xed, 0xed, 0xed, 0xed, 0xed, 0xed, 0xed}
+	invalidPattern := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 	return !bytes.Equal(fb.BlockData[:8], invalidPattern)
 }

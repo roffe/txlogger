@@ -119,12 +119,13 @@ func (t *Client) UploadBootloader(ctx context.Context, z22se bool) error {
 	}
 	startAddress := 0x102400
 	noTransfers := len(bootloaderBytes) / 238
+	total := len(bootloaderBytes)
 
 	start := time.Now()
 
-	t.cfg.OnProgress(-float64(9997))
+	t.cfg.OnProgress(-float64(total))
 	t.cfg.OnProgress(float64(0))
-	t.cfg.OnMessage("Uploading bootloader " + strconv.Itoa(len(bootloaderBytes)) + " bytes")
+	t.cfg.OnMessage("Uploading bootloader " + strconv.Itoa(total) + " bytes")
 
 	r := bytes.NewReader(bootloaderBytes)
 
@@ -206,7 +207,7 @@ func (t *Client) UploadBootloader(ctx context.Context, z22se bool) error {
 
 	startAddress += 0x06
 
-	t.cfg.OnProgress(float64(9997))
+	t.cfg.OnProgress(float64(total))
 	t.cfg.OnMessage(fmt.Sprintf("Done, took: %s", time.Since(start).Truncate(10*time.Millisecond).String()))
 
 	return nil
@@ -218,12 +219,13 @@ func (t *Client) UploadZ22sePreloader(ctx context.Context) error {
 	}
 	startAddress := 0xFF2000
 	noTransfers := 6
+	total := noTransfers*238 + 7 // the blocks plus the final frame; the rest of the image is not sent
 
 	start := time.Now()
 
-	t.cfg.OnProgress(-float64(9997))
+	t.cfg.OnProgress(-float64(total))
 	t.cfg.OnProgress(float64(0))
-	t.cfg.OnMessage("Uploading z22se preloader " + strconv.Itoa(len(bootloaderz22seBytes)) + " bytes")
+	t.cfg.OnMessage("Uploading z22se preloader " + strconv.Itoa(total) + " bytes")
 
 	r := bytes.NewReader(bootloaderz22seBytes)
 
@@ -308,7 +310,7 @@ func (t *Client) UploadZ22sePreloader(ctx context.Context) error {
 
 	startAddress += 0x06
 
-	t.cfg.OnProgress(float64(9997))
+	t.cfg.OnProgress(float64(total))
 	t.cfg.OnMessage(fmt.Sprintf("Done, took: %s", time.Since(start).Truncate(10*time.Millisecond).String()))
 
 	return nil
@@ -461,8 +463,8 @@ func (t *Client) IDemand(ctx context.Context, command Command, wish uint16) ([]b
 			// log.Println("Master, the marriage has been completed")
 			return nil
 		case 6:
-			// ADC-read; complete
-			out = resp.Data[4:5]
+			// ADC-read; complete. 10-bit reading, big endian in bytes 4-5
+			out = resp.Data[4:6]
 			return nil
 		default:
 			return retry.Unrecoverable(errors.New("command unknown to the legion"))
@@ -487,11 +489,7 @@ func (t *Client) ReadFlashRange(ctx context.Context, device byte, startAdress, l
 		return nil, fmt.Errorf("legion not running")
 	}
 	buf := make([]byte, lastAddress)
-	bufpnt := 0
-
-	if startAdress > 0x80 {
-		bufpnt = startAdress / 0x80
-	}
+	bufpnt := startAdress &^ 0x7F // start of the 0x80 byte block holding startAdress
 
 	// Pre-fill buffer with 0xFF (unprogrammed FLASH chip value)
 	buf[0] = 0xFF
@@ -625,7 +623,8 @@ func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, f
 	var blockNumber int = 0
 	var lastBlockNumber int = (lastAddress / 0x80) - 1
 	var byteswapped bool = false
-	var problem bool = false
+	var problem error
+	retries := 0
 
 	t.cfg.OnProgress(-float64(lastBlockNumber))
 	t.cfg.OnProgress(float64(0))
@@ -635,7 +634,11 @@ func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, f
 	}
 
 	for blockNumber <= lastBlockNumber {
-		problem = false
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		problem = nil
+		slow := false
 		var currentAddress int = startAddress + (blockNumber * 0x80)
 		data2Send := t8util.GetCurrentBlock(flashData, blockNumber, byteswapped)
 		var Csum16 int16 = 0
@@ -650,7 +653,7 @@ func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, f
 
 		if !ffblock && eregion {
 			if err := t.gm.TransferData(ctx, 0x00, length, currentAddress); err != nil {
-				problem = true
+				problem = err
 			} else {
 				wait := t.blockResponse(ctx)
 				iFrameNumber := 0x21
@@ -678,17 +681,26 @@ func (t *Client) WriteFlash(ctx context.Context, device byte, lastAddress int, f
 				}
 				resp, err := wait(time.Millisecond * 150)
 				if err != nil {
-					problem = true
-					continue
-				}
-				if resp.Data[0] != 0x01 && resp.Data[1] != 0x76 {
-					problem = true
+					problem = err
+				} else if resp.Data[0] != 0x01 || resp.Data[1] != 0x76 {
+					problem = fmt.Errorf("block reply %X", resp.Data)
+					// 01 7F 36 12 and 01 7F 36 33: the flash is slow to respond
+					slow = bytes.Equal(resp.Data[:3], []byte{0x01, 0x7F, 0x36}) && (resp.Data[3] == 0x12 || resp.Data[3] == 0x33)
 				}
 			}
 		}
-		if !problem {
+		switch {
+		case problem == nil:
+			retries = 0
 			blockNumber++
 			t.cfg.OnProgress(float64(blockNumber))
+		case slow:
+			// resend the block without counting it as a failed try
+		default:
+			retries++
+			if retries == 20 {
+				return fmt.Errorf("WriteFlash: gave up on block %06X after %d tries: %w", currentAddress, retries, problem)
+			}
 		}
 	}
 	return nil
@@ -724,11 +736,17 @@ func (t *Client) EraseFlash(ctx context.Context, device byte, formatMask uint64)
 			if retryCount > 20 {
 				return fmt.Errorf("erase failed, no response")
 			}
+			if err := wait(ctx, 500*time.Millisecond); err != nil {
+				return err
+			}
 			continue
 		}
+		retryCount = 0
 		if firstPass {
 			if formatbuf[3] != device {
-				time.Sleep(5 * time.Second)
+				if err := wait(ctx, 5*time.Second); err != nil {
+					return err
+				}
 				if err := t.c.Send(ctx, frame); err != nil {
 					return err
 				}
@@ -747,9 +765,21 @@ func (t *Client) EraseFlash(ctx context.Context, device byte, formatMask uint64)
 			}
 		}
 
-		time.Sleep(500 * time.Millisecond)
+		if err := wait(ctx, 500*time.Millisecond); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// wait pauses for d or until ctx ends. Tests replace it to skip the delays.
+var wait = func(ctx context.Context, d time.Duration) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(d):
+		return nil
+	}
 }
 
 // partitionList renders a format mask as "1, 3, 9" for the log.
@@ -817,6 +847,14 @@ func (c Command) String() string {
 }
 
 func demandErr(command Command, d []byte) error {
+	// 0xFF: the loader gave up on the command, asking again won't help.
+	if d[3] == 0xFF {
+		if command == MarrySecondaryProcessor {
+			return retry.Unrecoverable(errors.New("failed to start the secondary loader"))
+		}
+		return retry.Unrecoverable(errors.New("bootloader did what it could and failed. Sorry"))
+	}
+
 	if command == 0 && d[3] != 1 {
 		return errors.New("failed to set inter frame latency")
 	}
@@ -838,9 +876,6 @@ func demandErr(command Command, d []byte) error {
 
 	if command == 5 {
 		switch d[3] {
-		case 0xFF:
-			// Critical error; Could not start the secondary loader!
-			return errors.New("failed to start the secondary loader")
 		case 0xFD:
 			// Failed to write!
 			return errors.New("retrying write")
@@ -858,11 +893,6 @@ func demandErr(command Command, d []byte) error {
 	if command == 6 && d[3] != 0x01 {
 		return fmt.Errorf("ADC read not ready yet")
 	}
-
-	// Something is wrong or we sent the wrong command.
-	if d[3] == 0xFF {
-		return errors.New("bootloader did what it could and failed. Sorry")
-	}
 	return nil
 }
 
@@ -875,9 +905,7 @@ func checkErr(f gocan.Frame) error {
 	case f.Data[0] == 0x03 && f.Data[1] == 0x7F && f.Data[2] == 0x23:
 		return errors.New("no security access granted")
 	case f.Data[2] != 0x61 && f.Data[1] != 0x61:
-		if bytes.Equal(f.Data[:], []byte{0x01, 0x7E, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}) {
-			return fmt.Errorf("incorrect response to 0x21, sendReadDataByLocalIdentifier.  Byte 2 was %X", f.Data[2])
-		}
+		return fmt.Errorf("incorrect response to 0x21, sendReadDataByLocalIdentifier.  Byte 2 was %X", f.Data[2])
 	}
 	return nil
 }

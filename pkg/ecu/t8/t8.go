@@ -2,7 +2,6 @@ package t8
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
@@ -80,7 +79,7 @@ func (t *Client) RequestSecurityAccess(ctx context.Context) error {
 }
 
 func (t *Client) GetOilQuality(ctx context.Context) (float64, error) {
-	resp, err := t.RequestECUInfoAsUint64(ctx, pidOilQuality)
+	resp, err := t.RequestECUInfoAsUint32(ctx, pidOilQuality)
 	if err != nil {
 		return 0, err
 	}
@@ -130,8 +129,7 @@ func (t *Client) GetE85Percent(ctx context.Context) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
-	val := binary.LittleEndian.Uint32(resp[2:6])
-	return float64(val), nil
+	return float64(resp[2]), nil
 }
 
 func (t *Client) SetE85Percent(ctx context.Context, percent float64) error {

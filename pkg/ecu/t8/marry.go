@@ -30,6 +30,16 @@ func (t *Client) CheckIfCanChangeVIN(ctx context.Context) error {
 	return nil
 }
 
+// wait pauses for d or until ctx ends. Tests replace it to skip the delays.
+var wait = func(ctx context.Context, d time.Duration) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(d):
+		return nil
+	}
+}
+
 func (t *Client) MarryECU(ctx context.Context, pin string) error {
 	t.cfg.OnMessage("Marry ECU")
 	if err := t.CheckIfCanChangeVIN(ctx); err != nil {
@@ -47,18 +57,24 @@ func (t *Client) MarryECU(ctx context.Context, pin string) error {
 		}
 		tf := new(t8file.T8Header)
 		tf.DecodeExtraInfo(bin)
-		t.cfg.OnMessage("PIN stored in ECU: " + tf.PIN() + ", security access delay 30s")
-		time.Sleep(30 * time.Second)
+		if len(tf.FlashBlocks()) == 0 {
+			t.cfg.OnMessage("No PIN stored in ECU")
+		} else {
+			t.cfg.OnMessage("PIN stored in ECU: " + tf.PIN() + ", security access delay 30s")
+			if err := wait(ctx, 30*time.Second); err != nil {
+				return err
+			}
 
-		pin := []byte(tf.PIN())
-		pinCmd := []byte{0x00}
-		pinCmd = append(pinCmd, pin...)
+			pin := []byte(tf.PIN())
+			pinCmd := []byte{0x00}
+			pinCmd = append(pinCmd, pin...)
 
-		if err := t.gm.RequestSecurityAccess(ctx, 0x01, 1, t8sec.CalculateAccessKey); err != nil {
-			return err
+			if err := t.gm.RequestSecurityAccess(ctx, 0x01, 1, t8sec.CalculateAccessKey); err != nil {
+				return err
+			}
+			t.gm.DeviceControlWithCode(ctx, 0x60, pinCmd)
+			t.gm.DeviceControlWithCode(ctx, 0x6e, pinCmd)
 		}
-		t.gm.DeviceControlWithCode(ctx, 0x60, pinCmd)
-		t.gm.DeviceControlWithCode(ctx, 0x6e, pinCmd)
 	}
 
 	if err := t.CheckIfCanChangeVIN(ctx); err != nil {
@@ -92,19 +108,25 @@ func (t *Client) MarryECU(ctx context.Context, pin string) error {
 		}
 		t.cfg.OnMessage("NVDM virginized")
 
-		time.Sleep(200 * time.Millisecond)
+		if err := wait(ctx, 200*time.Millisecond); err != nil {
+			return err
+		}
 
 		t.cfg.OnMessage("Reset ECU")
 		if err := t.ResetECU(ctx); err != nil {
 			return err
 		}
-		time.Sleep(1 * time.Second)
+		if err := wait(ctx, 1*time.Second); err != nil {
+			return err
+		}
 	}
 
 	// ---------- Marry -----------------
 	t.cfg.OnMessage("Clear ECU DTC's")
 	_ = t.gm.TesterPresentNoResponseAllowed()
-	time.Sleep(25 * time.Millisecond)
+	if err := wait(ctx, 25*time.Millisecond); err != nil {
+		return err
+	}
 	if err := t.gm.InitiateDiagnosticOperation(ctx, gmlan.LEV_DADTC); err != nil {
 		return err
 	}
@@ -119,7 +141,9 @@ func (t *Client) MarryECU(ctx context.Context, pin string) error {
 		return err
 	}
 	_ = t.gm.TesterPresentNoResponseAllowed()
-	time.Sleep(200 * time.Millisecond)
+	if err := wait(ctx, 200*time.Millisecond); err != nil {
+		return err
+	}
 	currentVIN, err := t.gm.ReadDataByIdentifier(ctx, pidVIN)
 	if err != nil {
 		return err
@@ -148,7 +172,9 @@ func (t *Client) MarryECU(ctx context.Context, pin string) error {
 		return fmt.Errorf("error writing PIN 0x01: %w", err)
 	}
 
-	time.Sleep(1 * time.Second)
+	if err := wait(ctx, 1*time.Second); err != nil {
+		return err
+	}
 	_ = t.gm.TesterPresentNoResponseAllowed()
 
 	t.cfg.OnMessage("Getting married")
@@ -159,7 +185,9 @@ func (t *Client) MarryECU(ctx context.Context, pin string) error {
 	t.cfg.OnMessage("Waiting for marry finish")
 	for range 5 {
 		_ = t.gm.TesterPresentNoResponseAllowed()
-		time.Sleep(1 * time.Second)
+		if err := wait(ctx, 1*time.Second); err != nil {
+			return err
+		}
 	}
 
 	t.cfg.OnMessage("Getting security access to ECU")

@@ -51,6 +51,9 @@ func (t *Client) readECU(ctx context.Context, addr, length int, fast bool) ([]by
 			if err != nil {
 				return err
 			}
+			if len(b) != readLength {
+				return fmt.Errorf("got %d bytes, want %d", len(b), readLength)
+			}
 			out.Write(b)
 			return nil
 		},

@@ -106,6 +106,10 @@ func GetSymbolsT8(ctx context.Context, dev gocan.Adapter, cb func(string)) (*sym
 		return nil, err
 	}
 
+	if len(symbolNames) < len(symbols) {
+		return nil, fmt.Errorf("symbol table has %d names for %d symbols", len(symbolNames), len(symbols))
+	}
+
 	for i, sym := range symbols {
 		sym.Name = symbolNames[i]
 		sym.Unit = symbol.GetUnit(symbols[i].Name)

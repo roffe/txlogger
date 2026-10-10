@@ -39,6 +39,9 @@ func GetSymbolsT5(ctx context.Context, dev gocan.Adapter, cb func(string)) (*sym
 			swVersion = string(bytes.TrimPrefix(line, []byte("100100")))
 			continue
 		}
+		if len(line) < 8 {
+			return nil, fmt.Errorf("symbol line too short: %q", line)
+		}
 		addr, err := hex.DecodeString(string(line[0:4]))
 		if err != nil {
 			return nil, err
@@ -81,10 +84,6 @@ func sendCommand(ctx context.Context, c *gocan.Bus, cmd []byte) error {
 	return nil
 }
 
-func ack(ctx context.Context, c *gocan.Bus) error {
-	return c.Send(ctx, gocan.NewFrame(0x05, []byte{0xC6, 0x00}))
-}
-
 func recvDataEND(ctx context.Context, c *gocan.Bus) ([]byte, error) {
 	pattern := []byte{'E', 'N', 'D', 0x0D, 0x0A}
 	buff := bytes.NewBuffer(nil)
@@ -95,18 +94,14 @@ func recvDataEND(ctx context.Context, c *gocan.Bus) ([]byte, error) {
 			fmt.Print(".")
 			dd = 0
 		}
-		if err := ack(ctx, c); err != nil {
-			return nil, err
-		}
-
 		rctx, cancel := context.WithTimeout(ctx, 40*time.Millisecond)
-		resp, err := c.Recv(rctx, 0xC)
+		resp, err := c.Request(rctx, gocan.NewFrame(0x05, []byte{0xC6, 0x00}), 0xC)
 		cancel()
 		if err != nil {
 			return nil, err
 		}
 
-		if resp.Data[0] != 0xC6 && resp.Data[1] != 0x00 {
+		if resp.Data[0] != 0xC6 || resp.Data[1] != 0x00 {
 			return nil, fmt.Errorf("invalid response")
 		}
 

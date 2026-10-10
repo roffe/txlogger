@@ -33,6 +33,9 @@ func (th *T8Header) DecodeInfo(fileData []byte) {
 	}
 
 	checksumAreaOffset := int(GetChecksumAreaOffsetFromBytes(fileData))
+	if checksumAreaOffset >= len(fileData) {
+		return
+	}
 	endOfPIArea := GetEmptySpaceStartFrom(fileData, checksumAreaOffset)
 	length := endOfPIArea - checksumAreaOffset + 1
 	piarea := readDataFromBytes(fileData, checksumAreaOffset, length)
@@ -166,7 +169,9 @@ func (th *T8Header) DecodeExtraInfo(fullFileData []byte) {
 	processBlocks(th.lowaddress, th.lowtypes)
 	processBlocks(th.highaddress, th.hightypes)
 	// update info based on last flash block
-	th.fbc[len(th.fbc)-1].DecodeBlock(th)
+	if len(th.fbc) > 0 {
+		th.fbc[len(th.fbc)-1].DecodeBlock(th)
+	}
 }
 
 func (th *T8Header) EncodeExtraInfo() {

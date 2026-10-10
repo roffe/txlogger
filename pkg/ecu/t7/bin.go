@@ -87,9 +87,9 @@ func GetHeaderField(bin []byte, id byte) (string, error) {
 			// find the last field if there are several (mainly this
 			// is for searching for the last VIN field)
 			// return 1;
+		} else {
+			addr -= int(fieldLength)
 		}
-		addr -= int(fieldLength)
-
 	}
 	if found {
 		return string(answer), nil

@@ -108,5 +108,5 @@ func getDTCDescription(d []byte) (string, byte, error) {
 	three := (0xF0 & int(d[1])) >> 4
 	four := (0x0F & int(d[1]))
 
-	return fmt.Sprintf("%s%d%d%d%d", prefix, one, two, three, four), d[3], nil
+	return fmt.Sprintf("%s%d%X%X%X", prefix, one, two, three, four), d[3], nil
 }

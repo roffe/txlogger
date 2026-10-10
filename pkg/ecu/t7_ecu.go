@@ -83,6 +83,10 @@ func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (*sym
 		sym_count++
 	}
 
+	if len(symbols) == 0 {
+		return nil, errors.New("empty symbol table")
+	}
+
 	cb("Downloading symbol names")
 	compressedSymbolNameTable, err := k.ReadFlash(ctx, int(symbols[0].Address), int(symbols[0].Length))
 	if err != nil {
@@ -98,7 +102,7 @@ func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (*sym
 	if err != nil {
 		return nil, err
 	}
-	for i := 0; i < len(symbolNames)-1; i++ {
+	for i := 0; i < len(symbolNames)-1 && i < len(symbols); i++ {
 		symbols[i].Name = strings.TrimSpace(symbolNames[i])
 		symbols[i].Unit = symbol.GetUnit(symbols[i].Name)
 		symbols[i].Correctionfactor = symbol.GetCorrectionfactor(symbols[i].Name)

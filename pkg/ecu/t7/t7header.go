@@ -162,7 +162,7 @@ func (f *FileHeader) SetVin(vin string) {
 func NewFileHeader(filename string, autoFixFooter bool) (*FileHeader, error) {
 	file, err := os.OpenFile(filename, os.O_RDWR, 0o666)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	defer file.Close()
 
@@ -202,8 +202,12 @@ func NewFileHeader(filename string, autoFixFooter bool) (*FileHeader, error) {
 
 	if (fh.chassisIDCounter > 1 || !fh.immoCodeDetected || !fh.chassisIDDetected) && autoFixFooter {
 		log.Println("bad footer detected & auto fix enabled")
-		fh.clearFooter(file)
-		fh.createNewFooter(file, fh.symbolTableMarkerDetected, fh.symbolTableChecksumDetected, fh.f2ChecksumDetected)
+		if err := fh.clearFooter(file); err != nil {
+			return nil, err
+		}
+		if err := fh.createNewFooter(file, fh.symbolTableMarkerDetected, fh.symbolTableChecksumDetected, fh.f2ChecksumDetected); err != nil {
+			return nil, err
+		}
 	}
 
 	log.Printf("%+v", fh)
@@ -265,12 +269,10 @@ func (fh *FileHeader) parseField(fhf *FileHeaderField) {
 		fh.romChecksumType = fhf.Int()
 	case 0xFE:
 		fh.fwLength = fhf.Int()
-	default:
-		panic(fmt.Sprintf("Unknown ID: 0x%02X", fhf.ID))
 	}
 }
 
-func (f *FileHeader) clearFooter(file io.ReadWriteSeeker) {
+func (f *FileHeader) clearFooter(file io.ReadWriteSeeker) error {
 	log.Println("clear footer")
 	end, _ := file.Seek(0, io.SeekEnd)
 	file.Seek(0x07FE00, io.SeekStart)
@@ -284,7 +286,7 @@ func (f *FileHeader) clearFooter(file io.ReadWriteSeeker) {
 
 	n, err := file.Write(piArea)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	if n != int(length) {
@@ -302,9 +304,10 @@ func (f *FileHeader) clearFooter(file io.ReadWriteSeeker) {
 			}
 		}
 	*/
+	return nil
 }
 
-func (f *FileHeader) createNewFooter(file io.ReadWriteSeeker, create9B bool, create9C bool, createF2 bool) {
+func (f *FileHeader) createNewFooter(file io.ReadWriteSeeker, create9B bool, create9C bool, createF2 bool) error {
 	log.Println("write footer")
 	headers := []FileHeaderField{
 		{
@@ -407,7 +410,7 @@ func (f *FileHeader) createNewFooter(file io.ReadWriteSeeker, create9B bool, cre
 		{
 			ID:     0xF9,
 			Length: 1,
-			Data:   []byte{0x00},
+			Data:   []byte{f.romChecksumError},
 		},
 	}
 
@@ -442,24 +445,34 @@ func (f *FileHeader) createNewFooter(file io.ReadWriteSeeker, create9B bool, cre
 
 	file.Seek(-1, io.SeekEnd)
 	for _, h := range headers {
-		f.writeField(file, h)
+		if err := f.writeField(file, h); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func (fh *FileHeader) writeField(file io.ReadWriteSeeker, f FileHeaderField) {
+func (fh *FileHeader) writeField(file io.ReadWriteSeeker, f FileHeaderField) error {
 	log.Println(f.Pretty())
 	// Write length
-	file.Write([]byte{byte(f.Length)})
+	if _, err := file.Write([]byte{byte(f.Length)}); err != nil {
+		return err
+	}
 	file.Seek(-2, io.SeekCurrent)
 
 	// Write ID
-	file.Write([]byte{f.ID})
+	if _, err := file.Write([]byte{f.ID}); err != nil {
+		return err
+	}
 	file.Seek(-2, io.SeekCurrent) // Skip ID and length
 
 	for i := 0; i < f.Length; i++ {
-		file.Write([]byte{f.Data[i]})
+		if _, err := file.Write([]byte{f.Data[i]}); err != nil {
+			return err
+		}
 		file.Seek(-2, io.SeekCurrent)
 	}
+	return nil
 }
 
 func (fh *FileHeader) SetLastModifiedBy(value byte, pos int) {
