@@ -1,7 +1,6 @@
 package windows
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -818,22 +817,13 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 
 	updateFunc := func(idx int, value []float64) {
 		if mw.dlc != nil && ecuLive && mw.settings.GetAutoSave() {
-			buff := bytes.NewBuffer([]byte{})
-			var dataLen int
-			for i, val := range value {
-				buff.Write(symZ.EncodeFloat64(val))
-				if i == 0 {
-					dataLen = buff.Len()
-				}
-			}
-
+			addr, b := ramWrite(symZ, ecuAddr, idx, value)
 			start := time.Now()
-			if err := mw.dlc.SetRAM(ecuAddr+uint32(idx*dataLen), buff.Bytes()); err != nil {
+			if err := mw.dlc.SetRAM(addr, b); err != nil {
 				mw.Error(err)
 				return
 			}
-			// mw.Log(fmt.Sprintf("set $%d %s %s", addr, axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
-			mw.Log(fmt.Sprintf("set %s $%X %dms", axis.Z, ecuAddr+uint32(idx*dataLen), time.Since(start).Truncate(10*time.Millisecond).Milliseconds()))
+			mw.Log(fmt.Sprintf("set %s $%X %dms", axis.Z, addr, time.Since(start).Truncate(10*time.Millisecond).Milliseconds()))
 		}
 	}
 
@@ -859,14 +849,11 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 			return
 		}
 		start := time.Now()
-		buff := bytes.NewBuffer(symZ.EncodeFloat64s(data))
-		if err := mw.dlc.SetRAM(ecuAddr, buff.Bytes()); err != nil {
+		addr, b := ramWrite(symZ, ecuAddr, 0, data)
+		if err := mw.dlc.SetRAM(addr, b); err != nil {
 			mw.Error(err)
 			return
 		}
-		buff.Reset()
-
-		// mw.Log(fmt.Sprintf("save %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 		mw.Log(fmt.Sprintf("save %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 	}
 
@@ -882,16 +869,7 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 	}
 
 	saveFileFunc := func(data []float64) {
-		ss := mw.fw.GetByName(axis.Z)
-		if ss == nil {
-			mw.Log(fmt.Sprintf("failed to find symbol %s", axis.Z))
-			return
-		}
-		if err := ss.SetData(ss.EncodeFloat64s(data)); err != nil {
-			mw.Error(err)
-			return
-		}
-		if err := mw.fw.Save(mw.filename); err != nil {
+		if err := writeMap(mw.fw, mw.filename, axis.Z, data); err != nil {
 			mw.Error(err)
 			return
 		}
@@ -1041,6 +1019,29 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 	}))
 
 	return mv, cfg, axis, cancelFuncs, nil
+}
+
+// writeMap stores a map viewer's values in the named symbol and saves the
+// binary to filename.
+func writeMap(fw symbol.FirmwareFile, filename, name string, data []float64) error {
+	sym := fw.GetByName(name)
+	if sym == nil {
+		return fmt.Errorf("failed to find symbol %s", name)
+	}
+	if err := sym.SetData(sym.EncodeFloat64s(data)); err != nil {
+		return err
+	}
+	return fw.Save(filename)
+}
+
+// ramWrite encodes the values of cells idx and on, and returns where they go
+// in the ECU's RAM copy of the map, which starts at base.
+func ramWrite(sym *symbol.Symbol, base uint32, idx int, values []float64) (uint32, []byte) {
+	b := sym.EncodeFloat64s(values)
+	if len(values) == 0 {
+		return base, b
+	}
+	return base + uint32(idx*len(b)/len(values)), b
 }
 
 func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string, regionMap string) {
