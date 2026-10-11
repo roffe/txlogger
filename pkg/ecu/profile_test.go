@@ -104,7 +104,8 @@ func TestCANFilter(t *testing.T) {
 }
 
 // RAMAddress maps a symbol to its live RAM address per ECU: T5 uses the SRAM
-// offset, T7 only RAM-backed symbols (>= 0x80000), T8 address plus offset.
+// offset, T7 only RAM-backed symbols (>= 0x80000), T8 address plus offset
+// when that lands in SRAM (>= 0x100000).
 func TestRAMAddress(t *testing.T) {
 	cases := []struct {
 		ecu   string
@@ -117,6 +118,8 @@ func TestRAMAddress(t *testing.T) {
 		{"T7", symbol.Symbol{Address: 0x80000}, 0x80000, true},
 		{"T7", symbol.Symbol{Address: 0xF00010}, 0xF00010, true},
 		{"T8", symbol.Symbol{Address: 0x100000, SramOffset: 0x4000}, 0x104000, true},
+		{"T8", symbol.Symbol{Address: 0xA1046}, 0xA1046, false},
+		{"T8", symbol.Symbol{Address: 0x102100}, 0x102100, true},
 	}
 	for _, c := range cases {
 		addr, ok := GetProfile(c.ecu).RAMAddress(&c.sym)

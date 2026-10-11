@@ -17,8 +17,12 @@ var t8Profile = Profile{
 	CANRate:     500,
 	CANFilter:   func(string) []uint32 { return []uint32{0x5E8, 0x7E8} },
 	CANWideband: true,
+	// Only open binaries mirror calibration to SRAM (>= 0x100000); closed
+	// ones run it from flash. Flash can't be written live: the ECU acks the
+	// write without storing it, so only SRAM-backed maps are live.
 	RAMAddress: func(sym *symbol.Symbol) (uint32, bool) {
-		return sym.Address + sym.SramOffset, true
+		addr := sym.Address + sym.SramOffset
+		return addr, addr >= 0x100000
 	},
 	Signals: map[Signal]string{
 		RPM:           "ActualIn.n_Engine",
