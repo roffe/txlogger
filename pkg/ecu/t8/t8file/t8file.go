@@ -57,6 +57,8 @@ func (tf *T8File) saveDataToBinary(address int64, length int, data []byte) error
 	return err
 }
 
+// SaveFlashBlock writes the values edited since the file was read into every
+// NVDM record of the file, in place; see EncodeExtraInfo.
 func (tf *T8File) SaveFlashBlock() error {
 	tf.th.EncodeExtraInfo()
 
@@ -136,8 +138,8 @@ func (tf *T8File) ShowEditT8Dialog(win fyne.Window) {
 	ecuEntry := widget.NewEntry()
 	ecuEntry.SetText(tf.th.EcuDescription())
 	ecuEntry.Validator = func(s string) error {
-		if len(s) != 16 {
-			return errors.New("EcuDescription must be 16 characters long")
+		if len(s) != 15 {
+			return errors.New("EcuDescription must be 15 characters long")
 		}
 		return nil
 	}
@@ -199,7 +201,7 @@ func (tf *T8File) ShowEditT8Dialog(win fyne.Window) {
 				if len(vinEntry.Text) == 17 {
 					tf.th.SetVIN(vinEntry.Text)
 				}
-				if len(ecuEntry.Text) == 16 {
+				if len(ecuEntry.Text) == 15 {
 					tf.th.SetEcuDescription(ecuEntry.Text)
 				}
 				if len(pinEntry.Text) == 4 {

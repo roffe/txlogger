@@ -27,6 +27,7 @@ func nvdmImage(t *testing.T, pin string) []byte {
 	img[0x7FFF] = 0x00                                             // keeps the last NVDM block from reading as erased
 	plain := make([]byte, 0x130)
 	copy(plain[0x40:], pin)
+	copy(plain[0x50:], "Cryp") // marks it an NVDM record
 	for i, b := range plain {
 		img[0x4100+i] = (b ^ 0xA4) - 0x53 // the inverse of FlashBlock.DecodeBlock
 	}

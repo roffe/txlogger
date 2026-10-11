@@ -72,7 +72,7 @@ func TestEditDialogFields(t *testing.T) {
 		}
 	}
 
-	lengths := map[int]int{0: 17, 1: 16, 4: 4, 5: 12, 6: 12}
+	lengths := map[int]int{0: 17, 1: 15, 4: 4, 5: 12, 6: 12}
 	for i, n := range lengths {
 		if err := e[i].Validator(strings.Repeat("A", n)); err != nil {
 			t.Errorf("entry %d rejects %d characters: %v", i, n, err)

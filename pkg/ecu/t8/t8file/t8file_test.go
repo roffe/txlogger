@@ -141,8 +141,9 @@ func TestGetInfoNotT8(t *testing.T) {
 	}
 }
 
-// SaveFlashBlock writes the header's immobilizer data into every flash block
-// of the file and leaves every byte outside the blocks untouched.
+// SaveFlashBlock writes the edited values into every flash block of the file;
+// each block keeps its own other values and every byte outside the blocks is
+// left untouched.
 func TestSaveFlashBlock(t *testing.T) {
 	orig := testBin()
 	path := writeBin(t, orig)
@@ -183,8 +184,8 @@ func TestSaveFlashBlock(t *testing.T) {
 		if back.VIN() != "YS3FB49F741999999" || back.PIN() != "ZZ99" || back.PSK() != "CAFEBABE0001" {
 			t.Errorf("block %#x: VIN %q PIN %q PSK %q", a, back.VIN(), back.PIN(), back.PSK())
 		}
-		if back.ISK() != "B0B1B2B3B4B5" {
-			t.Errorf("block %#x: ISK = %q, want the header's B0B1B2B3B4B5", a, back.ISK())
+		if own := map[int]string{0x42D8: "FEDCBA987654", 0x4408: "665544332211", 0x62D8: "B0B1B2B3B4B5"}[a]; back.ISK() != own {
+			t.Errorf("block %#x: ISK = %q, want its own %s", a, back.ISK(), own)
 		}
 	}
 
@@ -237,7 +238,7 @@ func TestStockImage(t *testing.T) {
 		{"ReleaseDate", th.ReleaseDate(), "2004-08-12 14:13:34"},
 		{"ProgrammerName", th.ProgrammerName(), "Martin B Andersson"},
 		{"ProgrammerDevice", th.ProgrammerDevice(), "SPSTool\x00"}, // the record is 8 bytes, NUL included
-		{"EcuDescription", th.EcuDescription(), "Trionic 8 P6.8  "},
+		{"EcuDescription", th.EcuDescription(), "Trionic 8 P6.8 "},
 	} {
 		if c.got != c.want {
 			t.Errorf("%s = %q, want %q", c.name, c.got, c.want)

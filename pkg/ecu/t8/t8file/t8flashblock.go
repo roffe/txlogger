@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"strings"
+	"slices"
 )
 
+// FlashBlock is one NVDM record: the ECU's non-volatile data (VIN, immobilizer
+// keys, odometer and service counters, fault history) as written at a power
+// down, 0x130 bytes. The ECU stores records scrambled byte by byte and marks
+// them "Cryp"; it reads a record without the scrambled marker as is.
 type FlashBlock struct {
 	BlockType    int
 	BlockAddress int
@@ -14,82 +18,98 @@ type FlashBlock struct {
 	BlockData    []byte
 }
 
-func (fb *FlashBlock) DecodeBlock(th *T8Header) {
-	data := make([]byte, 0x130)
-	copy(data, fb.BlockData)
-	dataLen := len(data)
-	for t := range fb.BlockData {
-		data[t] += 0x53
-		data[t] ^= 0xA4
-	}
-	if dataLen >= 0xAF+0x10 {
-		th.ecuDescription = string(data[0xAF : 0xAF+0x10])
-	}
+const (
+	recordSize  = 0x130
+	cryptOffset = 0x50
+)
 
-	if dataLen >= 0xE0+0x11 {
-		th.vin = string(data[0xE0 : 0xE0+0x11])
-	}
+// recordField is one value the editor shows, at its place in a record.
+type recordField struct {
+	off, n int
+	get    func(*T8Header) string
+	set    func(*T8Header, []byte)
+	encode func(v string, n int) ([]byte, bool) // false: leave the stored bytes
+}
 
-	if dataLen >= 0x101+0x0B {
-		var builder strings.Builder
-		for _, b := range data[0x101 : 0x101+0x0B] {
-			if b != 0xFF {
-				builder.WriteByte(b)
-			}
-		}
-		th.interfaceDevice = builder.String()
-	}
+// recordFields are the editable values. The ECU description is the hardware
+// name (10 bytes) and its level and index (5); the interface device is the
+// 10 byte repair shop code or tester serial, FF padded; PSK and ISK are the
+// first 6 bytes of the 12 byte remote control and transponder keys.
+var recordFields = []recordField{
+	{0xAF, 15, (*T8Header).EcuDescription, func(th *T8Header, b []byte) { th.ecuDescription = string(b) }, padded(' ')},
+	{0xE0, 17, (*T8Header).VIN, func(th *T8Header, b []byte) { th.vin = string(b) }, padded(' ')},
+	{0x101, 10, (*T8Header).InterfaceDevice, func(th *T8Header, b []byte) { th.interfaceDevice = string(bytes.TrimRight(b, "\xFF")) }, padded(0xFF)},
+	{0x40, 4, (*T8Header).PIN, func(th *T8Header, b []byte) { th.pin = string(b) }, padded(' ')},
+	{0x55, 6, (*T8Header).PSK, func(th *T8Header, b []byte) { th.psk = fmt.Sprintf("%02X", b) }, hexBytes},
+	{0x61, 6, (*T8Header).ISK, func(th *T8Header, b []byte) { th.isk = fmt.Sprintf("%02X", b) }, hexBytes},
+}
 
-	if dataLen >= 0x40+0x04 {
-		th.pin = string(data[0x40 : 0x40+0x04])
-	}
-
-	if dataLen >= 0x55+0x06 {
-		th.psk = fmt.Sprintf("%02X", data[0x55:0x55+0x06])
-	}
-
-	if dataLen >= 0x61+0x06 {
-		th.isk = fmt.Sprintf("%02X", data[0x61:0x61+0x06])
+func padded(pad byte) func(string, int) ([]byte, bool) {
+	return func(v string, n int) ([]byte, bool) {
+		b := bytes.Repeat([]byte{pad}, n)
+		copy(b, v)
+		return b, true
 	}
 }
 
+func hexBytes(v string, n int) ([]byte, bool) {
+	b, err := hex.DecodeString(v)
+	return b, err == nil && len(b) == n
+}
+
+// record returns the block's record in plain form and whether it is stored
+// scrambled; ok is false when it carries no "Cryp" marker either way.
+func (fb *FlashBlock) record() (data []byte, scrambled, ok bool) {
+	if len(fb.BlockData) < recordSize {
+		return nil, false, false
+	}
+	data = slices.Clone(fb.BlockData[:recordSize])
+	if string(data[cryptOffset:cryptOffset+4]) == "Cryp" {
+		return data, false, true
+	}
+	for i := range data {
+		data[i] = (data[i] + 0x53) ^ 0xA4
+	}
+	if string(data[cryptOffset:cryptOffset+4]) == "Cryp" {
+		return data, true, true
+	}
+	return nil, false, false
+}
+
+// DecodeBlock reads the record's editable values into th; a block that is
+// not a record leaves th as it is.
+func (fb *FlashBlock) DecodeBlock(th *T8Header) {
+	data, _, ok := fb.record()
+	if !ok {
+		return
+	}
+	for _, f := range recordFields {
+		f.set(th, data[f.off:f.off+f.n])
+	}
+}
+
+// EncodeBlock returns the block with every editable value taken from th.
 func (fb *FlashBlock) EncodeBlock(th *T8Header) []byte {
-	data := make([]byte, len(fb.BlockData))
-	copy(data, fb.BlockData)
-	for t := range data {
-		data[t] += 0x53
-		data[t] ^= 0xA4
+	return fb.encode(th, recordFields)
+}
+
+// encode returns the block with the given fields set from th, stored the way
+// the block was: scrambled or plain. Every other byte is kept, and a block
+// that is not a record comes back unchanged.
+func (fb *FlashBlock) encode(th *T8Header, fields []recordField) []byte {
+	data, scrambled, ok := fb.record()
+	if !ok {
+		return slices.Clone(fb.BlockData)
 	}
-
-	copy(data[0xAF:0xAF+0x10], th.ecuDescription)
-
-	copy(data[0xE0:0xE0+17], th.vin)
-
-	for i := 0x101; i < 0x101+11; i++ {
-		data[i] = 0xFF
+	for _, f := range fields {
+		if b, ok := f.encode(f.get(th), f.n); ok {
+			copy(data[f.off:f.off+f.n], b)
+		}
 	}
-	copy(data[0x101:0x101+11], th.interfaceDevice)
-	copy(data[0x40:0x40+4], th.pin)
-
-	if pskBytes, err := hex.DecodeString(th.psk); err == nil && len(pskBytes) <= 6 {
-		copy(data[0x55:0x55+6], pskBytes)
-	}
-	if iskBytes, err := hex.DecodeString(th.isk); err == nil && len(iskBytes) <= 6 {
-		copy(data[0x61:0x61+6], iskBytes)
-	}
-
-	for t := range data {
-		data[t] ^= 0xA4
-		data[t] -= 0x53
+	if scrambled {
+		for i := range data {
+			data[i] = (data[i] ^ 0xA4) - 0x53
+		}
 	}
 	return data
-}
-
-func (fb *FlashBlock) isValid() bool {
-	if len(fb.BlockData) < 8 {
-		return false
-	}
-
-	invalidPattern := []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
-	return !bytes.Equal(fb.BlockData[:8], invalidPattern)
 }

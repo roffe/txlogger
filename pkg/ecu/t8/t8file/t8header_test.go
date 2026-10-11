@@ -3,6 +3,7 @@ package t8file
 import (
 	"bytes"
 	"encoding/binary"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -55,12 +56,13 @@ type block struct {
 // plain returns the decoded 0x130-byte block.
 func (b block) plain() []byte {
 	p := make([]byte, 0x130)
+	copy(p[0x50:], "Cryp")
 	copy(p[0x40:], b.pin)
 	copy(p[0x55:], b.psk)
 	copy(p[0x61:], b.isk)
 	copy(p[0xAF:], b.desc)
 	copy(p[0xE0:], b.vin)
-	for i := 0x101; i < 0x101+0x0B; i++ {
+	for i := 0x101; i < 0x101+0x0A; i++ {
 		p[i] = 0xFF
 	}
 	copy(p[0x101:], b.itf)
@@ -120,11 +122,11 @@ func putSegment(bin []byte, seg int, partNo, serial string, blocks ...placed) {
 }
 
 var (
-	blockA = block{vin: "YS3FB49F741000001", desc: "Trionic 8 P6.8  ", itf: "PPCAN 210", pin: "AB12",
+	blockA = block{vin: "YS3FB49F741000001", desc: "Trionic 8 P6.8 ", itf: "PPCAN 210", pin: "AB12",
 		psk: []byte{0x01, 0x23, 0x45, 0x67, 0x89, 0xAB}, isk: []byte{0xFE, 0xDC, 0xBA, 0x98, 0x76, 0x54}}
-	blockB = block{vin: "YS3FB49F741000002", desc: "Trionic 8 P6.8  ", itf: "PPCAN 210", pin: "CD34",
+	blockB = block{vin: "YS3FB49F741000002", desc: "Trionic 8 P6.8 ", itf: "PPCAN 210", pin: "CD34",
 		psk: []byte{0x11, 0x22, 0x33, 0x44, 0x55, 0x66}, isk: []byte{0x66, 0x55, 0x44, 0x33, 0x22, 0x11}}
-	blockC = block{vin: "YS3FB49F741000003", desc: "Trionic 8 P6.9  ", itf: "S001015575", pin: "EF56",
+	blockC = block{vin: "YS3FB49F741000003", desc: "Trionic 8 P6.9 ", itf: "S001015575", pin: "EF56",
 		psk: []byte{0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5}, isk: []byte{0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5}}
 )
 
@@ -345,8 +347,8 @@ func TestDecodeExtraInfoSkipsUnusableBlocks(t *testing.T) {
 	}
 }
 
-// A pointer to an erased (all 0xFF) block is not a flash block: the T8Suite
-// reference rejects blocks that decode to F6 F6 F6 F6 F6 F6 F6 F6.
+// A pointer to an erased (all 0xFF) block is not a flash block: it carries no
+// "Cryp" marker.
 func TestDecodeExtraInfoSkipsErasedBlock(t *testing.T) {
 	bin := blankBin()
 	putSegment(bin, 0x4000, "55353231", "",
@@ -441,37 +443,93 @@ func TestEncodeBlockKeepsKeysOnBadHex(t *testing.T) {
 	}
 }
 
-// EncodeBlock stores the whole 16-character ECU description that DecodeBlock
-// reads and the edit dialog requires.
+// EncodeBlock stores the 15-character ECU description (hardware name and its
+// level and index) and leaves the byte after it, the software version name.
 func TestEncodeBlockEcuDescription(t *testing.T) {
-	fb := FlashBlock{BlockData: blockA.raw()}
+	plain := blockA.plain()
+	plain[0xBE] = 'Q'
+	raw := make([]byte, len(plain))
+	for i, b := range plain {
+		raw[i] = encFB(b)
+	}
+	fb := FlashBlock{BlockData: raw}
 	th := new(T8Header)
 	fb.DecodeBlock(th)
-	th.SetEcuDescription("ABCDEFGHIJKLMNOP")
+	th.SetEcuDescription("ABCDEFGHIJKLMNO")
 
+	enc := FlashBlock{BlockData: fb.EncodeBlock(th)}
 	back := new(T8Header)
-	(&FlashBlock{BlockData: fb.EncodeBlock(th)}).DecodeBlock(back)
-	if back.EcuDescription() != "ABCDEFGHIJKLMNOP" {
-		t.Errorf("EcuDescription = %q, want %q", back.EcuDescription(), "ABCDEFGHIJKLMNOP")
+	enc.DecodeBlock(back)
+	if back.EcuDescription() != "ABCDEFGHIJKLMNO" {
+		t.Errorf("EcuDescription = %q, want %q", back.EcuDescription(), "ABCDEFGHIJKLMNO")
+	}
+	if data, _, _ := enc.record(); data[0xBE] != 'Q' {
+		t.Errorf("byte 0xBE = %q, want it left at 'Q'", data[0xBE])
 	}
 }
 
-// isValid rejects blocks shorter than the 8-byte marker and accepts a block
-// carrying immobilizer data. (Which 8-byte marker it rejects is pinned by
-// TestDecodeExtraInfoSkipsErasedBlock.)
-func TestFlashBlockIsValid(t *testing.T) {
+// A record is a block with the "Cryp" marker, stored scrambled or plain.
+// Anything else (short, erased, no marker) is not one.
+func TestFlashBlockRecord(t *testing.T) {
 	for _, c := range []struct {
-		name string
-		data []byte
-		want bool
+		name          string
+		data          []byte
+		ok, scrambled bool
 	}{
-		{"short", []byte{1, 2, 3}, false},
-		{"data", blockA.raw(), true},
+		{"scrambled", blockA.raw(), true, true},
+		{"plain", blockA.plain(), true, false},
+		{"short", []byte{1, 2, 3}, false, false},
+		{"erased", bytes.Repeat([]byte{0xFF}, 0x130), false, false},
+		{"no marker", make([]byte, 0x130), false, false},
 	} {
 		fb := FlashBlock{BlockData: c.data}
-		if got := fb.isValid(); got != c.want {
-			t.Errorf("%s: isValid = %v, want %v", c.name, got, c.want)
+		data, scrambled, ok := fb.record()
+		if ok != c.ok || scrambled != c.scrambled {
+			t.Errorf("%s: ok %v scrambled %v, want %v %v", c.name, ok, scrambled, c.ok, c.scrambled)
 		}
+		if ok && !bytes.Equal(data, blockA.plain()) {
+			t.Errorf("%s: record data is not the plain block", c.name)
+		}
+	}
+}
+
+// A plain record decodes like a scrambled one and stays plain when edited.
+func TestPlainRecordStaysPlain(t *testing.T) {
+	fb := FlashBlock{BlockData: blockA.plain()}
+	th := new(T8Header)
+	fb.DecodeBlock(th)
+	if th.VIN() != blockA.vin || th.PIN() != blockA.pin {
+		t.Fatalf("plain record decodes to VIN %q PIN %q", th.VIN(), th.PIN())
+	}
+	th.SetVIN(blockB.vin)
+	got := fb.EncodeBlock(th)
+	want := blockA.plain()
+	copy(want[0xE0:], blockB.vin)
+	if !bytes.Equal(got, want) {
+		t.Error("an edited plain record is not the plain block with the new VIN")
+	}
+}
+
+// EncodeExtraInfo writes only the edited values, into every record, and each
+// record keeps its own other values.
+func TestEncodeExtraInfoOnlyEdited(t *testing.T) {
+	th := new(T8Header)
+	th.DecodeExtraInfo(testBin())
+	th.SetVIN("YS3FB49F741999999")
+	th.SetPIN("ZZ99")
+	th.EncodeExtraInfo()
+	for i, b := range []block{blockA, blockB, blockC} {
+		want := b
+		want.vin, want.pin = "YS3FB49F741999999", "ZZ99"
+		if got := th.FlashBlocks()[i].BlockData; !bytes.Equal(got, want.raw()) {
+			t.Errorf("block %d is not its own record with the new VIN and PIN", i)
+		}
+	}
+	// nothing edited since: another save changes nothing
+	before := slices.Clone(th.FlashBlocks()[0].BlockData)
+	th.EncodeExtraInfo()
+	if !bytes.Equal(th.FlashBlocks()[0].BlockData, before) {
+		t.Error("a save without edits changed a record")
 	}
 }
 
@@ -485,7 +543,7 @@ func TestGetFormattedLog(t *testing.T) {
 	out := th.GetFormattedLog()
 
 	for _, want := range []string{
-		"ECU Description:  Trionic 8 P6.9  \n",
+		"ECU Description:  Trionic 8 P6.9 \n",
 		"Part Number:      55353231\n",
 		"Serial Number:    863232AC0A06C72H\n",
 		"Hardware ID:      GMPT 0100\n",

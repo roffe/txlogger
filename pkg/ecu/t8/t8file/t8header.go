@@ -25,6 +25,7 @@ type T8Header struct {
 	pin              string
 	psk              string
 	isk              string
+	read             *T8Header // the editable values as read from the records
 }
 
 func (th *T8Header) DecodeInfo(fileData []byte) {
@@ -150,7 +151,7 @@ func (th *T8Header) DecodeExtraInfo(fullFileData []byte) {
 					fb.BlockData = make([]byte, 0x130)
 					copy(fb.BlockData, fileData[dataOffset:dataOffset+0x130])
 
-					if fb.isValid() {
+					if _, _, ok := fb.record(); ok {
 						fb.BlockNumber = blockNumber
 						th.fbc = append(th.fbc, fb)
 						blockNumber++
@@ -172,12 +173,30 @@ func (th *T8Header) DecodeExtraInfo(fullFileData []byte) {
 	if len(th.fbc) > 0 {
 		th.fbc[len(th.fbc)-1].DecodeBlock(th)
 	}
+	th.read = th.editable()
 }
 
+// EncodeExtraInfo writes the values edited since the records were read into
+// every record, in place: only those fields change, each record keeps its own
+// other values (they are earlier power-down copies of the ECU's data) and a
+// record stays scrambled or plain as it was stored.
 func (th *T8Header) EncodeExtraInfo() {
-	for i, fb := range th.fbc {
-		th.fbc[i].BlockData = fb.EncodeBlock(th)
+	var changed []recordField
+	for _, f := range recordFields {
+		if th.read == nil || f.get(th) != f.get(th.read) {
+			changed = append(changed, f)
+		}
 	}
+	for i, fb := range th.fbc {
+		th.fbc[i].BlockData = fb.encode(th, changed)
+	}
+	th.read = th.editable()
+}
+
+// editable copies the values the editor changes.
+func (th *T8Header) editable() *T8Header {
+	return &T8Header{ecuDescription: th.ecuDescription, vin: th.vin, interfaceDevice: th.interfaceDevice,
+		pin: th.pin, psk: th.psk, isk: th.isk}
 }
 
 func (t *T8Header) FlashBlocks() []FlashBlock { return t.fbc }
@@ -237,11 +256,12 @@ func (th *T8Header) GetFormattedLog() string {
 	sb.WriteString("\n--- FLASH BLOCKS ---\n")
 	sb.WriteString(fmt.Sprintf("Total Blocks:     %d\n", len(th.fbc)))
 	for _, fb := range th.fbc {
-		fb.DecodeBlock(th)
+		b := new(T8Header)
+		fb.DecodeBlock(b)
 		sb.WriteString(fmt.Sprintf("[Block %02d] Addr: 0x%04X, Type: 0x%02X\n",
 			fb.BlockNumber, fb.BlockAddress, fb.BlockType))
-		sb.WriteString(fmt.Sprintf("\\__ VIN: %s PIN: %s\n", th.vin, th.pin))
-		sb.WriteString(fmt.Sprintf(" \\_ ISK: %s PSK: %s\n", th.isk, th.psk))
+		sb.WriteString(fmt.Sprintf("\\__ VIN: %s PIN: %s\n", b.vin, b.pin))
+		sb.WriteString(fmt.Sprintf(" \\_ ISK: %s PSK: %s\n", b.isk, b.psk))
 	}
 	sb.WriteString("===============================\n")
 
