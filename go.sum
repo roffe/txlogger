@@ -73,8 +73,8 @@ github.com/roffe/bdmtool/v3 v3.0.7 h1:lyArcyX5+AMKPWfRxqtM2GE5CNZ75UjqGganzg+Irq
 github.com/roffe/bdmtool/v3 v3.0.7/go.mod h1:N1x7XyJ782F8jXA8eU745r3d2edO0r845hw+C83Sx8w=
 github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974 h1:0sTHqcaQMYaRote/EYtlRXixwaCrR7nUkFQqEAioX5A=
 github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974/go.mod h1:qJAMUtwoSym/Ybjw8xt/iwCm19aAGiJtmSILHm6QHmY=
-github.com/roffe/ecusymbol v1.2.6-0.20261010215833-b8703e12cd6c h1:UdDm3YUQpV7kR0ZvX12iKO+JHqEf0R0NoCtVBIe/jWQ=
-github.com/roffe/ecusymbol v1.2.6-0.20261010215833-b8703e12cd6c/go.mod h1:fAnqgGsoKyrt92/3dw3zXp/Tuo++PUDFLEv+PLe5kUI=
+github.com/roffe/ecusymbol v1.2.6-0.20261011003712-c7023962a80a h1:VALdwW1DQAOZTDudi4+Nll6KsbM7GwI1U/K0IKtZ2Gw=
+github.com/roffe/ecusymbol v1.2.6-0.20261011003712-c7023962a80a/go.mod h1:fAnqgGsoKyrt92/3dw3zXp/Tuo++PUDFLEv+PLe5kUI=
 github.com/roffe/fyne/v2 v2.0.0-20261010200802-608fec71e386 h1:HtdkCOsIylQMQWJZyWxSyhkf2qLjkFikZbN8NFQv6Jc=
 github.com/roffe/fyne/v2 v2.0.0-20261010200802-608fec71e386/go.mod h1:eXHJ/D9Y58UcDw7SkguadCRI64M4flXyjoMn827Q5SI=
 github.com/roffe/gocan/v2 v2.1.1-0.20261010194948-26f833484dfd h1:xwxStJRrP993FfqIgYriHRVOtZ9DDzJW3EMUMRbhvTo=
