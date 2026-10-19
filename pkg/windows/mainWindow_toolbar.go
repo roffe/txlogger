@@ -1,7 +1,10 @@
 package windows
 
 import (
+	"image/color"
+
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
@@ -44,6 +47,12 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 			mw.selects.layoutSelect,
 		),
 	)
+	if fyne.CurrentDevice().IsMobile() {
+		// mobile draws the main menu as a button floating over the top left corner
+		burger := canvas.NewRectangle(color.Transparent)
+		burger.SetMinSize(widget.NewButtonWithIcon("", theme.MenuIcon(), nil).MinSize())
+		toolbar.Objects = append([]fyne.CanvasObject{burger}, toolbar.Objects...)
+	}
 	//if mw.previewFeatures {
 	/*
 		toolbar.Add(widget.NewButtonWithIcon("", theme.DocumentIcon(), func() {
