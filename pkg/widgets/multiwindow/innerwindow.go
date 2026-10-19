@@ -261,12 +261,12 @@ func (w *InnerWindow) CreateRenderer() fyne.WidgetRenderer {
 
 	if isLeading {
 		// Left side (darwin default or explicit left alignment)
-		buttons = container.NewHBox(close, min, max)
+		buttons = container.NewCenter(container.NewHBox(close, min, max))
 		// bar = container.NewBorder(nil, nil, buttons, borderIcon, title)
 		bar = container.NewBorder(nil, nil, buttons, borderIcon, container.New(layout.NewCustomPaddedLayout(topPad, 0, 0, 0), title))
 	} else {
 		// Right side (Windows/Linux default and explicit right alignment)
-		buttons = container.NewHBox(min, max, close)
+		buttons = container.NewCenter(container.NewHBox(min, max, close))
 		// bar = container.NewBorder(nil, nil, borderIcon, buttons, title)
 		bar = container.NewBorder(nil, nil, borderIcon, buttons, container.New(layout.NewCustomPaddedLayout(topPad, 0, 0, 0), title))
 	}

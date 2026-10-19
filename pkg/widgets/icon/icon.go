@@ -24,6 +24,8 @@ func New(cfg *Config) *Icon {
 	ic := &Icon{
 		cfg: cfg,
 	}
+	ic.ExtendBaseWidget(ic)
+
 	cfg.Image.FillMode = canvas.ImageFillContain
 	cfg.Image.ScaleMode = canvas.ImageScaleFastest
 
