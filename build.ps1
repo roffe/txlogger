@@ -4,7 +4,7 @@ param(
     [switch]$txlogger,
     [switch]$setup,
     [switch]$release,
-    [switch]$directx,
+    [switch]$wgpu,
     [switch]$usegitsrc
 )
 
@@ -61,7 +61,7 @@ if ($txlogger) {
     # $env:CGO_LDFLAGS = ($libs | ForEach-Object { '-L' + $_ }) -join ' '
     $env:GOARCH = "amd64"
     $tags = "canlib,canusb,combi,ftdi,j2534,pcan,rcan"
-    if ($directx) { $tags += ",directx" }
+    if ($wgpu) { $tags += ",wgpu" }
     fyne package -tags="$tags" --release
 }
 

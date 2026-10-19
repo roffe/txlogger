@@ -11,13 +11,13 @@ import (
 	"fyne.io/fyne/v2/canvas"
 )
 
-// plotShaderHLSL is the same shader ported to HLSL for Fyne's Direct3D 11
-// driver, which is only built with the `directx` tag. Carrying it
-// unconditionally costs an unreferenced blob on OpenGL targets and keeps the
-// widget free of build tags; see the file header for the porting notes.
+// plotShaderWGSL is the same shader ported to WGSL for Fyne's WebGPU painter.
+// Carrying it unconditionally costs an unreferenced blob on OpenGL targets and
+// keeps the widget free of build tags; see its file header for the porting
+// notes.
 //
-//go:embed plotter.hlsl
-var plotShaderHLSL []byte
+//go:embed plotter.wgsl
+var plotShaderWGSL []byte
 
 // GPU renderer: the whole plot is drawn by a single canvas.Shader. The log is
 // immutable once loaded, so every sample is uploaded to the GPU exactly once
@@ -106,7 +106,7 @@ func (p *Plotter) initShader() bool {
 		[]byte(plotShaderPreludeGL+plotShaderBody),
 		[]byte(plotShaderPreludeES+plotShaderBody),
 	)
-	p.shader.SourceHLSL = plotShaderHLSL
+	p.shader.SourceWGSL = plotShaderWGSL
 	p.shader.Textures = make(map[string]image.Image, 3)
 	p.shader.Uniforms = make(map[string]float32, 16)
 

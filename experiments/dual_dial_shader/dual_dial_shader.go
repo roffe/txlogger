@@ -28,3 +28,6 @@ precision mediump float;
 
 //go:embed dual_dial.frag
 var dualDialShaderBody string
+
+//go:embed dual_dial.wgsl
+var dualDialShaderWGSL []byte

@@ -33,3 +33,6 @@ precision mediump float;
 
 //go:embed dial.frag
 var dialShaderBody string
+
+//go:embed dial.wgsl
+var dialShaderWGSL []byte

@@ -9,32 +9,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"strconv"
 	"testing"
 )
-
-// hlslPrelude stands in for what the DirectX painter prepends (its
-// internal/painter/dx package is not importable): only the declarations this
-// shader actually reads.
-const hlslPrelude = `
-cbuffer Constants : register(b0) {
-    float4 frame;
-    float4 bounds;
-    float4 fillColor;
-    float4 strokeColor;
-    float4 shadowColor;
-    float4 radius;
-    float4 rectHalf;
-    float4 misc;
-    float4 shadowOffset;
-    float4 texParams;
-    float4 inset;
-};
-struct PSIn {
-    float4 pos : SV_POSITION;
-    float2 uv  : TEXCOORD0;
-};
-`
 
 func shaderPlotter(t testing.TB, numSeries, numPoints int) *Plotter {
 	t.Helper()
@@ -190,53 +166,35 @@ func TestPlotShaderSourcesCompile(t *testing.T) {
 		}
 	}
 
-	// The HLSL needs the driver's prelude for frame/bounds/PSIn. glslang's
-	// HLSL frontend is not fxc, but it catches the syntax and type errors
-	// that a Linux build otherwise only discovers on Windows.
-	p := filepath.Join(t.TempDir(), "plot.hlsl")
-	if err := os.WriteFile(p, append([]byte(hlslPrelude), plotShaderHLSL...), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	out, err := exec.Command(validator, "-D", "-e", "main", "-S", "frag",
-		"--target-env", "vulkan1.0", "-o", p+".spv", p).CombinedOutput()
-	if err != nil {
-		t.Fatalf("hlsl: %v\n%s", err, out)
-	}
 }
 
-// The DirectX painter binds textures by sorted name and reads uniform offsets
-// out of the HLSL's register(b1) cbuffer, so a name only present on one side
-// silently renders wrong - and only on Windows.
-func TestPlotShaderHLSLBindings(t *testing.T) {
+// The WebGPU painter fills the uniform struct's f32 members and the
+// texture_2d variables by name and skips any name it cannot find, so a name
+// only present on one side silently renders wrong.
+func TestPlotShaderWGSLBindings(t *testing.T) {
 	p := shaderPlotter(t, 3, 100)
-	src := string(plotShaderHLSL)
-
-	regs := regexp.MustCompile(`Texture2D\s+(\w+)\s*:\s*register\(t(\d+)\)`).FindAllStringSubmatch(src, -1)
-	names := slices.Sorted(maps.Keys(p.shader.Textures))
-	if len(regs) != len(names) {
-		t.Fatalf("HLSL declares %d textures, shader supplies %d %v", len(regs), len(names), names)
-	}
-	for i, r := range regs {
-		if r[1] != names[i] || r[2] != strconv.Itoa(i) {
-			t.Errorf("texture %d: HLSL has %s at t%s, sorted name is %s", i, r[1], r[2], names[i])
+	src := string(plotShaderWGSL)
+	names := func(re, s string) []string {
+		var out []string
+		for _, m := range regexp.MustCompile(re).FindAllStringSubmatch(s, -1) {
+			out = append(out, m[1])
 		}
+		slices.Sort(out)
+		return out
 	}
 
-	cb := regexp.MustCompile(`(?s)register\(b1\)\s*\{(.*?)\}`).FindStringSubmatch(src)
-	if cb == nil {
-		t.Fatal("no register(b1) cbuffer in the HLSL")
+	got := names(`var (\w+): texture_2d<f32>;`, src)
+	if want := slices.Sorted(maps.Keys(p.shader.Textures)); !slices.Equal(got, want) {
+		t.Errorf("WGSL declares textures %v, shader supplies %v", got, want)
 	}
-	declared := make(map[string]bool)
-	for _, m := range regexp.MustCompile(`float\s+(\w+)\s*;`).FindAllStringSubmatch(cb[1], -1) {
-		declared[m[1]] = true
+
+	st := regexp.MustCompile(`(?s)struct PlotUniforms \{(.*?)\n\}`).FindStringSubmatch(src)
+	if st == nil {
+		t.Fatal("no PlotUniforms struct in the WGSL")
 	}
-	for name := range p.shader.Uniforms {
-		if !declared[name] {
-			t.Errorf("uniform %q is not declared in the HLSL cbuffer", name)
-		}
-	}
-	if len(declared) != len(p.shader.Uniforms) {
-		t.Errorf("HLSL cbuffer declares %d uniforms, shader supplies %d", len(declared), len(p.shader.Uniforms))
+	got = names(`(?m)^\s*(\w+): f32,`, st[1])
+	if want := slices.Sorted(maps.Keys(p.shader.Uniforms)); !slices.Equal(got, want) {
+		t.Errorf("WGSL declares uniforms %v, shader supplies %v", got, want)
 	}
 }
 

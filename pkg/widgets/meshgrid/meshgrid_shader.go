@@ -12,13 +12,13 @@ import (
 	"github.com/roffe/txlogger/pkg/colors"
 )
 
-// meshShaderHLSL is the same shader ported to HLSL for Fyne's Direct3D 11
-// driver, which is only built with the `directx` tag. Carrying it
-// unconditionally costs an unreferenced string on OpenGL targets and keeps the
-// widget free of build tags; see the file header for the porting notes.
+// meshShaderWGSL is the same shader ported to WGSL for Fyne's WebGPU painter.
+// Carrying it unconditionally costs an unreferenced blob on OpenGL targets and
+// keeps the widget free of build tags; see its file header for the porting
+// notes.
 //
-//go:embed meshgrid.hlsl
-var meshShaderHLSL []byte
+//go:embed meshgrid.wgsl
+var meshShaderWGSL []byte
 
 // GPU renderer: the whole mesh is drawn by a single canvas.Shader. The mesh
 // values live in a small data texture and the camera in a handful of float
@@ -72,7 +72,7 @@ func (m *Meshgrid) initShader() {
 		[]byte(meshShaderPreludeGL+meshShaderBody),
 		[]byte(meshShaderPreludeES+meshShaderBody),
 	)
-	m.shader.SourceHLSL = meshShaderHLSL
+	m.shader.SourceWGSL = meshShaderWGSL
 	m.shader.Textures = make(map[string]image.Image, 2)
 	m.shader.Uniforms = make(map[string]float32, 32)
 	m.updateShaderData()

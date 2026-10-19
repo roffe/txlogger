@@ -40,6 +40,8 @@ github.com/go-text/typesetting-utils v0.0.0-20260419141703-4ffe8874dabc h1:8FGo2
 github.com/go-text/typesetting-utils v0.0.0-20260419141703-4ffe8874dabc/go.mod h1:3/62I4La/HBRX9TcTpBj4eipLiwzf+vhI+7whTc9V7o=
 github.com/godbus/dbus/v5 v5.2.2 h1:TUR3TgtSVDmjiXOgAAyaZbYmIeP3DPkld3jgKGV8mXQ=
 github.com/godbus/dbus/v5 v5.2.2/go.mod h1:3AAv2+hPq5rdnr5txxxRwiGjPXamgoIHgz9FPBfOp3c=
+github.com/gogpu/naga v0.20.3 h1:iklZY6jDXkhDAXMKPehd95Wi/mt4/+h7RGlUN1h15nI=
+github.com/gogpu/naga v0.20.3/go.mod h1:15sQaHKkbqXcwTN+hHYGLsA0WBBnkmYzne/eF5p5WEg=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
 github.com/gotmc/libusb/v2 v2.6.0 h1:5HRTO1EqchxnWvUIc7l3YtZN8NewWIiQtpSYvUvKu6w=
@@ -75,10 +77,12 @@ github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974 h1:0sTHqcaQMYaRote/EY
 github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974/go.mod h1:qJAMUtwoSym/Ybjw8xt/iwCm19aAGiJtmSILHm6QHmY=
 github.com/roffe/ecusymbol v1.2.6-0.20261011003712-c7023962a80a h1:VALdwW1DQAOZTDudi4+Nll6KsbM7GwI1U/K0IKtZ2Gw=
 github.com/roffe/ecusymbol v1.2.6-0.20261011003712-c7023962a80a/go.mod h1:fAnqgGsoKyrt92/3dw3zXp/Tuo++PUDFLEv+PLe5kUI=
-github.com/roffe/fyne/v2 v2.0.0-20261010200802-608fec71e386 h1:HtdkCOsIylQMQWJZyWxSyhkf2qLjkFikZbN8NFQv6Jc=
-github.com/roffe/fyne/v2 v2.0.0-20261010200802-608fec71e386/go.mod h1:eXHJ/D9Y58UcDw7SkguadCRI64M4flXyjoMn827Q5SI=
+github.com/roffe/fyne/v2 v2.0.0-20261019180338-98a44277973b h1:4r+ZHlAxNp56CD30HgO27UCe7l0AMLgCFNj1dpmEoI8=
+github.com/roffe/fyne/v2 v2.0.0-20261019180338-98a44277973b/go.mod h1:5Sr9h68YOtxelLxXXImhX0h/kWbYXW9Dv6w0k23kgNM=
 github.com/roffe/gocan/v2 v2.1.1-0.20261010194948-26f833484dfd h1:xwxStJRrP993FfqIgYriHRVOtZ9DDzJW3EMUMRbhvTo=
 github.com/roffe/gocan/v2 v2.1.1-0.20261010194948-26f833484dfd/go.mod h1:DFnrlwKrkRRU4ptrDCIIYfk8hWWFNIUsLX997vgRVKk=
+github.com/roffe/gowgpu v0.0.0-20261019175826-9751230ba6f8 h1:LkgS1da3iYoEjWiLNDXJsollpQRCrFN0wjkDBsVker0=
+github.com/roffe/gowgpu v0.0.0-20261019175826-9751230ba6f8/go.mod h1:prhckda/6oiVUHHq+eqSpIybpIrn9MjON9Rb1VNFrto=
 github.com/rymdport/portal v0.4.2 h1:7jKRSemwlTyVHHrTGgQg7gmNPJs88xkbKcIL3NlcmSU=
 github.com/rymdport/portal v0.4.2/go.mod h1:kFF4jslnJ8pD5uCi17brj/ODlfIidOxlgUDTO5ncnC4=
 github.com/samuelbrian/can-go v0.0.2 h1:M2B5j9O97lCGlsUYTWYFBwdhHWvA9HpW+A1wfDukRN4=
