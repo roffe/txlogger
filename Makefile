@@ -45,7 +45,7 @@ windows:
 	go build -tags=j2534 -ldflags '-s -w' -o j2534proxy.exe ./j2534proxy
 
 ANDROID_DIR?=$(HOME)/Android
-ANDROID_NDK_HOME?=$(ANDROID_DIR)/android-ndk-r27c
+ANDROID_NDK_HOME?=$(ANDROID_DIR)/android-ndk-r30
 ADB?=$(ANDROID_DIR)/platform-tools/adb
 # static libusb built with the NDK, combi and bdmtool link against it
 ANDROID_LIBUSB?=$(ANDROID_DIR)/libusb/arm64-v8a
