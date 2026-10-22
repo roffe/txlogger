@@ -77,12 +77,12 @@ github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974 h1:0sTHqcaQMYaRote/EY
 github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974/go.mod h1:qJAMUtwoSym/Ybjw8xt/iwCm19aAGiJtmSILHm6QHmY=
 github.com/roffe/ecusymbol v1.2.6-0.20261011003712-c7023962a80a h1:VALdwW1DQAOZTDudi4+Nll6KsbM7GwI1U/K0IKtZ2Gw=
 github.com/roffe/ecusymbol v1.2.6-0.20261011003712-c7023962a80a/go.mod h1:fAnqgGsoKyrt92/3dw3zXp/Tuo++PUDFLEv+PLe5kUI=
-github.com/roffe/fyne/v2 v2.0.0-20261020174401-ce9aa7749487 h1:WKLq/iILkpFuvNxuannXks6Y2ihcCfw4hdSz3pmXdMg=
-github.com/roffe/fyne/v2 v2.0.0-20261020174401-ce9aa7749487/go.mod h1:ZpMEub7canlIKyRhgQtt2FQ0mKqaDn7YnPYVIf4DIuA=
+github.com/roffe/fyne/v2 v2.0.0-20261022181558-75154749509e h1:UIYVCHaq+XxCSUoGLRWq5KcU49IaN7xdJRS9lIcAXvk=
+github.com/roffe/fyne/v2 v2.0.0-20261022181558-75154749509e/go.mod h1:xJvAG8UOF6WrXm9zKdVWl6TZgJrRkvqQuO/XQrCFzZI=
 github.com/roffe/gocan/v2 v2.1.1-0.20261010194948-26f833484dfd h1:xwxStJRrP993FfqIgYriHRVOtZ9DDzJW3EMUMRbhvTo=
 github.com/roffe/gocan/v2 v2.1.1-0.20261010194948-26f833484dfd/go.mod h1:DFnrlwKrkRRU4ptrDCIIYfk8hWWFNIUsLX997vgRVKk=
-github.com/roffe/gowgpu v0.0.0-20261020174302-ea47a2932148 h1:TjBDQZQhPUKB6TNr6jCQfRFcbAoIbyFeRDgf075H2Tg=
-github.com/roffe/gowgpu v0.0.0-20261020174302-ea47a2932148/go.mod h1:prhckda/6oiVUHHq+eqSpIybpIrn9MjON9Rb1VNFrto=
+github.com/roffe/gowgpu v0.0.0-20261022181510-205c72a06607 h1:BgX2P7RCigW6/XN+ExD633oLshnr4U5Bra5aSEhy4hk=
+github.com/roffe/gowgpu v0.0.0-20261022181510-205c72a06607/go.mod h1:prhckda/6oiVUHHq+eqSpIybpIrn9MjON9Rb1VNFrto=
 github.com/rymdport/portal v0.4.2 h1:7jKRSemwlTyVHHrTGgQg7gmNPJs88xkbKcIL3NlcmSU=
 github.com/rymdport/portal v0.4.2/go.mod h1:kFF4jslnJ8pD5uCi17brj/ODlfIidOxlgUDTO5ncnC4=
 github.com/samuelbrian/can-go v0.0.2 h1:M2B5j9O97lCGlsUYTWYFBwdhHWvA9HpW+A1wfDukRN4=

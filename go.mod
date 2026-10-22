@@ -3,7 +3,7 @@ module github.com/roffe/txlogger
 go 1.27.2
 
 //replace github.com/roffe/ecusymbol => ../ecusymbol
-replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20261020174401-ce9aa7749487
+replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20261022181558-75154749509e
 
 //replace go.bug.st/serial => ../../../go.bug.st/serial
 
@@ -60,7 +60,7 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.6.1 // indirect
 	github.com/roffe/avrflash v0.0.0-20260923171743-6502105c9b8d // indirect
-	github.com/roffe/gowgpu v0.0.0-20261020174302-ea47a2932148 // indirect
+	github.com/roffe/gowgpu v0.0.0-20261022181510-205c72a06607 // indirect
 	github.com/rymdport/portal v0.4.2 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
