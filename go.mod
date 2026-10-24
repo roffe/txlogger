@@ -3,7 +3,7 @@ module github.com/roffe/txlogger
 go 1.27.2
 
 //replace github.com/roffe/ecusymbol => ../ecusymbol
-replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20261024102744-7b89aec35571
+replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20261024160315-19f820953b1a
 
 //replace go.bug.st/serial => ../../../go.bug.st/serial
 
