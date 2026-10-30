@@ -17,7 +17,8 @@ func init() {
 		Name:        "Trionic 7",
 		NewFunc:     New,
 		CANRate:     500,
-		Filter:      []uint32{0x238, 0x258, 0x266, 0x270, t7kwp.FAST_UP_ID},
+		Filter:      []uint32{0x238, 0x258, 0x266, 0x270},
+		Unsolicited: []uint32{t7kwp.FAST_UP_ID},
 		ManualReset: true,
 	})
 }

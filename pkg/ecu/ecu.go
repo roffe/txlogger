@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"slices"
 	"sort"
 
 	"github.com/roffe/gocan/v2"
@@ -76,10 +77,23 @@ type EcuInfo struct {
 	NewFunc func(c *gocan.Bus, cfg *Config) Client
 	CANRate float64
 	Filter  []uint32
+	// Unsolicited are ids the ECU streams without a request per frame, like
+	// the T7 fast upload. An OBD dongle only hears frames that answer its own
+	// request and folds the filter into one mask, where these ids would let
+	// broadcasts take the reply slots, so CANFilter leaves them out for one.
+	Unsolicited []uint32
 	// ManualReset: resetting over CAN with the ignition on puts the throttle
 	// body in limp mode, so flash and dump leave the reset to the user and
 	// the reset button asks first.
 	ManualReset bool
+}
+
+// CANFilter returns the acceptance ids to open adapterName with.
+func (e EcuInfo) CANFilter(adapterName string) []uint32 {
+	if IsOBDAdapter(adapterName) {
+		return slices.Clone(e.Filter)
+	}
+	return slices.Concat(e.Filter, e.Unsolicited)
 }
 
 func Register(t *EcuInfo) {

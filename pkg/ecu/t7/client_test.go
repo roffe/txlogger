@@ -17,9 +17,9 @@ import (
 )
 
 // The package registers itself as "Trionic 7": 500 kbit/s, a receive filter
-// that includes the fast-upload stream id (or fast dumps starve on adapters
-// with a hardware filter), and a manual reset so flashing never resets an ECU
-// with the ignition on.
+// that includes the fast-upload stream id except on OBD dongles (or fast dumps
+// starve on adapters with a hardware filter), and a manual reset so flashing
+// never resets an ECU with the ignition on.
 func TestRegistration(t *testing.T) {
 	info := ecu.Info("Trionic 7")
 	if info.CANRate != 500 {
@@ -28,9 +28,19 @@ func TestRegistration(t *testing.T) {
 	if !info.ManualReset {
 		t.Error("ManualReset = false: a CAN reset with the ignition on puts the throttle body in limp mode")
 	}
-	for _, id := range []uint32{t7kwp.INIT_RESP_ID, 0x258, t7kwp.RESP_CHUNK_CONF_ID, t7kwp.REQ_CHUNK_CONF_ID, t7kwp.FAST_UP_ID} {
-		if !slices.Contains(info.Filter, id) {
-			t.Errorf("filter %X lacks 0x%03X", info.Filter, id)
+	replies := []uint32{t7kwp.INIT_RESP_ID, 0x258, t7kwp.RESP_CHUNK_CONF_ID, t7kwp.REQ_CHUNK_CONF_ID}
+	for adapter, want := range map[string][]uint32{
+		"CANusb":     append(slices.Clone(replies), t7kwp.FAST_UP_ID),
+		"OBDLink SX": replies,
+	} {
+		filter := info.CANFilter(adapter)
+		for _, id := range want {
+			if !slices.Contains(filter, id) {
+				t.Errorf("%s filter %X lacks 0x%03X", adapter, filter, id)
+			}
+		}
+		if len(filter) != len(want) {
+			t.Errorf("%s filter %X, want only %X", adapter, filter, want)
 		}
 	}
 

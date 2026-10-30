@@ -123,6 +123,24 @@ func TestRegistry(t *testing.T) {
 	}
 }
 
+// OBD dongles get only the reply ids; other adapters also get the ids the ECU
+// streams unasked.
+func TestEcuInfoCANFilter(t *testing.T) {
+	e := EcuInfo{Filter: []uint32{0x238, 0x258}, Unsolicited: []uint32{0x7C1}}
+	for adapter, want := range map[string][]uint32{
+		"OBDLink SX":      {0x238, 0x258},
+		"d2xx OBDLink EX": {0x238, 0x258},
+		"STN2120":         {0x238, 0x258},
+		"ELM327":          {0x238, 0x258},
+		"CANusb":          {0x238, 0x258, 0x7C1},
+		"Combi":           {0x238, 0x258, 0x7C1},
+	} {
+		if got := e.CANFilter(adapter); !slices.Equal(got, want) {
+			t.Errorf("CANFilter(%q) = %X, want %X", adapter, got, want)
+		}
+	}
+}
+
 // Registering a name twice panics instead of silently replacing the first
 // flasher.
 func TestRegisterDuplicatePanics(t *testing.T) {

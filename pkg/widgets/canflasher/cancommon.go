@@ -75,7 +75,7 @@ func translateName(s string) string {
 func (t *CanFlasherWidget) adapter(filter ...uint32) (gocan.Adapter, error) {
 	info := ecu.Info(t.ecuSelect.Selected)
 	if filter == nil {
-		filter = info.Filter
+		filter = info.CANFilter(t.cfg.CSW.GetAdapterName())
 	}
 	return t.cfg.CSW.GetAdapterWith(info.CANRate, filter)
 }
