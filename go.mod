@@ -22,7 +22,7 @@ require (
 	github.com/roffe/bdmtool/v3 v3.0.7
 	github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974
 	github.com/roffe/ecusymbol v1.2.6-0.20261011003712-c7023962a80a
-	github.com/roffe/gocan/v2 v2.1.1-0.20261010194948-26f833484dfd
+	github.com/roffe/gocan/v2 v2.1.1-0.20261030144418-7388248a57fd
 	github.com/stretchr/testify v1.12.1
 	github.com/yuin/gopher-lua v1.1.2
 	go.bug.st/serial v1.8.0
