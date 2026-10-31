@@ -1,3 +1,6 @@
+# 2.2.1
+- BDM Tool: the Firmware menu now installs CombiAdapter firmware 2.5 with bootloader 2.1, one image that runs on both the V1 and the V2 board. 2.2.0 still shipped the older 2.0 firmware, whose bootloader only worked on a V2, because the BDM Tool library had not been updated. The menu offers Bootloader 2.1 + 2.5 (latest), Bootloader 1.0 (original) + 2.5 and Bootloader 1.0 (original) + 1.1 (legacy), and every step of a bootloader and firmware install is shown in the log
+
 # 2.2.0
 - Trionic 5.2 binaries (128 kB) can now be opened, edited and saved. The T5.2-specific maps open from the same menu entries as on T5.5: the knock sensitivity table (Knock_ref_tab!) and the automatic 1st gear boost limit (Regl_tryck_fga!)
 - Fixed the Trionic 5 boost control bias map (Reg_kon_mat!) on most T5.5 binaries. Later firmware stores it as 31 rows of 16-bit values from 2500 rpm up in 100 rpm steps, not as the 8x16 throttle/rpm matrix the old firmware uses; it showed as 62 cells of 1 and 4. Knock_count_cyl2-4 now log as 2-byte counters like T5Suite reads them
