@@ -40,6 +40,8 @@ github.com/go-text/typesetting-utils v0.0.0-20260419141703-4ffe8874dabc h1:8FGo2
 github.com/go-text/typesetting-utils v0.0.0-20260419141703-4ffe8874dabc/go.mod h1:3/62I4La/HBRX9TcTpBj4eipLiwzf+vhI+7whTc9V7o=
 github.com/godbus/dbus/v5 v5.2.2 h1:TUR3TgtSVDmjiXOgAAyaZbYmIeP3DPkld3jgKGV8mXQ=
 github.com/godbus/dbus/v5 v5.2.2/go.mod h1:3AAv2+hPq5rdnr5txxxRwiGjPXamgoIHgz9FPBfOp3c=
+github.com/gogpu/naga v0.20.6-0.20261031111303-7e8984a54a3c h1:NHz0w3kVa5zLPpAWTEqAESESfqyKb7cirjy35l7HubY=
+github.com/gogpu/naga v0.20.6-0.20261031111303-7e8984a54a3c/go.mod h1:15sQaHKkbqXcwTN+hHYGLsA0WBBnkmYzne/eF5p5WEg=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
 github.com/gotmc/libusb/v2 v2.6.0 h1:5HRTO1EqchxnWvUIc7l3YtZN8NewWIiQtpSYvUvKu6w=
@@ -75,14 +77,12 @@ github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974 h1:0sTHqcaQMYaRote/EY
 github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974/go.mod h1:qJAMUtwoSym/Ybjw8xt/iwCm19aAGiJtmSILHm6QHmY=
 github.com/roffe/ecusymbol v1.2.6-0.20261011003712-c7023962a80a h1:VALdwW1DQAOZTDudi4+Nll6KsbM7GwI1U/K0IKtZ2Gw=
 github.com/roffe/ecusymbol v1.2.6-0.20261011003712-c7023962a80a/go.mod h1:fAnqgGsoKyrt92/3dw3zXp/Tuo++PUDFLEv+PLe5kUI=
-github.com/roffe/fyne/v2 v2.0.0-20261028102534-1fccb7b6f9ae h1:KQToU4/kuNfCUtT+cGn1UVfChNztHWeK5uozdhoWFv8=
-github.com/roffe/fyne/v2 v2.0.0-20261028102534-1fccb7b6f9ae/go.mod h1:HgiCGxkB92HUf3aRphbnvE8oPHLOoI/31nOsWQyQ52Y=
+github.com/roffe/fyne/v2 v2.0.0-20261031111849-28131f8c3fe9 h1:zz1JjBy8Oc/k5SjcE01hvcWgM3g4a45C6tVhZh3rRHM=
+github.com/roffe/fyne/v2 v2.0.0-20261031111849-28131f8c3fe9/go.mod h1:6bO+4mpFQGjbJPfCTcRfCG+veqOxgEDR0ap5WJHHrFY=
 github.com/roffe/gocan/v2 v2.1.1-0.20261030144418-7388248a57fd h1:XYLGtXIslsJ9Za0wRwWN/dxKadMI5zzT/oiU7BpCNpE=
 github.com/roffe/gocan/v2 v2.1.1-0.20261030144418-7388248a57fd/go.mod h1:wSVBzZjHUiqPepfp6RZx/xZsTeogAmXHEsSX2npgc+U=
-github.com/roffe/gowgpu v0.0.0-20261028100612-49d601b1ade0 h1:FnwbE9R0abbJHZsSfvK4HjCZiHkmshqtxDl9Qb/wOHc=
-github.com/roffe/gowgpu v0.0.0-20261028100612-49d601b1ade0/go.mod h1:FO0O/LfXO4yEm9s/aywQvjjJyYiE3oA94kwBuUq8L3o=
-github.com/roffe/naga v0.0.0-20261028100100-81f6a794b048 h1:4YQOT9xQeDyAwUlukrf7n5owHekf8ky0wSCnsS8PB1s=
-github.com/roffe/naga v0.0.0-20261028100100-81f6a794b048/go.mod h1:xVSreQeq7W169Wr9X6TuyO/I959MnEGw4xxAGOsGQns=
+github.com/roffe/gowgpu v0.0.0-20261031111521-45c1d97b4093 h1:/YqxKbUpDX8Q5KP7raJrts2DFOGRQS9QkJZPpWicUdQ=
+github.com/roffe/gowgpu v0.0.0-20261031111521-45c1d97b4093/go.mod h1:XZJ7JoezQIPMmAJg19z/RDD5zYYQ659Uk43rxmWicF4=
 github.com/rymdport/portal v0.4.2 h1:7jKRSemwlTyVHHrTGgQg7gmNPJs88xkbKcIL3NlcmSU=
 github.com/rymdport/portal v0.4.2/go.mod h1:kFF4jslnJ8pD5uCi17brj/ODlfIidOxlgUDTO5ncnC4=
 github.com/samuelbrian/can-go v0.0.2 h1:M2B5j9O97lCGlsUYTWYFBwdhHWvA9HpW+A1wfDukRN4=
