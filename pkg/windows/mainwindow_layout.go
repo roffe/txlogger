@@ -115,7 +115,7 @@ func (mw *MainWindow) jsonLayout() ([]byte, error) {
 
 	b, err := json.Marshal(&LayoutFile{
 		ECU:     mw.selects.ecuSelect.Selected,
-		Preset:  mw.selects.presetSelect.Selected,
+		Preset:  mw.symbolList.SelectedPreset(),
 		Windows: history,
 	})
 	if err != nil {
@@ -146,7 +146,7 @@ func (mw *MainWindow) LoadLayout(name string) error {
 	if mw.dlc == nil {
 		// mw.selects.ecuSelect.SetSelected(layout.ECU)
 		mw.selects.ecuSelect.Selected = layout.ECU
-		mw.selects.presetSelect.SetSelected(layout.Preset)
+		mw.symbolList.SelectPreset(layout.Preset)
 	}
 
 	for _, h := range layout.Windows {
@@ -157,6 +157,9 @@ func (mw *MainWindow) LoadLayout(name string) error {
 			continue
 		case "Dashboard":
 			mw.buttons.dashboardBtn.OnTapped()
+			continue
+		case "Symbol list":
+			mw.buttons.symbolListBtn.OnTapped()
 			continue
 		default:
 			openMap = true

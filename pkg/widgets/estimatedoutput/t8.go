@@ -20,11 +20,11 @@ const (
 
 var t8Gears = []string{"Undefined", "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Reverse"}
 
-func t8Biopower(fw symbol.SymbolCollection) bool {
+func t8Biopower(fw symbol.FirmwareFile) bool {
 	return has(fw, "FFTrqCal.FFTrq_MaxEngineTab1") || has(fw, "FFTrqCal.FFTrq_MaxEngineTab2")
 }
 
-func (t8) Options(fw symbol.SymbolCollection) []Option {
+func (t8) Options(fw symbol.FirmwareFile) []Option {
 	return []Option{
 		{Key: "automatic", Label: "Automatic gearbox", Kind: OptionBool},
 		{Key: "e85", Label: "E85 fuel", Kind: OptionBool, Disabled: !t8Biopower(fw)},
@@ -48,7 +48,7 @@ type t8calc struct {
 	pedalMap, rpmAxis, pedalAxis             []int
 	airTorqueMap, airTorqueX, airTorqueY     []int
 	bstknkMax, bstknkMaxAu, bstknkX, bstknkY []int
-	ffMaxAirmass                             []int
+	ffMaxAirmass, ffMaxAirmassX              []int
 	nominalMap, nominalX                     []int
 	trqLimEng, trqLimE85                     []int
 	trqLimAuto, trqLimGear                   []int
@@ -57,7 +57,7 @@ type t8calc struct {
 	fuelcutLimit                             int
 }
 
-func (t8) Calculate(fw symbol.SymbolCollection, opts map[string]float64) (*Result, error) {
+func (t8) Calculate(fw symbol.FirmwareFile, opts map[string]float64) (*Result, error) {
 	c := &t8calc{
 		automatic:  opts["automatic"] == 1,
 		overboost:  opts["overboost"] == 1,
@@ -108,6 +108,7 @@ func (t8) Calculate(fw symbol.SymbolCollection, opts map[string]float64) (*Resul
 	if c.e85 {
 		c.trqLimE85 = l.ints("FFTrqCal.FFTrq_MaxEngineTab" + tabNo)
 		c.ffMaxAirmass = l.ints("FFAirCal.m_maxAirmass")
+		c.ffMaxAirmassX = signed16(l.ints("FFAirCal.fi_offsetXSP"))
 		c.veMap = l.ints("FFFuelCal.TempEnrichFacMAP")
 	} else {
 		c.veMap = l.ints("BFuelCal.TempEnrichFacMap")
@@ -299,16 +300,17 @@ func (c *t8calc) checkTorqueLimiters(rpm, request int) (int, string) {
 
 func (c *t8calc) checkAirmassLimiters(rpm, request int, limiter *string) int {
 	var tbl []int
+	x := c.bstknkX
 	switch {
 	case c.automatic:
 		tbl = c.bstknkMaxAu
 	case c.e85:
-		// the original passes the BstKnk x-axis for the flexifuel map too
-		tbl = c.ffMaxAirmass
+		tbl, x = c.ffMaxAirmass, c.ffMaxAirmassX
 	default:
 		tbl = c.bstknkMax
 	}
-	if lim := cint(interpTable(tbl, c.bstknkX, c.bstknkY, rpm, 0)); lim < request {
+	// the limit at 0° ignition offset
+	if lim := cint(interpTable(tbl, x, c.bstknkY, rpm, 0)); lim < request {
 		request = lim
 		*limiter = limAirmass
 	}

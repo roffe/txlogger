@@ -13,7 +13,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/gocan/v2"
-	"github.com/roffe/txlogger/pkg/kwp2000"
+	"github.com/roffe/gocan/v2/t7kwp"
 )
 
 var _ fyne.Widget = (*MyrtilosRegistration)(nil)
@@ -47,7 +47,6 @@ func NewMyrtilosRegistration(mw *MainWindow) fyne.Widget {
 				Alignment:  fyne.TextAlignLeading,
 				Truncation: fyne.TextTruncateEllipsis,
 			}
-
 		},
 		func(item binding.DataItem, obj fyne.CanvasObject) {
 			i := item.(binding.String)
@@ -111,10 +110,10 @@ func (mr *MyrtilosRegistration) register(key []byte) error {
 		return err
 	}
 	defer c.Close()
-	kwp := kwp2000.New(c)
+	kwp := t7kwp.New(c)
 
 	log.Println("Starting session")
-	if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
+	if err := kwp.StartSession(ctx, t7kwp.INIT_MSG_ID, t7kwp.INIT_RESP_ID); err != nil {
 		return err
 	}
 	defer func() {

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -228,8 +229,17 @@ func readSerialCommand(port io.ReadWriteCloser, timeout time.Duration) (*serialc
 	readbuf := make([]byte, 16)
 
 	deadline := time.Now().Add(timeout)
+	// A net.Conn blocks in Read until data arrives, so hand it the deadline.
+	if c, ok := port.(interface{ SetReadDeadline(time.Time) error }); ok {
+		if err := c.SetReadDeadline(deadline); err != nil {
+			return nil, err
+		}
+	}
 	for time.Now().Before(deadline) {
 		n, err := port.Read(readbuf)
+		if errors.Is(err, os.ErrDeadlineExceeded) {
+			break
+		}
 		if err != nil {
 			return nil, fmt.Errorf("read error: %w", err)
 		}

@@ -26,12 +26,12 @@ func FindMinMaxFloat64(data []float64) (float64, float64) {
 	}
 
 	// Process 4 float64s at a time (256-bit AVX)
-	vmin := archsimd.LoadFloat64x4Slice(data[:4])
+	vmin := archsimd.LoadFloat64x4(data[:4])
 	vmax := vmin
 
 	i := 4
 	for i+4 <= n {
-		v := archsimd.LoadFloat64x4Slice(data[i : i+4])
+		v := archsimd.LoadFloat64x4(data[i : i+4])
 		vmin = vmin.Min(v)
 		vmax = vmax.Max(v)
 		i += 4
@@ -42,13 +42,13 @@ func FindMinMaxFloat64(data []float64) (float64, float64) {
 	hi := vmin.GetHi()
 	rmin := lo.Min(hi)
 	var minArr [2]float64
-	rmin.Store(&minArr)
+	rmin.StoreArray(&minArr)
 
 	lo = vmax.GetLo()
 	hi = vmax.GetHi()
 	rmax := lo.Max(hi)
 	var maxArr [2]float64
-	rmax.Store(&maxArr)
+	rmax.StoreArray(&maxArr)
 
 	mn := min(minArr[0], minArr[1])
 	mx := max(maxArr[0], maxArr[1])

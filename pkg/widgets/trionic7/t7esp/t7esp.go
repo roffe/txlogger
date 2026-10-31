@@ -36,11 +36,9 @@ var (
 type Widget struct {
 	widget.BaseWidget
 	espSelect *widget.Select
-
 	container *fyne.Container
-
-	filename string
-	fw       *symbol.T7File
+	filename  string
+	fw        *symbol.T7File
 }
 
 func New(filename string, fw *symbol.T7File) *Widget {
@@ -101,7 +99,6 @@ func (tr *TestWidgetRenderer) MinSize() fyne.Size {
 }
 
 func (tr *TestWidgetRenderer) Refresh() {
-
 }
 
 func (tr *TestWidgetRenderer) Objects() []fyne.CanvasObject {

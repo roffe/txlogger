@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"sync"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
@@ -27,9 +28,7 @@ func (c *T8Client) GetRAM(address, length uint32) ([]byte, error) {
 	if address+length <= 0x100000 {
 		return nil, fmt.Errorf("GetRAM: address not in SRAM: $%X", address)
 	}
-	req := NewReadDataRequest(address, length)
-	c.readChan <- req
-	return req.Data, req.Wait()
+	return c.BaseLogger.GetRAM(address, length)
 }
 
 const (
@@ -72,18 +71,20 @@ func (c *T8Client) Start(pctx context.Context) error {
 
 	channels := c.buildChannels()
 
-	opts := []gmlan.GMLanOption{gmlan.WithCanID(0x7E0), gmlan.WithRecvID(0x7E8)}
-	if cl.AdapterName() == "ELM327" {
-		opts = append(opts, gmlan.WithDefaultTimeout(400*time.Millisecond))
-	}
-
-	gm := gmlan.NewWithOpts(cl, opts...)
+	gm := gmlan.NewWithOpts(cl,
+		gmlan.WithCanID(0x7E0),
+		gmlan.WithRecvID(0x7E8),
+		gmlan.WithDefaultTimeout(200*time.Millisecond),
+	)
 
 	if err := initT8Logging(ctx, gm, c.Symbols, c.OnMessage); err != nil {
 		return fmt.Errorf("failed to init t8 logging: %w", err)
 	}
 
-	go c.run(ctx, cl, gm, channels)
+	// Wait for the logging loop to exit before the deferred closes above run.
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	wg.Go(func() { c.run(ctx, cl, gm, channels) })
 
 	return cl.Wait(ctx)
 }
@@ -116,7 +117,7 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Bus, gm *gmlan.Client, cha
 		time.Sleep(50 * time.Millisecond)
 	}()
 
-	adConverter := NewWBLInterpolator(c.WidebandConfig)
+	adScanner := c.adScannerFunc()
 
 	t := time.NewTicker(time.Second / time.Duration(c.Rate))
 	defer t.Stop()
@@ -131,25 +132,24 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Bus, gm *gmlan.Client, cha
 			return
 		case <-c.secondTicker.C:
 			c.FpsCounter(c.capturePerSecond)
-			if c.errPerSecond > 5 {
+			if c.errPerSecond.Load() > 5 {
 				c.OnMessage("too many errors, aborting logging")
 				return
 			}
 			c.resetPerSecond()
 		case read := <-c.readChan:
-			for read.Left > 0 {
+			var err error
+			for read.Left > 0 && err == nil {
 				chunkSize = uint32(math.Min(float64(read.Left), T8ReadChunkSize))
 				log.Printf("Reading RAM 0x%X %d", read.Address, chunkSize)
-				data, err := gm.ReadMemoryByAddress(ctx, read.Address, chunkSize)
-				if err != nil {
-					read.Complete(err)
-					continue
+				var data []byte
+				if data, err = gm.ReadMemoryByAddress(ctx, read.Address, chunkSize); err == nil {
+					read.Data = append(read.Data, data...)
+					read.Left -= chunkSize
+					read.Address += chunkSize
 				}
-				read.Data = append(read.Data, data...)
-				read.Left -= chunkSize
-				read.Address += chunkSize
 			}
-			read.Complete(nil)
+			read.Complete(err)
 		case upd := <-c.writeChan:
 			chunkSize = uint32(math.Min(float64(upd.Length), T8WriteChunkSize))
 			log.Printf("Updating RAM 0x%X %d", upd.Address, chunkSize)
@@ -161,7 +161,7 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Bus, gm *gmlan.Client, cha
 			upd.Length -= chunkSize
 			upd.Data = upd.Data[chunkSize:]
 			if upd.Length > 0 {
-				c.writeChan <- upd
+				requeue(c.writeChan, upd)
 				t.Reset(time.Second / time.Duration(c.Rate))
 				continue
 			}
@@ -180,8 +180,11 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Bus, gm *gmlan.Client, cha
 				continue
 			}
 			if len(databuff) != int(expectedPayloadSize) {
+				// One short read is a bad sample, not a reason to end the
+				// session: skip it and keep logging.
+				c.onError()
 				c.OnMessage(fmt.Sprintf("expected %d bytes, got %d", expectedPayloadSize, len(databuff)))
-				return
+				continue
 			}
 			r := bytes.NewReader(databuff)
 
@@ -193,22 +196,14 @@ func (c *T8Client) run(ctx context.Context, cl *gocan.Bus, gm *gmlan.Client, cha
 				}
 
 				ebus.Publish(va.Name, va.Float64())
-
-				if c.WidebandConfig.ADScanner && va.Name == c.WidebandConfig.ADScannerSymbol {
-					lambda := adConverter(va.Int())
-					c.sysvars.Set(LAMBDAADSCANNER, lambda)
-					ebus.Publish(LAMBDAADSCANNER, lambda)
-				}
+				adScanner(va.Name, va.Int())
 			}
 
 			if r.Len() > 0 {
 				c.OnMessage(fmt.Sprintf("%d leftover bytes!", r.Len()))
 			}
 
-			if c.lamb != nil {
-				ebus.Publish(EXTERNALWBLSYM, c.lamb.GetLambda())
-				c.sysvars.Set(EXTERNALWBLSYM, c.lamb.GetLambda())
-			}
+			c.publishExternalWBL()
 
 			if err := c.lw.Write(timeStamp, channels); err != nil {
 				c.onError()
@@ -252,6 +247,11 @@ func clearDynamicallyDefinedRegister(ctx context.Context, gm *gmlan.Client) erro
 	return nil
 }
 
+const (
+	APPT_DBSP = 0x80
+	APPT_DBMA = 0x03
+)
+
 func setUpDynamicallyDefinedRegisterBySymbol(ctx context.Context, gm *gmlan.Client, symbol uint16) error {
 	/* payload
 	byte[0] = register id
@@ -262,49 +262,38 @@ func setUpDynamicallyDefinedRegisterBySymbol(ctx context.Context, gm *gmlan.Clie
 	byte[5] symbol id high byte
 	byte[6]	symbol id low byte
 	*/
-	if err := gm.WriteDataByIdentifier(ctx, 0x17, []byte{0xF0, 0x80, 0x00, 0x00, 0x00, byte(symbol >> 8), byte(symbol)}); err != nil {
+	if err := gm.WriteDataByIdentifier(ctx, 0x17, []byte{0xF0, APPT_DBSP, 0x00, 0x00, 0x00, byte(symbol >> 8), byte(symbol)}); err != nil {
 		return fmt.Errorf("SetUpDynamicallyDefinedRegisterBySymbol: %w", err)
 	}
 	return nil
 }
 
-func AirDemToStringT8(v float64) string {
-	switch v {
-	case 10:
-		return "PedalMap"
-	case 11:
-		return "Cruise Control"
-	case 12:
-		return "Idle Control"
-	case 20:
-		return "Max Engine Torque"
-	case 21:
-		return "Traction Control"
-	case 22:
-		return "Manual Gearbox Limit"
-	case 23:
-		return "Automatic Gearbox Lim"
-	case 24:
-		return "Stall Limit (Automatic)"
-	case 25:
-		return "Hardcoded Limit"
-	case 26:
-		return "Reverse Limit (Automatic)"
-	case 27:
-		return "Max Vehicle speed"
-	case 28:
-		return "Brake Management"
-	case 29:
-		return "System Action"
-	case 30:
-		return "Max Engine Speed"
-	case 40:
-		return "Min Load"
-	case 50:
-		return "Knock Airmass Limit"
-	case 52:
-		return "Max Turbo Speed"
-	default:
-		return "Unknown"
+// dbmaPayload builds the $17 payload for one "define by memory address" entry,
+// matching case APPT_DBMA in SetUpDynamicallyDefinedRegister (APP_Apptool.c):
+//
+//	byte[0] register id (only 0xF0 is supported)
+//	byte[1] type, APPT_DBMA
+//	byte[2] unused
+//	byte[3] number of bytes to read at the address
+//	byte[4] address bits 23:16   (the ECU forces bits 31:24 to zero)
+//	byte[5] address bits 15:8
+//	byte[6] address bits 7:0
+func dbmaPayload(address uint32, length uint8) []byte {
+	return []byte{
+		0xF0, APPT_DBMA, 0x00, length,
+		byte(address >> 16), byte(address >> 8), byte(address),
 	}
+}
+
+func setupDynamicallyDefinedRegisterByAddress(ctx context.Context, gm *gmlan.Client, address uint32, length uint8) error {
+	if address > 0xFFFFFF {
+		return fmt.Errorf("SetUpDynamicallyDefinedRegisterByAddress: address %08X exceeds the 24 bit range the ECU accepts", address)
+	}
+	if length == 0 {
+		return fmt.Errorf("SetUpDynamicallyDefinedRegisterByAddress: length must be at least 1 byte")
+	}
+	if err := gm.WriteDataByIdentifier(ctx, 0x17, dbmaPayload(address, length)); err != nil {
+		return fmt.Errorf("SetUpDynamicallyDefinedRegisterByAddress: %w", err)
+	}
+	return nil
 }

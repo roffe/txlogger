@@ -15,7 +15,6 @@ import (
 // then upload bootloader and jump to it
 
 func (t *Client) Alive(ctx context.Context) bool {
-
 	t.cfg.OnMessage("checking if Legion is running")
 
 	err := retry.Do(func() error {

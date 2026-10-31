@@ -2,6 +2,7 @@ package tappabletext
 
 import (
 	"bytes"
+	"log"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
@@ -15,19 +16,20 @@ import (
 var _ fyne.Tappable = (*SecretText)(nil)
 
 type SecretText struct {
-	*widget.Label
+	widget.Label
 	tappedTimes int
 	Taps        int
 	Func        func()
 }
 
 func New(text string, taps int, fn func()) *SecretText {
-	label := widget.NewLabel(text)
-	return &SecretText{
-		Label: label,
+	s := &SecretText{
+		Label: *widget.NewLabel(text),
 		Taps:  taps,
 		Func:  fn,
 	}
+	s.ExtendBaseWidget(s)
+	return s
 }
 
 func (s *SecretText) Tapped(*fyne.PointEvent) {
@@ -42,9 +44,12 @@ func (s *SecretText) Tapped(*fyne.PointEvent) {
 			panic("mp3.NewDecoder failed: " + err.Error())
 		}
 
-		player := sound.NewPlayer(decodedMp3)
-
-		player.Play()
+		player, err := sound.NewPlayer(decodedMp3)
+		if err != nil {
+			log.Println(err)
+		} else {
+			player.Play()
+		}
 
 		if f := s.Func; f != nil {
 			f()
@@ -70,7 +75,11 @@ func (s *SecretText) Tapped(*fyne.PointEvent) {
 
 		d := dialog.NewCustom("You found the secret", "Leif", t, fyne.CurrentApp().Driver().AllWindows()[0])
 		d.SetOnClosed(func() {
-			player.Pause()
+			if player != nil {
+				player.Pause()
+			}
+			sound.Suspend()
+			t.Stop() // the shader animation otherwise repaints until the renderer expires
 		})
 		d.Show()
 	}

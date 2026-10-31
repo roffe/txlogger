@@ -93,7 +93,6 @@ func (t *Widget) createFileList() *fyne.Container {
 			}
 			f := t.files[i]
 			o.(*FileEntry).Set(i, f)
-
 		},
 	)
 
@@ -256,7 +255,6 @@ func (fe *FileEntry) Set(idx int, f txwebclient.File) {
 	fe.sizeLabel.SetText(fmt.Sprintf("%.2f KB", float64(f.Size)/1024.0))
 
 	fe.openButton.OnTapped = func() {
-
 		fe.openButton.SetIcon(theme.FileIcon())
 		p := progressmodal.New(
 			fyne.CurrentApp().Driver().CanvasForObject(fe.t.fileList),
@@ -285,7 +283,6 @@ func (fe *FileEntry) Set(idx int, f txwebclient.File) {
 				fe.t.CloseFunc()
 			})
 		}()
-
 	}
 	fe.deleteBtn.OnTapped = func() {
 		fmt.Println("Delete", f.Name)

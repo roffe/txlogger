@@ -1,6 +1,7 @@
 package boosttuner
 
 import (
+	"fmt"
 	"math"
 
 	"fyne.io/fyne/v2"
@@ -251,6 +252,19 @@ func (bt *BoostTuner) loadSimMaps() (simMaps, error) {
 	m.pMap = bt.pidMapData("P", symPMap)
 	m.iMap = bt.pidMapData("I", symIMap)
 	m.dMap = bt.pidMapData("D", symDMap)
+	for _, c := range []struct {
+		name    string
+		z, x, y []float64
+	}{
+		{symRegMap, m.regMapRaw, m.setLoadXSP, m.nEngSP},
+		{symPMap, m.pMap, m.pidXSP, m.pidYSP},
+		{symIMap, m.iMap, m.pidXSP, m.pidYSP},
+		{symDMap, m.dMap, m.pidXSP, m.pidYSP},
+	} {
+		if len(c.z) != len(c.x)*len(c.y) {
+			return m, fmt.Errorf("%s size %d != %d x %d axes", c.name, len(c.z), len(c.x), len(c.y))
+		}
+	}
 
 	if v, err := bt.readSymbol("BoostCal.IFacMax"); err == nil && len(v) > 0 {
 		m.iFacMax = v[0]

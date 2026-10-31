@@ -5,14 +5,12 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
 	"github.com/roffe/txlogger/pkg/common"
-	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
 
@@ -44,14 +42,16 @@ func newOtoContext() *oto.Context {
 */
 
 func (mw *MainWindow) Close() {
+	sz := mw.Canvas().Size()
+	mw.app.Preferences().SetFloat(prefsWindowW, float64(sz.Width))
+	mw.app.Preferences().SetFloat(prefsWindowH, float64(sz.Height))
 	if mw.dlc != nil {
 		mw.Log("Closing datalogger client")
 		mw.dlc.Close()
 		time.Sleep(250 * time.Millisecond)
 	}
+	// closing the master window ends ShowAndRun; main's defers (crash.log removal etc) run on return
 	mw.Window.Close()
-	time.Sleep(200 * time.Millisecond)
-	os.Exit(0)
 }
 
 func (mw *MainWindow) onDropped(p fyne.Position, uris []fyne.URI) {
@@ -121,17 +121,15 @@ func (mw *MainWindow) openSettings() {
 		mw.wm.Raise(w)
 		return
 	}
-	inner := multiwindow.NewInnerWindow("Settings", mw.settings)
-	inner.Icon = theme.SettingsIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("Settings", mw.settings, theme.SettingsIcon())
 	mw.wm.Add(inner)
 }
 
 func (mw *MainWindow) loadPrefs() {
+	// selecting the ECU also selects its last used preset via the
+	// ecuSelect callback
 	ecu := mw.app.Preferences().StringWithFallback(prefsSelectedECU, "T7")
 	mw.selects.ecuSelect.SetSelected(ecu)
-
-	preset := mw.app.Preferences().StringWithFallback(ecu+prefsSelectedPreset, ecu+" Dash")
-	mw.selects.presetSelect.SetSelected(preset)
 
 	/*
 		if filename == "" {
@@ -151,44 +149,4 @@ func (mw *MainWindow) loadPrefs() {
 			mw.filename = filename
 		}
 	*/
-}
-
-func (mw *MainWindow) newSymbolnameTypeahead() {
-	mw.selects.symbolLookup = widgets.NewCompletionEntry([]string{})
-	mw.selects.symbolLookup.PlaceHolder = "Search for symbol"
-	mw.selects.symbolLookup.OnChanged = func(s string) {
-		if mw.fw == nil {
-			return
-		}
-		// completion start for text length >= 3
-		if len(s) < 3 {
-			mw.selects.symbolLookup.HideCompletion()
-			return
-		}
-		// Get the list of possible completion
-		// results := []string{"ADC1", "ADC2", "ADC3", "ADC4", "ADC5"}
-		var results []string
-		for _, sym := range mw.fw.Symbols() {
-			if sym.Length > 8 {
-				continue
-			}
-
-			if strings.Contains(strings.ToLower(sym.Name), strings.ToLower(s)) {
-				results = append(results, sym.Name)
-			}
-		}
-		// no results
-		if len(results) == 0 {
-			mw.selects.symbolLookup.HideCompletion()
-			return
-		}
-		sort.Slice(results, func(i, j int) bool { return strings.ToLower(results[i]) < strings.ToLower(results[j]) })
-
-		mw.selects.symbolLookup.SetOptions(results)
-		mw.selects.symbolLookup.ShowCompletion()
-	}
-
-	mw.selects.symbolLookup.OnSubmitted = func(s string) {
-		log.Println("Submitted", s)
-	}
 }

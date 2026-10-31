@@ -101,6 +101,7 @@ func New(cfg *widgets.GaugeConfig) *Dial {
 		[]byte(dialShaderPreludeGL+dialShaderBody),
 		[]byte(dialShaderPreludeES+dialShaderBody),
 	)
+	c.shader.SourceWGSL = dialShaderWGSL
 	c.shader.Uniforms = map[string]float32{
 		"size_d":   100,
 		"steps":    float32(cfg.Steps),

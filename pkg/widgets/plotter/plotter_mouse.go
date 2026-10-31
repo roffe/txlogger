@@ -35,7 +35,6 @@ func (p *Plotter) Dragged(event *fyne.DragEvent) {
 	if f := p.OnDragged; f != nil {
 		f(event)
 	}
-
 }
 
 func (p *Plotter) DragEnd() {

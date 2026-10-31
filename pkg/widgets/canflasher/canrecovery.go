@@ -11,7 +11,7 @@ import (
 )
 
 func (t *CanFlasherWidget) ecuRecover(filename string) {
-	dev, err := t.cfg.CSW.GetAdapterWithExtraFilters(t.ecuSelect.Selected, []uint32{0x011, 0x311}, true)
+	dev, err := t.adapter(0x011, 0x311)
 	if err != nil {
 		t.log(err.Error())
 		return
@@ -24,6 +24,9 @@ func (t *CanFlasherWidget) ecuRecover(filename string) {
 	}
 
 	t.progressBar.SetValue(0)
+
+	// read widget state on the main thread, before the worker starts
+	cfg := t.ecuConfig()
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 1800*time.Second)
@@ -43,12 +46,7 @@ func (t *CanFlasherWidget) ecuRecover(filename string) {
 		}
 		defer c.Close()
 
-		tr, err := ecu.New(c, &ecu.Config{
-			Name:       t.ecuSelect.Selected,
-			OnProgress: t.progress,
-			OnMessage:  t.log,
-			OnError:    func(err error) { t.log(err.Error()) },
-		})
+		tr, err := ecu.New(c, cfg)
 		if err != nil {
 			t.log(err.Error())
 			return

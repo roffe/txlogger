@@ -3,20 +3,26 @@ package t7
 import (
 	"context"
 
+	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/txlogger/pkg/dtc"
 )
 
-func (t *Client) ReadDTC(ctx context.Context) ([]dtc.DTC, error) {
-	//kw := kwp2000.New(t.c, 0x220, 0x238)
-	//if err := kw.StartSession(ctx); err != nil {
-	//	return nil, err
-	//}
-	//
-	//ok, err := kw.RequestSecurityAccess(ctx, false)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//log.Printf("%t", ok)
+// readDTCStatus selects which stored DTCs to report. Bits 5-6 are the storage
+// state filter; 0x02 leaves them clear, which the firmware reads as "all DTCs".
+const readDTCStatus = 0x02
 
-	return nil, nil
+func (t *Client) ReadDTC(ctx context.Context) ([]dtc.DTC, error) {
+	if err := t.DataInitialization(ctx); err != nil {
+		return nil, err
+	}
+	defer t.StopSession(ctx)
+	raw, err := t.kwp.ReadDTCByStatus(ctx, readDTCStatus)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]dtc.DTC, 0, len(raw))
+	for _, d := range raw {
+		out = append(out, dtc.DTC{ECU: symbol.ECU_T7, Code: d.Code, Status: d.Status})
+	}
+	return out, nil
 }

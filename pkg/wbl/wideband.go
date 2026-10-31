@@ -6,8 +6,8 @@ import (
 	"log"
 	"strconv"
 
-	"github.com/roffe/gocan/v2/pkg/serialcommand"
 	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/pkg/serialcommand"
 	"github.com/roffe/txlogger/pkg/wbl/aem"
 	"github.com/roffe/txlogger/pkg/wbl/ecumaster"
 	"github.com/roffe/txlogger/pkg/wbl/innovate"
@@ -28,6 +28,21 @@ type WBLConfig struct {
 	Port     string
 	Log      func(string)
 	Txbridge bool
+}
+
+// aemCANID is the (extended) frame an AEM UEGO sends when wired to CAN.
+const aemCANID uint32 = 0x180
+
+// CANIDs returns the ids the selected wideband reads off the ECU's CAN bus,
+// for the adapter acceptance filter; nil when it doesn't use CAN.
+func CANIDs(wblType, port string) []uint32 {
+	switch {
+	case wblType == ecumaster.ProductString: // CAN only, no port choice
+		return ecumaster.CANIDs
+	case wblType == aem.ProductString && port == "CAN":
+		return []uint32{aemCANID}
+	}
+	return nil
 }
 
 // txbridge WBL config and readings travel as the dongle's 'w' serial
@@ -106,7 +121,9 @@ func newInnovate(ctx context.Context, cl *gocan.Bus, cfg *WBLConfig) (LambdaProv
 			return nil, err
 		}
 	}
-	wblClient.Start(ctx)
+	if err := wblClient.Start(ctx); err != nil {
+		return nil, err
+	}
 	if cfg.Txbridge {
 		go func() {
 			defer cfg.Log("wbl channel closed")
@@ -142,11 +159,10 @@ func newAEM(ctx context.Context, cl *gocan.Bus, cfg *WBLConfig) (LambdaProvider,
 				//lambda := float64(binary.BigEndian.Uint16(msg.Data()[0:2])) / 100
 				wblClient.SetLambda(f / 10)
 			}
-
 		}()
 	case "CAN":
 		cfg.Log("Starting AEM CAN client")
-		ch := cl.Subscribe(ctx, 0x180)
+		ch := cl.Subscribe(ctx, aemCANID)
 		go func() {
 			defer cfg.Log("wbl channel closed")
 			for msg := range ch {

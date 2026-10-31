@@ -54,7 +54,7 @@ func (mw *MainWindow) openSymbolCompare() {
 	}, "Binary file", "bin")
 }
 
-func (mw *MainWindow) showSymbolCompare(typ symbol.ECUType, otherName string, other symbol.SymbolCollection) {
+func (mw *MainWindow) showSymbolCompare(typ symbol.ECUType, otherName string, other symbol.FirmwareFile) {
 	var diffs []symbolcompare.Item
 	for _, s := range mw.fw.Symbols() {
 		o := other.GetByName(s.Name)
@@ -133,8 +133,7 @@ func (mw *MainWindow) showSymbolCompare(typ symbol.ECUType, otherName string, ot
 	})
 	split := container.NewHSplit(cmp, mapTabs)
 	split.Offset = 0.3
-	inner := multiwindow.NewInnerWindow("Compare with "+otherName, split)
-	inner.Icon = theme.SearchReplaceIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("Compare with "+otherName, split, theme.SearchReplaceIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(1200, 700))
 }
@@ -142,17 +141,23 @@ func (mw *MainWindow) showSymbolCompare(typ symbol.ECUType, otherName string, ot
 // compareTabContent builds the current and other binary's version of a map
 // plus a per-cell diff as three tabs. ponytail: native AppTabs, no custom
 // wrapper.
-func (mw *MainWindow) compareTabContent(typ symbol.ECUType, otherName string, other symbol.SymbolCollection, mapName string) (fyne.CanvasObject, error) {
-	axis, xData, yData, curZ, xPrec, yPrec, zPrec, err := compareMapData(mw.fw, typ, mapName)
-	if err != nil {
-		return nil, err
-	}
+func (mw *MainWindow) compareTabContent(typ symbol.ECUType, otherName string, other symbol.FirmwareFile, mapName string) (fyne.CanvasObject, error) {
 	_, _, _, othZ, _, _, _, err := compareMapData(other, typ, mapName)
 	if err != nil {
 		return nil, err
 	}
+	return mw.mapDiffTabs(typ, mapName, "Current", otherName, othZ)
+}
+
+// mapDiffTabs renders mapName from the loaded binary next to othZ (another
+// binary's values, or a proposal from the AI chat) plus a per-cell delta.
+func (mw *MainWindow) mapDiffTabs(typ symbol.ECUType, mapName, curLabel, otherLabel string, othZ []float64) (fyne.CanvasObject, error) {
+	axis, xData, yData, curZ, xPrec, yPrec, zPrec, err := compareMapData(mw.fw, typ, mapName)
+	if err != nil {
+		return nil, err
+	}
 	if len(curZ) != len(othZ) {
-		return nil, fmt.Errorf("%s has different dimensions in the two binaries (%d vs %d)", mapName, len(curZ), len(othZ))
+		return nil, fmt.Errorf("%s: %d values expected, got %d", mapName, len(curZ), len(othZ))
 	}
 	cur, err := mw.readonlyMapViewer(mapName, axis.ZDescription, axis, xData, yData, curZ, xPrec, yPrec, zPrec)
 	if err != nil {
@@ -172,9 +177,31 @@ func (mw *MainWindow) compareTabContent(typ symbol.ECUType, otherName string, ot
 	}
 	return container.NewAppTabs(
 		container.NewTabItem("Diff", diffMv),
-		container.NewTabItem("Current", cur),
-		container.NewTabItem(otherName, oth),
+		container.NewTabItem(curLabel, cur),
+		container.NewTabItem(otherLabel, oth),
 	), nil
+}
+
+// showAIMapDiff opens the AI chat's proposed values for a map next to the
+// current ones. Called from the chat's tool loop, so it must run on the main
+// thread — aichat wraps it in fyne.DoAndWait.
+func (mw *MainWindow) showAIMapDiff(mapName string, proposed []float64) error {
+	if mw.fw == nil {
+		return errors.New("no binary loaded")
+	}
+	typ := symbol.ECUTypeFromString(mw.selects.ecuSelect.Selected)
+	content, err := mw.mapDiffTabs(typ, mapName, "Before", "After", proposed)
+	if err != nil {
+		return err
+	}
+	title := "AI suggestion: " + mapName
+	if w := mw.wm.HasWindow(title); w != nil {
+		w.Close() // replace the previous suggestion for this map
+	}
+	inner := multiwindow.NewInnerWindowWithIcon(title, content, theme.SearchReplaceIcon())
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(900, 600))
+	return nil
 }
 
 func (mw *MainWindow) readonlyMapViewer(name, zLabel string, axis symbol.Axis, xData, yData, zData []float64, xPrec, yPrec, zPrec int) (*mapviewer.MapViewer, error) {
@@ -198,7 +225,7 @@ func (mw *MainWindow) readonlyMapViewer(name, zLabel string, axis symbol.Axis, x
 
 // compareMapData resolves a map's axes + data from one collection. A trimmed
 // version of newMapViewer's resolution: no as2, no T5 coolant special-case.
-func compareMapData(coll symbol.SymbolCollection, typ symbol.ECUType, mapName string) (axis symbol.Axis, xData, yData, zData []float64, xPrec, yPrec, zPrec int, err error) {
+func compareMapData(coll symbol.FirmwareFile, typ symbol.ECUType, mapName string) (axis symbol.Axis, xData, yData, zData []float64, xPrec, yPrec, zPrec int, err error) {
 	axis = symbol.GetInfo(typ, mapName)
 
 	symX := coll.GetByName(axis.X)

@@ -58,7 +58,7 @@ var _ fyne.Widget = (*BoostTuner)(nil)
 // disk). Both are supplied by the main window, which owns mw.fw and the filename.
 type Config struct {
 	// Symbols is the currently loaded binary (mw.fw). Used read-only here.
-	Symbols symbol.SymbolCollection
+	Symbols symbol.FirmwareFile
 	// Save writes data (in engineering units) into the named symbol and persists
 	// the binary to disk, taking a one-time backup on first write. nil disables
 	// the "Apply to binary" buttons.
@@ -311,7 +311,7 @@ func (bt *BoostTuner) openLogDialog() {
 				}
 			})
 		}()
-	}, "logfile", "t5l", "t7l", "t8l", "csv", "bpl")
+	}, "Log file", "t5l", "t7l", "t8l", "csv", "bpl")
 }
 
 // parseLog reads a single log into a row-aligned series map, padding gaps with
@@ -323,29 +323,13 @@ func parseLog(name string, r io.Reader) (map[string][]float64, int, error) {
 	}
 	defer lf.Close()
 
+	// The log's columns are already row-aligned with NaN gaps. Callers only
+	// append them onto their own series, never write into them.
 	local := make(map[string][]float64)
-	n := 0
-	for {
-		rec := lf.Next()
-		if rec.EOF {
-			break
-		}
-		for k, v := range rec.Values {
-			if k == "Pgm_status" {
-				continue
-			}
-			arr := local[k]
-			for len(arr) < n { // back-fill records before this key first appeared
-				arr = append(arr, math.NaN())
-			}
-			local[k] = append(arr, v)
-		}
-		n++
-		for k, arr := range local { // forward-fill keys missing from this record
-			for len(arr) < n {
-				arr = append(arr, math.NaN())
-			}
-			local[k] = arr
+	n := lf.Len()
+	for _, k := range lf.Columns() {
+		if k != "Pgm_status" {
+			local[k] = lf.Column(k)
 		}
 	}
 	if n == 0 {

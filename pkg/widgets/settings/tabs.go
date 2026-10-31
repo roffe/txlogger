@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/roffe/txlogger/pkg/common"
+	"github.com/roffe/txlogger/pkg/ecu"
 	xlayout "github.com/roffe/txlogger/pkg/layout"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
@@ -42,13 +43,29 @@ func (sw *Widget) generalTab() *container.TabItem {
 		section("Map editor & preview",
 			leftIcon(theme.MoveUpIcon(), sw.cursorFollowCrosshair),
 			leftIcon(theme.ViewFullScreenIcon(), sw.meshView),
-			leftIcon(theme.SearchIcon(), container.NewVBox(sw.livePreview, sw.realtimeBars)),
+			leftIcon(theme.SearchIcon(), sw.realtimeBars),
 		),
 		section("Appearance",
 			leftLabeled("Color blind mode", sw.colorBlindMode),
 		),
 		section("Working directory",
 			sw.workDir,
+		),
+	)
+}
+
+// aiTab configures the local AI chat. Everything runs against an Ollama server
+// the user controls, so there is no API key and nothing to send anywhere.
+func (sw *Widget) aiTab() *container.TabItem {
+	return tab("AI", theme.ComputerIcon(),
+		section("Ollama server",
+			leftLabeled("URL", sw.aiURL),
+			leftLabeled("Model", container.NewBorder(nil, nil, nil, sw.aiRefresh, sw.aiModel)),
+			sw.aiStatus,
+		),
+		section("Generation",
+			leftIcon(theme.InfoIcon(), sw.aiThink),
+			leftLabeled("Context size (tokens)", sw.aiCtxEntry),
 		),
 	)
 }
@@ -129,11 +146,9 @@ func (sw *Widget) wblTab() *container.TabItem {
 
 	sw.wblADscanner = sw.newADscannerCheck()
 
-	adSymbols := []string{
-		"AD_EGR",
-		"DisplProt.AD_Scanner",
-		"LambdaScan.AD_Scanner",
-		"LambdaScan.AD_Scanner2",
+	var adSymbols []string
+	for _, p := range ecu.Profiles() {
+		adSymbols = append(adSymbols, p.ADScannerSymbols...)
 	}
 	sw.wblADScannerSymbol = widget.NewSelect(adSymbols, prefWBLADScannerSymbol.set)
 	sw.wblADScannerSymbol.SetSelected(sw.GetADScannerSymbolName())

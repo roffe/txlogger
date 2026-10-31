@@ -40,11 +40,11 @@ func New(cfg *CombinedLogplayerConfig) *Widget {
 
 	db := dashboard.NewDashboard(cfg.DBcfg)
 
+	// The log player publishes and sets the time from its own goroutine;
+	// the dashboard's setters are safe to call there.
 	for _, name := range db.GetMetricNames() {
 		cancel := buz.SubscribeFunc(name, func(f float64) {
-			fyne.Do(func() {
-				db.SetValue(name, f)
-			})
+			db.SetValue(name, f)
 		})
 		cp.cancelFuncs = append(cp.cancelFuncs, cancel)
 	}

@@ -1,13 +1,14 @@
 package windows
 
 import (
-	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
 	"math"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -18,41 +19,54 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/bdmtool/v3/bdm"
+	"github.com/roffe/bdmtool/v3/icons"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan/v2"
+	"github.com/roffe/txlogger/pkg/assets"
 	"github.com/roffe/txlogger/pkg/colors"
 	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/ecu/t8/t8file"
+	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/update"
 	"github.com/roffe/txlogger/pkg/widgets"
+	"github.com/roffe/txlogger/pkg/widgets/aichat"
 	"github.com/roffe/txlogger/pkg/widgets/boosttuner"
+	"github.com/roffe/txlogger/pkg/widgets/camtiming"
 	"github.com/roffe/txlogger/pkg/widgets/canflasher"
 	"github.com/roffe/txlogger/pkg/widgets/customcolors"
 	"github.com/roffe/txlogger/pkg/widgets/dtcreader"
 	"github.com/roffe/txlogger/pkg/widgets/editparameters"
 	"github.com/roffe/txlogger/pkg/widgets/estimatedoutput"
+	"github.com/roffe/txlogger/pkg/widgets/gearcalc"
+	"github.com/roffe/txlogger/pkg/widgets/hexeditor"
 	"github.com/roffe/txlogger/pkg/widgets/j1979diag"
 	"github.com/roffe/txlogger/pkg/widgets/mapviewer"
 	"github.com/roffe/txlogger/pkg/widgets/matrixbuilder"
+	"github.com/roffe/txlogger/pkg/widgets/mbt"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 	"github.com/roffe/txlogger/pkg/widgets/progressmodal"
 	"github.com/roffe/txlogger/pkg/widgets/rescaler"
+	"github.com/roffe/txlogger/pkg/widgets/seedkey"
+	"github.com/roffe/txlogger/pkg/widgets/shortcuts"
 	"github.com/roffe/txlogger/pkg/widgets/symbolbrowser"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmmod"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/pgmstatus"
 	"github.com/roffe/txlogger/pkg/widgets/trionic5/t5cli"
 	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7esp"
 	"github.com/roffe/txlogger/pkg/widgets/trionic7/t7piarea"
+	"github.com/roffe/txlogger/pkg/widgets/trionic8/t8nvdm"
 	"github.com/roffe/txlogger/pkg/widgets/txconfigurator"
 )
 
 func (mw *MainWindow) setupMenu() {
-	getFW := func() symbol.SymbolCollection {
+	getFW := func() symbol.FirmwareFile {
 		return mw.fw
 	}
 
 	openItem := fyne.NewMenuItemWithIcon("Open", theme.FolderIcon(), nil)
-	openItem.ChildMenu = fyne.NewMenu("File",
+	openItem.ChildMenu = fyne.NewMenu(
+		"File",
 		fyne.NewMenuItemWithIcon("Open binary", theme.DocumentIcon(), mw.loadBinary),
 		fyne.NewMenuItemWithIcon("Open log", theme.DocumentIcon(), func() {
 			cb := func(r fyne.URIReadCloser) {
@@ -71,7 +85,7 @@ func (mw *MainWindow) setupMenu() {
 				filename := r.URI().Path()
 				mw.LoadLogfileCombined(filename, r, fyne.Position{}, true)
 			}
-			widgets.SelectFile(cb, "logfile", "t5l", "t7l", "t8l", "csv", "bpl")
+			widgets.SelectFile(cb, "Log file", "t5l", "t7l", "t8l", "csv", "bpl")
 		}),
 		fyne.NewMenuItemWithIcon("Open log folder", theme.FolderIcon(), func() {
 			var cmd *exec.Cmd
@@ -101,16 +115,25 @@ func (mw *MainWindow) setupMenu() {
 	)
 
 	settingsMenuItem := fyne.NewMenuItemWithIcon("Settings", theme.SettingsIcon(), mw.openSettings)
-	settingsMenuItem.ChildMenu = fyne.NewMenu("Settings",
+	settingsMenuItem.ChildMenu = fyne.NewMenu(
+		"Settings",
 		fyne.NewMenuItemWithIcon("General", theme.SettingsIcon(), mw.openSettings),
 		fyne.NewMenuItemWithIcon("Colors", theme.ColorChromaticIcon(), func() {
 			if w := mw.wm.HasWindow("Custom Colors"); w != nil {
 				mw.wm.Raise(w)
 				return
 			}
-			w := multiwindow.NewInnerWindow("Custom Colors", customcolors.New())
-			w.Icon = theme.ColorChromaticIcon()
+			w := multiwindow.NewInnerWindowWithIcon("Custom Colors", customcolors.New(), theme.ColorChromaticIcon())
 			mw.wm.Add(w)
+		}),
+		fyne.NewMenuItemWithIcon("Keyboard shortcuts", theme.SettingsIcon(), func() {
+			if w := mw.wm.HasWindow("Keyboard shortcuts"); w != nil {
+				mw.wm.Raise(w)
+				return
+			}
+			inner := multiwindow.NewInnerWindowWithIcon("Keyboard shortcuts", shortcuts.New(listLayouts, mw.applyShortcuts), theme.SettingsIcon())
+			mw.wm.Add(inner)
+			inner.Resize(fyne.NewSize(760, 300))
 		}),
 		fyne.NewMenuItemWithIcon("txbridge", theme.SettingsIcon(), func() {
 			// Open txbridge configurator in a new window
@@ -118,21 +141,20 @@ func (mw *MainWindow) setupMenu() {
 				mw.wm.Raise(w)
 				return
 			}
-			inner := multiwindow.NewInnerWindow("txbridge", txconfigurator.NewConfigurator(mw.settings.GetPort))
-			inner.Icon = theme.SettingsIcon()
+			inner := multiwindow.NewInnerWindowWithIcon("txbridge", txconfigurator.NewConfigurator(mw.settings.GetPort), theme.SettingsIcon())
 			mw.wm.Add(inner)
 		}),
 	)
 
 	leading := []*fyne.Menu{
-		fyne.NewMenu("File",
+		fyne.NewMenu(
+			"File",
 			fyne.NewMenuItemWithIcon("About", theme.HelpIcon(), func() {
 				if w := mw.wm.HasWindow("About"); w != nil {
 					mw.wm.Raise(w)
 					return
 				}
-				inner := multiwindow.NewInnerWindow("About", mw.about())
-				inner.Icon = theme.HelpIcon()
+				inner := multiwindow.NewInnerWindowWithIcon("About", mw.about(), theme.HelpIcon())
 				mw.wm.Add(inner)
 			}),
 			openItem,
@@ -143,7 +165,8 @@ func (mw *MainWindow) setupMenu() {
 				update.UpdateCheck(mw.app, mw.Window)
 			}),
 		),
-		fyne.NewMenu("Tools",
+		fyne.NewMenu(
+			"Tools",
 			fyne.NewMenuItemWithIcon("Symbol Browser", theme.ListIcon(), func() {
 				if w := mw.wm.HasWindow("Symbol Browser"); w != nil {
 					mw.wm.Raise(w)
@@ -156,15 +179,17 @@ func (mw *MainWindow) setupMenu() {
 					mw.openMap(typ, title, mapName, "")
 				}
 				browser := symbolbrowser.New(getFW, getECU, openMap, mw.Error)
-				inner := multiwindow.NewInnerWindow("Symbol Browser", browser)
-				inner.Icon = theme.ListIcon()
+				inner := multiwindow.NewInnerWindowWithIcon("Symbol Browser", browser, theme.ListIcon())
 				mw.wm.Add(inner)
 				inner.Resize(fyne.Size{Width: 760, Height: 520})
 			}),
 			fyne.NewMenuItemWithIcon("Compare symbols with other binary", theme.SearchReplaceIcon(), mw.openSymbolCompare),
+			fyne.NewMenuItemWithIcon("Hex editor", theme.DocumentIcon(), mw.openHexEditor),
 			fyne.NewMenuItemWithIcon("Matrix Builder", theme.InfoIcon(), mw.openMatrixBuilder),
 			fyne.NewMenuItemWithIcon("Estimated output", theme.InfoIcon(), mw.openEstimatedOutput),
+			fyne.NewMenuItemWithIcon("Cam timing", theme.InfoIcon(), mw.openCamTiming),
 			fyne.NewMenuItemWithIcon("T5 CLI", theme.ComputerIcon(), mw.openT5CLI),
+			fyne.NewMenuItemWithIcon("BDM Tool", icons.Get("app"), mw.openBDMTool),
 			//fyne.NewMenuItemWithIcon("Rescale AccPedalMap", theme.GridIcon(), func() {
 			//	mw.openRescaler(symbol.ECU_T8, "TrqMastCal.X_AccPedalMAP")
 			//}),
@@ -182,10 +207,15 @@ func (mw *MainWindow) setupMenu() {
 	cycleBackItem := fyne.NewMenuItem("Cycle windows back", func() { mw.wm.CycleBack() })
 	cycleBackItem.Shortcut = &desktop.CustomShortcut{KeyName: fyne.KeyTab, Modifier: fyne.KeyModifierControl | fyne.KeyModifierShift}
 
+	closeItem := fyne.NewMenuItem("Close window", func() { mw.wm.CloseActive() })
+	closeItem.Shortcut = &desktop.CustomShortcut{KeyName: fyne.KeyW, Modifier: fyne.KeyModifierControl}
+
 	trailing := []*fyne.Menu{
-		fyne.NewMenu("Arrange",
+		fyne.NewMenu(
+			"Arrange",
 			cycleItem,
 			cycleBackItem,
+			closeItem,
 			fyne.NewMenuItemSeparator(),
 			fyne.NewMenuItem("Grid", func() {
 				mw.wm.Arrange(&multiwindow.GridArranger{})
@@ -205,19 +235,18 @@ func (mw *MainWindow) setupMenu() {
 	if mw.previewFeatures {
 		leading[len(leading)-1].Items = append(
 			leading[len(leading)-1].Items,
-			fyne.NewMenuItemWithIcon("Canflasher", theme.UploadIcon(), func() {
+			fyne.NewMenuItemWithIcon("AI chat (local)", theme.ComputerIcon(), mw.openAIChat),
+			fyne.NewMenuItemWithIcon("Canflasher", canflasherIcon, func() {
 				if w := mw.wm.HasWindow("Canflasher"); w != nil {
 					mw.wm.Raise(w)
 					return
 				}
-				inner := multiwindow.NewInnerWindow("Canflasher", canflasher.New(&canflasher.Config{
+				inner := multiwindow.NewInnerWindowWithIcon("Canflasher", canflasher.New(&canflasher.Config{
 					CSW: mw.settings,
-				}))
-				inner.Icon = theme.UploadIcon()
+				}), canflasherIcon)
 				mw.wm.Add(inner)
 				inner.Resize(fyne.NewSize(450, 250))
 			}),
-			fyne.NewMenuItemWithIcon("T7 Boost Auto-Tuner", theme.MediaFastForwardIcon(), mw.openBoostTuner),
 		)
 	}
 
@@ -240,13 +269,67 @@ func (mw *MainWindow) openEstimatedOutput() {
 	}
 	eo := estimatedoutput.New(&estimatedoutput.Config{
 		ECU:        ecu,
-		GetFW:      func() symbol.SymbolCollection { return mw.fw },
+		GetFW:      func() symbol.FirmwareFile { return mw.fw },
 		Colorblind: mw.settings.GetColorBlindMode(),
 	})
-	inner := multiwindow.NewInnerWindow(title, eo)
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon(title, eo, theme.InfoIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(920, 560))
+}
+
+func (mw *MainWindow) openBDMTool() {
+	if w := mw.wm.HasWindow("BDM Tool"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	var inner *multiwindow.InnerWindow
+	ui := bdm.New(&bdm.Config{
+		Window: mw.Window,
+		OpenFile: func(ext string, fn func(string)) {
+			widgets.SelectFile(func(r fyne.URIReadCloser) { r.Close(); fn(r.URI().Path()) }, ext[1:]+" file", ext[1:])
+		},
+		SaveFile: func(name, ext string, fn func(string)) { widgets.SaveFile(fn, ext[1:]+" file", ext[1:], name) },
+		OnExit:   func() { inner.Close() },
+	})
+	// File duplicates the panel buttons, so only Firmware and Help go in the bar.
+	bar := multiwindow.NewMenuBar(ui.Menu().Items...)
+	inner = multiwindow.NewInnerWindowWithIcon("BDM Tool", container.NewBorder(bar, nil, nil, nil, ui), icons.Get("app"))
+	inner.OnClose = ui.Disconnect
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(470, 500))
+}
+
+// openMBT opens (or raises) the "T7 MBT ignition analyser": an offline
+// estimate of MBT timing and cylinder pressure over the loaded ignition map.
+func (mw *MainWindow) openMBT() {
+	if mw.fw == nil {
+		mw.Error(fmt.Errorf("no binary loaded"))
+		return
+	}
+	if ecu := mw.selects.ecuSelect.Selected; ecu != "T7" {
+		mw.Error(fmt.Errorf("the MBT analyser is Trionic 7 only, %s is selected", ecu))
+		return
+	}
+	const title = "T7 MBT ignition analyser"
+	if w := mw.wm.HasWindow(title); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	inner := multiwindow.NewInnerWindowWithIcon(title, mbt.New(&mbt.Config{
+		GetFW:      func() symbol.FirmwareFile { return mw.fw },
+		Colorblind: mw.settings.GetColorBlindMode(),
+		OpenWindow: func(title string, content fyne.CanvasObject) {
+			if w := mw.wm.HasWindow(title); w != nil {
+				mw.wm.Raise(w)
+				return
+			}
+			help := multiwindow.NewSystemWindowWithIcon(title, content, theme.HelpIcon())
+			mw.wm.Add(help)
+			help.Resize(fyne.NewSize(820, 620))
+		},
+	}), theme.InfoIcon())
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(1100, 640))
 }
 
 func (mw *MainWindow) openT5CLI() {
@@ -257,11 +340,73 @@ func (mw *MainWindow) openT5CLI() {
 	cli := t5cli.New(func() (gocan.Adapter, error) {
 		return mw.settings.GetAdapter("T5")
 	})
-	inner := multiwindow.NewInnerWindow("T5 CLI", cli)
-	inner.Icon = theme.ComputerIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("T5 CLI", cli, theme.ComputerIcon())
 	inner.OnClose = cli.Close
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(700, 480))
+}
+
+// openCamTiming opens (or raises) the cam timing tool: the valve timing
+// diagram of the SAAB 16v cams, and the volumetric efficiency measured
+// out of a log next to it.
+func (mw *MainWindow) openCamTiming() {
+	const title = "Cam timing"
+	if w := mw.wm.HasWindow(title); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	inner := multiwindow.NewInnerWindowWithIcon(title, camtiming.New(&camtiming.Config{
+		ECU: mw.selects.ecuSelect.Selected,
+	}), theme.SettingsIcon())
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(980, 620))
+}
+
+func (mw *MainWindow) openT7GearCalc() {
+	if w := mw.wm.HasWindow("T7 gear calculator"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	inner := multiwindow.NewInnerWindowWithIcon("T7 gear calculator", gearcalc.New(), theme.SettingsIcon())
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(880, 480))
+}
+
+// openAIChat opens the local AI chat. The model runs in Ollama on the user's
+// own machine and reads the loaded binary and log through the same accessors
+// the map viewer and log player use — nothing is uploaded anywhere.
+func (mw *MainWindow) openAIChat() {
+	if w := mw.wm.HasWindow("AI chat"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	chat := aichat.New(&aichat.Config{
+		FW:      func() symbol.FirmwareFile { return mw.fw },
+		ECU:     func() string { return mw.selects.ecuSelect.Selected },
+		Log:     func() logfile.Logfile { return mw.logz },
+		BinName: func() string { return filepath.Base(mw.filename) },
+		LogName: func() string { return mw.logFilename },
+		Client:  mw.settings.AIClient,
+		Logger:  mw.Log,
+		ShowMapDiff: func(name string, proposed []float64) error {
+			var err error
+			fyne.DoAndWait(func() { err = mw.showAIMapDiff(name, proposed) })
+			return err
+		},
+	})
+	inner := multiwindow.NewInnerWindowWithIcon("AI chat", chat, theme.ComputerIcon())
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(700, 560))
+}
+
+func (mw *MainWindow) openSeedKey() {
+	if w := mw.wm.HasWindow("T7 Seed/Key patcher"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	inner := multiwindow.NewInnerWindowWithIcon("T7 Seed/Key patcher", seedkey.New(), theme.SearchReplaceIcon())
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(560, 300))
 }
 
 func (mw *MainWindow) getAdapter() (gocan.Adapter, error) {
@@ -278,10 +423,9 @@ func (mw *MainWindow) openDTCReader() {
 		mw.wm.Raise(w)
 		return
 	}
-	getFW := func() symbol.SymbolCollection { return mw.fw }
+	getFW := func() symbol.FirmwareFile { return mw.fw }
 	getECU := func() string { return mw.selects.ecuSelect.Selected }
-	inner := multiwindow.NewInnerWindow("DTC Reader", dtcreader.New(getFW, getECU, mw.getAdapter, mw.Log, mw.Error))
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("DTC Reader", dtcreader.New(getFW, getECU, mw.getAdapter, mw.Log, mw.Error), theme.InfoIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.Size{Width: 600, Height: 400})
 }
@@ -298,8 +442,7 @@ func (mw *MainWindow) openJ1979() {
 		return mw.settings.GetAdapter("T7")
 	}
 	j := j1979diag.New(getAdapter, mw.Log, mw.Error)
-	inner := multiwindow.NewInnerWindow("J1979", j)
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("J1979", j, theme.InfoIcon())
 	inner.OnClose = j.Close
 	mw.wm.Add(inner)
 	inner.Resize(fyne.Size{Width: 700, Height: 500})
@@ -311,8 +454,7 @@ func (mw *MainWindow) openEditParameters() {
 		return
 	}
 	param := editparameters.NewEditParameters(mw.getAdapter, mw.Error, mw.Log)
-	inner := multiwindow.NewInnerWindow("Edit Parameters", param)
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("Edit Parameters", param, theme.InfoIcon())
 	mw.wm.Add(inner)
 }
 
@@ -321,8 +463,7 @@ func (mw *MainWindow) openRegisterEU0D() {
 		mw.wm.Raise(w)
 		return
 	}
-	inner := multiwindow.NewInnerWindow("Register EU0D", NewMyrtilosRegistration(mw))
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("Register EU0D", NewMyrtilosRegistration(mw), theme.InfoIcon())
 	mw.wm.Add(inner)
 }
 
@@ -337,8 +478,7 @@ func (mw *MainWindow) openESPCalibration() {
 		return
 	}
 	esp := t7esp.New(mw.filename, t)
-	inner := multiwindow.NewInnerWindow("ESP Calibration selection", esp)
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("ESP Calibration selection", esp, theme.InfoIcon())
 	inner.DisableResize = true
 	mw.wm.Add(inner)
 }
@@ -355,10 +495,107 @@ func (mw *MainWindow) openPIAreaEditor() {
 		mw.Error(errors.New("not a T7 file"))
 		return
 	}
-	inner := multiwindow.NewInnerWindow("PI area editor", t7piarea.New(mw.filename, t))
-	inner.Icon = theme.InfoIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("PI area editor", t7piarea.New(mw.filename, t), theme.InfoIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.Size{Width: 700, Height: 500})
+}
+
+// openNVDMEditor edits the NVDM block of the loaded binary. Reflash the ECU
+// with "Unlock systems partition" enabled to apply it.
+func (mw *MainWindow) openNVDMEditor() {
+	if w := mw.wm.HasWindow("NVDM editor"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	t, ok := mw.fw.(*symbol.T8File)
+	if !ok {
+		mw.Error(errors.New("not a T8 file"))
+		return
+	}
+	inner := multiwindow.NewInnerWindowWithIcon("NVDM editor", t8nvdm.New(mw.filename, t), theme.InfoIcon())
+	mw.wm.Add(inner)
+	inner.Resize(fyne.Size{Width: 600, Height: 600})
+}
+
+// openHexEditor opens a raw hex editor over the loaded binary. Byte() hands
+// back the file's live backing slice (after syncing cached symbol data into
+// it), so edits land directly in the data Save() writes out. Save() also
+// copies every symbol's cached bytes back over that slice, which would clobber
+// hex edits made inside a symbol's region — so each edit is mirrored into any
+// overlapping symbol, using the same address translation Save() itself uses.
+func (mw *MainWindow) openHexEditor() {
+	if w := mw.wm.HasWindow("Hex editor"); w != nil {
+		mw.wm.Raise(w)
+		return
+	}
+	if mw.fw == nil {
+		mw.Error(errors.New("no binary loaded"))
+		return
+	}
+	raw, ok := mw.fw.(interface{ Byte() ([]byte, error) })
+	if !ok {
+		mw.Error(errors.New("loaded binary does not expose raw data"))
+		return
+	}
+	data, err := raw.Byte()
+	if err != nil {
+		mw.Error(err)
+		return
+	}
+
+	type region struct {
+		start, end int
+		sym        *symbol.Symbol
+	}
+	var regions []region
+	for _, s := range mw.fw.Symbols() {
+		off := int64(s.Address)
+		if s.Address > 0x7FFFFF { // T7 SRAM-mapped symbol, same rule as T7File.Save
+			off -= int64(s.SramOffset)
+		}
+		n := len(s.Bytes())
+		if off <= 0 || n == 0 || off+int64(n) > int64(len(data)) {
+			continue
+		}
+		regions = append(regions, region{int(off), int(off) + n, s})
+	}
+	// ponytail: linear scans over ~10k regions per keypress/edit; index if it ever shows up in a profile
+	symAt := func(off int) string {
+		for _, r := range regions {
+			if off >= r.start && off < r.end {
+				return fmt.Sprintf("%s+%d", r.sym.Name, off-r.start)
+			}
+		}
+		return ""
+	}
+	onEdit := func(off int, b byte) {
+		for _, r := range regions {
+			if off >= r.start && off < r.end {
+				r.sym.Bytes()[off-r.start] = b
+			}
+		}
+	}
+	onSave := func() error {
+		if mw.filename == "" {
+			return errors.New("no filename to save to")
+		}
+		if bak := mw.filename + ".bak"; !fileExists(bak) {
+			if orig, err := os.ReadFile(mw.filename); err == nil {
+				_ = os.WriteFile(bak, orig, 0o644)
+			}
+		}
+		return mw.fw.Save(mw.filename)
+	}
+
+	he := hexeditor.New(hexeditor.Config{
+		Data:     data,
+		OnEdit:   onEdit,
+		OnSave:   onSave,
+		SymbolAt: symAt,
+	})
+	inner := multiwindow.NewInnerWindowWithIcon("Hex editor", he, theme.DocumentIcon())
+	mw.wm.Add(inner)
+	inner.Resize(fyne.NewSize(760, 620))
 }
 
 func (mw *MainWindow) openFirmwareInfoEdit() {
@@ -412,8 +649,7 @@ func (mw *MainWindow) openPgmMod() {
 	}
 
 	pgm.Set(symZ.Bytes())
-	mapWindow := multiwindow.NewInnerWindow("Pgm_mod!", pgm)
-	mapWindow.Icon = theme.GridIcon()
+	mapWindow := multiwindow.NewInnerWindowWithIcon("Pgm_mod!", pgm, theme.GridIcon())
 	mw.wm.Add(mapWindow)
 }
 
@@ -423,8 +659,7 @@ func (mw *MainWindow) openPgmStatus() {
 	}
 	pgs := pgmstatus.New()
 	cancel := ebus.SubscribeFunc("Pgm_status", pgs.Set)
-	iw := multiwindow.NewInnerWindow("Pgm_status", pgs)
-	iw.Icon = theme.InfoIcon()
+	iw := multiwindow.NewInnerWindowWithIcon("Pgm_status", pgs, theme.InfoIcon())
 	iw.OnClose = func() {
 		if cancel != nil {
 			cancel()
@@ -436,6 +671,7 @@ func (mw *MainWindow) openPgmStatus() {
 func (mw *MainWindow) loadBinary() {
 	if mw.dlc != nil {
 		mw.Error(errors.New("stop logging before loading a new binary"))
+		// common.ShowError("Ooups!", errors.New("stop logging before loading a new binary"))
 		return
 	}
 	cb := func(r fyne.URIReadCloser) {
@@ -443,6 +679,7 @@ func (mw *MainWindow) loadBinary() {
 		filename := r.URI().Path()
 		if err := mw.LoadSymbolsFromFile(filename); err != nil {
 			mw.Error(err)
+			// common.ShowError("Darn it!", err)
 			return
 		}
 	}
@@ -451,11 +688,18 @@ func (mw *MainWindow) loadBinary() {
 
 var openMapLock sync.Mutex
 
+var canflasherIcon = fyne.NewStaticResource("canflasher.png", assets.CanFlasher)
+
 // newMapViewer builds a fully wired MapViewer for a single symbol (file/ECU
 // load+save funcs, live X/Y crosshair subscriptions) but does not create a
 // window. openMap wraps one; openMultiMap arranges several in a grid. The
 // returned cancelFuncs must be called when the containing window closes.
 func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap string) (*mapviewer.MapViewer, *mapviewer.Config, symbol.Axis, []func(), error) {
+	if mw.fw.GetByName(mapName) == nil {
+		if alt := mw.profile().SymbolAliases[mapName]; alt != "" && mw.fw.GetByName(alt) != nil {
+			mapName = alt
+		}
+	}
 	var axis symbol.Axis
 	if mw.as2 != nil {
 		axis.Z = mapName
@@ -554,54 +798,39 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 		xData = xData[:8]
 	}
 
+	// Reg_kon_mat! changed layout: 0x80 bytes is a throttle x rpm matrix,
+	// later firmware stores one 16-bit value per rpm step from 2500 rpm.
+	if strings.HasPrefix(symZ.Name, "Reg_kon_mat") && symZ.Length != 0x80 {
+		xData = []float64{0}
+		yData = regKonMatRPMAxis(mw.fw, len(zData))
+		axis.X, axis.XDescription = "", ""
+	}
+
 	var mv *mapviewer.MapViewer
 
+	// only RAM-backed maps get ECU load/save
+	var ecuAddr uint32
+	var ecuLive bool
+	if p := mw.profile(); p.RAMAddress != nil {
+		ecuAddr, ecuLive = p.RAMAddress(symZ)
+	}
+
 	updateFunc := func(idx int, value []float64) {
-		if mw.dlc != nil && mw.settings.GetAutoSave() {
-			buff := bytes.NewBuffer([]byte{})
-			var dataLen int
-			for i, val := range value {
-				buff.Write(symZ.EncodeFloat64(val))
-				if i == 0 {
-					dataLen = buff.Len()
-				}
-			}
-
-			var addr uint32
-			switch mw.selects.ecuSelect.Selected {
-			case "T5":
-				addr = symZ.SramOffset
-			case "T7":
-				addr = symZ.Address
-			case "T8":
-				addr = symZ.Address + symZ.SramOffset
-			}
-
+		if mw.dlc != nil && ecuLive && mw.settings.GetAutoSave() {
+			addr, b := ramWrite(symZ, ecuAddr, idx, value)
 			start := time.Now()
-			if err := mw.dlc.SetRAM(addr+uint32(idx*dataLen), buff.Bytes()); err != nil {
+			if err := mw.dlc.SetRAM(addr, b); err != nil {
 				mw.Error(err)
 				return
 			}
-			// mw.Log(fmt.Sprintf("set $%d %s %s", addr, axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
-			mw.Log(fmt.Sprintf("set %s $%X %dms", axis.Z, addr+uint32(idx*dataLen), time.Since(start).Truncate(10*time.Millisecond).Milliseconds()))
+			mw.Log(fmt.Sprintf("set %s $%X %dms", axis.Z, addr, time.Since(start).Truncate(10*time.Millisecond).Milliseconds()))
 		}
 	}
 
 	loadRamFunc := func() {
-		if mw.dlc != nil {
+		if mw.dlc != nil && ecuLive {
 			start := time.Now()
-			var addr uint32
-
-			switch mw.selects.ecuSelect.Selected {
-			case "T5":
-				addr = symZ.SramOffset
-			case "T7":
-				addr = symZ.Address
-			case "T8":
-				addr = symZ.Address + symZ.SramOffset
-			}
-
-			data, err := mw.dlc.GetRAM(addr, uint32(symZ.Length))
+			data, err := mw.dlc.GetRAM(ecuAddr, uint32(symZ.Length))
 			if err != nil {
 				mw.Error(err)
 				return
@@ -616,28 +845,15 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 	}
 
 	saveRamFunc := func(data []float64) {
-		if mw.dlc == nil {
+		if mw.dlc == nil || !ecuLive {
 			return
 		}
 		start := time.Now()
-		buff := bytes.NewBuffer(symZ.EncodeFloat64s(data))
-		var startPos uint32
-		switch mw.selects.ecuSelect.Selected {
-		case "T5":
-			startPos = symZ.SramOffset
-		case "T7":
-			startPos = symZ.Address
-		case "T8":
-			startPos = symZ.Address + symZ.SramOffset
-		}
-
-		if err := mw.dlc.SetRAM(startPos, buff.Bytes()); err != nil {
+		addr, b := ramWrite(symZ, ecuAddr, 0, data)
+		if err := mw.dlc.SetRAM(addr, b); err != nil {
 			mw.Error(err)
 			return
 		}
-		buff.Reset()
-
-		// mw.Log(fmt.Sprintf("save %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 		mw.Log(fmt.Sprintf("save %s %s", axis.Z, time.Since(start).Truncate(10*time.Millisecond)))
 	}
 
@@ -653,16 +869,7 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 	}
 
 	saveFileFunc := func(data []float64) {
-		ss := mw.fw.GetByName(axis.Z)
-		if ss == nil {
-			mw.Log(fmt.Sprintf("failed to find symbol %s", axis.Z))
-			return
-		}
-		if err := ss.SetData(ss.EncodeFloat64s(data)); err != nil {
-			mw.Error(err)
-			return
-		}
-		if err := mw.fw.Save(mw.filename); err != nil {
+		if err := writeMap(mw.fw, mw.filename, axis.Z, data); err != nil {
 			mw.Error(err)
 			return
 		}
@@ -790,6 +997,9 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 			},
 		},
 	}
+	if !ecuLive {
+		cfg.Buttons = cfg.Buttons[:2] // drop Load/Save ECU
+	}
 
 	var err error
 	mv, err = mapviewer.New(cfg)
@@ -805,10 +1015,33 @@ func (mw *MainWindow) newMapViewer(typ symbol.ECUType, mapName string, regionMap
 		cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(axis.YFrom, mv.SetY))
 	}
 	cancelFuncs = append(cancelFuncs, ebus.SubscribeFunc(ebus.TOPIC_COLORBLINDMODE, func(value float64) {
-		mv.SetColorBlindMode(colors.ColorBlindMode(int(value)))
+		fyne.Do(func() { mv.SetColorBlindMode(colors.ColorBlindMode(int(value))) })
 	}))
 
 	return mv, cfg, axis, cancelFuncs, nil
+}
+
+// writeMap stores a map viewer's values in the named symbol and saves the
+// binary to filename.
+func writeMap(fw symbol.FirmwareFile, filename, name string, data []float64) error {
+	sym := fw.GetByName(name)
+	if sym == nil {
+		return fmt.Errorf("failed to find symbol %s", name)
+	}
+	if err := sym.SetData(sym.EncodeFloat64s(data)); err != nil {
+		return err
+	}
+	return fw.Save(filename)
+}
+
+// ramWrite encodes the values of cells idx and on, and returns where they go
+// in the ECU's RAM copy of the map, which starts at base.
+func ramWrite(sym *symbol.Symbol, base uint32, idx int, values []float64) (uint32, []byte) {
+	b := sym.EncodeFloat64s(values)
+	if len(values) == 0 {
+		return base, b
+	}
+	return base + uint32(idx*len(b)/len(values)), b
 }
 
 func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string, regionMap string) {
@@ -835,8 +1068,7 @@ func (mw *MainWindow) openMap(typ symbol.ECUType, title string, mapName string, 
 		return
 	}
 
-	mapWindow := multiwindow.NewInnerWindow(axis.Z+" - "+axis.ZDescription, mv)
-	mapWindow.Icon = theme.GridIcon()
+	mapWindow := multiwindow.NewInnerWindowWithIcon(axis.Z+" - "+axis.ZDescription, mv, theme.GridIcon())
 
 	cfg.OnMouseDown = func() {
 		mw.wm.Raise(mapWindow)
@@ -903,8 +1135,7 @@ func (mw *MainWindow) openMultiMap(typ symbol.ECUType, title string, data string
 		return
 	}
 
-	mapWindow := multiwindow.NewInnerWindow(title, grid)
-	mapWindow.Icon = theme.GridIcon()
+	mapWindow := multiwindow.NewInnerWindowWithIcon(title, grid, theme.GridIcon())
 
 	for _, cfg := range cfgs {
 		cfg.OnMouseDown = func() {
@@ -1084,8 +1315,7 @@ func (mw *MainWindow) openBoostTuner() {
 		MeshRenderer: mw.settings.GetMeshRenderer(),
 		Colorblind:   mw.settings.GetColorBlindMode(),
 	})
-	inner := multiwindow.NewInnerWindow("Boost Auto-Tuner", bt)
-	inner.Icon = theme.GridIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("Boost Auto-Tuner", bt, theme.GridIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(1100, 760))
 }
@@ -1102,8 +1332,7 @@ func (mw *MainWindow) openMatrixBuilder() {
 		mw.wm.Raise(w)
 		return
 	}
-	inner := multiwindow.NewInnerWindow("Matrix builder", matrixbuilder.New(mw.settings.GetMeshRenderer()))
-	inner.Icon = theme.GridIcon()
+	inner := multiwindow.NewInnerWindowWithIcon("Matrix builder", matrixbuilder.New(mw.settings.GetMeshRenderer()), theme.GridIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(1000, 720))
 }
@@ -1177,8 +1406,26 @@ func (mw *MainWindow) openRescaler(typ symbol.ECUType, mapName string) {
 		},
 	}
 
-	inner := multiwindow.NewInnerWindow(winName, rescaler.New(cfg))
-	inner.Icon = theme.GridIcon()
+	inner := multiwindow.NewInnerWindowWithIcon(winName, rescaler.New(cfg), theme.GridIcon())
 	mw.wm.Add(inner)
 	inner.Resize(fyne.NewSize(900, 720))
+}
+
+// regKonMatRPMAxis is the rpm axis of the 31-row Reg_kon_mat!: 2500 rpm plus
+// n times the step stored as a word 0x1E4 bytes before the end of the binary,
+// 10 when unprogrammed (T5Suite GetRegulationDivisorValue).
+func regKonMatRPMAxis(fw symbol.FirmwareFile, n int) []float64 {
+	step := 10
+	if raw, ok := fw.(interface{ Bytes() []byte }); ok {
+		if d := raw.Bytes(); len(d) > 0x1E4 {
+			if v := int(binary.BigEndian.Uint16(d[len(d)-0x1E4:])); v != 0xFFFF {
+				step = v
+			}
+		}
+	}
+	axis := make([]float64, n)
+	for i := range axis {
+		axis[i] = float64(2500 + i*step*10)
+	}
+	return axis
 }

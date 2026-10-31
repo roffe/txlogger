@@ -62,7 +62,6 @@ func (t *T7Extras) CreateRenderer() fyne.WidgetRenderer {
 }
 
 func (t *T7Extras) resetECU() error {
-
 	adapter, err := t.mw.settings.GetAdapter("T7")
 	if err != nil {
 		return err
@@ -74,8 +73,8 @@ func (t *T7Extras) resetECU() error {
 	}
 	defer c.Close()
 
-	/* 	kwp := kwp2000.New(c)
-	   	if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
+	/* 	kwp := t7kwp.New(c)
+	   	if err := kwp.StartSession(ctx, t7kwp.INIT_MSG_ID, t7kwp.INIT_RESP_ID); err != nil {
 	   		return err
 	   	}
 	   	granted, err := kwp.RequestSecurityAccess(ctx, false)
@@ -119,7 +118,6 @@ func (tr *T7ExtrasRenderer) MinSize() fyne.Size {
 }
 
 func (tr *T7ExtrasRenderer) Refresh() {
-
 }
 
 func (tr *T7ExtrasRenderer) Objects() []fyne.CanvasObject {

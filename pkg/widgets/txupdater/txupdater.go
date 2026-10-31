@@ -38,7 +38,6 @@ func New(port string) *TxUpdater {
 				Alignment:  fyne.TextAlignLeading,
 				Truncation: fyne.TextTruncateEllipsis,
 			}
-
 		},
 		func(item binding.DataItem, obj fyne.CanvasObject) {
 			i := item.(binding.String)
@@ -123,7 +122,6 @@ func (tr *TxUpdaterRenderer) MinSize() fyne.Size {
 }
 
 func (tr *TxUpdaterRenderer) Refresh() {
-
 }
 
 func (tr *TxUpdaterRenderer) Objects() []fyne.CanvasObject {

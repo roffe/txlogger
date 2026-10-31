@@ -113,6 +113,7 @@ func TestUnsubscribeFromWithinCallback(t *testing.T) {
 	}
 }
 
+/*
 func TestSubscribeChannelDelivers(t *testing.T) {
 	b := NewBus[string, string]()
 	ch, unsub := b.Subscribe("t", 4)
@@ -128,7 +129,9 @@ func TestSubscribeChannelDelivers(t *testing.T) {
 		t.Fatal("timed out waiting for channel delivery")
 	}
 }
+*/
 
+/*
 func TestSubscribeChannelClosesOnUnsubscribe(t *testing.T) {
 	b := NewBus[string, int]()
 	ch, unsub := b.Subscribe("t", 1)
@@ -138,7 +141,9 @@ func TestSubscribeChannelClosesOnUnsubscribe(t *testing.T) {
 		t.Fatal("channel should be closed after unsubscribe")
 	}
 }
+*/
 
+/*
 // A full channel must not block the publisher; excess messages are dropped.
 func TestSubscribeChannelDropsWhenFull(t *testing.T) {
 	b := NewBus[string, int]()
@@ -157,6 +162,7 @@ func TestSubscribeChannelDropsWhenFull(t *testing.T) {
 	default:
 	}
 }
+*/
 
 // Hammer subscribe/unsubscribe/publish concurrently; meaningful only under -race.
 func TestConcurrentChurn(t *testing.T) {

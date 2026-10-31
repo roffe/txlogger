@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/roffe/gocan/v2"
-	"github.com/roffe/txlogger/pkg/kwp2000"
+	"github.com/roffe/gocan/v2/t7kwp"
 )
 
 // T7 CAN identifiers.
@@ -76,7 +76,7 @@ func (c *Client) StartSession(ctx context.Context) error {
 		return fmt.Errorf("StartSession: %w", err)
 	}
 	if resp.Data[3] != startCommunicationReq|positiveResponseFlag {
-		return fmt.Errorf("StartSession: %w", kwp2000.TranslateErrorCode(resp.Data[5]))
+		return fmt.Errorf("StartSession: %w", t7kwp.TranslateErrorCode(resp.Data[5]))
 	}
 	c.responseID = uint32(resp.Data[6])<<8 | uint32(resp.Data[7])
 	return nil
@@ -96,7 +96,7 @@ func (c *Client) TesterPresent(ctx context.Context) error {
 		return fmt.Errorf("TesterPresent: %w", err)
 	}
 	if resp.Data[3] == negativeResponse {
-		return fmt.Errorf("TesterPresent: %w", kwp2000.TranslateErrorCode(resp.Data[5]))
+		return fmt.Errorf("TesterPresent: %w", t7kwp.TranslateErrorCode(resp.Data[5]))
 	}
 	return nil
 }
@@ -111,7 +111,7 @@ func (c *Client) requestJ1979(ctx context.Context, msg ...byte) ([]byte, error) 
 		return nil, fmt.Errorf("mode $%02X: %w", msg[0], err)
 	}
 	if resp.Data[3] == negativeResponse {
-		return nil, fmt.Errorf("mode $%02X: %w", msg[0], kwp2000.TranslateErrorCode(resp.Data[5]))
+		return nil, fmt.Errorf("mode $%02X: %w", msg[0], t7kwp.TranslateErrorCode(resp.Data[5]))
 	}
 
 	// First frame: [seq, 0xA1, kwpLen, SID, data...] — up to 5 message bytes.

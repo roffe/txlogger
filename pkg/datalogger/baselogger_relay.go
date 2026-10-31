@@ -32,7 +32,7 @@ func (bl *BaseLogger) runRelay() error {
 				bl.OnMessage("Received symbol list request")
 				err := c.Send(relayserver.Message{
 					Kind: relayserver.MsgTypeSymbolListResponse,
-					Body: bl.Config.Symbols,
+					Body: bl.Symbols,
 				})
 				if err != nil {
 					bl.onError()

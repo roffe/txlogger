@@ -42,11 +42,20 @@ func Init() error {
 }
 
 // Create a new 'player' that will handle our sound. Paused by default.
-func NewPlayer(r io.Reader) *oto.Player {
+func NewPlayer(r io.Reader) (*oto.Player, error) {
 	if octx == nil {
 		if err := Init(); err != nil {
-			panic("sound.NewPlayer: " + err.Error())
+			return nil, err
 		}
 	}
-	return octx.NewPlayer(r)
+	_ = octx.Resume()
+	return octx.NewPlayer(r), nil
+}
+
+// Suspend stops the audio device. An idle context otherwise keeps feeding it
+// silence, waking the process ~40 times a second.
+func Suspend() {
+	if octx != nil {
+		_ = octx.Suspend()
+	}
 }

@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan/v2"
-	"github.com/roffe/txlogger/pkg/ebus"
 	"github.com/roffe/txlogger/pkg/t5can"
 )
 
@@ -93,14 +93,9 @@ func (c *T5FastClient) Start(pctx context.Context) error {
 	defer t.Stop()
 	t5 := t5can.NewClient(cl)
 
-	// T5 decodes every value into sysvars (see newT5Converter), so all columns
-	// are sysvar channels.
-	channels := make([]Channel, 0, len(c.Symbols)+2)
 	gatherLen := uint32(0)
 	for _, s := range c.Symbols {
-		s.Correctionfactor = 0.1
 		gatherLen += uint32(s.Length)
-		channels = append(channels, newSysvarChannel(c.sysvars, s.Name))
 	}
 
 	if err := c.setupWBL(ctx, cl); err != nil {
@@ -110,9 +105,7 @@ func (c *T5FastClient) Start(pctx context.Context) error {
 	if c.lamb != nil {
 		defer c.lamb.Stop()
 	}
-	for _, name := range c.appendExtraSysvars(nil) {
-		channels = append(channels, newSysvarChannel(c.sysvars, name))
-	}
+	channels := c.t5Channels()
 
 	// Upload the gather stub + descriptor table and arm the stream-call once.
 	image, err := buildT5GatherImage(c.Symbols)
@@ -127,10 +120,12 @@ func (c *T5FastClient) Start(pctx context.Context) error {
 	}
 	c.OnMessage(fmt.Sprintf("T5 fast-logger enabled (%d symbols, %d byte payload)", len(c.Symbols), len(image)))
 
-	converto := newT5Converter()
-	adscannerConverter := NewWBLInterpolator(c.WidebandConfig)
+	publish := c.t5Publisher()
 
-	go func() {
+	// Wait for the logging loop to exit before the deferred closes above run.
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	wg.Go(func() {
 		defer cl.Close()
 		for {
 			select {
@@ -141,7 +136,7 @@ func (c *T5FastClient) Start(pctx context.Context) error {
 				return
 			case <-c.secondTicker.C:
 				c.FpsCounter(c.capturePerSecond)
-				if c.errPerSecond > 5 {
+				if c.errPerSecond.Load() > 5 {
 					c.OnMessage("too many errors, aborting logging")
 					return
 				}
@@ -151,6 +146,7 @@ func (c *T5FastClient) Start(pctx context.Context) error {
 				if err != nil {
 					c.onError()
 					c.OnMessage(err.Error())
+					read.Complete(err)
 					continue
 				}
 				read.Data = data
@@ -190,21 +186,9 @@ func (c *T5FastClient) Start(pctx context.Context) error {
 						return
 					}
 					off = end
-					val := converto(sym.Name, sym.Bytes())
-					if c.WidebandConfig.ADScanner && sym.Name == c.WidebandConfig.ADScannerSymbol {
-						lambda := adscannerConverter(int(val))
-						c.sysvars.Set(LAMBDAADSCANNER, lambda)
-						ebus.Publish(LAMBDAADSCANNER, lambda)
-					}
-					c.sysvars.Set(sym.Name, val)
-					ebus.Publish(sym.Name, val)
+					publish(sym)
 				}
-
-				if c.lamb != nil {
-					lambda := c.lamb.GetLambda()
-					c.sysvars.Set(EXTERNALWBLSYM, lambda)
-					ebus.Publish(EXTERNALWBLSYM, lambda)
-				}
+				c.publishExternalWBL()
 
 				if err := c.lw.Write(ts, channels); err != nil {
 					c.OnMessage("failed to write log: " + err.Error())
@@ -213,7 +197,7 @@ func (c *T5FastClient) Start(pctx context.Context) error {
 				c.onCapture(ts)
 			}
 		}
-	}()
+	})
 	return cl.Wait(ctx)
 }
 

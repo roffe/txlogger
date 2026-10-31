@@ -28,11 +28,20 @@ import (
 // clamps points to the object's own size).
 const polyPad float32 = 1.5
 
+// polyColor is the persistent backing store for one cell's fill and stroke.
+// The polygon's color.Color fields hold pointers into it, so the per-frame
+// color update mutates in place instead of boxing a fresh color.RGBA on the
+// heap for every cell (which dominated updatePolygons' allocations).
+type polyColor struct {
+	fill, stroke color.RGBA
+}
+
 // initPolygons creates the reusable cell polygons. Geometry and colors are
 // filled in by updatePolygons; nothing here needs a driver, so it is safe to
 // call from the constructor (and from tests without an app).
 func (m *Meshgrid) initPolygons() {
 	m.polys = make([]*canvas.ArbitraryPolygon, m.rows*m.cols)
+	m.polyColors = make([]polyColor, m.rows*m.cols)
 	for i := range m.polys {
 		m.polys[i] = &canvas.ArbitraryPolygon{Points: make([]fyne.Position, 4)}
 	}
@@ -169,22 +178,28 @@ func (m *Meshgrid) updatePolygons() {
 			}
 
 			// Flat shade: average the four corner colors, then apply the same
-			// Lambert term the image renderer uses per quad.
+			// Lambert term the image renderer uses per quad. The colors go
+			// into the cell's persistent polyColor and the polygon gets
+			// pointers to them; color.Transparent is still assigned directly
+			// so the painter's == color.Transparent skip-check keeps working.
 			shade := m.quadShade(i, j, lx, ly, lz)
-			fill := avgQuadColor(vertCol[ai], vertCol[bi], vertCol[ci], vertCol[di], shade)
+			pc := &m.polyColors[i*m.cols+j]
+			pc.fill = avgQuadColor(vertCol[ai], vertCol[bi], vertCol[ci], vertCol[di], shade)
 
 			switch mode {
 			case RenderModeSolidWireframe:
-				poly.FillColor = fill
-				poly.StrokeColor = fadeColor(fill, surfaceEdgeFade)
+				pc.stroke = fadeColor(pc.fill, surfaceEdgeFade)
+				poly.FillColor = &pc.fill
+				poly.StrokeColor = &pc.stroke
 				poly.StrokeWidth = 1
 			case RenderModeSolid:
-				poly.FillColor = fill
+				poly.FillColor = &pc.fill
 				poly.StrokeColor = color.Transparent
 				poly.StrokeWidth = 0
 			case RenderModeWireframe:
+				pc.stroke = pc.fill
 				poly.FillColor = color.Transparent
-				poly.StrokeColor = fill
+				poly.StrokeColor = &pc.stroke
 				poly.StrokeWidth = 1
 			}
 

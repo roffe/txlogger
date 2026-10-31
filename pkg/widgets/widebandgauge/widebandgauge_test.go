@@ -53,9 +53,12 @@ func TestZoneColorBands(t *testing.T) {
 		idx  int
 		want color.RGBA
 	}{
-		{0, richAmber}, {ledsRich - 1, richAmber},
-		{ledsRich, stoichGrn}, {ledsRich + ledsStoich - 1, stoichGrn},
-		{ledsRich + ledsStoich, leanRed}, {ledsRich + ledsStoich + ledsLean - 1, leanRed},
+		{0, richAmber},
+		{ledsRich - 1, richAmber},
+		{ledsRich, stoichGrn},
+		{ledsRich + ledsStoich - 1, stoichGrn},
+		{ledsRich + ledsStoich, leanRed},
+		{ledsRich + ledsStoich + ledsLean - 1, leanRed},
 	} {
 		if got := zoneColor(tc.idx); got != tc.want {
 			t.Errorf("zoneColor(%d) = %v, want %v", tc.idx, got, tc.want)

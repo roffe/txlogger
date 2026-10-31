@@ -30,7 +30,7 @@ const (
 
 var t7Gears = []string{"Reverse", "First", "Second", "Third", "Fourth", "Fifth"}
 
-func (t7) Options(fw symbol.SymbolCollection) []Option {
+func (t7) Options(fw symbol.FirmwareFile) []Option {
 	return []Option{
 		{Key: "automatic", Label: "Automatic gearbox", Kind: OptionBool},
 		{Key: "e85", Label: "E85 fuel", Kind: OptionBool, Disabled: !has(fw, "TorqueCal.M_EngMaxE85Tab")},
@@ -78,7 +78,7 @@ type t7calc struct {
 	fuelcutLimit                             int
 }
 
-func (t7) Calculate(fw symbol.SymbolCollection, opts map[string]float64) (*Result, error) {
+func (t7) Calculate(fw symbol.FirmwareFile, opts map[string]float64) (*Result, error) {
 	c := &t7calc{
 		automatic:   opts["automatic"] == 1,
 		convertible: opts["convertible"] == 1,

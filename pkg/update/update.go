@@ -2,6 +2,7 @@ package update
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -99,8 +100,13 @@ type Assets struct {
 }
 
 func UpdateCheck(a fyne.App, mw fyne.Window) {
-	isLatest, latestVersion := IsLatest("v" + a.Metadata().Version)
-	if !isLatest {
+	latest, err := GetLatest()
+	if err != nil {
+		dialog.ShowError(err, mw)
+		return
+	}
+	latestVersion := latest.TagName
+	if semver.Compare(latestVersion, "v"+a.Metadata().Version) > 0 {
 		u, err := url.Parse("https://txlogger.com")
 		if err != nil {
 			panic(err)
@@ -108,16 +114,29 @@ func UpdateCheck(a fyne.App, mw fyne.Window) {
 		link := widget.NewHyperlink("Get it at txlogger.com", u)
 		link.Alignment = fyne.TextAlignLeading
 		link.TextStyle = fyne.TextStyle{Bold: true}
-		dialog.ShowCustom(
-			"Update available",
-			"Close",
-			container.NewVBox(
-				widget.NewLabel("Current version: v"+a.Metadata().Version),
-				widget.NewLabel("Latest version: "+latestVersion),
-				link,
-			),
-			mw,
+		content := container.NewVBox(
+			widget.NewLabel("Current version: v"+a.Metadata().Version),
+			widget.NewLabel("Latest version: "+latestVersion),
+			link,
 		)
+		if appImagePath() != "" {
+			content.Add(widget.NewButton("Update AppImage now", func() {
+				pd := dialog.NewCustomWithoutButtons("Updating", widget.NewLabel("Downloading "+latestVersion+"..."), mw)
+				pd.Show()
+				go func() {
+					err := selfUpdateAppImage(latest)
+					fyne.Do(func() {
+						pd.Hide()
+						if err != nil {
+							dialog.ShowError(err, mw)
+							return
+						}
+						dialog.ShowInformation("Updated", "Restart txlogger to run "+latestVersion, mw)
+					})
+				}()
+			}))
+		}
+		dialog.ShowCustom("Update available", "Close", content, mw)
 	} else {
 		dialog.ShowInformation("No update available", "You are running the latest version", mw)
 	}
@@ -157,6 +176,9 @@ func httpGetBody(url string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GET %s: %s", url, resp.Status)
+	}
 	return io.ReadAll(resp.Body)
 }
 
@@ -167,5 +189,5 @@ func IsLatest(version string) (bool, string) {
 	}
 	//	log.Println("latest.TagName:", latest.TagName)
 	//	log.Println("current.Version:", version)
-	return !(semver.Compare(latest.TagName, version) > 0), latest.TagName
+	return semver.Compare(latest.TagName, version) <= 0, latest.TagName
 }

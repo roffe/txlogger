@@ -2,7 +2,6 @@ package windows
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -19,31 +18,36 @@ import (
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	fynetooltip "github.com/dweymouth/fyne-tooltip"
+	ttwidget "github.com/dweymouth/fyne-tooltip/widget"
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/ecusymbol/as2"
+	"github.com/roffe/gocan/v2/t7kwp"
 	"github.com/roffe/txlogger/j2534proxy/client"
-	"github.com/roffe/txlogger/pkg/colors"
+	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/datalogger"
 	"github.com/roffe/txlogger/pkg/debug"
 	"github.com/roffe/txlogger/pkg/ebus"
+	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/update"
-	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/widgets/combinedlogplayer"
 	"github.com/roffe/txlogger/pkg/widgets/dashboard"
 	"github.com/roffe/txlogger/pkg/widgets/ledicon"
 	"github.com/roffe/txlogger/pkg/widgets/logplayer"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
+	"github.com/roffe/txlogger/pkg/widgets/seedkey"
 	"github.com/roffe/txlogger/pkg/widgets/settings"
+	"github.com/roffe/txlogger/pkg/widgets/shortcuts"
 	"github.com/roffe/txlogger/pkg/widgets/symbollist"
 )
 
 const (
-	prefsLastBinFile    = "lastBinFile"
-	prefsSelectedECU    = "lastECU"
-	prefsSymbolList     = "symbolList"
-	prefsSelectedPreset = "selectedPreset"
-	prefsRemoteMode     = "remoteMode"
+	prefsLastBinFile = "lastBinFile"
+	prefsSelectedECU = "lastECU"
+	prefsRemoteMode  = "remoteMode"
+	prefsWindowW     = "windowWidth"
+	prefsWindowH     = "windowHeight"
 )
 
 // var _ desktop.Mouseable = (*SecretText)(nil)
@@ -69,10 +73,20 @@ type MainWindow struct {
 	counters                    *mainWindowCounters
 	loggingRunning              bool
 	filename                    string
-	symbolList                  *symbollist.Widget
+	symbolList                  *symbollist.Viewer
 
 	as2 *as2.File
-	fw  symbol.SymbolCollection
+	fw  symbol.FirmwareFile
+
+	// logz is the most recently opened log file, kept so tools that work on
+	// "the log" (currently the AI chat) have something to read. Several log
+	// players can be open at once; this is the last one loaded.
+	logz        logfile.Logfile
+	logFilename string
+
+	// seedKey is the T7 SecurityAccess pair read out of the loaded binary,
+	// tried first when logging so ECUs with a patched/custom algorithm unlock.
+	seedKey *t7kwp.SeedKey
 
 	dlc             datalogger.IClient
 	dlcCancel       context.CancelFunc
@@ -86,29 +100,26 @@ type MainWindow struct {
 	j2534LED *ledicon.Widget
 	canLED   *ledicon.Widget
 
+	keyBindings []shortcuts.Binding
+
 	previewFeatures bool
 }
 
 type mainWindowSelects struct {
-	symbolLookup *widgets.CompletionEntry
 	ecuSelect    *widget.Select
-	presetSelect *widget.Select
 	layoutSelect *widget.Select
 	remoteSelect *widget.Select
 }
 
 type mainWindowButtons struct {
-	debugBtn     *widget.Button
-	addSymbolBtn *widget.Button
-	logBtn       *widget.Button
-	// loadSymbolsEcuBtn *widget.Button
-	syncSymbolsBtn *widget.Button
-	dashboardBtn   *widget.Button
+	debugBtn     *ttwidget.Button
+	logBtn       *ttwidget.Button
+	dashboardBtn *ttwidget.Button
 
 	layoutRefreshBtn *widget.Button
-	symbolListBtn    *widget.Button
-	addGaugeBtn      *widget.Button
-	livePlotBtn      *widget.Button
+	symbolListBtn    *ttwidget.Button
+	addGaugeBtn      *ttwidget.Button
+	livePlotBtn      *ttwidget.Button
 }
 
 type mainWindowCounters struct {
@@ -118,9 +129,6 @@ type mainWindowCounters struct {
 }
 
 func NewMainWindow(app fyne.App) *MainWindow {
-	symbolListConfig := &symbollist.Config{
-		ColorBlindMode: colors.ModeNormal,
-	}
 	mw := &MainWindow{
 		Window:     app.NewWindow("txlogger"),
 		app:        app,
@@ -130,24 +138,24 @@ func NewMainWindow(app fyne.App) *MainWindow {
 		selects:  &mainWindowSelects{},
 		buttons:  &mainWindowButtons{},
 
-		symbolList: symbollist.New(symbolListConfig),
-
 		j2534LED:        ledicon.New("J2534"),
 		canLED:          ledicon.New("CAN"),
 		statusText:      widget.NewLabel("Harder, Better, Faster, Stronger"),
 		previewFeatures: app.Preferences().BoolWithFallback("enable_preview_features1337", false),
 	}
 
-	ebus.SubscribeFunc(ebus.TOPIC_COLORBLINDMODE, func(v float64) {
-		mw.symbolList.SetColorBlindMode(colors.ColorBlindMode(int(v)))
-		mw.symbolList.Refresh()
+	mw.symbolList = symbollist.NewViewer(&symbollist.ViewerConfig{
+		App:    app,
+		Window: mw.Window,
+		ECU:    func() string { return mw.selects.ecuSelect.Selected },
+		Log:    mw.Log,
+		Error:  mw.Error,
 	})
 
 	mw.setupMenu()
 	mw.createButtons()
 	mw.createSelects()
 	mw.createCounters()
-	mw.newSymbolnameTypeahead()
 	mw.setupShortcuts()
 
 	mw.settings = settings.New(&settings.Config{
@@ -159,7 +167,8 @@ func NewMainWindow(app fyne.App) *MainWindow {
 
 	mw.loadPrefs()
 
-	symbolListConfig.ColorBlindMode = mw.settings.GetColorBlindMode()
+	mw.symbolList.SetColorBlindMode(mw.settings.GetColorBlindMode())
+	mw.symbolList.UpdateBars(mw.settings.GetRealtimeBars())
 
 	mw.wm = multiwindow.NewMultipleWindows()
 	mw.wm.LockViewport = true
@@ -170,9 +179,16 @@ func NewMainWindow(app fyne.App) *MainWindow {
 	mw.Window.SetOnDropped(mw.onDropped)
 	mw.SetCloseIntercept(mw.Close)
 	mw.SetPadded(true)
-	mw.SetContent(mw.content)
-	mw.Resize(fyne.NewSize(1000, 700))
-	mw.CenterOnScreen()
+	mw.SetContent(fynetooltip.AddWindowToolTipLayer(mw.content, mw.Canvas()))
+	/*
+		// ponytail: size only, Fyne has no API to get or set window position
+		p := app.Preferences()
+		mw.Resize(fyne.NewSize(
+			float32(p.FloatWithFallback(prefsWindowW, 1000)),
+			float32(p.FloatWithFallback(prefsWindowH, 700)),
+		))
+		mw.CenterOnScreen()
+	*/
 	mw.SetMaster()
 
 	mw.whatsNew()
@@ -238,11 +254,6 @@ func (mw *MainWindow) startJ2534Proxy() {
 func (mw *MainWindow) setupShortcuts() {
 	ctrlEnter := &desktop.CustomShortcut{KeyName: fyne.KeyReturn, Modifier: fyne.KeyModifierControl}
 	altEnter := &desktop.CustomShortcut{KeyName: fyne.KeyReturn, Modifier: fyne.KeyModifierAlt}
-	ctrl1 := &desktop.CustomShortcut{KeyName: fyne.Key1, Modifier: fyne.KeyModifierControl}
-	ctrl2 := &desktop.CustomShortcut{KeyName: fyne.Key2, Modifier: fyne.KeyModifierControl}
-	ctrl3 := &desktop.CustomShortcut{KeyName: fyne.Key3, Modifier: fyne.KeyModifierControl}
-	ctrl4 := &desktop.CustomShortcut{KeyName: fyne.Key4, Modifier: fyne.KeyModifierControl}
-
 	mw.Window.Canvas().AddShortcut(ctrlEnter, func(shortcut fyne.Shortcut) {
 		mw.wm.Arrange(&multiwindow.GridArranger{})
 	})
@@ -251,23 +262,60 @@ func (mw *MainWindow) setupShortcuts() {
 		mw.Window.SetFullScreen(!mw.Window.FullScreen())
 	})
 
-	mw.Window.Canvas().AddShortcut(ctrl1, func(shortcut fyne.Shortcut) {
-		log.Println("open settings with Ctrl-1")
+	mw.applyShortcuts(shortcuts.Load())
+}
+
+// applyShortcuts takes the user-configured shortcuts into use, replacing the
+// previous set. The menu is rebuilt because that is where they live.
+func (mw *MainWindow) applyShortcuts(bindings []shortcuts.Binding) {
+	mw.keyBindings = bindings
+	mw.SetMainMenu(mw.GetMenu(mw.selects.ecuSelect.Selected))
+}
+
+// shortcutMenu holds the user-configured shortcuts that apply to the given
+// ECU. They are menu items rather than canvas shortcuts because menu shortcuts
+// are matched before the focused widget gets a shot: a focused map viewer
+// would otherwise swallow them, so hopping between two maps with Ctrl-1/Ctrl-2
+// would only work once. The menu is rebuilt on every ECU switch, which is what
+// makes per-ECU bindings work.
+func (mw *MainWindow) shortcutMenu(ecu string) *fyne.Menu {
+	items := make([]*fyne.MenuItem, 0, len(mw.keyBindings))
+	for _, b := range mw.keyBindings {
+		if b.Key == "" || !b.AppliesTo(ecu) {
+			continue
+		}
+		item := fyne.NewMenuItem(b.Label(), func() { mw.runShortcut(b) })
+		item.Shortcut = &desktop.CustomShortcut{KeyName: b.Key, Modifier: b.Modifier}
+		items = append(items, item)
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	return fyne.NewMenu("Shortcuts", items...)
+}
+
+func (mw *MainWindow) runShortcut(b shortcuts.Binding) {
+	switch b.Action {
+	case shortcuts.ActionSettings:
 		mw.openSettings()
-	})
-
-	mw.Window.Canvas().AddShortcut(ctrl2, func(shortcut fyne.Shortcut) {
-		log.Println("open symbol list with Ctrl-2")
+	case shortcuts.ActionSymbolList:
 		mw.buttons.symbolListBtn.OnTapped()
-	})
-
-	mw.Window.Canvas().AddShortcut(ctrl3, func(shortcut fyne.Shortcut) {
-		log.Println("Ctrl-3")
-	})
-
-	mw.Window.Canvas().AddShortcut(ctrl4, func(shortcut fyne.Shortcut) {
-		log.Println("Ctrl-4")
-	})
+	case shortcuts.ActionMap:
+		// Raise an already open viewer instead of leaning on openMap's own
+		// check, which looks for the bare symbol name while the window it
+		// creates is titled "<symbol> - <description>".
+		for _, w := range mw.wm.Windows() {
+			if t := w.Title(); t == b.Target || strings.HasPrefix(t, b.Target+" - ") {
+				mw.wm.Raise(w)
+				return
+			}
+		}
+		mw.openMap(symbol.ECUTypeFromString(mw.selects.ecuSelect.Selected), "", b.Target, "")
+	case shortcuts.ActionLayout:
+		if err := mw.LoadLayout(b.Target); err != nil {
+			mw.Error(err)
+		}
+	}
 }
 
 func (mw *MainWindow) render() {
@@ -306,6 +354,7 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 		mw.Error(fmt.Errorf("failed to open log file: %w", err))
 		return
 	}
+	mw.logz, mw.logFilename = logz, fp
 
 	dbcfg := &dashboard.Config{
 		Logplayer:      true,
@@ -316,29 +365,8 @@ func (mw *MainWindow) LoadLogfileCombined(filename string, reader io.ReadCloser,
 		WidebandSymbol: mw.settings.GetWidebandSymbolName(),
 	}
 
-	rec := logz.Next()
-	if !rec.EOF {
-		for k := range rec.Values {
-			if k == "AirMassMast.m_Request" {
-				dbcfg.AirDemToString = datalogger.AirDemToStringT8
-				break
-			} else if k == "Lufttemp" {
-				// T5
-				break
-			} else {
-				dbcfg.AirDemToString = datalogger.AirDemToStringT7
-				break
-			}
-		}
-	}
-	logz.Seek(0)
-
-	switch mw.selects.ecuSelect.Selected {
-	case "T7":
-		dbcfg.AirDemToString = datalogger.AirDemToStringT7
-	case "T8":
-		dbcfg.AirDemToString = datalogger.AirDemToStringT8
-	}
+	// the log may come from another ECU than the selected one
+	dbcfg.AirDemToString = ecu.ProfileForLog(logz.Columns(), mw.profile()).AirDemToString
 
 	cpCfg := &combinedlogplayer.CombinedLogplayerConfig{
 		Logfile: logz,
@@ -422,6 +450,8 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Positio
 		return
 	}
 
+	mw.logz, mw.logFilename = logz, fp
+
 	mw.Log("loaded log file " + filename)
 	mw.addRecent(filename)
 
@@ -459,8 +489,7 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Positio
 						return
 					}
 
-					iw := multiwindow.NewInnerWindow("Lambda feedback", mv)
-					iw.Icon = theme.InfoIcon()
+					iw := multiwindow.NewInnerWindowWithIcon("Lambda feedback", mv, theme.InfoIcon())
 
 				}),
 			),
@@ -470,8 +499,7 @@ func (mw *MainWindow) LoadLogfile(filename string, r io.Reader, pos fyne.Positio
 			lp,
 		)
 	*/
-	iw := multiwindow.NewSystemWindow(fp, lp)
-	iw.Icon = theme.MediaPlayIcon()
+	iw := multiwindow.NewSystemWindowWithIcon(fp, lp, theme.MediaPlayIcon())
 
 	lp.OnMouseDown = func() {
 		mw.wm.Raise(iw)
@@ -500,22 +528,19 @@ func (mw *MainWindow) Error(err error) {
 	debug.LogDepth(2, err.Error())
 	_ = mw.outputData.Append(err.Error())
 	go fyne.Do(func() {
-		dialog.ShowError(err, mw.Window)
+		// dialog.ShowError(err, mw.Window)
+		common.ShowError("Dang it!", err)
 	})
 	// log.Printf("error: %s", err)
 }
 
 func (mw *MainWindow) Disable() {
 	mw.buttonsDisabled = true
-	mw.buttons.addSymbolBtn.Disable()
-	// mw.buttons.loadSymbolsEcuBtn.Disable()
-	mw.buttons.syncSymbolsBtn.Disable()
 	if !mw.loggingRunning {
 		mw.buttons.logBtn.Disable()
 	}
 
 	mw.selects.ecuSelect.Disable()
-	mw.selects.presetSelect.Disable()
 	mw.selects.remoteSelect.Disable()
 
 	mw.symbolList.Disable()
@@ -523,44 +548,12 @@ func (mw *MainWindow) Disable() {
 
 func (mw *MainWindow) Enable() {
 	mw.buttonsDisabled = false
-	mw.buttons.addSymbolBtn.Enable()
-	// mw.buttons.loadSymbolsEcuBtn.Enable()
-	mw.buttons.syncSymbolsBtn.Enable()
 	mw.buttons.logBtn.Enable()
 
 	mw.selects.ecuSelect.Enable()
-	mw.selects.presetSelect.Enable()
 	mw.selects.remoteSelect.Enable()
 
 	mw.symbolList.Enable()
-}
-
-func (mw *MainWindow) SyncSymbols() {
-	// Print where SyncSymbols was called from
-	_, file, line, _ := runtime.Caller(1)
-	log.Printf("SyncSymbols called from %s:%d", file, line)
-
-	if mw.fw == nil {
-		return
-	}
-	cnt := 0
-	for _, v := range mw.symbolList.Symbols() {
-		sym := mw.fw.GetByName(v.Name)
-		if sym != nil {
-			v.Name = sym.Name
-			v.Number = sym.Number
-			v.Address = sym.Address
-			v.SramOffset = sym.SramOffset
-			v.Length = sym.Length
-			v.Mask = sym.Mask
-			v.Type = sym.Type
-			v.Unit = sym.Unit
-			v.Correctionfactor = sym.Correctionfactor
-			cnt++
-		}
-	}
-	mw.symbolList.Refresh()
-	mw.Log(fmt.Sprintf("Synced %d / %d symbols", cnt, mw.symbolList.Count()))
 }
 
 /*
@@ -618,6 +611,7 @@ func (mw *MainWindow) LoadSymbolsFromFile(filename string) error {
 	mw.app.Preferences().SetString(prefsLastBinFile, filename)
 	mw.addRecent(filename)
 
+	mw.captureSeedKey(ecuType, data)
 	mw.LoadSymbols(symbols, ecuType.String())
 	// mw.selects.ecuSelect.SetSelected(ecuType.String())
 	// mw.fw = symbols
@@ -634,39 +628,32 @@ func (mw *MainWindow) LoadSymbolsFromBytes(filename string, data []byte) error {
 	mw.SetTitle(filepath.Base(filename))
 	mw.app.Preferences().SetString(prefsLastBinFile, filename)
 
+	mw.captureSeedKey(ecuType, data)
 	mw.LoadSymbols(symbols, ecuType.String())
 	return nil
 }
 
-func (mw *MainWindow) LoadSymbols(symbols symbol.SymbolCollection, ecuType string) {
-	mw.selects.ecuSelect.SetSelected(ecuType)
+// captureSeedKey reads the T7 SecurityAccess algorithm (XOR/SUB) out of the
+// loaded binary so logging can unlock ECUs flashed with a patched/custom
+// algorithm. Cleared for non-T7 or when the routine isn't found (falls back to
+// the stock pairs).
+func (mw *MainWindow) captureSeedKey(ecuType symbol.ECUType, data []byte) {
+	mw.seedKey = nil
+	if ecuType != symbol.ECU_T7 {
+		return
+	}
+	_, xor, sub, err := seedkey.Find(data)
+	if err != nil {
+		return
+	}
+	mw.seedKey = &t7kwp.SeedKey{XOR: xor, Sub: sub}
+	mw.Log(fmt.Sprintf("Seed/key from binary: XOR %04X SUB %04X (%s)", xor, sub, seedkey.MethodName(xor, sub)))
+}
+
+func (mw *MainWindow) LoadSymbols(symbols symbol.FirmwareFile, ecuType string) {
 	mw.fw = symbols
-	mw.SyncSymbols()
-}
-
-func (mw *MainWindow) LoadPreset(r io.Reader) error {
-	b, err := io.ReadAll(r)
-	if err != nil {
-		return fmt.Errorf("failed to read config file: %w", err)
-	}
-	var cfg []*symbol.Symbol
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		return fmt.Errorf("failed to unmarshal config file: %w", err)
-	}
-	mw.symbolList.LoadSymbols(cfg...)
-	mw.app.Preferences().SetString(prefsSymbolList, string(b))
-	return nil
-}
-
-func (mw *MainWindow) ExportPreset(filename string) error {
-	b, err := json.Marshal(mw.symbolList.Symbols())
-	if err != nil {
-		return fmt.Errorf("failed to marshal config file: %w", err)
-	}
-	if err := os.WriteFile(filename, b, 0o644); err != nil {
-		return fmt.Errorf("failed to write config file: %w", err)
-	}
-	return nil
+	mw.symbolList.SetSymbols(symbols)
+	mw.selects.ecuSelect.SetSelected(ecuType) // selects the ECU's preset, which syncs
 }
 
 // -----

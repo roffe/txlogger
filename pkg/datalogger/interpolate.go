@@ -2,7 +2,7 @@ package datalogger
 
 func NewWBLInterpolator(wb WidebandConfig) func(int) float64 {
 	return func(value int) float64 {
-		if len(wb.SupportPoints) != len(wb.LambdaValues) {
+		if len(wb.SupportPoints) == 0 || len(wb.SupportPoints) != len(wb.LambdaValues) {
 			return -1
 		}
 		if value <= wb.SupportPoints[0] {

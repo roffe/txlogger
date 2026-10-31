@@ -8,6 +8,7 @@ func (mw *MainWindow) t8Menu() []MenuItem {
 			{Name: "DTC Reader", Func: mw.openDTCReader},
 			{Name: "Edit Parameters", Func: mw.openEditParameters},
 			{Name: "Firmware info edit", Func: mw.openFirmwareInfoEdit},
+			{Name: "NVDM editor", Func: mw.openNVDMEditor},
 		}},
 		{Name: "Airmass", Children: []MenuItem{
 			{Name: "Max airmass map (manual)", Data: "BstKnkCal.MaxAirmass"},

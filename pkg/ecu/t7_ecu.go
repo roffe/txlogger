@@ -11,18 +11,18 @@ import (
 
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan/v2"
-	"github.com/roffe/txlogger/pkg/kwp2000"
+	"github.com/roffe/gocan/v2/t7kwp"
 )
 
-func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (symbol.SymbolCollection, error) {
+func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (*symbol.Collection, error) {
 	cl, err := gocan.OpenAdapter(context.TODO(), dev)
 	if err != nil {
 		return nil, err
 	}
 	defer cl.Close()
 
-	k := kwp2000.New(cl)
-	if err := k.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
+	k := t7kwp.New(cl)
+	if err := k.StartSession(ctx, t7kwp.INIT_MSG_ID, t7kwp.INIT_RESP_ID); err != nil {
 		return nil, err
 	}
 	defer k.StopSession(ctx)
@@ -49,7 +49,7 @@ func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (symb
 		return nil, err
 	}
 	// log.Println("time to read symbol table", time.Since(start))
-	//cb(fmt.Sprintf("Took %s to load Symbol Table", time.Since(start)))
+	// cb(fmt.Sprintf("Took %s to load Symbol Table", time.Since(start)))
 
 	//	os.WriteFile("symtable.bin", symTable, 0644)
 
@@ -83,6 +83,10 @@ func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (symb
 		sym_count++
 	}
 
+	if len(symbols) == 0 {
+		return nil, errors.New("empty symbol table")
+	}
+
 	cb("Downloading symbol names")
 	compressedSymbolNameTable, err := k.ReadFlash(ctx, int(symbols[0].Address), int(symbols[0].Length))
 	if err != nil {
@@ -98,7 +102,7 @@ func GetSymbolsT7(ctx context.Context, dev gocan.Adapter, cb func(string)) (symb
 	if err != nil {
 		return nil, err
 	}
-	for i := 0; i < len(symbolNames)-1; i++ {
+	for i := 0; i < len(symbolNames)-1 && i < len(symbols); i++ {
 		symbols[i].Name = strings.TrimSpace(symbolNames[i])
 		symbols[i].Unit = symbol.GetUnit(symbols[i].Name)
 		symbols[i].Correctionfactor = symbol.GetCorrectionfactor(symbols[i].Name)

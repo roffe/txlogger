@@ -31,12 +31,33 @@ const (
 	// edge so it doesn't sit directly on the surface. The distances below are
 	// measured outward from this shifted line.
 	axisEdgeOffset = 8.0
-	axisTickLen    = 7.0  // tick-mark length, px, drawn outward from the edge
-	axisLabelPad   = 24.0 // outward distance of a value label's center from the lifted edge
-	axisNameGap    = 16.0 // extra clearance of the axis-name label past the value labels
+	axisTickLen    = 7.0 // tick-mark length, px, drawn outward from the edge
+	// axisLabelGap is the clearance between a tick mark and its value label,
+	// and between the value labels and an axis name placed beyond them.
+	axisLabelGap = 4.0
+	// axisNameGap is the clearance of an axis name placed past the end of its
+	// edge, enough to clear the row of the last tick's value label.
+	axisNameGap = 12.0
 	// zDivisions is the number of intervals on the vertical value scale, so it
 	// shows zDivisions+1 ticks from zmin to zmax.
 	zDivisions = 5
+	// axisShallowSin is the sine of the screen angle between the X and Y
+	// floor edges below which their label bands start printing into the same
+	// screen band (fully collinear when the floor is viewed edge-on).
+	axisShallowSin = 0.12
+	// axisBandLift is how far the shorter of two colliding floor axes is
+	// lifted along its outward normal at full collinearity: past the other
+	// axis' value-label and name rows, so the two scales stack readably
+	// instead of overprinting.
+	axisBandLift = 56.0
+	// axisMinEdgePx is the projected edge length below which tick marks and
+	// value labels are skipped: an edge foreshortened almost to a point (the
+	// Z scale in a top-down view) stacks all its labels onto one spot.
+	axisMinEdgePx = 24.0
+	// axisCornerHysteresis is how many pixels better a new corner pick must
+	// be before it replaces the previous frame's; without the margin a
+	// near-tie flips the winner with every pixel of drag.
+	axisCornerHysteresis = 24.0
 )
 
 // axisSeg is one screen-space line: a box edge or a tick mark.
@@ -84,7 +105,11 @@ func (m *Meshgrid) updateAxisObjects() {
 	for i, l := range m.axisLinePool {
 		if i < len(segs) {
 			s := segs[i]
-			l.StrokeColor = s.col
+			// Only write the color when it changed: assigning a color.RGBA
+			// to the color.Color field boxes it on the heap every frame.
+			if c, ok := l.StrokeColor.(color.RGBA); !ok || c != s.col {
+				l.StrokeColor = s.col
+			}
 			l.Position1 = fyne.NewPos(s.x1, s.y1)
 			l.Position2 = fyne.NewPos(s.x2, s.y2)
 			if l.Hidden {
@@ -99,7 +124,9 @@ func (m *Meshgrid) updateAxisObjects() {
 		if i < len(labels) {
 			lb := labels[i]
 			t.Text = lb.text
-			t.Color = lb.col
+			if c, ok := t.Color.(color.RGBA); !ok || c != lb.col {
+				t.Color = lb.col
+			}
 			sz := t.MinSize()
 			t.Resize(sz)
 			// canvas.Text positions by its top-left; center it on the anchor.
@@ -143,32 +170,7 @@ func (m *Meshgrid) computeAxisGeometry() ([]axisSeg, []axisLabel) {
 	yMin, yMax := ch, float64(m.rows+1)*ch
 	zTop := m.depth
 
-	// The four floor corners (z=0). The front-most (largest screen Y) carries
-	// the X and Y scales on its two outgoing floor edges. The vertical Z scale
-	// goes on the most side-on of the remaining corners (the leftmost), so its
-	// edge rides the silhouette in open space instead of being buried behind
-	// the surface the way the back corner was.
-	type pt struct{ ox, oy float64 }
-	floor := [4]pt{{0, yMin}, {xMax, yMin}, {0, yMax}, {xMax, yMax}}
-	frontIdx := 0
-	frontY := float32(math.Inf(-1))
-	for i, c := range floor {
-		_, sy, _ := m.projectOriginal(c.ox, c.oy, 0)
-		if sy > frontY {
-			frontY, frontIdx = sy, i
-		}
-	}
-	zIdx := -1
-	zX := float32(math.Inf(1))
-	for i, c := range floor {
-		if i == frontIdx {
-			continue
-		}
-		sx, _, _ := m.projectOriginal(c.ox, c.oy, 0)
-		if sx < zX {
-			zX, zIdx = sx, i
-		}
-	}
+	floor, frontIdx, zIdx := m.axisCorners()
 	front, zCorner := floor[frontIdx], floor[zIdx]
 
 	// "Inside" reference: screen centroid of all eight box corners. Labels are
@@ -187,52 +189,157 @@ func (m *Meshgrid) computeAxisGeometry() ([]axisSeg, []axisLabel) {
 	yCol := color.RGBA{R: 90, G: 220, B: 90, A: 255}
 	zCol := color.RGBA{R: 120, G: 170, B: 255, A: 255}
 
+	// With the floor viewed at a shallow angle, the X and Y edges project
+	// toward the same screen line and their label bands overprint. Lift the
+	// shorter-projected axis outward past the other's rows so the two scales
+	// stack; the lift fades back to zero as the viewing angle opens up.
+	liftX, liftY := float32(0), float32(0)
+	{
+		x0, y0, _ := m.projectOriginal(0, front.oy, 0)
+		x1, y1, _ := m.projectOriginal(xMax, front.oy, 0)
+		u0, v0, _ := m.projectOriginal(front.ox, yMin, 0)
+		u1, v1, _ := m.projectOriginal(front.ox, yMax, 0)
+		xdx, xdy := float64(x1-x0), float64(y1-y0)
+		ydx, ydy := float64(u1-u0), float64(v1-v0)
+		xL, yL := math.Hypot(xdx, xdy), math.Hypot(ydx, ydy)
+		if xL > 0 && yL > 0 {
+			if s := math.Abs(xdx*ydy-xdy*ydx) / (xL * yL); s < axisShallowSin {
+				lift := float32((1 - s/axisShallowSin) * axisBandLift)
+				if xL < yL {
+					liftX = lift
+				} else {
+					liftY = lift
+				}
+			}
+		}
+	}
+
 	// X scale: front edge at constant Y, value per column at the cell center.
 	nx := 0
 	if len(m.xData) >= m.cols {
 		nx = m.cols
+		if len(m.xLabels) != nx {
+			m.xLabels = formatAxisLabels(m.xData[:nx], m.xPrec)
+		}
 	}
-	segs, labels = m.appendAxis(segs, labels, inside, xCol,
+	segs, labels = m.appendAxis(segs, labels, inside, xCol, liftX, false,
 		[3]float64{0, front.oy, 0}, [3]float64{xMax, front.oy, 0}, m.xlabel, nx,
 		func(k int) [3]float64 { return [3]float64{(float64(k) + 0.5) * cw, front.oy, 0} },
-		func(k int) string { return strconv.FormatFloat(m.xData[k], 'f', m.xPrec, 64) })
+		m.xLabels)
 
 	// Y scale: side edge at constant X. Data row 0 sits at the high-Y (far)
 	// end, so row k maps to Oy = (rows+0.5-k)*ch.
 	ny := 0
 	if len(m.yData) >= m.rows {
 		ny = m.rows
+		if len(m.yLabels) != ny {
+			m.yLabels = formatAxisLabels(m.yData[:ny], m.yPrec)
+		}
 	}
-	segs, labels = m.appendAxis(segs, labels, inside, yCol,
+	segs, labels = m.appendAxis(segs, labels, inside, yCol, liftY, false,
 		[3]float64{front.ox, yMin, 0}, [3]float64{front.ox, yMax, 0}, m.ylabel, ny,
 		func(k int) [3]float64 { return [3]float64{front.ox, (float64(m.rows) + 0.5 - float64(k)) * ch, 0} },
-		func(k int) string { return strconv.FormatFloat(m.yData[k], 'f', m.yPrec, 64) })
+		m.yLabels)
 
 	// Z scale: vertical edge at the side corner, zmin..zmax mapped to 0..zTop.
+	// Its name goes above the top end: beside the value labels a wide name on
+	// a vertical edge would need a band of its own.
 	nz := 0
 	if m.zrange > 0 && zTop > 0 {
 		nz = zDivisions + 1
+		if len(m.zLabels) != nz || m.zLabelMin != m.zmin || m.zLabelRange != m.zrange {
+			m.zLabels = m.zLabels[:0]
+			for k := 0; k < nz; k++ {
+				m.zLabels = append(m.zLabels, strconv.FormatFloat(m.zmin+float64(k)/zDivisions*m.zrange, 'f', m.zPrec, 64))
+			}
+			m.zLabelMin, m.zLabelRange = m.zmin, m.zrange
+		}
 	}
-	segs, labels = m.appendAxis(segs, labels, inside, zCol,
+	segs, labels = m.appendAxis(segs, labels, inside, zCol, 0, true,
 		[3]float64{zCorner.ox, zCorner.oy, 0}, [3]float64{zCorner.ox, zCorner.oy, zTop}, m.zlabel, nz,
 		func(k int) [3]float64 { return [3]float64{zCorner.ox, zCorner.oy, float64(k) / zDivisions * zTop} },
-		func(k int) string {
-			return strconv.FormatFloat(m.zmin+float64(k)/zDivisions*m.zrange, 'f', m.zPrec, 64)
-		})
+		m.zLabels)
 
 	m.scratchAxisSegs, m.scratchAxisLabels = segs, labels
 	return segs, labels
 }
 
+// floorPt is a floor corner (z=0) of the mesh's bounding box, in original
+// coordinates.
+type floorPt struct{ ox, oy float64 }
+
+// axisCorners returns the four floor corners of the mesh's bounding box and
+// picks the two that carry the scales. The front-most (largest screen Y)
+// carries the X and Y scales on its two outgoing floor edges. The vertical Z
+// scale goes on the most side-on of the remaining corners, so its edge rides
+// the silhouette in open space instead of being buried behind the surface the
+// way the back corner was.
+func (m *Meshgrid) axisCorners() (floor [4]floorPt, frontIdx, zIdx int) {
+	xMax := float64(m.cols) * float64(m.cellWidth)
+	yMin, yMax := float64(m.cellHeight), float64(m.rows+1)*float64(m.cellHeight)
+	floor = [4]floorPt{{0, yMin}, {xMax, yMin}, {0, yMax}, {xMax, yMax}}
+	frontY := float32(math.Inf(-1))
+	var floorX, floorY [4]float32
+	var floorMeanX float32
+	for i, c := range floor {
+		sx, sy, _ := m.projectOriginal(c.ox, c.oy, 0)
+		floorX[i], floorY[i] = sx, sy
+		floorMeanX += sx * 0.25
+		if sy > frontY {
+			frontY, frontIdx = sy, i
+		}
+	}
+	// Both corner picks get hysteresis: near a tie the winner otherwise flips
+	// with every pixel of drag, bouncing the scales from one edge to another.
+	// The previous frame's corner is kept until the new winner clearly beats it.
+	if p := m.frontCornerIdx; p >= 0 && p != frontIdx && floorY[p] > frontY-axisCornerHysteresis {
+		frontIdx = p
+	}
+	m.frontCornerIdx = frontIdx
+
+	// The Z scale should ride the silhouette, so among the remaining corners
+	// pick the one whose projected X sits farthest from the floor's screen
+	// center. Simply taking the leftmost could pick an interior corner when a
+	// shallow view squeezes the floor corners toward one line, running the
+	// scale straight through the middle of the surface.
+	zIdx = -1
+	zDist := float32(-1)
+	for i := range floor {
+		if i == frontIdx {
+			continue
+		}
+		d := floorX[i] - floorMeanX
+		if d < 0 {
+			d = -d
+		}
+		if d > zDist {
+			zDist, zIdx = d, i
+		}
+	}
+	if p := m.zCornerIdx; p >= 0 && p != frontIdx && p != zIdx {
+		d := floorX[p] - floorMeanX
+		if d < 0 {
+			d = -d
+		}
+		if d > zDist-axisCornerHysteresis {
+			zIdx = p
+		}
+	}
+	m.zCornerIdx = zIdx
+	return floor, frontIdx, zIdx
+}
+
 // appendAxis appends one labeled axis: the edge line from p0 to p1 (original
-// coords) lifted off the mesh by axisEdgeOffset, the axis name centered on the
-// middle of that edge, and a thinned set of tick marks plus value labels at the
-// original-space points returned by pointAt(k), k in [0,n). Everything is
-// offset along one outward edge normal so the ticks stay parallel and the whole
-// scale sits clear of the surface. The name rides the middle so it doesn't
-// collide with the corner tick values.
-func (m *Meshgrid) appendAxis(segs []axisSeg, labels []axisLabel, inside fyne.Position, col color.RGBA,
-	p0, p1 [3]float64, name string, n int, pointAt func(int) [3]float64, valueAt func(int) string,
+// coords) lifted off the mesh by axisEdgeOffset plus the caller's extra lift,
+// the axis name, and a thinned set of tick marks plus the value labels vals[k]
+// at the original-space points returned by pointAt(k), k in [0,n). Everything
+// is offset along one outward edge normal so the ticks stay parallel and the
+// whole scale sits clear of the surface. The name rides the middle of the edge
+// beyond the value labels, so it doesn't collide with the corner tick values,
+// or with nameAtEnd sits past the p1 end. Labels are horizontal text whatever
+// the edge's screen angle, so their distances come from textExtent.
+func (m *Meshgrid) appendAxis(segs []axisSeg, labels []axisLabel, inside fyne.Position, col color.RGBA, lift float32, nameAtEnd bool,
+	p0, p1 [3]float64, name string, n int, pointAt func(int) [3]float64, vals []string,
 ) ([]axisSeg, []axisLabel) {
 	sx0, sy0, _ := m.projectOriginal(p0[0], p0[1], p0[2])
 	sx1, sy1, _ := m.projectOriginal(p1[0], p1[1], p1[2])
@@ -241,17 +348,37 @@ func (m *Meshgrid) appendAxis(segs []axisSeg, labels []axisLabel, inside fyne.Po
 	// transform is affine, so the tick points stay collinear with the edge and
 	// land on the offset line after the same shift.
 	nx, ny := edgeOutwardNormal(sx0, sy0, sx1, sy1, inside)
-	ox, oy := nx*axisEdgeOffset, ny*axisEdgeOffset
+	ox, oy := nx*(axisEdgeOffset+lift), ny*(axisEdgeOffset+lift)
 
 	ex0, ey0 := sx0+ox, sy0+oy
 	ex1, ey1 := sx1+ox, sy1+oy
 	segs = append(segs, axisSeg{ex0, ey0, ex1, ey1, col})
 
-	if name != "" {
+	L := math.Hypot(float64(ex1-ex0), float64(ey1-ey0))
+	maxChars := 1
+	for k := 0; k < n; k++ {
+		if c := len(vals[k]); c > maxChars {
+			maxChars = c
+		}
+	}
+
+	if name != "" && nameAtEnd {
+		// Past the p1 end, along the edge; a degenerate edge has no direction,
+		// so fall back to the outward normal.
+		ux, uy := nx, ny
+		if L > 1e-6 {
+			ux, uy = (ex1-ex0)/float32(L), (ey1-ey0)/float32(L)
+		}
+		d := axisNameGap + textExtent(ux, uy, len(name))
+		labels = append(labels, axisLabel{name, ex1 + ux*d, ey1 + uy*d, col})
+	} else if name != "" {
 		// Sit the name on the edge midpoint, just past the value-label band so
-		// it never overlaps the corner ticks (and tracks axisLabelPad changes).
+		// it never overlaps the tick values at any edge angle. The lift moves
+		// the whole scale, so the name must ride along or it ends up on the
+		// wrong side of its own axis line.
 		mx, my := (sx0+sx1)*0.5, (sy0+sy1)*0.5
-		nameDist := float32(axisEdgeOffset + axisLabelPad + axisNameGap)
+		nameDist := lift + axisEdgeOffset + axisTickLen + 2*axisLabelGap +
+			2*textExtent(nx, ny, maxChars) + textExtent(nx, ny, len(name))
 		labels = append(labels, axisLabel{name, mx + nx*nameDist, my + ny*nameDist, col})
 	}
 	if n <= 0 {
@@ -259,30 +386,58 @@ func (m *Meshgrid) appendAxis(segs []axisSeg, labels []axisLabel, inside fyne.Po
 	}
 
 	// Thin labels to the count that fits along the projected edge length.
-	L := math.Hypot(float64(ex1-ex0), float64(ey1-ey0))
-	maxChars := 1
-	for k := 0; k < n; k++ {
-		if c := len(valueAt(k)); c > maxChars {
-			maxChars = c
-		}
+	if L < axisMinEdgePx {
+		// Foreshortened almost to a point: every tick label would land on
+		// the same spot. Keep the edge and name, skip the ticks.
+		return segs, labels
 	}
-	step := axisLabelStep(n, L, maxChars)
+	minSpacing := float64(maxChars)*axisCharW + 8
+	step := axisLabelStep(n, L, minSpacing)
 
 	appendTick := func(k int) {
 		p := pointAt(k)
 		sx, sy, _ := m.projectOriginal(p[0], p[1], p[2])
 		bx, by := sx+ox, sy+oy // tick base sits on the lifted edge line
 		segs = append(segs, axisSeg{bx, by, bx + nx*axisTickLen, by + ny*axisTickLen, col})
-		labels = append(labels, axisLabel{valueAt(k), bx + nx*axisLabelPad, by + ny*axisLabelPad, col})
+		d := axisTickLen + axisLabelGap + textExtent(nx, ny, len(vals[k]))
+		labels = append(labels, axisLabel{vals[k], bx + nx*d, by + ny*d, col})
 	}
+
+	// The last tick is always labeled so the axis' full extent is annotated,
+	// but with a thinning step > 1 it can land under a label width from the
+	// final stepped tick and overprint it ("70006500"). Drop that stepped
+	// neighbor instead of the extent label when they'd crowd.
+	last := n - 1
+	prev := last / step * step
+	skipPrev := last != prev && float64(last-prev)*(L/float64(n)) < minSpacing
 	for k := 0; k < n; k += step {
+		if k == prev && skipPrev {
+			continue
+		}
 		appendTick(k)
 	}
-	// Always label the last tick so the axis' full extent is annotated.
-	if last := n - 1; last%step != 0 {
+	if last != prev {
 		appendTick(last)
 	}
 	return segs, labels
+}
+
+// textExtent is the half extent of a horizontal text box of the given length
+// along the unit direction (dx, dy): how far the box's center must sit from a
+// point for the box to clear it in that direction.
+func textExtent(dx, dy float32, chars int) float32 {
+	return float32(math.Abs(float64(dx))*float64(chars)*axisCharW/2 + math.Abs(float64(dy))*float64(axisTextSize)/2)
+}
+
+// formatAxisLabels formats one tick label per value. Called once per axis:
+// the tick values and precision are fixed at construction, so the strings are
+// cached instead of re-formatted on every rotation frame.
+func formatAxisLabels(data []float64, prec int) []string {
+	out := make([]string, len(data))
+	for i, v := range data {
+		out[i] = strconv.FormatFloat(v, 'f', prec, 64)
+	}
+	return out
 }
 
 // edgeOutwardNormal returns the unit screen-space normal of edge (s0->s1) that
@@ -302,13 +457,12 @@ func edgeOutwardNormal(sx0, sy0, sx1, sy1 float32, inside fyne.Position) (float3
 	return float32(nx), float32(ny)
 }
 
-// axisLabelStep returns the index stride that keeps drawn labels at least one
-// label-width apart along a projected edge of screen length L.
-func axisLabelStep(n int, L float64, maxChars int) int {
+// axisLabelStep returns the index stride that keeps drawn labels at least
+// minSpacing pixels apart along a projected edge of screen length L.
+func axisLabelStep(n int, L, minSpacing float64) int {
 	if n <= 1 || L <= 0 {
 		return 1
 	}
-	minSpacing := float64(maxChars)*axisCharW + 8
 	fit := int(L / minSpacing)
 	if fit < 1 {
 		fit = 1

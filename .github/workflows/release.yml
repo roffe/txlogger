@@ -1,0 +1,101 @@
+name: Release
+
+on:
+  push:
+    tags:
+    - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6.0.2
+    - name: Set up Go
+      uses: actions/setup-go@v6.4.0
+      with:
+        go-version: '1.27.3'
+        cache: false
+    - name: Get dependencies
+      run: sudo apt-get update && sudo apt-get install 7zip gcc libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev libusb-1.0-0-dev libgtk-3-dev libasound2-dev libftdi1 libftdi1-dev
+    - name: Get Go dependencies
+      run: go get .
+    - name: Build txlogger
+      run: make txlogger
+    - name: Build AppImage
+      run: make appimage
+    - name: Archive
+      run: 7z a txlogger_ubuntu_x64.7z txlogger
+    - name: Release
+      uses: softprops/action-gh-release@v3
+      if: github.ref_type == 'tag'
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        make_latest: "true"
+        files: |
+          txlogger_ubuntu_x64.7z
+          txlogger-x86_64.AppImage
+
+  windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v6.0.2
+      with:
+        submodules: recursive
+
+    - name: Install NSIS
+      uses: repolevedavaj/install-nsis@v1.2.1
+      with:
+        nsis-version: '3.11'
+
+    - name: Set up Go
+      uses: actions/setup-go@v6.4.0
+      with:
+        go-version: '1.27.3'
+        cache: false
+
+    - name: Install dependencies
+      run: |
+        go get .
+        go install fyne.io/tools/cmd/fyne@latest
+
+    - name: Install CANLIB
+      run: |
+        Invoke-WebRequest -Uri "https://pim.kvaser.com/var/assets/Product_Resources/7330130980150/5.51.461/canlib_5_51_461.exe" -OutFile canlib.exe
+        Start-Process -FilePath .\canlib.exe -ArgumentList "/S" -Wait
+
+    - name: Install llvm-mingw
+      run: |
+        Invoke-WebRequest -Uri "https://github.com/mstorsjo/llvm-mingw/releases/download/20251216/llvm-mingw-20251216-ucrt-x86_64.zip" -OutFile llvm-mingw.zip
+        Expand-Archive -Path llvm-mingw.zip -DestinationPath .\ -Force
+        Rename-Item -Path .\llvm-mingw-20251216-ucrt-x86_64 -NewName llvm-mingw
+
+    - name: Install libusb via vcpkg
+      run: |
+        git clone https://github.com/microsoft/vcpkg.git --depth=1
+        .\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+        .\vcpkg\vcpkg.exe install libusb:x64-windows
+
+    - name: Build
+      run: |
+        $env:PATH += ";D:\a\txlogger\txlogger\llvm-mingw\bin"
+        .\build.ps1 -j2534proxy -txlogger -setup
+
+    - name: Creating Zip
+      run: 7z a txlogger.zip txlogger.exe j2534proxy.exe .\debug.bat C:\Progra~2\Kvaser\Canlib\bin_x64\canlib32.dll .\vcpkg\packages\libusb_x64-windows\bin\libusb-1.0.dll .\dist\canusbdrv64.dll
+
+    - name: Creating Setup Zip
+      run: 7z a txlogger_setup.zip txlogger_setup.exe
+
+    - name: Release
+      uses: softprops/action-gh-release@v3
+      if: github.ref_type == 'tag'
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        make_latest: "true"
+        files: |
+          txlogger.zip
+          txlogger_setup.zip

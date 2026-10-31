@@ -31,15 +31,16 @@ const (
 	Unknown = "Unknown"
 )
 
-var (
-	ErrDataTooShort = errors.New("data is too short to decode, expected at least 8 bytes")
-)
+var ErrDataTooShort = errors.New("data is too short to decode, expected at least 8 bytes")
+
+// CANIDs are the frames the LAMBDA to CAN module broadcasts.
+var CANIDs = []uint32{0x664, 0x665}
 
 type LambdaToCAN struct {
-	c       *gocan.Bus
-	st      LambdaToCANStatus
-	running bool
-	mu      sync.Mutex
+	c      *gocan.Bus
+	st     LambdaToCANStatus
+	cancel context.CancelFunc
+	mu     sync.Mutex
 }
 
 func NewLambdaToCAN(c *gocan.Bus) *LambdaToCAN {
@@ -47,15 +48,15 @@ func NewLambdaToCAN(c *gocan.Bus) *LambdaToCAN {
 }
 
 func (l *LambdaToCAN) Start(ctx context.Context) error {
-	l.running = true
-	ch := l.c.Subscribe(ctx, 0x664, 0x665)
+	ctx, l.cancel = context.WithCancel(ctx)
+	ch := l.c.Subscribe(ctx, CANIDs...)
 	go func() {
-		for l.running {
+		for {
 			select {
 			case msg, ok := <-ch:
 				if !ok {
 					log.Println("channel closed")
-					return //channel closed
+					return // channel closed
 				}
 				if err := l.decodeCAN(msg.ID, msg.Bytes()); err != nil {
 					log.Println(err)
@@ -68,8 +69,11 @@ func (l *LambdaToCAN) Start(ctx context.Context) error {
 	return nil
 }
 
+// Stop ends the reader and releases its bus subscription.
 func (l *LambdaToCAN) Stop() {
-	l.running = false
+	if l.cancel != nil {
+		l.cancel()
+	}
 }
 
 func (l *LambdaToCAN) Status() LambdaToCANStatus {

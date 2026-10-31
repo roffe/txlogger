@@ -52,6 +52,7 @@ func (t *Client) Info(ctx context.Context) ([]model.HeaderResult, error) {
 
 	var out []model.HeaderResult
 	for i, h := range T8Headers {
+		t.cfg.OnProgress(float64(i))
 		switch h.Type {
 		case "string":
 			data, err := t.gm.ReadDataByIdentifierString(ctx, h.ID)
@@ -202,11 +203,12 @@ func (t *Client) Info(ctx context.Context) ([]model.HeaderResult, error) {
 				out = append(out, res)
 			}
 		}
-		t.cfg.OnProgress(float64(i + 1))
 	}
+	t.cfg.OnProgress(float64(len(T8Headers)))
 
 	return out, nil
 }
+
 func (t *Client) RequestECUInfoAsString(ctx context.Context, pid byte) (string, error) {
 	resp, err := t.RequestECUInfo(ctx, pid)
 	if err != nil {

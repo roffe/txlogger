@@ -1,15 +1,27 @@
 package windows
 
 import (
+	"image/color"
+
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	ttwidget "github.com/dweymouth/fyne-tooltip/widget"
 	"github.com/roffe/txlogger/pkg/widgets/multiwindow"
 )
 
 func (mw *MainWindow) newToolbar() *fyne.Container {
+	arrangeBt := ttwidget.NewButtonWithIcon("", theme.GridIcon(), func() {
+		mw.wm.Arrange(&multiwindow.GridArranger{})
+	})
+	arrangeBt.SetToolTip("Arrange windows in a grid")
+
+	closeAllBt := ttwidget.NewButtonWithIcon("", theme.ContentClearIcon(), mw.wm.CloseAll)
+	closeAllBt.SetToolTip("Close all windows")
+
 	toolbar := container.NewHBox(
 		mw.buttons.symbolListBtn,
 		container.NewBorder(
@@ -24,10 +36,8 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 		mw.buttons.livePlotBtn,
 		mw.buttons.dashboardBtn,
 		mw.buttons.addGaugeBtn,
-		widget.NewButtonWithIcon("", theme.GridIcon(), func() {
-			mw.wm.Arrange(&multiwindow.GridArranger{})
-		}),
-		widget.NewButtonWithIcon("", theme.ContentClearIcon(), mw.wm.CloseAll),
+		arrangeBt,
+		closeAllBt,
 		layout.NewSpacer(),
 		container.NewBorder(
 			nil,
@@ -37,6 +47,12 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 			mw.selects.layoutSelect,
 		),
 	)
+	if fyne.CurrentDevice().IsMobile() {
+		// mobile draws the main menu as a button floating over the top left corner
+		burger := canvas.NewRectangle(color.Transparent)
+		burger.SetMinSize(widget.NewButtonWithIcon("", theme.MenuIcon(), nil).MinSize())
+		toolbar.Objects = append([]fyne.CanvasObject{burger}, toolbar.Objects...)
+	}
 	//if mw.previewFeatures {
 	/*
 		toolbar.Add(widget.NewButtonWithIcon("", theme.DocumentIcon(), func() {
@@ -58,8 +74,7 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 				}
 				return nil
 			}
-			inner := multiwindow.NewInnerWindow("txweb", txb)
-			inner.Icon = theme.FileApplicationIcon()
+			inner := multiwindow.NewInnerWindowWithIcon("txweb", txb, theme.FileApplicationIcon())
 			mw.wm.Add(inner)
 			inner.Resize(fyne.NewSize(700, 500))
 		}),
@@ -83,8 +98,7 @@ func (mw *MainWindow) newToolbar() *fyne.Container {
 				mapp,
 			)
 
-			inner := multiwindow.NewInnerWindow("Map", cnt)
-			inner.Icon = theme.NavigateNextIcon()
+			inner := multiwindow.NewInnerWindowWithIcon("Map", cnt, theme.NavigateNextIcon())
 			mw.wm.Add(inner)
 		}),
 	*/

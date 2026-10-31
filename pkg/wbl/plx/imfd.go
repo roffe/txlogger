@@ -3,10 +3,10 @@ package plx
 import (
 	"context"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"go.bug.st/serial"
 )
@@ -237,6 +237,41 @@ var DefaultIMFDClientConfig = &IMFDClientConfig{
 	VehicleSpeed: 1,
 }
 
+// unit returns the configured unit for a sensor, 0 for sensors without a
+// unit choice.
+func (c *IMFDClientConfig) unit(st sensorType) uint16 {
+	var u int
+	switch st {
+	case WidebandAirFuel:
+		u = c.WidebandAirFuel
+	case ExhaustGasTemperature:
+		u = c.ExhaustGasTemperature
+	case FluidTemperature:
+		u = c.FluidTemperature
+	case Vacuum:
+		u = c.Vacuum
+	case Boost:
+		u = c.Boost
+	case AirIntakeTemperature:
+		u = c.AirIntakeTemperature
+	case VehicleSpeed:
+		u = c.VehicleSpeed
+	case FuelPressure:
+		u = c.FuelPressure
+	case MAP:
+		u = c.MAP
+	case MAF:
+		u = c.MAF
+	case NarrowbandOxygenSensor:
+		u = c.NarrowbandOxygenSensor
+	case DutyCycle:
+		u = c.DutyCycle
+	case FuelEfficiency:
+		u = c.FuelEfficiency
+	}
+	return uint16(u)
+}
+
 func NewIMFDClient(port string, cfg *IMFDClientConfig, logFunc func(string)) (*IMFDClient, error) {
 	if cfg == nil {
 		cfg = DefaultIMFDClientConfig
@@ -290,7 +325,7 @@ func (s *IMFDClient) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	p.SetReadTimeout(2)
+	p.SetReadTimeout(5 * time.Millisecond)
 
 	buf := make([]byte, 1)
 	go func() {
@@ -299,17 +334,19 @@ func (s *IMFDClient) Start(ctx context.Context) error {
 			select {
 			case <-ctx.Done():
 				return
+			case <-s.closed:
+				return
 			default:
 				n, err := p.Read(buf)
 				if err != nil {
-					log.Println(err)
+					s.logFunc(err.Error())
 					return
 				}
 				if n == 0 {
 					continue
 				}
 				if err := s.Parse(buf[:n]); err != nil {
-					log.Println(err)
+					s.logFunc(err.Error())
 				}
 			}
 		}
@@ -380,7 +417,6 @@ func (s *IMFDClient) parsePackets(data []byte) error {
 
 func createMapkey(typ sensorType, instance uint8) string {
 	return fmt.Sprintf("%s #%d", typ.String(), instance)
-
 }
 
 func (s *IMFDClient) parsePacket(packet []byte) error {
@@ -392,7 +428,7 @@ func (s *IMFDClient) parsePacket(packet []byte) error {
 	address := uint16(addrMSB)<<6 | uint16(addrLSB)
 	data := uint16(dataMSB)<<6 | uint16(dataLSB)
 	st := sensorType(address)
-	value, _ := convertData(st, 0, data)
+	value, _ := convertData(st, s.cfg.unit(st), data)
 	key := createMapkey(st, instance)
 	s.values[key] = value
 	return nil
@@ -502,7 +538,7 @@ func convertData(sensor sensorType, unit, raw uint16) (float64, string) {
 			retUnit = "km/h"
 		}
 	case ThrottlePosition: // TPS
-		value = float64(raw) //Throttle Position % 0-100
+		value = float64(raw) // Throttle Position % 0-100
 		retUnit = "%"
 	case EngineLoad: // Engine Load %
 		value = float64(raw)
@@ -566,13 +602,13 @@ func convertData(sensor sensorType, unit, raw uint16) (float64, string) {
 			retUnit = "v"
 		}
 	case FuelLevel: // Fuel level
-		value = float64(raw) //Fuel Level %
+		value = float64(raw) // Fuel Level %
 		retUnit = "%"
 	case VoltMeter: // Volts
-		value = float64(raw) / 51.15 //Volt Meter Volts
+		value = float64(raw) / 51.15 // Volt Meter Volts
 		retUnit = "v"
 	case Knock: // Knock
-		value = float64(raw) / 204.6 //Knock volts 0-5
+		value = float64(raw) / 204.6 // Knock volts 0-5
 		retUnit = "v"
 	case DutyCycle: // Duty cycle
 		switch unit {

@@ -69,3 +69,9 @@ var Korvring []byte
 
 //go:embed stagafr.jpg
 var STAGAfr []byte
+
+//go:embed zonedout.png
+var ZonedOut []byte
+
+//go:embed canflasher.png
+var CanFlasher []byte

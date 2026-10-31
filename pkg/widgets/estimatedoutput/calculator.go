@@ -60,30 +60,24 @@ type Table struct {
 
 // Calculator estimates output curves for one ECU family from its binary.
 type Calculator interface {
-	Options(fw symbol.SymbolCollection) []Option
-	Calculate(fw symbol.SymbolCollection, opts map[string]float64) (*Result, error)
+	Options(fw symbol.FirmwareFile) []Option
+	Calculate(fw symbol.FirmwareFile, opts map[string]float64) (*Result, error)
 }
+
+// calculators is the estimator for each ECU that has one; new ECUs are
+// added here.
+var calculators = map[string]Calculator{"T5": t5{}, "T7": t7{}, "T8": t8{}}
 
 // For returns the Calculator for the given ECU name, or nil when the ECU
-// has no estimator. New ECUs are added here.
-func For(ecu string) Calculator {
-	switch ecu {
-	case "T5":
-		return t5{}
-	case "T7":
-		return t7{}
-	case "T8":
-		return t8{}
-	}
-	return nil
-}
+// has no estimator.
+func For(ecu string) Calculator { return calculators[ecu] }
 
-func has(fw symbol.SymbolCollection, name string) bool {
+func has(fw symbol.FirmwareFile, name string) bool {
 	return fw.GetByName(name) != nil
 }
 
 // nonZero reports whether the symbol exists and holds any non-zero byte.
-func nonZero(fw symbol.SymbolCollection, name string) bool {
+func nonZero(fw symbol.FirmwareFile, name string) bool {
 	s := fw.GetByName(name)
 	if s == nil {
 		return false
@@ -125,17 +119,31 @@ func cint(v float64) int { return int(math.RoundToEven(v)) }
 // symLoader collects missing-symbol errors so the user gets one message
 // naming everything the binary lacks.
 type symLoader struct {
-	fw      symbol.SymbolCollection
+	fw      symbol.FirmwareFile
 	missing []string
 }
 
-func (l *symLoader) ints(name string) []int {
+func (l *symLoader) sym(name string) *symbol.Symbol {
 	s := l.fw.GetByName(name)
 	if s == nil {
 		l.missing = append(l.missing, name)
-		return nil
 	}
-	return s.Ints()
+	return s
+}
+
+func (l *symLoader) ints(name string) []int {
+	if s := l.sym(name); s != nil {
+		return s.Ints()
+	}
+	return nil
+}
+
+// uint8s reads a table byte by byte, whatever width the loader typed it as.
+func (l *symLoader) uint8s(name string) []int {
+	if s := l.sym(name); s != nil {
+		return s.Uint8s()
+	}
+	return nil
 }
 
 func (l *symLoader) first(name string) int {

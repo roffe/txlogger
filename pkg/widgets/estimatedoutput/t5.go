@@ -48,7 +48,7 @@ var (
 	}
 )
 
-func (t5) Options(fw symbol.SymbolCollection) []Option {
+func (t5) Options(fw symbol.FirmwareFile) []Option {
 	return []Option{
 		{Key: "turbo", Label: "Turbo", Kind: OptionChoice, Choices: t5Turbos},
 		{Key: "mapsensor", Label: "MAP sensor", Kind: OptionChoice, Choices: t5MapSensors},
@@ -63,7 +63,7 @@ type t5calc struct {
 	insp, fuelX, fuelY    []int
 }
 
-func (t5) Calculate(fw symbol.SymbolCollection, opts map[string]float64) (*Result, error) {
+func (t5) Calculate(fw symbol.FirmwareFile, opts map[string]float64) (*Result, error) {
 	turbo := int(opts["turbo"])
 	if turbo < 0 || turbo >= len(t5TorqueTables) {
 		turbo = 0
@@ -85,8 +85,8 @@ func (t5) Calculate(fw symbol.SymbolCollection, opts map[string]float64) (*Resul
 		injKonst:     l.first("Inj_konst!"),
 		minTid:       l.first("Min_tid!"),
 		battKorr:     l.ints("Batt_korr_tab!"),
-		luftKompfak:  l.ints("Luft_kompfak!"),
-		lufttempSteg: l.ints("Lufttemp_steg!"),
+		luftKompfak:  l.uint8s("Luft_kompfak!"),  // byte tables in T5Suite,
+		lufttempSteg: l.uint8s("Lufttemp_steg!"), // 16-bit in ecusymbol
 		// ponytail: LOLA binaries use Inj_map_0! instead; add when someone has one
 		insp:  l.ints("Insp_mat!"),
 		fuelX: l.ints("Fuel_map_xaxis!"),

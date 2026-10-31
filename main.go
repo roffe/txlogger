@@ -8,20 +8,24 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"strings"
 	"syscall"
 
+	db "runtime/debug"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	_ "github.com/roffe/gocan/v2/adapters/all"
+	_ "github.com/roffe/gocan/v2/adapters/combi"
 	"github.com/roffe/txlogger/pkg/common"
 	"github.com/roffe/txlogger/pkg/debug"
+	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/ipc"
 	"github.com/roffe/txlogger/pkg/presets"
 	"github.com/roffe/txlogger/pkg/theme"
+	"github.com/roffe/txlogger/pkg/widgets"
 	"github.com/roffe/txlogger/pkg/windows"
-
-	_ "github.com/roffe/gocan/v2/adapters/all"
-	_ "github.com/roffe/gocan/v2/adapters/combi"
 )
 
 var (
@@ -52,14 +56,22 @@ func signalHandler(mw *windows.MainWindow) {
 }
 
 func main() {
-	if os.Getenv("FP") == "1" {
-		runFileChild()
+	if widgets.RunFileChild() {
 		return
+	}
+
+	// absolute path so -d (chdir) doesn't break the deferred remove
+	if crashLog, err := filepath.Abs("crash.log"); err == nil {
+		if f, err := os.Create(crashLog); err == nil {
+			defer os.Remove(crashLog)
+			defer f.Close()
+			db.SetCrashOutput(f, db.CrashOptions{})
+		}
 	}
 
 	InitConsole()
 	// create txlogger dir in user home for debug log and such
-	if err := common.CreatetxloggerDirs(); err != nil {
+	if err := common.CreatetxloggerDirs(ecu.ProfileNames()); err != nil {
 		log.Printf("error creating txlogger dir in user home: %v", err)
 	}
 
@@ -82,7 +94,21 @@ func main() {
 
 	// create app
 	tx := app.NewWithID("com.roffe.txlogger")
-	tx.Settings().SetTheme(&theme.TxTheme{})
+	th, err := theme.Load()
+	if err != nil {
+		debug.Log("theme.json: " + err.Error())
+	}
+	tx.Settings().SetTheme(th)
+
+	/*
+		if desk, ok := tx.(desktop.App); ok {
+			m := fyne.NewMenu("MyApp",
+				fyne.NewMenuItem("Show", func() {
+					log.Println("Tapped show")
+				}))
+			desk.SetSystemTrayMenu(m)
+		}
+	*/
 
 	// load presets
 	if err := presets.Load(tx); err != nil {

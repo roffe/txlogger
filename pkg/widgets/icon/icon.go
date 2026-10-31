@@ -24,12 +24,14 @@ func New(cfg *Config) *Icon {
 	ic := &Icon{
 		cfg: cfg,
 	}
+	ic.ExtendBaseWidget(ic)
+
 	cfg.Image.FillMode = canvas.ImageFillContain
 	cfg.Image.ScaleMode = canvas.ImageScaleFastest
 
 	cfg.Image.SetMinSize(cfg.Minsize)
 
-	ic.text = canvas.NewText("", color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF})
+	ic.text = canvas.NewText(cfg.Text, color.RGBA{R: 0x2c, G: 0xfc, B: 0x03, A: 0xFF})
 	ic.text.TextSize = 25
 	ic.text.TextStyle.Monospace = true
 	ic.text.Alignment = fyne.TextAlignLeading

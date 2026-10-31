@@ -19,7 +19,7 @@ import (
 
 type Config struct {
 	ECU        string
-	GetFW      func() symbol.SymbolCollection
+	GetFW      func() symbol.FirmwareFile
 	Colorblind colors.ColorBlindMode
 }
 

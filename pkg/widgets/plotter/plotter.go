@@ -1,11 +1,11 @@
 package plotter
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"log"
 	"sort"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"unicode"
@@ -69,7 +69,7 @@ type Plotter struct {
 	imgBuffers [2]*image.RGBA
 	imgIndex   int
 
-	// textBuffer []byte
+	fmtBuf []byte // legend value scratch, UI goroutine only
 
 	size fyne.Size
 
@@ -319,12 +319,13 @@ func (p *Plotter) seekTo(pos int) {
 	valueIndex := min(p.dataLength, p.cursorPos)
 	for i, v := range p.valueOrder {
 		obj := p.legendTexts[i]
-		newValue := fmt.Sprintf("%.4g", p.values[v][valueIndex])
-		// newValue := strconv.FormatFloat(p.values[v][valueIndex], 'f', obj.precission, 64)
-		if obj.value.Text == newValue {
+		// Same as %.4g, formatted into a reused buffer so an unchanged value,
+		// the common case frame to frame, allocates nothing.
+		p.fmtBuf = strconv.AppendFloat(p.fmtBuf[:0], p.values[v][valueIndex], 'g', 4, 64)
+		if obj.value.Text == string(p.fmtBuf) {
 			continue
 		}
-		obj.SetValue(newValue)
+		obj.SetValue(string(p.fmtBuf))
 	}
 
 	if p.backend == PlotBackendShader {
@@ -551,7 +552,7 @@ func (ts *TimeSeries) PlotImage(img *image.RGBA, values map[string][]float64, st
 		fx := float64(x)
 		x0 := int(((fx - 1) * widthFactor))
 		y0 := int(float64(hh) - (data[x-1]-ts.Min)*heightFactor)
-		x1 := (int(fx * widthFactor))
+		x1 := int(fx * widthFactor)
 		if x == dle {
 			x1 = w
 		}

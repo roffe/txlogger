@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/roffe/gocan/v2"
@@ -27,8 +28,9 @@ type BaseLogger struct {
 
 	capturePerSecond int
 	captureCount     int
-	errPerSecond     int
-	errCount         int
+	// The error counters are also bumped from the adapter's event goroutine.
+	errPerSecond atomic.Int64
+	errCount     atomic.Int64
 
 	closeOnce sync.Once
 
@@ -71,7 +73,7 @@ func NewBaseLogger(cfg Config, lw LogWriter) *BaseLogger {
 func (bl *BaseLogger) Close() {
 	bl.closeOnce.Do(func() {
 		if bl.r != nil {
-			bl.r.Close()
+			_ = bl.r.Close()
 		}
 		close(bl.quitChan)
 		time.Sleep(150 * time.Millisecond)
@@ -95,7 +97,35 @@ func (bl *BaseLogger) GetRAM(address uint32, length uint32) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("busy")
 	}
-	return req.Data, req.Wait()
+	err := req.Wait() // Data is filled in by the logger loop; read it only after Wait
+	return req.Data, err
+}
+
+// publishSysvar stores a sysvar and publishes it on the bus.
+func (bl *BaseLogger) publishSysvar(name string, v float64) {
+	bl.sysvars.Set(name, v)
+	ebus.Publish(name, v)
+}
+
+// publishExternalWBL samples the external wideband, if one is configured.
+func (bl *BaseLogger) publishExternalWBL() {
+	if bl.lamb != nil {
+		bl.publishSysvar(EXTERNALWBLSYM, bl.lamb.GetLambda())
+	}
+}
+
+// adScannerFunc returns fn(symbolName, adValue) that publishes the AD scanner
+// lambda when symbolName is the configured AD scanner input, and reports
+// whether it was.
+func (bl *BaseLogger) adScannerFunc() func(name string, ad int) bool {
+	conv := NewWBLInterpolator(bl.WidebandConfig)
+	return func(name string, ad int) bool {
+		if !bl.WidebandConfig.ADScanner || name != bl.WidebandConfig.ADScannerSymbol {
+			return false
+		}
+		bl.publishSysvar(LAMBDAADSCANNER, conv(ad))
+		return true
+	}
 }
 
 // update capture counters and emit the per-frame tick so live consumers can
@@ -110,14 +140,14 @@ func (bl *BaseLogger) onCapture(t time.Time) {
 }
 
 func (bl *BaseLogger) onError() {
-	bl.errCount++
-	bl.errPerSecond++
-	bl.ErrorCounter(bl.errCount)
+	n := bl.errCount.Add(1)
+	bl.errPerSecond.Add(1)
+	bl.ErrorCounter(int(n))
 }
 
 func (bl *BaseLogger) resetPerSecond() {
 	bl.capturePerSecond = 0
-	bl.errPerSecond = 0
+	bl.errPerSecond.Store(0)
 }
 
 func (bl *BaseLogger) calculateCompensatedTimestamp() time.Time {
@@ -168,8 +198,8 @@ func (bl *BaseLogger) buildChannels() []Channel {
 
 func (bl *BaseLogger) setupWBL(ctx context.Context, cl *gocan.Bus) error {
 	cfg := &wbl.WBLConfig{
-		WBLType:  bl.Config.WidebandConfig.Name,
-		Port:     bl.Config.WidebandConfig.Port,
+		WBLType:  bl.WidebandConfig.Name,
+		Port:     bl.WidebandConfig.Port,
 		Log:      bl.OnMessage,
 		Txbridge: strings.HasPrefix(cl.AdapterName(), "txbridge"),
 	}

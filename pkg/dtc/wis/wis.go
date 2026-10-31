@@ -112,26 +112,34 @@ func Search(code string, models ...string) []Result {
 		}
 		sort.Sort(sort.Reverse(sort.StringSlice(years)))
 
+		// a run is one document over consecutive years in the index, from
+		// its newest year down to oldest
 		type key struct{ doc, code, system string }
-		var order []key
-		newest := map[key]*Result{}
-		oldest := map[key]string{}
-		for _, y := range years {
+		type run struct {
+			Result
+			oldest string
+			last   int // index in years of oldest
+		}
+		var runs []*run
+		open := map[key]*run{}
+		for i, y := range years {
 			var exact, loose []Entry
 			for _, e := range d.index[m][y] {
 				// entries from the 9400/9600 index can carry several codes
-				// joined with "/"
-				for _, c := range strings.Split(strings.ToUpper(e.Code), "/") {
+				// separated by "," (or "/")
+				isLoose := false
+				for _, c := range strings.FieldsFunc(strings.ToUpper(e.Code), isCodeSep) {
 					c = strings.TrimSpace(c)
-					cbase, _, _ := strings.Cut(c, " ")
 					if c == code {
 						exact = append(exact, e)
+						isLoose = false
 						break
 					}
-					if cbase == base {
-						loose = append(loose, e)
-						break
-					}
+					cbase, _, _ := strings.Cut(c, " ")
+					isLoose = isLoose || cbase == base
+				}
+				if isLoose {
+					loose = append(loose, e)
 				}
 			}
 			// a full "code + failure mode" query returns only its own doc;
@@ -142,22 +150,28 @@ func Search(code string, models ...string) []Result {
 			}
 			for _, e := range hits {
 				k := key{e.Doc, e.Code, e.System}
-				if _, ok := newest[k]; !ok {
-					order = append(order, k)
-					newest[k] = &Result{Model: m, Year: y, Entry: e}
+				if r, ok := open[k]; ok && r.last >= i-1 {
+					r.oldest, r.last = y, i
+					continue
 				}
-				oldest[k] = y
+				r := &run{Result: Result{Model: m, Year: y, Entry: e}, oldest: y, last: i}
+				open[k] = r
+				runs = append(runs, r)
 			}
 		}
-		for _, k := range order {
-			r := *newest[k]
-			if oldest[k] != r.Year {
-				r.Year = oldest[k] + "-" + r.Year
+		for _, r := range runs {
+			res := r.Result
+			if r.oldest != res.Year {
+				res.Year = r.oldest + "-" + res.Year
 			}
-			out = append(out, r)
+			out = append(out, res)
 		}
 	}
 	return out
+}
+
+func isCodeSep(r rune) bool {
+	return r == ',' || r == '/'
 }
 
 // Years lists the model years available for a model, newest first.

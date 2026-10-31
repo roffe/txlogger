@@ -52,7 +52,6 @@ func GetBinInfo(bin []byte) BinInfo {
 	return BinInfo{
 		vin, hw, immo, spno, sver, etype, tester, swdate,
 	}
-
 }
 
 func GetHeaderField(bin []byte, id byte) (string, error) {
@@ -83,14 +82,14 @@ func GetHeaderField(bin []byte, id byte) (string, error) {
 			}
 			log.Printf("0x%02x %d> %q", fieldID, len(answer), string(answer))
 			found = true
-			//break
+			// break
 			// when this return is commented out, the function will
 			// find the last field if there are several (mainly this
 			// is for searching for the last VIN field)
 			// return 1;
+		} else {
+			addr -= int(fieldLength)
 		}
-		addr -= int(fieldLength)
-
 	}
 	if found {
 		return string(answer), nil

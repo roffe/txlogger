@@ -48,7 +48,7 @@ var tolerancces []int = []int{
 }
 
 // AnalyzeLambda analyzes lambda values based on stable pedal conditions
-func AnalyzeLambda(fw symbol.SymbolCollection, xFrom, yFrom string, logfile logfile.Logfile) ([]int, []int, [][]float64) {
+func AnalyzeLambda(fw symbol.FirmwareFile, xFrom, yFrom string, logfile logfile.Logfile) ([]int, []int, [][]float64) {
 	x := fw.GetByName("IgnNormCal.m_AirXSP")
 	y := fw.GetByName("IgnNormCal.n_EngYSP")
 
@@ -78,9 +78,9 @@ func AnalyzeLambda(fw symbol.SymbolCollection, xFrom, yFrom string, logfile logf
 	// Ring buffer to store the last 5 pedal positions
 
 	for rec := logfile.Next(); !rec.EOF; rec = logfile.Next() {
-		rpm := rec.Values["ActualIn.n_Engine"]
-		air := rec.Values["MAF.m_AirInlet"]
-		lambda := rec.Values["Lambda.External"]
+		rpm, _ := rec.Value("ActualIn.n_Engine")
+		air, _ := rec.Value("MAF.m_AirInlet")
+		lambda, _ := rec.Value("Lambda.External")
 
 		xIdx, xfrac := findIndexAndFrac(xsp, air)
 		yIdx, yfrac := findIndexAndFrac(ysp, rpm)

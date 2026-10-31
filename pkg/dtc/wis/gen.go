@@ -182,9 +182,9 @@ func main() {
 		dir := filepath.Join(src, model)
 		docs := newZipDir(dir)
 		index[model] = map[string][]entry{}
-		titles := map[string]string{}   // doc path -> extracted heading
-		images := map[string]bool{}     // svg ids referenced by written docs
-		written := map[string]bool{}    // doc paths already in the zip
+		titles := map[string]string{} // doc path -> extracted heading
+		images := map[string]bool{}   // svg ids referenced by written docs
+		written := map[string]bool{}  // doc paths already in the zip
 
 		// writeDoc extracts, cleans and stores one document, returning its
 		// path in the archive and its heading.

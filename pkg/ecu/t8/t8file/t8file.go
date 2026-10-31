@@ -13,7 +13,9 @@ import (
 	"github.com/roffe/txlogger/pkg/ecu/t8util"
 )
 
-var T8MagicBytes = []byte{0x00, 0x10, 0x0C, 0x00}
+// T8ResetVector is the second longword of every T8 image; the first (the
+// initial stack pointer) is not the same in every dump.
+var T8ResetVector = []byte{0x00, 0x00, 0x04, 0x8C}
 
 type T8File struct {
 	filePath string
@@ -35,8 +37,7 @@ func (tf *T8File) GetInfo(path string) *T8Header {
 }
 
 func (tf *T8File) saveDataToBinary(address int64, length int, data []byte) error {
-
-	file, err := os.OpenFile(tf.filePath, os.O_RDWR|os.O_CREATE, 0666)
+	file, err := os.OpenFile(tf.filePath, os.O_RDWR|os.O_CREATE, 0o666)
 	if err != nil {
 		return err
 	}
@@ -56,6 +57,8 @@ func (tf *T8File) saveDataToBinary(address int64, length int, data []byte) error
 	return err
 }
 
+// SaveFlashBlock writes the values edited since the file was read into every
+// NVDM record of the file, in place; see EncodeExtraInfo.
 func (tf *T8File) SaveFlashBlock() error {
 	tf.th.EncodeExtraInfo()
 
@@ -119,7 +122,7 @@ func isValidT8Bin(data []byte) bool {
 		return false
 	}
 
-	return bytes.HasPrefix(data, T8MagicBytes)
+	return bytes.Equal(data[4:8], T8ResetVector)
 }
 
 func (tf *T8File) ShowEditT8Dialog(win fyne.Window) {
@@ -135,29 +138,21 @@ func (tf *T8File) ShowEditT8Dialog(win fyne.Window) {
 	ecuEntry := widget.NewEntry()
 	ecuEntry.SetText(tf.th.EcuDescription())
 	ecuEntry.Validator = func(s string) error {
-		if len(s) != 16 {
-			return errors.New("EcuDescription must be 16 characters long")
+		if len(s) != 15 {
+			return errors.New("EcuDescription must be 15 characters long")
 		}
 		return nil
 	}
 
+	// Part number and software version are shown read-only: SaveFlashBlock
+	// writes only the flash-block fields.
 	partEntry := widget.NewEntry()
 	partEntry.SetText(tf.th.PartNumber())
-	partEntry.Validator = func(s string) error {
-		if len(s) != 8 {
-			return errors.New("PartNumber must be 8 digits long")
-		}
-		return nil
-	}
+	partEntry.Disable()
 
 	softEntry := widget.NewEntry()
 	softEntry.SetText(tf.th.SoftwareVersion())
-	softEntry.Validator = func(s string) error {
-		if len(s) != 30 {
-			return errors.New("SoftwareVersion must be 30 characters long")
-		}
-		return nil
-	}
+	softEntry.Disable()
 
 	pinEntry := widget.NewEntry()
 	pinEntry.SetText(tf.th.PIN())
@@ -181,7 +176,7 @@ func (tf *T8File) ShowEditT8Dialog(win fyne.Window) {
 	iskEntry.SetText(tf.th.ISK())
 	iskEntry.Validator = func(s string) error {
 		if len(s) != 12 {
-			return errors.New("PIN must be 12 characters long")
+			return errors.New("ISK must be 12 characters long")
 		}
 		return nil
 	}
@@ -206,14 +201,8 @@ func (tf *T8File) ShowEditT8Dialog(win fyne.Window) {
 				if len(vinEntry.Text) == 17 {
 					tf.th.SetVIN(vinEntry.Text)
 				}
-				if len(ecuEntry.Text) == 16 {
+				if len(ecuEntry.Text) == 15 {
 					tf.th.SetEcuDescription(ecuEntry.Text)
-				}
-				if len(partEntry.Text) == 8 {
-					tf.th.SetPartNumber(partEntry.Text)
-				}
-				if len(softEntry.Text) == 30 {
-					tf.th.SetSoftwareVersion(softEntry.Text)
 				}
 				if len(pinEntry.Text) == 4 {
 					tf.th.SetPIN(pinEntry.Text)
@@ -224,21 +213,17 @@ func (tf *T8File) ShowEditT8Dialog(win fyne.Window) {
 				if len(iskEntry.Text) == 12 {
 					tf.th.SetISK(iskEntry.Text)
 				}
-				done := make(chan bool)
-				d := dialog.NewConfirm("Confirmation", "Be careful, your car will not start "+
-					"if you change immo data, are you sure to continue ??", func(b bool) {
-					done <- b
-				}, fyne.CurrentApp().Driver().AllWindows()[0])
-				d.Show()
-
-				go func() {
-					result := <-done
-					if result {
-						tf.SaveFlashBlock()
-						dialog.ShowInformation("Success", "Data has been stored in T8 bin file.", win)
+				dialog.ShowConfirm("Confirmation", "Be careful, your car will not start "+
+					"if you change immo data, are you sure to continue ??", func(ok bool) {
+					if !ok {
+						return
 					}
-				}()
-
+					if err := tf.SaveFlashBlock(); err != nil {
+						dialog.ShowError(err, win)
+						return
+					}
+					dialog.ShowInformation("Success", "Data has been stored in T8 bin file.", win)
+				}, win)
 			}
 		},
 		win,

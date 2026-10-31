@@ -2,7 +2,11 @@ package cbar
 
 import (
 	"image/color"
+	"math"
 	"strconv"
+	"strings"
+	"sync"
+	"unicode/utf8"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -27,13 +31,23 @@ type CBar struct {
 
 	// Peak-hold markers: latch the furthest excursion either side of center so a
 	// value jittering at 10 Hz still shows how far it actually went.
-	peakLo, peakHi       *canvas.Rectangle
-	peakLoVal, peakHiVal float64
+	peakLo, peakHi *canvas.Rectangle
 
 	cfg *widgets.GaugeConfig
 
-	// Cached values
-	value float64
+	// mu guards the SetValue side below. SetValue runs on publishing
+	// goroutines; apply, Layout and CreateRenderer run on the UI goroutine
+	// and never take mu.
+	mu                 sync.Mutex
+	target             float64 // last value SetValue accepted, clamped; NaN until the first
+	targetLo, targetHi float64 // peak markers after the last sample
+	text               string  // readout for target
+	buf                []byte  // format scratch
+
+	// On screen; UI goroutine only
+	value                float64
+	peakLoVal, peakHiVal float64
+	readout              string
 
 	lastSize    fyne.Size
 	valueRange  float64
@@ -46,7 +60,7 @@ type CBar struct {
 	displayY float32
 
 	// Bar colors: below center / above center / on center
-	colorLow, colorHigh, colorCenter color.RGBA
+	colorLow, colorHigh, colorCenter color.NRGBA
 
 	// Cache layout calculations
 	middleHeight     float32
@@ -56,7 +70,6 @@ type CBar struct {
 
 	// Fast float formatting
 	fmtPrec int
-	buf     []byte
 
 	// Cached monospace glyph width for the current display TextSize
 	charWidth float32
@@ -81,24 +94,30 @@ func New(cfg *widgets.GaugeConfig) *CBar {
 
 	s := &CBar{
 		cfg:        cfg,
+		target:     math.NaN(), // the first sample always draws
+		targetLo:   cfg.Center,
+		targetHi:   cfg.Center,
 		value:      cfg.Center,
 		peakLoVal:  cfg.Center,
 		peakHiVal:  cfg.Center,
 		valueRange: cfg.Max - cfg.Min,
 		fmtPrec:    -1,
 		// Modern bars are solid; the classic ones let the ticks show through
-		colorLow:    color.RGBA{0x26, 0xCC, 0x00, 0xFF},
-		colorHigh:   color.RGBA{0xD0, 0x32, 0x2A, 0xFF},
-		colorCenter: color.RGBA{0xFC, 0xBA, 0x03, 0xFF},
+		colorLow:    color.NRGBA{0x26, 0xCC, 0x00, 0xFF},
+		colorHigh:   color.NRGBA{0xD0, 0x32, 0x2A, 0xFF},
+		colorCenter: color.NRGBA{0xFC, 0xBA, 0x03, 0xFF},
 	}
 	if cfg.Classic {
-		s.colorLow = color.RGBA{0x26, 0xCC, 0x00, 0x80}
-		s.colorHigh = color.RGBA{0xA5, 0x00, 0x00, 0x80}
-		s.colorCenter = color.RGBA{0xFC, 0xBA, 0x03, 0x80}
+		s.colorLow = color.NRGBA{0x26, 0xCC, 0x00, 0x80}
+		s.colorHigh = color.NRGBA{0xA5, 0x00, 0x00, 0x80}
+		s.colorCenter = color.NRGBA{0xFC, 0xBA, 0x03, 0x80}
 	}
 	if n := common.ParseFixedPrec(cfg.DisplayString); n >= 0 {
 		s.fmtPrec = n
 	}
+	// Until the first sample the bar sits at center but reads 0: no data yet
+	s.text = string(s.format(nil, 0))
+	s.readout = s.text
 	s.ExtendBaseWidget(s)
 	return s
 }
@@ -126,9 +145,11 @@ func (s *CBar) initializeVisualElements() {
 		FillColor: s.colorCenter,
 	}
 
-	peakColor := color.RGBA{0xFF, 0xFF, 0xFF, 0xE0}
+	// NRGBA, not RGBA: partial alpha with full channels is invalid premultiplied
+	// and renders black on the software rasterizer.
+	peakColor := color.NRGBA{0xFF, 0xFF, 0xFF, 0xE0}
 	if s.cfg.Classic {
-		peakColor = color.RGBA{0xFF, 0xFF, 0xFF, 0xA0}
+		peakColor = color.NRGBA{0xFF, 0xFF, 0xFF, 0xA0}
 	}
 	s.peakLo = &canvas.Rectangle{FillColor: peakColor}
 	s.peakHi = &canvas.Rectangle{FillColor: peakColor}
@@ -141,20 +162,16 @@ func (s *CBar) initializeVisualElements() {
 		Alignment: fyne.TextAlignCenter,
 	}
 
-	s.buf = s.buf[:0]
-	if s.fmtPrec >= 0 {
-		s.buf = strconv.AppendFloat(s.buf, 0, 'f', s.fmtPrec, 64)
-	} else {
-		s.buf = common.AppendFormatFloat(s.buf, s.cfg.DisplayString, 0)
-	}
+	// Readout starts from s.readout: SetValue may have run before the first render
 	s.displayText = &canvas.Text{
-		Text:      string(s.buf),
+		Text:      s.readout,
 		Color:     textColor,
 		TextSize:  float32(s.cfg.DisplayTextSize),
 		TextStyle: fyne.TextStyle{Monospace: true},
 		Alignment: fyne.TextAlignLeading,
 	}
 
+	s.bars = make([]*canvas.Line, 0, s.cfg.Steps+1)
 	for i := 0; i <= s.cfg.Steps; i++ {
 		tick := widgets.TickMajor
 		switch {
@@ -171,7 +188,15 @@ func (s *CBar) initializeVisualElements() {
 	}
 }
 
-// applyBar positions, sizes and colors the deviation bar from the current value.
+// format appends the readout for v to dst.
+func (s *CBar) format(dst []byte, v float64) []byte {
+	if s.fmtPrec >= 0 {
+		return strconv.AppendFloat(dst, v, 'f', s.fmtPrec, 64)
+	}
+	return common.AppendFormatFloat(dst, s.cfg.DisplayString, v)
+}
+
+// applyBar positions, sizes and colors the deviation bar from the value on screen.
 func (s *CBar) applyBar() {
 	barPosition := s.center
 	var pxWidth float32
@@ -197,24 +222,22 @@ func (s *CBar) applyBar() {
 	s.applyPeaks()
 }
 
-// syncPeaks latches the current value into whichever marker it exceeds and
-// decays both back toward center. Reports whether either moved.
+// syncPeaks decays both markers back toward center, then latches target into
+// whichever one it reaches past, so a marker never sits inside the value.
+// Reports whether either moved. Caller holds mu.
 func (s *CBar) syncPeaks() bool {
-	lo, hi := s.peakLoVal, s.peakHiVal
-	if s.value < lo {
-		lo = s.value
-	} else {
-		lo += (s.cfg.Center - lo) * peakDecay
+	lo := s.targetLo + (s.cfg.Center-s.targetLo)*peakDecay
+	hi := s.targetHi + (s.cfg.Center-s.targetHi)*peakDecay
+	if s.target < lo {
+		lo = s.target
 	}
-	if s.value > hi {
-		hi = s.value
-	} else {
-		hi += (s.cfg.Center - hi) * peakDecay
+	if s.target > hi {
+		hi = s.target
 	}
-	if lo == s.peakLoVal && hi == s.peakHiVal {
+	if lo == s.targetLo && hi == s.targetHi {
 		return false
 	}
-	s.peakLoVal, s.peakHiVal = lo, hi
+	s.targetLo, s.targetHi = lo, hi
 	return true
 }
 
@@ -231,29 +254,46 @@ func (s *CBar) applyPeaks() {
 	}
 }
 
+// SetValue may be called from any goroutine. The value is clamped, the peaks
+// decayed and the readout formatted here; only the canvas update goes through
+// fyne.Do.
 func (s *CBar) SetValue(value float64) {
 	value = max(s.cfg.Min, min(s.cfg.Max, value))
-	changed := value != s.value
-	s.value = value
+	s.mu.Lock()
+	defer s.mu.Unlock() // held across fyne.Do so updates reach the UI in order
+	changed := value != s.target
+	s.target = value
 
 	// Peaks keep decaying even when the value is unchanged, so a latched
 	// excursion never freezes on the face.
 	if !s.syncPeaks() && !changed {
 		return
 	}
-	s.applyBar()
-	if !changed {
-		return
-	}
 
-	s.buf = s.buf[:0]
-	if s.fmtPrec >= 0 {
-		s.buf = strconv.AppendFloat(s.buf, s.value, 'f', s.fmtPrec, 64)
-	} else {
-		s.buf = common.AppendFormatFloat(s.buf, s.cfg.DisplayString, s.value)
+	text := "" // empty: readout unchanged
+	if changed {
+		s.buf = s.format(s.buf[:0], value)
+		if !common.SameTextBytes(s.text, s.buf) {
+			s.text = string(s.buf)
+			text = s.text
+		}
 	}
-	if !common.SameTextBytes(s.displayText.Text, s.buf) {
-		s.displayText.Text = string(s.buf)
+	lo, hi := s.targetLo, s.targetHi
+	fyne.Do(func() { s.apply(value, lo, hi, text) })
+}
+
+// apply draws what SetValue worked out. UI goroutine only.
+func (s *CBar) apply(value, lo, hi float64, text string) {
+	s.value, s.peakLoVal, s.peakHiVal = value, lo, hi
+	if text != "" {
+		s.readout = text
+	}
+	if s.bar == nil {
+		return // not rendered yet; CreateRenderer and Layout draw from the fields above
+	}
+	s.applyBar()
+	if text != "" {
+		s.displayText.Text = text
 		s.displayText.Refresh()
 		s.updateDisplayTextPosition()
 	}
@@ -268,19 +308,12 @@ func (s *CBar) updateDisplayTextPosition() {
 		return
 	}
 
-	dotIdx := -1
-	for i := 0; i < len(text); i++ {
-		if text[i] == '.' {
-			dotIdx = i
-			break
-		}
-	}
-
+	// Offsets count glyphs, not bytes: a "λ" prefix is one glyph wide
 	var x float32
-	if dotIdx >= 0 {
-		x = s.lastSize.Width*0.5 - s.charWidth*(float32(dotIdx)+0.5)
+	if dotIdx := strings.IndexByte(text, '.'); dotIdx >= 0 {
+		x = s.lastSize.Width*0.5 - s.charWidth*(float32(utf8.RuneCountInString(text[:dotIdx]))+0.5)
 	} else {
-		x = s.lastSize.Width*0.5 - s.charWidth*float32(len(text))*0.5
+		x = s.lastSize.Width*0.5 - s.charWidth*float32(utf8.RuneCountInString(text))*0.5
 	}
 
 	s.displayText.Move(fyne.Position{X: x, Y: s.displayY})
@@ -289,6 +322,7 @@ func (s *CBar) updateDisplayTextPosition() {
 func (s *CBar) CreateRenderer() fyne.WidgetRenderer {
 	// Initialize visual elements
 	s.initializeVisualElements()
+	s.lastSize = fyne.Size{} // the new objects need the next Layout, even at the same size
 	return &CBarRenderer{CBar: s}
 }
 
@@ -315,11 +349,11 @@ func (r *CBarRenderer) Layout(space fyne.Size) {
 	r.lastSize = space
 
 	// Cache frequently used calculations
-	r.center = space.Width * 0.5
+	r.widthFactor = space.Width / float32(r.valueRange)
+	r.center = float32(r.cfg.Center-r.cfg.Min) * r.widthFactor
 	r.middleHeight = space.Height * 0.5
 	r.heightOneThird = space.Height * common.OneThird
 	r.heightOneSeventh = space.Height * common.OneSeventh
-	r.widthFactor = space.Width / float32(r.valueRange)
 	r.barHeight = space.Height
 	r.stepFactor = space.Width / float32(r.cfg.Steps)
 

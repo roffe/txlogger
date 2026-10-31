@@ -8,12 +8,13 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	symbol "github.com/roffe/ecusymbol"
 	"github.com/roffe/gocan/v2"
+	"github.com/roffe/gocan/v2/t7kwp"
 	"github.com/roffe/txlogger/pkg/ebus"
-	"github.com/roffe/txlogger/pkg/kwp2000"
 )
 
 type T7Client struct {
@@ -125,10 +126,8 @@ func (c *T7Client) Start(pctx context.Context) error {
 	// instead of relying on cl.Wait returning and the deferred cancel bouncing back.
 	ctx = cl.Context()
 
-	checkBroadcast := true
-	if strings.Contains(cl.AdapterName(), "OBDLink") || strings.Contains(cl.AdapterName(), "STN") || strings.Contains(cl.AdapterName(), "ELM") {
-		checkBroadcast = false
-	}
+	name := cl.AdapterName()
+	checkBroadcast := !strings.Contains(name, "OBDLink") && !strings.Contains(name, "STN") && !strings.Contains(name, "ELM")
 
 	if checkBroadcast {
 		bctx, bcancel := context.WithCancel(ctx)
@@ -164,9 +163,8 @@ func (c *T7Client) Start(pctx context.Context) error {
 	// the remaining symbols (Number >= 0) are polled each tick.
 	channels := c.buildChannels()
 
-	kwp := kwp2000.New(cl)
-
-	adConverter := NewWBLInterpolator(c.WidebandConfig)
+	kwp := t7kwp.New(cl)
+	kwp.SetSeedKey(c.SeedKey) // custom pair extracted from the loaded binary, if any
 
 	if err := initT7logging(ctx, kwp, c.Symbols, c.OnMessage); err != nil {
 		return fmt.Errorf("failed to init t7 logging: %w", err)
@@ -220,34 +218,7 @@ func (c *T7Client) Start(pctx context.Context) error {
 		}
 	*/
 
-	router := map[string]func(s *symbol.Symbol) bool{
-		"IgnKnk.fi_Offset": func(s *symbol.Symbol) bool {
-			data := s.Bytes()
-			if len(data) != 8 {
-				return false
-			}
-
-			ioffCyl1 := int16(binary.BigEndian.Uint16(data[0:2]))
-			ioffCyl2 := int16(binary.BigEndian.Uint16(data[2:4]))
-			ioffCyl3 := int16(binary.BigEndian.Uint16(data[4:6]))
-			ioffCyl4 := int16(binary.BigEndian.Uint16(data[6:8]))
-
-			ebus.Publish("IgnKnk.fi_Offset.Cyl1", float64(ioffCyl1)/10)
-			ebus.Publish("IgnKnk.fi_Offset.Cyl2", float64(ioffCyl2)/10)
-			ebus.Publish("IgnKnk.fi_Offset.Cyl3", float64(ioffCyl3)/10)
-			ebus.Publish("IgnKnk.fi_Offset.Cyl4", float64(ioffCyl4)/10)
-			return true
-		},
-	}
-
-	if c.WidebandConfig.ADScanner {
-		router[c.WidebandConfig.ADScannerSymbol] = func(s *symbol.Symbol) bool {
-			lambda := adConverter(s.Int())
-			c.sysvars.Set(LAMBDAADSCANNER, lambda)
-			ebus.Publish(LAMBDAADSCANNER, lambda)
-			return true
-		}
-	}
+	publishSpecial := c.t7SpecialPublisher()
 
 	/*
 		if c.lamb != nil {
@@ -260,7 +231,10 @@ func (c *T7Client) Start(pctx context.Context) error {
 		}
 	*/
 
-	go func() {
+	// Wait for the logging loop to exit before the deferred closes above run.
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	wg.Go(func() {
 		defer cl.Close()
 		defer func() {
 			_ = kwp.StopSession(ctx)
@@ -276,7 +250,7 @@ func (c *T7Client) Start(pctx context.Context) error {
 				return
 			case <-c.secondTicker.C:
 				c.FpsCounter(c.capturePerSecond)
-				if c.errPerSecond > 5 {
+				if c.errPerSecond.Load() > 5 {
 					c.OnMessage("too many errors, aborting logging")
 					return
 				}
@@ -300,11 +274,7 @@ func (c *T7Client) Start(pctx context.Context) error {
 				write.Address += uint32(toWrite)
 				write.Length -= toWrite
 				if write.Length > 0 {
-					select {
-					case c.writeChan <- write:
-					default:
-						log.Println("kisskorv updateChan full")
-					}
+					requeue(c.writeChan, write)
 					continue
 				}
 				write.Complete(nil)
@@ -338,22 +308,16 @@ func (c *T7Client) Start(pctx context.Context) error {
 						break
 					}
 
-					if fn, ok := router[va.Name]; ok && fn(va) {
-						continue
+					if !publishSpecial(va) {
+						ebus.Publish(va.Name, va.Float64())
 					}
-
-					ebus.Publish(va.Name, va.Float64())
 				}
 
 				if r.Len() > 0 {
 					c.OnMessage(fmt.Sprintf("%d leftover bytes!", r.Len()))
 				}
 
-				if c.lamb != nil {
-					lambda := c.lamb.GetLambda()
-					c.sysvars.Set(EXTERNALWBLSYM, lambda)
-					ebus.Publish(EXTERNALWBLSYM, lambda)
-				}
+				c.publishExternalWBL()
 
 				if err := c.lw.Write(timeStamp, channels); err != nil {
 					c.onError()
@@ -362,12 +326,12 @@ func (c *T7Client) Start(pctx context.Context) error {
 				c.onCapture(timeStamp)
 			}
 		}
-	}()
+	})
 	return cl.Wait(ctx)
 }
 
-func initT7logging(ctx context.Context, kwp *kwp2000.Client, symbols []*symbol.Symbol, onMessage func(string)) error {
-	if err := kwp.StartSession(ctx, kwp2000.INIT_MSG_ID, kwp2000.INIT_RESP_ID); err != nil {
+func initT7logging(ctx context.Context, kwp *t7kwp.Client, symbols []*symbol.Symbol, onMessage func(string)) error {
+	if err := kwp.StartSession(ctx, t7kwp.INIT_MSG_ID, t7kwp.INIT_RESP_ID); err != nil {
 		return fmt.Errorf("failed to start session: %w", err)
 	}
 	onMessage("Connected to ECU")
@@ -407,75 +371,6 @@ func initT7logging(ctx context.Context, kwp *kwp2000.Client, symbols []*symbol.S
 	}
 	onMessage("Configured dynamic register")
 	return nil
-}
-
-func AirDemToStringT7(v float64) string {
-	switch v {
-	case 10:
-		return "PedalMap"
-	case 11:
-		return "Cruise Control"
-	case 12:
-		return "Idle Control"
-	case 20:
-		return "Max Engine Torque"
-	case 21:
-		return "Traction Control"
-	case 22:
-		return "Manual Gearbox Limit"
-	case 23:
-		return "Automatic Gearbox Lim"
-	case 24:
-		return "Stall Limit"
-	case 25:
-		return "Special Mode"
-	case 26:
-		return "Reverse Limit (Auto)"
-	case 27:
-		return "Misfire diagnose"
-	case 28:
-		return "Brake Management"
-	case 29:
-		return "Diff Prot (Automatic)"
-	case 30:
-		return "Not used"
-	case 31:
-		return "Max Vehicle Speed"
-	case 40:
-		return "LDA Request"
-	case 41:
-		return "Min Load"
-	case 42:
-		return "Dash Pot"
-	case 50:
-		return "Knock Airmass Limit"
-	case 51:
-		return "Max Engine Speed"
-	case 52:
-		return "Max Air for Lambda 1"
-	case 53:
-		return "Max Turbo Speed"
-	case 54:
-		return "Crankcase vent error"
-	case 55:
-		return "Faulty APC valve"
-	case 60:
-		return "Emission Limitation"
-	case 61:
-		return "Engine Tipin"
-	case 62:
-		return "Engine Tipout"
-	case 70:
-		return "Safety Switch"
-	case 71:
-		return "O2 Sens fault, E85"
-	case 80:
-		return "Cold engine temp"
-	case 81:
-		return "Overheating"
-	default:
-		return "Unknown"
-	}
 }
 
 func FCutToStringT7(value float64) string {
@@ -527,3 +422,25 @@ func newDisplProtADConverterT7(wbl WidebandConfig) func(float64) float64 {
 	}
 }
 */
+
+var ignOffsetCylNames = [4]string{"IgnKnk.fi_Offset.Cyl1", "IgnKnk.fi_Offset.Cyl2", "IgnKnk.fi_Offset.Cyl3", "IgnKnk.fi_Offset.Cyl4"}
+
+// t7SpecialPublisher returns fn(sym) that publishes T7 symbols needing custom
+// decoding (per-cylinder ignition offsets, the AD scanner input) and reports
+// whether it handled sym; otherwise the caller publishes sym.Float64().
+func (bl *BaseLogger) t7SpecialPublisher() func(s *symbol.Symbol) bool {
+	adScanner := bl.adScannerFunc()
+	return func(s *symbol.Symbol) bool {
+		if s.Name == "IgnKnk.fi_Offset" {
+			data := s.Bytes()
+			if len(data) != 8 {
+				return false
+			}
+			for cyl, name := range ignOffsetCylNames {
+				ebus.Publish(name, float64(int16(binary.BigEndian.Uint16(data[cyl*2:])))/10)
+			}
+			return true
+		}
+		return adScanner(s.Name, s.Int())
+	}
+}

@@ -156,10 +156,17 @@ func (m MonitorStatus) String() string {
 		n string
 		m Monitor
 	}{
-		{"misfire", m.Misfire}, {"fuel", m.FuelSystem}, {"components", m.Components},
-		{"catalyst", m.Catalyst}, {"heated cat", m.HeatedCatalyst}, {"evap", m.Evap},
-		{"sec air", m.SecondaryAir}, {"A/C", m.ACRefrigerant}, {"O2 sensor", m.O2Sensor},
-		{"O2 heater", m.O2Heater}, {"EGR", m.EGR},
+		{"misfire", m.Misfire},
+		{"fuel", m.FuelSystem},
+		{"components", m.Components},
+		{"catalyst", m.Catalyst},
+		{"heated cat", m.HeatedCatalyst},
+		{"evap", m.Evap},
+		{"sec air", m.SecondaryAir},
+		{"A/C", m.ACRefrigerant},
+		{"O2 sensor", m.O2Sensor},
+		{"O2 heater", m.O2Heater},
+		{"EGR", m.EGR},
 	}
 	var incomplete []string
 	for _, x := range named {

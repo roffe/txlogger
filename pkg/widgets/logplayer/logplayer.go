@@ -2,6 +2,8 @@ package logplayer
 
 import (
 	"fmt"
+	"math"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -275,25 +277,13 @@ func (l *Logplayer) render() {
 	l.objs.selectionLabel.TextStyle.Monospace = true
 	l.updateSelectionLabel()
 
-	n := l.logFile.Len()
 	values := make(map[string][]float64)
-	for {
-		if rec := l.logFile.Next(); !rec.EOF {
-			for k, v := range rec.Values {
-				if k == "Pgm_status" {
-					continue
-				}
-				s, ok := values[k]
-				if !ok {
-					s = make([]float64, 0, n) // ponytail: cap once, kills append regrowth churn
-				}
-				values[k] = append(s, v)
-			}
-		} else {
-			break
+	for _, k := range l.logFile.Columns() {
+		if col := gapFilled(l.logFile.Column(k)); col != nil && k != "Pgm_status" {
+			values[k] = col
 		}
 	}
-	l.logFile.Seek(-1)
+	l.logFile.Seek(-1) // playback starts at the first record, wherever the caller left it
 
 	l.objs.plotter = plotter.NewPlotter(
 		values,
@@ -311,6 +301,30 @@ func (l *Logplayer) render() {
 		}),
 		plotter.WithRenderer(l.cfg.PlotterRenderer),
 	)
+}
+
+// gapFilled returns col with its missing (NaN) values carried over from the
+// nearest earlier value, or the first one for a leading gap, since the plotter
+// draws every sample. Columns without gaps, the norm, are returned as is, and
+// nil when the column has no values at all.
+func gapFilled(col []float64) []float64 {
+	first := slices.IndexFunc(col, func(v float64) bool { return !math.IsNaN(v) })
+	if first < 0 {
+		return nil
+	}
+	if first == 0 && !slices.ContainsFunc(col, math.IsNaN) {
+		return col
+	}
+	out := slices.Clone(col)
+	last := out[first]
+	for i, v := range out {
+		if math.IsNaN(v) {
+			out[i] = last
+		} else {
+			last = v
+		}
+	}
+	return out
 }
 
 func (l *Logplayer) CreateRenderer() fyne.WidgetRenderer {
@@ -575,7 +589,7 @@ func (l *Logplayer) playLog() {
 					if f := l.cfg.TimeSetter; f != nil {
 						f(rec.Time)
 					}
-					for k, v := range rec.Values {
+					for k, v := range rec.All() {
 						l.cfg.EBus.Publish(k, v)
 					}
 					timeSetter(rec.Time)
@@ -601,7 +615,7 @@ func (l *Logplayer) playLog() {
 						reanchor()
 						schedule()
 					} else {
-						for k, v := range rec.Values {
+						for k, v := range rec.All() {
 							l.cfg.EBus.Publish(k, v)
 						}
 						l.cfg.EBus.Publish("__frame__", float64(rec.Time.UnixMilli()))
@@ -622,7 +636,7 @@ func (l *Logplayer) playLog() {
 						reanchor()
 						schedule()
 					} else {
-						for k, v := range rec.Values {
+						for k, v := range rec.All() {
 							l.cfg.EBus.Publish(k, v)
 						}
 						l.cfg.EBus.Publish("__frame__", float64(rec.Time.UnixMilli()))
@@ -658,7 +672,7 @@ func (l *Logplayer) playLog() {
 						l.objs.timeLabel.SetText(timeText)
 					})
 				}
-				for k, v := range rec.Values {
+				for k, v := range rec.All() {
 					l.cfg.EBus.Publish(k, v)
 				}
 				l.cfg.EBus.Publish("__frame__", float64(rec.Time.UnixMilli()))

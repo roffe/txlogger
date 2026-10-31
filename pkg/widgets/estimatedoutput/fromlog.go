@@ -9,6 +9,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/roffe/txlogger/pkg/ecu"
 	"github.com/roffe/txlogger/pkg/logfile"
 	"github.com/roffe/txlogger/pkg/widgets"
 )
@@ -27,10 +28,18 @@ type logSignals struct {
 	rpm, speed, speedAlt, airmass, throttle string
 }
 
-var logSignalsByECU = map[string]logSignals{
-	"T5": {rpm: "Rpm", speed: "Bil_hast", throttle: "Medeltrot"},
-	"T7": {rpm: "ActualIn.n_Engine", speed: "In.v_Vehicle", speedAlt: "In.v_Vehicle2", airmass: "MAF.m_AirInlet", throttle: "Out.X_AccPedal"},
-	"T8": {rpm: "ActualIn.n_Engine", speed: "In.v_Vehicle", speedAlt: "In.v_Vehicle2", airmass: "MAF.m_AirInlet", throttle: "Out.X_AccPos"},
+// logSignalsFor takes the ECU's log signal names from its profile; ok is
+// false when it lacks rpm or speed.
+func logSignalsFor(ecuName string) (sig logSignals, ok bool) {
+	s := ecu.GetProfile(ecuName).Signals
+	sig = logSignals{
+		rpm:      s[ecu.RPM],
+		speed:    s[ecu.Speed],
+		speedAlt: s[ecu.SpeedUndriven],
+		airmass:  s[ecu.Airmass],
+		throttle: s[ecu.Throttle],
+	}
+	return sig, sig.rpm != "" && sig.speed != ""
 }
 
 // logParams are the street-dyno inputs for the dv/dt power calculation.
@@ -74,14 +83,14 @@ func extractPulls(lf logfile.Logfile, sig logSignals) ([]*logPull, error) {
 		var cntA, cntBoth int
 		for i := 0; i < n; i++ {
 			rec := lf.RecordAt(i)
-			a, okA := rec.Values[sig.speedAlt]
+			a, okA := rec.Value(sig.speedAlt)
 			if !okA {
 				continue
 			}
 			cntA++
 			minA = math.Min(minA, a)
 			maxA = math.Max(maxA, a)
-			if s, okS := rec.Values[sig.speed]; okS {
+			if s, okS := rec.Value(sig.speed); okS {
 				cntBoth++
 				sumA += a
 				sumS += s
@@ -95,8 +104,8 @@ func extractPulls(lf logfile.Logfile, sig logSignals) ([]*logPull, error) {
 	var t0 float64
 	for i := 0; i < n; i++ {
 		rec := lf.RecordAt(i)
-		r, ok := rec.Values[sig.rpm]
-		s, ok2 := rec.Values[speedKey]
+		r, ok := rec.Value(sig.rpm)
+		s, ok2 := rec.Value(speedKey)
 		if !ok || !ok2 {
 			continue
 		}
@@ -108,12 +117,12 @@ func extractPulls(lf logfile.Logfile, sig logSignals) ([]*logPull, error) {
 		t = append(t, ts-t0)
 		rpm = append(rpm, r)
 		v = append(v, s/3.6)
-		a, okA := rec.Values[sig.airmass]
+		a, okA := rec.Value(sig.airmass)
 		if !okA {
 			a = math.NaN()
 		}
 		air = append(air, a)
-		x, okT := rec.Values[sig.throttle]
+		x, okT := rec.Value(sig.throttle)
 		if !okT {
 			x = math.NaN()
 		}
@@ -371,7 +380,7 @@ func slopeAndMean(t, v []float64) (float64, float64) {
 
 // loadLog lets the user pick a log file and extracts the pulls from it.
 func (w *Widget) loadLog() {
-	sig, ok := logSignalsByECU[w.cfg.ECU]
+	sig, ok := logSignalsFor(w.cfg.ECU)
 	if !ok {
 		w.logInfo.SetText("no log signals defined for " + w.cfg.ECU)
 		return

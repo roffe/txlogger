@@ -6,6 +6,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/test"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/stretchr/testify/assert"
 )
@@ -259,4 +260,80 @@ func TestCompletionEntry_SubclassFocusGained(t *testing.T) {
 	entryPos := fyne.CurrentApp().Driver().AbsolutePositionForObject(entry)
 	assert.Greater(t, entryPos.Y, float32(0))
 	assert.Equal(t, entryPos.Add(fyne.NewPos(0, entry.Size().Height)), entry.popUpPos())
+}
+
+// An open completion popup follows the entry: moving the entry moves the
+// popup by the same amount, and resizing it gives the popup the new width.
+func TestCompletionEntry_PopupFollowsEntry(t *testing.T) {
+	entry := createEntry()
+	win := test.NewWindow(container.NewWithoutLayout(entry))
+	win.Resize(fyne.NewSize(500, 300))
+	defer win.Close()
+	entry.Resize(fyne.NewSize(200, entry.MinSize().Height))
+
+	entry.SetText("init")
+	popup := entry.popupMenu
+	before := popup.Position()
+	assert.Equal(t, float32(200), popup.Size().Width)
+	assert.GreaterOrEqual(t, before.Y, entry.Size().Height, "popup opens below the entry")
+
+	entry.Move(fyne.NewPos(30, 40))
+	assert.Equal(t, before.Add(fyne.NewPos(30, 40)), popup.Position())
+
+	entry.Resize(fyne.NewSize(260, entry.Size().Height))
+	assert.Equal(t, float32(260), popup.Size().Width)
+}
+
+// The popup is cut short so it never runs past the bottom of the canvas.
+func TestCompletionEntry_PopupClampedToCanvas(t *testing.T) {
+	entry := NewCompletionEntry(entryData)
+	win := test.NewWindow(container.NewWithoutLayout(entry))
+	win.Resize(fyne.NewSize(500, 300))
+	defer win.Close()
+	entry.Resize(fyne.NewSize(200, entry.MinSize().Height))
+
+	entry.ShowCompletion()
+	full := entry.popupMenu.Size().Height
+	entry.Move(fyne.NewPos(0, 300-entry.Size().Height-full/2))
+
+	popup := entry.popupMenu
+	assert.Less(t, popup.Size().Height, full, "popup shrinks near the bottom")
+	bottom := popup.Position().Y + popup.Size().Height
+	assert.InDelta(t, win.Canvas().Size().Height-2*theme.Padding(), bottom, 0.01)
+}
+
+// Up steps back through the list, and Enter on the keypad picks the selected
+// item just like Return.
+func TestCompletionEntry_NavigateUpThenEnter(t *testing.T) {
+	entry := createEntry()
+	win := test.NewWindow(entry)
+	win.Resize(fyne.NewSize(500, 300))
+	defer win.Close()
+
+	entry.SetText("init")
+	for _, key := range []fyne.KeyName{fyne.KeyDown, fyne.KeyDown, fyne.KeyDown, fyne.KeyUp} {
+		win.Canvas().Focused().TypedKey(&fyne.KeyEvent{Name: key})
+	}
+	assert.Equal(t, 1, entry.navigableList.selected)
+	assert.Equal(t, "init", entry.Text, "navigating does not change the text")
+
+	win.Canvas().Focused().TypedKey(&fyne.KeyEvent{Name: fyne.KeyEnter})
+	assert.Equal(t, "bar", entry.Text)
+	assert.False(t, entry.popupMenu.Visible())
+}
+
+// Keys the list does not navigate with edit the entry, so the user can keep
+// typing while the completion list has focus.
+func TestCompletionEntry_OtherKeysEditEntry(t *testing.T) {
+	entry := createEntry()
+	win := test.NewWindow(entry)
+	win.Resize(fyne.NewSize(500, 300))
+	defer win.Close()
+
+	entry.SetText("init")
+	entry.CursorColumn = 4
+	win.Canvas().Focused().TypedKey(&fyne.KeyEvent{Name: fyne.KeyBackspace})
+	assert.Equal(t, "ini", entry.Text)
+	assert.True(t, win.Canvas().Focused() == entry.navigableList, "list keeps focus")
+	assert.True(t, entry.popupMenu.Visible())
 }

@@ -4,7 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"fyne.io/fyne/v2"
 	"github.com/roffe/txlogger/pkg/bus"
 )
 
@@ -16,6 +15,13 @@ var (
 const (
 	TOPIC_COLORBLINDMODE = "color_blind_mode"
 	TOPIC_ECU            = "selected_ecu"
+	// TOPIC_REALTIMEBARS carries the value bar setting, 1 for on and 0 for off,
+	// so the symbol list picks the change up without being reopened.
+	TOPIC_REALTIMEBARS = "realtime_bars"
+	// TOPIC_WBLSYMBOL signals that the wideband source changed and the symbol
+	// it resolves to may have moved. The value carries nothing; subscribers ask
+	// settings for the current name.
+	TOPIC_WBLSYMBOL = "wbl_symbol"
 	// TOPIC_FRAME fires once per completed log frame, carrying the frame's
 	// timestamp as Unix milliseconds (float64). Subscribers use it as the frame
 	// boundary to sample the latest value of every symbol with a shared, real
@@ -44,13 +50,13 @@ func PublishFrame(t time.Time) {
 	CONTROLLER.Publish(TOPIC_FRAME, float64(t.UnixMilli()))
 }
 
+// SubscribeFunc calls f with every value published to topic and returns the
+// unsubscribe func. f runs synchronously on the publishing goroutine (a
+// datalogger or log player for symbol topics, usually the UI goroutine for
+// settings topics), so it must be quick and reach Fyne objects only through
+// fyne.Do. The widget setters fed from here post just their canvas work.
 func SubscribeFunc(topic string, f func(float64)) func() {
-	wrapFN := func(v float64) {
-		fyne.Do(func() {
-			f(v)
-		})
-	}
-	return CONTROLLER.SubscribeFunc(topic, wrapFN)
+	return CONTROLLER.SubscribeFunc(topic, f)
 }
 
 func SetOnMessage(f func(string, float64)) {

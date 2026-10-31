@@ -1,8 +1,11 @@
 package datalogger
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/roffe/gocan/v2"
@@ -71,29 +74,30 @@ func (c *TxBridge) Start(ctx context.Context) error {
 		return err
 	}
 
-	switch c.Config.ECU {
-	case "T5":
-		if err := c.setECU("5"); err != nil {
-			return err
-		}
-		if c.Config.ExperimentalT5FastLogging {
-			debug.Log("Using experimental T5 fast logger")
-			return c.t5new(ctx, cl)
-		}
-		return c.t5(ctx, cl)
-	case "T7":
-		if err := c.setECU("7"); err != nil {
-			return err
-		}
-		return c.t7(ctx, cl)
-	case "T8":
-		if err := c.setECU("8"); err != nil {
-			return err
-		}
-		return c.t8(ctx, cl)
-	default:
-		return errors.New("unknown ECU type: " + c.Config.ECU)
+	e, ok := txbridgeECUs[c.ECU]
+	if !ok {
+		return errors.New("unknown ECU type: " + c.ECU)
 	}
+	if err := c.setECU(e.id); err != nil {
+		return err
+	}
+	return e.run(c, ctx, cl)
+}
+
+// txbridgeECUs is the dongle's ECU id and the logging loop for each ECU the
+// txbridge firmware can log.
+var txbridgeECUs = map[string]struct {
+	id  string
+	run func(*TxBridge, context.Context, *gocan.Bus) error
+}{
+	"T5": {"5", func(c *TxBridge, ctx context.Context, cl *gocan.Bus) error {
+		if c.ExperimentalT5FastLogging {
+			debug.Log("Using experimental T5 fast logger")
+		}
+		return c.t5(ctx, cl, c.ExperimentalT5FastLogging)
+	}},
+	"T7": {"7", (*TxBridge).t7},
+	"T8": {"8", (*TxBridge).t8},
 }
 
 func (c *TxBridge) setECU(ecuType string) error {
@@ -104,8 +108,8 @@ func (c *TxBridge) setECU(ecuType string) error {
 	// Setting the ECU above applies a per-ECU default delay. Override it with the
 	// configured rate now: delayTime is the firmware's ms between reads = 1000/Hz.
 	// Framed command: 'D' <len=1> <delay> <checksum=delay>.
-	if c.Config.Rate > 0 {
-		delay := 1000 / c.Config.Rate
+	if c.Rate > 0 {
+		delay := 1000 / c.Rate
 		if delay < 1 {
 			delay = 1
 		} else if delay > 255 {
@@ -139,4 +143,92 @@ func (c *TxBridge) startLogging() error {
 // keeps issuing reads against an ended session and work() logs a spurious timeout.
 func (c *TxBridge) stopLogging() error {
 	return c.tb.Raw([]byte("s"))
+}
+
+// perSecond runs the once-a-second bookkeeping of the txbridge loops and
+// returns why the session should abort, or "" to keep logging.
+func (c *TxBridge) perSecond(lastData time.Time) string {
+	c.FpsCounter(c.capturePerSecond)
+	if c.errPerSecond.Load() > 5 {
+		return "too many errors, aborting logging"
+	}
+	if time.Since(lastData) > dataTimeout {
+		return "no data for 5s, aborting logging"
+	}
+	c.resetPerSecond()
+	return ""
+}
+
+// readFrameHeader consumes the dongle's little-endian ms timestamp from a log
+// frame and returns the reader positioned at the symbol payload plus the frame's
+// host-compensated time.
+func (c *TxBridge) readFrameHeader(data []byte) (*bytes.Reader, time.Time, error) {
+	r := bytes.NewReader(data)
+	if err := binary.Read(r, binary.LittleEndian, &c.currtimestamp); err != nil {
+		return nil, time.Time{}, fmt.Errorf("failed to read timestamp: %w", err)
+	}
+	if c.firstTime.IsZero() {
+		c.firstTime = time.Now()
+		c.firstTimestamp = c.currtimestamp
+	}
+	return r, c.calculateCompensatedTimestamp(), nil
+}
+
+// handleReadTxbridge serves one chunk (at most chunk bytes) of a RAM read via
+// the dongle's 'R' command, re-queueing the request until it is complete so
+// log frames interleave with long transfers.
+func (c *TxBridge) handleReadTxbridge(ctx context.Context, read *DataRequest, chunk uint32, timeout time.Duration) {
+	n := min(chunk, read.Length)
+	rctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	resp, err := c.tb.Request(rctx, 'R', append(binary.LittleEndian.AppendUint32(nil, read.Address), byte(n)), 'R')
+	if err != nil {
+		read.Complete(err)
+		return
+	}
+	read.Address += n
+	read.Length -= n
+	read.Data = append(read.Data, resp.Data...)
+	if read.Length > 0 {
+		requeue(c.readChan, read)
+		return
+	}
+	read.Complete(nil)
+}
+
+// handleWriteTxbridge is the 'W' counterpart of handleReadTxbridge.
+func (c *TxBridge) handleWriteTxbridge(ctx context.Context, write *DataRequest, chunk uint32, timeout time.Duration) {
+	n := min(chunk, write.Length)
+	data := append(binary.LittleEndian.AppendUint32(nil, write.Address), byte(n))
+	data = append(data, write.Data[:n]...)
+	rctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	resp, err := c.tb.Request(rctx, 'W', data, 'W', 'e')
+	if err != nil {
+		write.Complete(err)
+		return
+	}
+	if resp.Command == 'e' {
+		write.Complete(fmt.Errorf("error response: % 02X", resp.Data))
+		return
+	}
+	write.Address += n
+	write.Length -= n
+	write.Data = write.Data[n:]
+	if write.Length > 0 {
+		requeue(c.writeChan, write)
+		return
+	}
+	write.Complete(nil)
+}
+
+// requeue puts a partially served request back for its next chunk. The logger
+// loop is the channel's only consumer, so fail the request rather than block it
+// if a new request took the slot meanwhile.
+func requeue(ch chan *DataRequest, req *DataRequest) {
+	select {
+	case ch <- req:
+	default:
+		req.Complete(errors.New("request queue full"))
+	}
 }

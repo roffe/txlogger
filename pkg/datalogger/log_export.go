@@ -3,7 +3,9 @@ package datalogger
 import (
 	"errors"
 	"fmt"
-	"sort"
+	"maps"
+	"os"
+	"slices"
 	"strings"
 
 	"github.com/roffe/txlogger/pkg/logfile"
@@ -21,25 +23,25 @@ func ExportRecords(dir, prefix, ext string, records []logfile.Record) (string, e
 
 	ext = strings.ToLower(strings.TrimPrefix(ext, "."))
 
+	var newWriter func(*os.File) LogWriter
+	switch ext {
+	case "csv":
+		newWriter = func(f *os.File) LogWriter { return NewCSVWriter(f) }
+	case "bpl":
+		newWriter = func(f *os.File) LogWriter { return NewBPLWriter(f) }
+	case "t5l", "t7l", "t8l":
+		newWriter = func(f *os.File) LogWriter { return NewTXLWriter(f) }
+	default:
+		return "", fmt.Errorf("unsupported export format: %s", ext)
+	}
+
 	file, filename, err := createLog(dir, prefix, ext)
 	if err != nil {
 		return "", err
 	}
+	w := newWriter(file)
 
-	var w LogWriter
-	switch ext {
-	case "csv":
-		w = NewCSVWriter(file)
-	case "bpl":
-		w = NewBPLWriter(file)
-	case "t5l", "t7l", "t8l":
-		w = NewTXLWriter(file)
-	default:
-		file.Close()
-		return "", fmt.Errorf("unsupported export format: %s", ext)
-	}
-
-	cols := recordColumns(records[0])
+	cols := recordColumns(records)
 
 	// One channel set is built up front; the backing values are rewritten for
 	// each record so we don't allocate a closure per cell.
@@ -57,10 +59,10 @@ func ExportRecords(dir, prefix, ext string, records []logfile.Record) (string, e
 	for i := range records {
 		rec := records[i]
 		for j, name := range cols {
-			values[j] = rec.Values[name]
+			values[j], _ = rec.Value(name)
 		}
 		if err := w.Write(rec.Time, channels); err != nil {
-			w.Close()
+			_ = w.Close()
 			return "", fmt.Errorf("failed to write record: %w", err)
 		}
 	}
@@ -71,13 +73,14 @@ func ExportRecords(dir, prefix, ext string, records []logfile.Record) (string, e
 	return filename, nil
 }
 
-// recordColumns returns the value column names of a record in a stable
-// (alphabetical) order so the exported log has a deterministic layout.
-func recordColumns(rec logfile.Record) []string {
-	cols := make([]string, 0, len(rec.Values))
-	for k := range rec.Values {
-		cols = append(cols, k)
+// recordColumns returns every value column name found in the records in a
+// stable (alphabetical) order so the exported log has a deterministic layout.
+func recordColumns(records []logfile.Record) []string {
+	seen := make(map[string]struct{})
+	for _, rec := range records {
+		for k := range rec.All() {
+			seen[k] = struct{}{}
+		}
 	}
-	sort.Strings(cols)
-	return cols
+	return slices.Sorted(maps.Keys(seen))
 }

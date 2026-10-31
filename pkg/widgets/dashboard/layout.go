@@ -113,7 +113,7 @@ func defaultLayout() *Layout {
 			{ID: "ign", X: 8, Y: 1, W: 4, H: 1},
 			{ID: "ioff", X: 8, Y: 2, W: 4, H: 1},
 			{ID: "idc", X: 21, Y: 1, W: 4, H: 1},
-			{ID: "amul", X: 14, Y: 17, W: 5, H: 1},
+			{ID: "amul", X: 13, Y: 17, W: 6, H: 1, Align: AlignCenter},
 			{ID: "activeAirDem", X: 12, Y: 12, W: 8, H: 1},
 			{ID: "time", X: 13, Y: 4, W: 6, H: 1},
 			{ID: "cruise", X: 7, Y: 14, W: 4, H: 2},

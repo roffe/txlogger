@@ -70,6 +70,37 @@ func TestToggleZoomStable(t *testing.T) {
 	}
 }
 
+// After the initial fit every axis label must lie inside the widget and clear
+// of the others: the scales sit outside the surface, so the fit has to leave
+// room for them, and a name must not overprint its own tick values.
+func TestFitKeepsAxisLabelsInView(t *testing.T) {
+	for _, size := range []fyne.Size{{Width: 800, Height: 500}, {Width: 900, Height: 300}, {Width: 400, Height: 600}} {
+		m := testGrid(t)
+		m.size = fyne.Size{}    // force the first Layout to fit
+		m.refreshPending = true // suppress the async throttledRefresh in tests
+		(&meshgridRenderer{MG: m}).Layout(size)
+
+		_, labels := m.computeAxisGeometry()
+		type box struct{ x0, y0, x1, y1 float32 }
+		boxes := make([]box, len(labels))
+		for i, l := range labels {
+			hw, hh := float32(len(l.text))*axisCharW/2, axisTextSize/2
+			b := box{l.x - hw, l.y - hh, l.x + hw, l.y + hh}
+			boxes[i] = b
+			if b.x0 < 0 || b.y0 < 0 || b.x1 > size.Width || b.y1 > size.Height {
+				t.Errorf("%v: label %q at (%v,%v) reaches outside the widget", size, l.text, l.x, l.y)
+			}
+		}
+		for i, a := range boxes {
+			for j, b := range boxes[i+1:] {
+				if a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1 {
+					t.Errorf("%v: labels %q and %q overlap", size, labels[i].text, labels[i+1+j].text)
+				}
+			}
+		}
+	}
+}
+
 // TestRenderRotated renders an asymmetric surface (tall corner spike) from
 // four yaw angles so painter's-order mistakes show up as the spike being
 // overdrawn by cells that are behind it.

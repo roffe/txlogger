@@ -2,6 +2,7 @@ package txbridge
 
 import (
 	"errors"
+	"io"
 	"net"
 	"strings"
 	"time"
@@ -108,15 +109,24 @@ func (c *Client) ReadCommand(timeout time.Duration) (*serialcommand.SerialComman
 	readbuf := make([]byte, 260)
 	deadline := time.Now().Add(timeout)
 	c.conn.SetReadDeadline(deadline)
-	n, err := c.conn.Read(readbuf)
+	// TCP keeps no message boundaries: read the command and length bytes, then
+	// exactly the data and checksum the length byte says follow.
+	n, err := c.conn.Read(readbuf[:2])
 	if err != nil {
 		return nil, err
 	}
 	if n == 0 {
 		return nil, ErrNoData // No data read
 	}
+	if _, err := io.ReadFull(c.conn, readbuf[n:2]); err != nil {
+		return nil, err
+	}
+	size := 2 + int(readbuf[1]) + 1
+	if _, err := io.ReadFull(c.conn, readbuf[2:size]); err != nil {
+		return nil, err
+	}
 	cmd := &serialcommand.SerialCommand{}
-	err = cmd.UnmarshalBinary(readbuf[:n])
+	err = cmd.UnmarshalBinary(readbuf[:size])
 	if err != nil {
 		return nil, err
 	}
