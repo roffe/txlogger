@@ -15,7 +15,7 @@ default: txlogger
 clean:
 	rm -f cangateway j2534proxy.exe
 	rm -f txlogger
-	rm -f txlogger-*-x86_64.AppImage
+	rm -f txlogger-x86_64.AppImage
 	rm -f txlogger-wgpu.exe
 	rm -f txlogger.exe
 	rm -f txlogger.apk
@@ -25,6 +25,7 @@ pkg/ota/firmware.bin: /home/roffe/Documents/PlatformIO/Projects/txbridge/.pio/bu
 
 txlogger:
 	go build -tags=$(BUILDTAGS) -ldflags '-s -w' -o txlogger .
+#	fyne build -tags=$(BUILDTAGS) .
 
 release:
 	fyne package -tags=$(BUILDTAGS) --release
@@ -60,7 +61,11 @@ install-android: android
 
 run: clean pkg/ota/firmware.bin
 	@echo Using compiler "$(CC)"
-	-GOEXPERIMENT=simd go run -tags=$(BUILDTAGS),wayland . 2>&1 | tee -i run.log
+	FYNE_TEXT=slug \
+	GOEXPERIMENT=simd \
+	FYNE_MINSIZE=incremental \
+	FYNE_TEXT=slug \
+	go run -tags=$(BUILDTAGS) . 2>&1 | tee -i run.log
 
 snapshots:
 	go run -tags combi,canusb,ftdi,j2534,pcan,rcan,socketcan ./cmd/screenshots \
