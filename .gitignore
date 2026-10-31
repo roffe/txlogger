@@ -43,6 +43,7 @@ txlogger.exe
 
 run.log
 crash.log
+ui.log
 
 *.code-workspace
 scripts/t7immo.lua
