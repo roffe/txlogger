@@ -71,8 +71,8 @@ github.com/nicksnyder/go-i18n/v2 v2.6.1 h1:JDEJraFsQE17Dut9HFDHzCoAWGEQJom5s0TRd
 github.com/nicksnyder/go-i18n/v2 v2.6.1/go.mod h1:Vee0/9RD3Quc/NmwEjzzD7VTZ+Ir7QbXocrkhOzmUKA=
 github.com/roffe/avrflash v0.0.0-20260923171743-6502105c9b8d h1:15takAoOsj2Y3J/w2jGXS7iZpxatynhSiyNkthEnlPc=
 github.com/roffe/avrflash v0.0.0-20260923171743-6502105c9b8d/go.mod h1:gsCOTJJVNf5jNAutAGwvkKPB5f9nt/+gjpwzJ7y9CVI=
-github.com/roffe/bdmtool/v3 v3.0.11 h1:K0x18T2Ric4lSnpI8WNT+4+Tk4kp+Y0n3DGx9LoSvsg=
-github.com/roffe/bdmtool/v3 v3.0.11/go.mod h1:husql/fWIBoNTVZwzx/wYFS1M3NtIENG6PWAAuXLSps=
+github.com/roffe/bdmtool/v3 v3.0.12-0.20261105233839-22e86f9d69e5 h1:ILDUXvq+kCMF3JbESbT+6HEfSB4Sqb/dGKHQ5pgEJxw=
+github.com/roffe/bdmtool/v3 v3.0.12-0.20261105233839-22e86f9d69e5/go.mod h1:HAz6ASL3y2od2RvDkemlPrWH5yHg2zXxEPgReDY1hxM=
 github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974 h1:0sTHqcaQMYaRote/EYtlRXixwaCrR7nUkFQqEAioX5A=
 github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974/go.mod h1:qJAMUtwoSym/Ybjw8xt/iwCm19aAGiJtmSILHm6QHmY=
 github.com/roffe/ecusymbol v1.2.6-0.20261011003712-c7023962a80a h1:VALdwW1DQAOZTDudi4+Nll6KsbM7GwI1U/K0IKtZ2Gw=
