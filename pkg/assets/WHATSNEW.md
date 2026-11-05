@@ -1,3 +1,6 @@
+# 2.2.2
+- Fixed txlogger eating memory and falling further and further behind while logging with "Enable CAN Debugging" ticked in Settings. Every line added to the debug log made the next one slower, so with the adapter logging every CAN frame it could use gigabytes within a minute
+
 # 2.2.1
 - BDM Tool: the Firmware menu now installs CombiAdapter firmware 2.5 with bootloader 2.1, one image that runs on both the V1 and the V2 board. 2.2.0 still shipped the older 2.0 firmware, whose bootloader only worked on a V2, because the BDM Tool library had not been updated. The menu offers Bootloader 2.1 + 2.5 (latest), Bootloader 1.0 (original) + 2.5 and Bootloader 1.0 (original) + 1.1 (legacy), and every step of a bootloader and firmware install is shown in the log
 
