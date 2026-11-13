@@ -1332,9 +1332,31 @@ func (mw *MainWindow) openMatrixBuilder() {
 		mw.wm.Raise(w)
 		return
 	}
-	inner := multiwindow.NewInnerWindowWithIcon("Matrix builder", matrixbuilder.New(mw.settings.GetMeshRenderer()), theme.GridIcon())
+	mb := matrixbuilder.New(mw.settings.GetMeshRenderer())
+	mb.Maps = mw.mapAxes
+	inner := multiwindow.NewInnerWindowWithIcon("Matrix builder", mb, theme.GridIcon())
 	mw.wm.Add(inner)
-	inner.Resize(fyne.NewSize(1000, 720))
+	inner.Resize(fyne.NewSize(1000, 720).Min(mw.wm.Size()))
+}
+
+// mapAxes returns the axes of every map in the loaded binary that has both an
+// X and a Y axis.
+func (mw *MainWindow) mapAxes() map[string]matrixbuilder.MapAxes {
+	if mw.fw == nil {
+		return nil
+	}
+	out := make(map[string]matrixbuilder.MapAxes)
+	// ponytail: raw axis symbols only, none of newMapViewer's per-map axis
+	// fixups (T5 coolant steps, Pwm_ind_trot!) or as2 axes. Share its axis
+	// resolution if someone needs those maps here.
+	for name, axis := range symbol.GetAxisCollection(symbol.ECUTypeFromString(mw.selects.ecuSelect.Selected)) {
+		x, y := mw.fw.GetByName(axis.X), mw.fw.GetByName(axis.Y)
+		if x == nil || y == nil || mw.fw.GetByName(name) == nil {
+			continue
+		}
+		out[name] = matrixbuilder.MapAxes{X: x.Float64s(), Y: y.Float64s()}
+	}
+	return out
 }
 
 // openRescaler opens (or raises) the map rescaler for a single map. It reads the

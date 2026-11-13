@@ -1,3 +1,7 @@
+# 2.2.3
+- Matrix builder: the new "Axes from map" button fills in the X and Y axis from a map in the loaded binary, so the matrix gets the same shape as for example BFuelCal.Map without typing every value in by hand. Pick the map from the menu and the number of columns and rows follows
+- Fixed windows that are taller or wider than the txlogger window getting stuck with their title bar hidden above the map buttons as soon as they were moved. This hit the matrix builder on small laptop screens. It now opens no bigger than the space there is, its Y axis values scroll instead of forcing the window taller, and a window that doesn't fit stays at the top left corner where the title bar can be reached
+
 # 2.2.2
 - Fixed txlogger eating memory and falling further and further behind while logging with "Enable CAN Debugging" ticked in Settings. Every line added to the debug log made the next one slower, so with the adapter logging every CAN frame it could use gigabytes within a minute
 - BDM Tool: an ArduBDM now connects on the first try after it's plugged in. A Nano that had just been plugged in often didn't answer until it was reset, and one that had been back-powered from a powered ECU could stream zeros and leave Connect at "Connecting..." forever. The board is now reset on every connect and tried once more if the first reply is garbage, and the first command after Stop no longer comes back "illegal command" when the CPU was already in BDM
