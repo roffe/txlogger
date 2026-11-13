@@ -44,3 +44,27 @@ func TestDragClampNoDrift(t *testing.T) {
 		t.Fatalf("window drifted off the cursor: x = %v, want 100", got)
 	}
 }
+
+// A window taller than the viewport must stay at the top when dragged, so its
+// title bar remains reachable.
+func TestDragClampOversizedWindow(t *testing.T) {
+	test.NewTempApp(t)
+
+	m := NewMultipleWindows()
+	m.LockViewport = true
+	win := test.NewTempWindow(t, m)
+	win.Resize(fyne.NewSize(800, 600))
+
+	w := NewInnerWindow("a", widget.NewLabel("a"))
+	m.Add(w)
+	w.Resize(fyne.NewSize(1000, 900))
+	title := test.TempWidgetRenderer(t, w).(*innerWindowRenderer).title
+
+	title.Dragged(&fyne.DragEvent{
+		PointEvent: fyne.PointEvent{AbsolutePosition: fyne.NewPos(60, 60)},
+		Dragged:    fyne.Delta{DX: 10, DY: 10},
+	})
+	if got := w.Position(); got != fyne.NewPos(0, 0) {
+		t.Fatalf("oversized window left the viewport origin: %v", got)
+	}
+}
