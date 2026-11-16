@@ -7,8 +7,6 @@ replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20261116084458-c3a767
 
 //replace go.bug.st/serial => ../../../go.bug.st/serial
 
-replace go.einride.tech/can => github.com/samuelbrian/can-go v0.0.2
-
 require (
 	fyne.io/fyne/v2 v2.8.2
 	github.com/Microsoft/go-winio v0.6.3
@@ -22,12 +20,12 @@ require (
 	github.com/roffe/bdmtool/v3 v3.0.12-0.20261105233839-22e86f9d69e5
 	github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974
 	github.com/roffe/ecusymbol v1.3.0
-	github.com/roffe/gocan/v2 v2.1.1-0.20261112214939-c906caa34417
+	github.com/roffe/gocan/v2 v2.1.1-0.20261116201504-9cc79a556434
 	github.com/stretchr/testify v1.12.1
 	github.com/yuin/gopher-lua v1.1.2
 	go.bug.st/serial v1.8.0
 	golang.org/x/image v0.47.0
-	golang.org/x/mod v0.42.0
+	golang.org/x/mod v0.43.0
 	golang.org/x/sys v0.50.0
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.78
 )
@@ -38,7 +36,7 @@ require (
 	github.com/FyshOS/fancyfs v0.0.1 // indirect
 	github.com/anthonynsimon/bild v0.17.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
-	github.com/ebitengine/purego v0.11.1 // indirect
+	github.com/ebitengine/purego v0.11.3 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/fyne-io/gl-js v0.2.1-0.20260315212741-029c47fd27e8 // indirect
 	github.com/fyne-io/glfw-js v0.4.0 // indirect
@@ -66,7 +64,7 @@ require (
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9 // indirect
 	github.com/yuin/goldmark v1.8.6 // indirect
-	go.einride.tech/can v0.16.1 // indirect
+	go.einride.tech/can v0.17.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.59.0 // indirect
 	golang.org/x/net v0.62.0 // indirect
