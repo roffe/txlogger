@@ -21,14 +21,14 @@ require (
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/roffe/bdmtool/v3 v3.0.12-0.20261105233839-22e86f9d69e5
 	github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974
-	github.com/roffe/ecusymbol v1.2.6-0.20261011003712-c7023962a80a
+	github.com/roffe/ecusymbol v1.3.0
 	github.com/roffe/gocan/v2 v2.1.1-0.20261112214939-c906caa34417
 	github.com/stretchr/testify v1.12.1
 	github.com/yuin/gopher-lua v1.1.2
 	go.bug.st/serial v1.8.0
 	golang.org/x/image v0.47.0
 	golang.org/x/mod v0.42.0
-	golang.org/x/sys v0.49.0
+	golang.org/x/sys v0.50.0
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.78
 )
 
@@ -68,9 +68,9 @@ require (
 	github.com/yuin/goldmark v1.8.6 // indirect
 	go.einride.tech/can v0.16.1 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/crypto v0.58.0 // indirect
-	golang.org/x/net v0.60.0 // indirect
-	golang.org/x/sync v0.24.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/crypto v0.59.0 // indirect
+	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	kernel.org/pub/linux/libs/security/libcap/psx v1.2.78 // indirect
 )
