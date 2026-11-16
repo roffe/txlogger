@@ -3,7 +3,7 @@ module github.com/roffe/txlogger
 go 1.27.2
 
 //replace github.com/roffe/ecusymbol => ../ecusymbol
-replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20261116084458-c3a767d9b3a5
+replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20261116233411-e88bf9ac65eb
 
 //replace go.bug.st/serial => ../../../go.bug.st/serial
 
@@ -15,7 +15,7 @@ require (
 	github.com/ebitengine/oto/v3 v3.5.1
 	github.com/go-gl/gl v0.0.0-20260331235117-4566fea9a276
 	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.2
-	github.com/godbus/dbus/v5 v5.2.2
+	github.com/godbus/dbus/v5 v5.2.4
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/roffe/bdmtool/v3 v3.0.12-0.20261105233839-22e86f9d69e5
 	github.com/roffe/browse v0.0.0-20261004104941-eb6d091b1974
@@ -44,7 +44,7 @@ require (
 	github.com/fyne-io/oksvg v0.2.1-0.20260918172519-a9af55fa95d9 // indirect
 	github.com/go-text/render v0.2.1 // indirect
 	github.com/go-text/typesetting v0.3.5 // indirect
-	github.com/gogpu/naga v0.20.6-0.20261031111303-7e8984a54a3c // indirect
+	github.com/gogpu/naga v0.22.4 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/gotmc/libusb/v2 v2.6.0 // indirect
 	github.com/hack-pad/go-indexeddb v0.3.2 // indirect
@@ -56,14 +56,14 @@ require (
 	github.com/mdlayher/netlink v1.8.0 // indirect
 	github.com/mdlayher/socket v0.5.1 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
-	github.com/nicksnyder/go-i18n/v2 v2.6.1 // indirect
+	github.com/nicksnyder/go-i18n/v2 v2.7.0 // indirect
 	github.com/roffe/avrflash v0.0.0-20260923171743-6502105c9b8d // indirect
-	github.com/roffe/gowgpu v0.0.0-20261031111521-45c1d97b4093 // indirect
+	github.com/roffe/gowgpu v0.0.0-20261116233338-127a502404a1 // indirect
 	github.com/rymdport/portal v0.4.2 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/yeka/zip v0.0.0-20231116150916-03d6312748a9 // indirect
-	github.com/yuin/goldmark v1.8.6 // indirect
+	github.com/yuin/goldmark v1.8.7 // indirect
 	go.einride.tech/can v0.17.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.59.0 // indirect
