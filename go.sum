@@ -79,8 +79,8 @@ github.com/roffe/ecusymbol v1.3.0 h1:hyDEfkGF7xeSFDmSTb4IKPFhr8RX8TyGBnjKPsm67/s
 github.com/roffe/ecusymbol v1.3.0/go.mod h1:qoDxW9dTubPJZS4MF4o/aLiyR12Dr2g3a6jY2x/o5gI=
 github.com/roffe/fyne/v2 v2.0.0-20261116084458-c3a767d9b3a5 h1:qe7itdrn8UO6I+G63r1QtpH81gXsgPHXXLlscgG3z9g=
 github.com/roffe/fyne/v2 v2.0.0-20261116084458-c3a767d9b3a5/go.mod h1:6bO+4mpFQGjbJPfCTcRfCG+veqOxgEDR0ap5WJHHrFY=
-github.com/roffe/gocan/v2 v2.1.1-0.20261116201504-9cc79a556434 h1:wQYLybAHRAKao6ullkhd4FCHZfBGwQd1eaKQ8/mSrcY=
-github.com/roffe/gocan/v2 v2.1.1-0.20261116201504-9cc79a556434/go.mod h1:YDqeON1C2dXEvIyRzzpIafK2U5r0SQsOFutcoa9CQ/o=
+github.com/roffe/gocan/v2 v2.2.0 h1:Csf7LiFJuo71E6eheVgREHLE1xKbmGb+EnGNKSfr8/Y=
+github.com/roffe/gocan/v2 v2.2.0/go.mod h1:YDqeON1C2dXEvIyRzzpIafK2U5r0SQsOFutcoa9CQ/o=
 github.com/roffe/gowgpu v0.0.0-20261031111521-45c1d97b4093 h1:/YqxKbUpDX8Q5KP7raJrts2DFOGRQS9QkJZPpWicUdQ=
 github.com/roffe/gowgpu v0.0.0-20261031111521-45c1d97b4093/go.mod h1:XZJ7JoezQIPMmAJg19z/RDD5zYYQ659Uk43rxmWicF4=
 github.com/rymdport/portal v0.4.2 h1:7jKRSemwlTyVHHrTGgQg7gmNPJs88xkbKcIL3NlcmSU=
