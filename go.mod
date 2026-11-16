@@ -24,7 +24,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/yuin/gopher-lua v1.1.2
 	go.bug.st/serial v1.8.0
-	golang.org/x/image v0.47.0
+	golang.org/x/image v0.48.0
 	golang.org/x/mod v0.43.0
 	golang.org/x/sys v0.50.0
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.78
