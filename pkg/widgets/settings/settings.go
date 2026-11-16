@@ -63,7 +63,7 @@ type Widget struct {
 	debugCheckbox   *widget.Check
 	adapterSelector *widget.Select
 	refreshBtn      *widget.Button
-	portSelector    *widget.SelectEntry
+	portSelector    *portEntry
 	portDescription *widget.Label
 	speedSelector   *widget.Select
 	adapters        map[string]*gocan.AdapterInfo
@@ -181,8 +181,6 @@ func (sw *Widget) sortedAdapterNames() []string {
 
 // --- public API ------------------------------------------------------------
 
-var portCache = make(map[string]*enumerator.PortDetails)
-
 func (sw *Widget) ListPorts() []string {
 	ports, err := enumerator.GetDetailedPortsList()
 	if err != nil || len(ports) == 0 {
@@ -192,7 +190,6 @@ func (sw *Widget) ListPorts() []string {
 	for _, port := range ports {
 		// log.Println(port)
 		portsList = append(portsList, port.Name)
-		portCache[port.Name] = port
 	}
 	sort.Strings(portsList)
 	return portsList

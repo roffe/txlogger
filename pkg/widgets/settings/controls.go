@@ -168,25 +168,32 @@ func (sw *Widget) newAdapterSelector() *widget.Select {
 		if info.RequiresSerialPort {
 			sw.portSelector.Enable()
 			sw.speedSelector.Enable()
+			sw.showPortStatus()
 			return
 		}
-		sw.portDescription.SetText("")
 		sw.portSelector.Disable()
 		sw.speedSelector.Disable()
+		sw.showPortStatus()
 	})
 }
 
-func (sw *Widget) newPortSelector() *widget.SelectEntry {
-	sel := widget.NewSelectEntry(sw.ListPorts())
-	sel.OnChanged = func(s string) {
+func (sw *Widget) newPortSelector() *portEntry {
+	e := newPortEntry()
+	e.OnChanged = func(s string) {
 		prefPort.set(s)
-		if itm, ok := portCache[s]; ok {
-			sw.portDescription.SetText(itm.SerialNumber)
-		} else {
-			sw.portDescription.SetText("")
-		}
+		sw.showPortStatus()
 	}
-	return sel
+	return e
+}
+
+// showPortStatus fills the Info row with what is plugged into the port.
+func (sw *Widget) showPortStatus() {
+	text, importance := sw.portSelector.status()
+	if sw.portSelector.Disabled() {
+		text = ""
+	}
+	sw.portDescription.Importance = importance
+	sw.portDescription.SetText(text)
 }
 
 func (sw *Widget) newSpeedSelector() *widget.Select {
@@ -195,8 +202,8 @@ func (sw *Widget) newSpeedSelector() *widget.Select {
 
 func (sw *Widget) newPortRefreshButton() *widget.Button {
 	return widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
-		sw.portSelector.SetOptions(sw.ListPorts())
-		sw.portSelector.Refresh()
+		sw.portSelector.relist()
+		sw.showPortStatus()
 		sw.RefreshAdapters()
 	})
 }
