@@ -13,9 +13,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -59,9 +61,18 @@ const (
 
 var _ fyne.Widget = (*MatrixBuilder)(nil)
 
+// MapAxes holds the X and Y breakpoints of a map.
+type MapAxes struct {
+	X, Y []float64
+}
+
 type MatrixBuilder struct {
 	widget.BaseWidget
 	renderMode meshgrid.RenderBackend
+
+	// Maps returns the axes of the maps in the loaded binary, keyed by map
+	// name. It feeds the "Axes from map" menu.
+	Maps func() map[string]MapAxes
 
 	// values holds every series merged across all loaded log files. All series
 	// share the same length (nrecords); gaps are padded with NaN so samples
@@ -388,10 +399,16 @@ func (mb *MatrixBuilder) buildUI() {
 	mb.yBox = container.NewVBox()
 	mb.rebuildAxisEntries()
 
+	var axesBtn *widget.Button
+	axesBtn = widget.NewButtonWithIcon("Axes from map", theme.MenuDropDownIcon(), func() {
+		mb.showAxisMenu(axesBtn)
+	})
+
 	mb.controls = container.NewVBox(
 		// widget.NewLabelWithStyle("Series", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		colsRow,
 		rowsRow,
+		axesBtn,
 		widget.NewSeparator(),
 		labeled("X", mb.xSel),
 		labeled("Y", mb.ySel),
@@ -433,9 +450,10 @@ func (mb *MatrixBuilder) buildUI() {
 		container.NewBorder(
 			xPanel,
 			bottomBar,
-			container.NewVBox(
+			container.NewBorder(
 				widget.NewLabelWithStyle("Y axis values", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-				mb.yBox,
+				nil, nil, nil,
+				container.NewVScroll(mb.yBox),
 			),
 			nil,
 			mb.display,
@@ -989,6 +1007,61 @@ func (mb *MatrixBuilder) setRows(n int) {
 	mb.rowsLabel.SetText(strconv.Itoa(n))
 	mb.rebuildAxisEntries()
 	mb.rebuildDisplay()
+}
+
+// SetAxes replaces the X and Y breakpoints and resizes the matrix to fit them.
+func (mb *MatrixBuilder) SetAxes(x, y []float64) error {
+	if len(x) < minAxis || len(x) > maxAxis || len(y) < minAxis || len(y) > maxAxis {
+		return fmt.Errorf("axes are %dx%d, the matrix builder takes %d to %d breakpoints per axis", len(x), len(y), minAxis, maxAxis)
+	}
+	mb.cols, mb.rows = len(x), len(y)
+	mb.xAxis, mb.yAxis = slices.Clone(x), slices.Clone(y)
+	mb.zData = make([]float64, mb.cols*mb.rows)
+	mb.built = false
+	mb.colsLabel.SetText(strconv.Itoa(mb.cols))
+	mb.rowsLabel.SetText(strconv.Itoa(mb.rows))
+	mb.rebuildAxisEntries()
+	mb.rebuildDisplay()
+	return nil
+}
+
+// showAxisMenu pops up the maps of the loaded binary below anchor, grouped by
+// the part of the name before the dot. Picking one imports its axes.
+func (mb *MatrixBuilder) showAxisMenu(anchor fyne.CanvasObject) {
+	var axes map[string]MapAxes
+	if mb.Maps != nil {
+		axes = mb.Maps()
+	}
+	if len(axes) == 0 {
+		mb.status.SetText("Load a binary to take the axes from one of its maps")
+		return
+	}
+	var items []*fyne.MenuItem
+	groups := make(map[string]*fyne.MenuItem)
+	for _, name := range slices.Sorted(maps.Keys(axes)) {
+		item := fyne.NewMenuItem(name, func() {
+			if err := mb.SetAxes(axes[name].X, axes[name].Y); err != nil {
+				mb.status.SetText(err.Error())
+				return
+			}
+			mb.status.SetText("Axes from " + name)
+		})
+		prefix, _, ok := strings.Cut(name, ".")
+		if !ok {
+			items = append(items, item)
+			continue
+		}
+		g := groups[prefix]
+		if g == nil {
+			g = fyne.NewMenuItem(prefix, nil)
+			g.ChildMenu = fyne.NewMenu("")
+			groups[prefix] = g
+			items = append(items, g)
+		}
+		g.ChildMenu.Items = append(g.ChildMenu.Items, item)
+	}
+	c := fyne.CurrentApp().Driver().CanvasForObject(anchor)
+	widget.ShowPopUpMenuAtRelativePosition(fyne.NewMenu("", items...), c, fyne.NewPos(0, anchor.Size().Height), anchor)
 }
 
 // autoFill spreads the selected series' min..max evenly across the axis
