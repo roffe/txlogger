@@ -3,15 +3,15 @@ module github.com/roffe/txlogger
 go 1.27.2
 
 //replace github.com/roffe/ecusymbol => ../ecusymbol
-replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20261116233411-e88bf9ac65eb
+replace fyne.io/fyne/v2 => github.com/roffe/fyne/v2 v2.0.0-20261126185115-8006a7a6f08a
 
 //replace go.bug.st/serial => ../../../go.bug.st/serial
 
 require (
-	fyne.io/fyne/v2 v2.8.2
-	github.com/Microsoft/go-winio v0.6.3
+	fyne.io/fyne/v2 v2.8.3
+	github.com/Microsoft/go-winio v0.6.4
 	github.com/avast/retry-go/v4 v4.7.0
-	github.com/dweymouth/fyne-tooltip v0.4.0
+	github.com/dweymouth/fyne-tooltip v0.5.0
 	github.com/ebitengine/oto/v3 v3.5.1
 	github.com/go-gl/gl v0.0.0-20260331235117-4566fea9a276
 	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.2
@@ -38,7 +38,7 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
 	github.com/ebitengine/purego v0.11.3 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
-	github.com/fyne-io/gl-js v0.2.1-0.20260315212741-029c47fd27e8 // indirect
+	github.com/fyne-io/gl-js v0.2.1-0.20261121122654-840fe93a293a // indirect
 	github.com/fyne-io/glfw-js v0.4.0 // indirect
 	github.com/fyne-io/image v0.1.1 // indirect
 	github.com/fyne-io/oksvg v0.2.1-0.20260918172519-a9af55fa95d9 // indirect
